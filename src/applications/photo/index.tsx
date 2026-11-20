@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, Brush, Eraser, Crop, Move, SquareDashed, Lasso, Pipette, Hand, Stamp,
   Layers as LayersIcon, SlidersHorizontal, Images, Download, Circle, Undo2, Redo2,
@@ -194,6 +194,19 @@ function RasterEditor({ context, actions }: { context: ScreenContext; actions: A
   const { record, handle, bank } = usePhotoDoc(context);
   const ui = useStore(photoUi);
   const data = useHistogram(handle.doc, bank);
+  /* Opening an image whose active layer is an adjustment would greet the brush with "holds no pixels":
+     start on the top pixel layer instead (a view choice, so it makes no undo entry). */
+  const settledFor = useRef<string>();
+  useEffect(() => {
+    const open = handle.doc;
+    if (!open || !record || settledFor.current === record.id) return;
+    settledFor.current = record.id;
+    const active = layerById(open, open.activeLayerId);
+    if (active && active.kind !== "pixel") {
+      const top = [...open.layers].reverse().find((layer) => layer.kind === "pixel");
+      if (top) handle.live({ ...open, activeLayerId: top.id });
+    }
+  }, [handle, record]);
   if (!record) return <div className="pg-body"><MissingPhoto context={context} /></div>;
   const doc = handle.doc;
   const tab = context.tab;
@@ -1220,7 +1233,7 @@ function BulkImport({ context, close }: { context: ScreenContext; close: () => v
 function AssetDetail({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const record = useRecord(payload?.id ?? context.selectedId);
-  if (!record) return <Empty title="Select an image first" />;
+  if (!record) return <Notice tone="info" title="Select an image first">Pick an image in the library, then open its details.</Notice>;
   const doc = parsePhoto(record.body);
   return (
     <Stack gap={3}>
@@ -1269,7 +1282,7 @@ function LicencePanel({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const record = useRecord(payload?.id ?? context.selectedId);
   const [credit, setCredit] = useState("");
-  if (!record) return <Empty title="Select an image first" />;
+  if (!record) return <Notice tone="info" title="Select an image first">Pick an image in the library, then open its rights.</Notice>;
   const licence = String(record.fields.license ?? "Unknown");
   const saved = String(record.fields.credit ?? "not recorded");
   return (
@@ -1279,7 +1292,10 @@ function LicencePanel({ context }: { context: ScreenContext }) {
         <Select
           aria-label="Licence"
           value={licence}
-          onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, license: event.target.value } }, { event: `Licence set on ${record.title}` }); }}
+          onChange={async (event) => {
+            const saved = await context.mutate.patch(record.id, { fields: { ...record.fields, license: event.target.value } }, { expectRevision: record.revision, event: `Licence set on ${record.title}` });
+            if (!saved) context.toast("Licence not saved", "The record changed or could not be written. Reopen it and try again.", "failed");
+          }}
         >
           {LICENCES.map((option) => <option key={option}>{option}</option>)}
         </Select>
@@ -1289,7 +1305,11 @@ function LicencePanel({ context }: { context: ScreenContext }) {
       </OverlaySection>
       <DrawerActions>
         <OverlayActions
-          primary={<Button variant="primary" disabled={!credit.trim()} onClick={() => { void context.mutate.patch(record.id, { fields: { ...record.fields, credit: credit.trim() } }, { event: `Credit recorded on ${record.title}` }); setCredit(""); }}>Save the credit</Button>}
+          primary={<Button variant="primary" disabled={!credit.trim()} onClick={async () => {
+            const saved = await context.mutate.patch(record.id, { fields: { ...record.fields, credit: credit.trim() } }, { expectRevision: record.revision, event: `Credit recorded on ${record.title}` });
+            if (saved) { setCredit(""); context.toast("Credit saved", `${record.title}: ${credit.trim()}`); }
+            else context.toast("Credit not saved", "The record changed or could not be written. Your text is kept; try again.", "failed");
+          }}>Save the credit</Button>}
           end={<OverlayCancel>Close</OverlayCancel>}
         />
       </DrawerActions>
@@ -2288,8 +2308,11 @@ function LayerPropertiesOverlay({ context }: { context: ScreenContext }) {
 
 function RightsOverlay({ context }: { context: ScreenContext }) {
   const { record, handle } = usePhotoDoc(context);
+  const [credit, setCredit] = useState<string | null>(null);
   if (!record || !handle.doc) return <Empty title="Open an image first" />;
   const doc = handle.doc;
+  const draft = credit ?? doc.rights.credit;
+  const dirty = draft.trim() !== doc.rights.credit && draft.trim() !== "";
   return (
     <Stack gap={3}>
       {doc.rights.license === "Unknown" && <Notice tone="danger" title="Do not publish">Resolve the licence before this image leaves the workspace.</Notice>}
@@ -2298,9 +2321,15 @@ function RightsOverlay({ context }: { context: ScreenContext }) {
           {LICENCES.map((option) => <option key={option}>{option}</option>)}
         </Select>
       </OverlaySection>
-      <OverlaySection title="Credit">
-        <TextInput aria-label="Credit" value={doc.rights.credit} onChange={(event) => handle.edit((current) => ({ ...current, rights: { ...current.rights, credit: event.target.value } }), "Change the credit")} />
+      <OverlaySection title="Credit" hint={`Now: ${doc.rights.credit}`}>
+        <TextInput aria-label="Credit" value={draft} onChange={(event) => setCredit(event.target.value)} />
       </OverlaySection>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={!dirty} onClick={() => { handle.edit((current) => ({ ...current, rights: { ...current.rights, credit: draft.trim() } }), "Change the credit"); setCredit(null); context.toast("Credit saved", draft.trim()); }}>Save the credit</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }

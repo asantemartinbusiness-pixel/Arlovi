@@ -1730,6 +1730,7 @@ function MediaImport({ context, close }: { context: ScreenContext; close: () => 
 function ClipProperty({ context }: { context: ScreenContext }) {
   const { record, handle } = useVideoDoc(context);
   if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  if (!handle.doc.clips.some((item) => item.id === videoUi.get().selectedClipId)) return <Notice tone="info" title="Select a clip">Click a clip on the timeline, then open its properties.</Notice>;
   return <ClipPanel handle={handle} context={context} inOverlay />;
 }
 

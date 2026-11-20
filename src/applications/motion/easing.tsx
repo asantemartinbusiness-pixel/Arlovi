@@ -350,7 +350,9 @@ export function CurveEditor({ close }: { close: () => void }) {
     <Stack gap={3}>
       <p className="vx-mini">{found.layer.name} · {PROPERTY_LABEL[found.property]} from <span className="ds-num">{found.keyframe.t.toFixed(2)}s</span>{found.next ? <> to <span className="ds-num">{found.next.t.toFixed(2)}s</span></> : " (last keyframe: its easing has no effect until another follows)"}. Drag a handle or focus it and use the arrow keys.</p>
       {found.keyframe.easing.kind !== "bezier" && <Notice tone="info" title={`Currently ${found.keyframe.easing.kind}`}>Saving replaces it with the bezier curve below.</Notice>}
-      <EasingGraph easing={easing} size={260} onChange={setDraft} label="Curve being edited" />
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ flex: "0 0 auto" }}><EasingGraph easing={easing} size={170} onChange={setDraft} label="Curve being edited" /></div>
+        <Stack gap={2} style={{ flex: "1 1 200px", minWidth: 0 }}>
       <div className="vx-fieldrow">
         {(["x1", "y1", "x2", "y2"] as const).map((name, index) => (
           <NumberBox key={name} label={name} value={points[index]} step={0.01} onChange={(next) => {
@@ -363,6 +365,8 @@ export function CurveEditor({ close }: { close: () => void }) {
       <Row gap={1} wrap>
         {EASING_PRESETS.filter((preset) => preset.easing.kind === "bezier").map((preset) => <Button key={preset.id} size="sm" variant="ghost" onClick={() => setDraft(preset.easing)}>{preset.name}</Button>)}
       </Row>
+        </Stack>
+      </div>
       <code className="ds-num vx-mini">cubic-bezier({points.join(", ")})</code>
       <ModalActions><OverlayActions primary={<Button variant="primary" onClick={() => { handle.edit((current) => setEasing(current, found.layer.id, found.property, found.keyframe.id, easing), "Edit the easing curve"); close(); }}>Save the curve</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>

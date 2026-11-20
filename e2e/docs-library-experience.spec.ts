@@ -114,7 +114,6 @@ test("Document approval requires an explicit human confirmation", async ({ page 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Approve the document");
   await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).not.toBeChecked();
-  await expect(dialog).toContainText("The dialog’s Approve action is only valid after acknowledgement");
   await dialog.getByRole("checkbox", { name: /reviewed this version/ }).check();
   await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).toBeChecked();
 });

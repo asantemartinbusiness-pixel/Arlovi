@@ -629,7 +629,9 @@ export function KeyframeEditor({ close }: { close: () => void }) {
       </FormField>
       {easing.kind === "bezier" && (
         <>
-          <EasingGraph easing={easing} size={220} onChange={setEasingDraft} label="Keyframe easing" />
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <div style={{ flex: "0 0 auto" }}><EasingGraph easing={easing} size={170} onChange={setEasingDraft} label="Keyframe easing" /></div>
+          <Stack gap={2} style={{ flex: "1 1 200px", minWidth: 0 }}>
           <div className="vx-fieldrow">
             {(["x1", "y1", "x2", "y2"] as const).map((name, index) => (
               <NumberBox key={name} label={name} value={points[index]} step={0.01} onChange={(next) => {
@@ -640,6 +642,8 @@ export function KeyframeEditor({ close }: { close: () => void }) {
             ))}
           </div>
           <code className="ds-num vx-mini">cubic-bezier({points.join(", ")})</code>
+          </Stack>
+          </div>
         </>
       )}
       {easing.kind === "spring" && (
