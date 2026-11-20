@@ -11,7 +11,7 @@ import { freshness, wallMs } from "@/platform/clock";
 import { CapabilityLine, DiagramToggle } from "@/applications/t2_shared/pieces";
 import { usePanelFlags } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
-import { commitTogether, type TogetherChange } from "@/applications/shared/commit";
+import { commitTogether, type TogetherChange } from "@/platform/commit";
 import { internalPeople } from "./people";
 import { KnowledgeWorkspace } from "./knowledge/Workspace";
 import { KNOWLEDGE } from "./knowledge/model";

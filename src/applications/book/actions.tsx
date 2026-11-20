@@ -10,7 +10,7 @@ import { useUi } from "@/runtime/ui";
 import type { Rec } from "@/domain/types";
 import { documentTotals, statusFor, writeLines } from "@/domain/fin-invoice";
 import type { TaxCategory } from "@/platform/money";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import { CHANGED_ELSEWHERE, createStore, downloadCsv, ProviderBoundary, type ConfirmSpec } from "@/applications/market/kit";
 import {
   bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isLive, useBookData,

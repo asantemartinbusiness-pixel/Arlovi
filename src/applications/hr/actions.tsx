@@ -15,7 +15,7 @@ import { knownRecord, newRecord } from "@/platform/repo";
 import { planShiftSwap, planTimesheetApprovals } from "./workforce";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
 /* ------------------------------------------------------------------ *

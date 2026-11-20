@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { ConflictError } from "@/platform/repo";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import { rescindQueuedGrants } from "@/applications/hr/actions";
 import { saveSite, useWebUi } from "@/applications/web/state";
 

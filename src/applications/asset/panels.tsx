@@ -6,7 +6,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { clockIso } from "@/platform/clock";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import { csvList, licence, type LicenceState } from "./library-model";
 import type { Rec } from "@/domain/types";
 import { AssetPreview, AssetViewer, FileStateTag, assetPreviewUri, fileState, palette, storedBytes, uploadedFileName } from "./thumbs";

@@ -7,7 +7,7 @@ import { can as roleCan, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
 import { useInboxData } from "./engine";
 import { clockIso } from "@/platform/clock";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 
 /* ====================================================================== *
  * Inbox contract actions that change the record they name.

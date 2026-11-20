@@ -256,3 +256,13 @@ Summary of the 11: 2 `regression introduced by the programme` (header-context-sa
 | 9 | switching company | asserts "No language model is connected. Answers come from records in Harbor Supply, not from an AI model" | spec stale | pass |
 
 Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint clean; tsc 0 errors; registry-contract 4/4.
+
+## Hardening (after the CI fixes)
+
+- `commitTogether` moved to `src/platform/commit.ts`; all 15 importers and the write-integrity unit test point there.
+- ESLint `no-restricted-syntax` now rejects `await …mutate.patch(...)` as a bare statement. It found 6 remaining unchecked writes, all fixed:
+  analytics dashboard and report layout writes (toast when refused), asset tag editor (typed tags restored when refused),
+  automation resume (revision re-checked before any write is reapplied; a refused outcome write stops the success toast),
+  automation last-run summary (stated when not updated), inbox approval rollback (says when the target could not be reset).
+- WF-16 expectation aligned with the B7 record header (h1 is the portal name).
+- Re-runs: typecheck 0, lint 0, vitest 829/829, analytics/automation/asset/workflow specs 34/34 with journeys 24/24.

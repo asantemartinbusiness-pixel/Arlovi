@@ -137,6 +137,16 @@ export interface ExecuteOutcome {
 export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcome> {
   const { context, workflow, graph, pool, mode, trigger } = options;
   const resumeStored = options.resumeRun ? readRun(options.resumeRun) : undefined;
+  if (options.resumeRun) {
+    /* A run continued elsewhere since this view loaded must not be resumed
+       twice: its writes would be applied again. */
+    const current = await getRecordInOrg(context.org.id, options.resumeRun.id);
+    if (!current || current.revision !== options.resumeRun.revision) {
+      const reason = "This run changed elsewhere since it was opened. Reload it before deciding.";
+      context.toast("Run not continued", reason, "blocked");
+      throw new LiveRunRefused(reason);
+    }
+  }
   if (mode === "live") {
     const reason = await storedLiveRunBlocker(context, workflow.id);
     if (reason) {
@@ -192,12 +202,17 @@ export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcom
   let runId: string;
   if (options.resumeRun) {
     runId = options.resumeRun.id;
-    await context.mutate.patch(options.resumeRun.id, {
+    const saved = await context.mutate.patch(options.resumeRun.id, {
       status: run.status,
       summary: run.message,
       fields: { ...options.resumeRun.fields, ...fields },
       body: stored,
     }, { expectRevision: options.resumeRun.revision, event: `Run resumed and finished as ${run.status}` });
+    if (!saved) {
+      const reason = "The run record changed while it was continuing, so its outcome was not stored. Reload the run and check its writes before acting again.";
+      context.toast("Run outcome not stored", reason, "blocked");
+      throw new LiveRunRefused(reason);
+    }
   } else {
     const created = await context.mutate.create({
       collection: "workflowRuns",
@@ -213,7 +228,7 @@ export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcom
   }
 
   if (mode === "live") {
-    await context.mutate.patch(workflow.id, {
+    const noted = await context.mutate.patch(workflow.id, {
       fields: {
         ...workflow.fields,
         lastRunAt: run.startedAt,
@@ -221,6 +236,7 @@ export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcom
         lastRunId: runId,
       },
     }, { event: `Last run recorded as ${run.status}` });
+    if (!noted) context.toast("Workflow summary not updated", "The run is stored, but the workflow's last-run fields were not changed.", "info");
   }
 
   return { run, runId, writesApplied };

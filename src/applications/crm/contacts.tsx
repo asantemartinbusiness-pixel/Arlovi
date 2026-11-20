@@ -20,7 +20,7 @@ import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, consentLabel, Money, StagePill } from "./parts";
 import { MergeGroups } from "./actions";
 import { clockIso } from "@/platform/clock";
-import { commitTogether, type TogetherChange } from "@/applications/shared/commit";
+import { commitTogether, type TogetherChange } from "@/platform/commit";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { accountHref } from "./account";
 

@@ -1207,7 +1207,7 @@ test("WF-16 External client collaboration: scoped portal, invitation at the boun
   await shows(page, /Harrow House Interiors[^]*Inherits internal access\s*NO/);
 
   // Portal invitation: scoped to this portal alone, the email stays a local draft.
-  await open(page, "/portal/portals/nl-portals-001/admin", "Access and analytics");
+  await open(page, "/portal/portals/nl-portals-001/admin", "Harrow House Interiors");
   await action(page, "Invite someone");
   await expect(dialog(page).getByText("An invitation grants nothing beyond this portal")).toBeVisible();
   await dialog(page).getByLabel("Name").fill("Ines Harrow");

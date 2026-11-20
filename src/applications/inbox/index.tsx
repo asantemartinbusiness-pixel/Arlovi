@@ -1088,8 +1088,10 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
         fields: { ...record!.fields, decision: "approved", decidedBy: actor, decidedPlanVersion: planVersion },
       }, { event: `Approved ${record!.title} at plan version ${planVersion}`, expectRevision: record!.revision });
       if (!saved) {
-        if (target) await context.mutate.patch(target.id, { fields: { ...target.fields } }, { event: `Approval withdrawn from ${target.title}: the request changed` });
-        context.toast("Not approved", "The request changed while you were confirming. Reopen it and review it again.", "blocked");
+        const withdrawn = target ? await context.mutate.patch(target.id, { fields: { ...target.fields } }, { event: `Approval withdrawn from ${target.title}: the request changed` }) : true;
+        context.toast("Not approved", withdrawn
+          ? "The request changed while you were confirming. Reopen it and review it again."
+          : `The request changed while you were confirming, and ${target!.title} could not be reset. Check it before reopening the request.`, "blocked");
         return;
       }
       await context.mutate.log(`Step-up confirmation entered for ${record!.title}. Local confirmation only.`, { entityId: record!.id, type: "approval.step_up", capability: "ready_local" });

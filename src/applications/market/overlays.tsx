@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import {
   Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Meter, Notice, OverlayActions, OverlayCancel,
   ModalActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,

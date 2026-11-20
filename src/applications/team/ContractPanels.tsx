@@ -11,7 +11,7 @@ import {
   contractProblems, executionAvailability, normaliseScopeId, requiresReauthorisation,
   type ApprovalLevel, type ContractDraft, type ScopeAccess, type ToolScope,
 } from "./contract";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import "./team-contract.css";
 
 /* ====================================================================== *

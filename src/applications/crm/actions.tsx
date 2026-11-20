@@ -13,7 +13,7 @@ import { CapabilityNotice, ConsentPill, Money, StagePill, isExpired } from "./pa
 import { quoteTotals } from "./quotes";
 import { duplicateQuoteBody, fieldsForQuoteDuplicate } from "./quoteEvidence";
 import { clockIso } from "@/platform/clock";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 
 /* ====================================================================== *
  * CRM contract actions that perform the named operation. Each writes the

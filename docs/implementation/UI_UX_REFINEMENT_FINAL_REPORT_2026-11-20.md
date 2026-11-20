@@ -62,7 +62,7 @@ plus repository-wide integrity passes.
 
 - Repository-wide sweep: about 255 write handlers that ignored a revision-conflict result before a
   success message now check it; 49 busy flags reset in `finally`; 11 multi-record writes converted to
-  one `commitTogether` transaction (`src/applications/shared/commit.ts`), plus the per-package fixes
+  one `commitTogether` transaction (`src/platform/commit.ts`), plus the per-package fixes
   (Finance 27, Procurement/Commerce 29, Care/Portal/Asset 49, Team/Mission 37, AI/Brain 49,
   Automation/Analytics all).
 - Selection-guard sweep: 24 overlays that rendered their own "select something first" state while
@@ -115,5 +115,5 @@ plus repository-wide integrity passes.
    CRM deals, People employee profile and the Docs editor.
 2. Enrich seeds (campaign touches on orders, a deposit-bearing booking, a pixel-layer default in the
    sample photo) so the enhanced panels show their full behaviour out of the box.
-3. Promote `commitTogether` into `src/platform` and lint for ignored write results so the integrity
-   pattern cannot regress.
+3. Done after the report: `commitTogether` now lives in `src/platform/commit.ts`, and lint rejects an
+   ignored `mutate.patch` result (6 remaining cases fixed; see `GATES.md`, "Hardening").

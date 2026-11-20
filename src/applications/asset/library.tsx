@@ -727,8 +727,10 @@ export function AssetEditor({ context, close }: { context: ScreenContext; close:
 
 export function TagEditor({ context, record }: { context: ScreenContext; record: Rec }) {
   const [value, setValue] = useState("");
-  async function save(tags: string[], message: string) {
-    await context.mutate.patch(record.id, { tags }, { event: message, expectRevision: record.revision });
+  async function save(tags: string[], message: string, typed?: string) {
+    const saved = await context.mutate.patch(record.id, { tags }, { event: message, expectRevision: record.revision });
+    // Refused: give the typed tags back so nothing the person entered is lost.
+    if (!saved && typed !== undefined) setValue(typed);
   }
   return (
     <Stack gap={2}>
@@ -746,8 +748,9 @@ export function TagEditor({ context, record }: { context: ScreenContext; record:
           event.preventDefault();
           const tags = parseTags(value);
           if (!tags.length) return;
+          const typed = value;
           setValue("");
-          void save(addTags(record.tags, tags), `Tagged ${record.title}: ${tags.join(", ")}`);
+          void save(addTags(record.tags, tags), `Tagged ${record.title}: ${tags.join(", ")}`, typed);
         }}
       >
         <Row gap={2}>

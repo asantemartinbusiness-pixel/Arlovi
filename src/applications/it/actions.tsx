@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { Siren } from "lucide-react";
 import { Button, Empty, FactGrid, Field, KeyValueList, Notice, OverlayActions, Pill, Row, Select, Stack } from "@/design-system";

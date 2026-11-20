@@ -15,7 +15,7 @@ import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
 import { AssignmentHistory, ContractEditor, ExecutionAvailabilityCard } from "./ContractPanels";
 import { AgentOverviewCard } from "./AgentOverviewCard";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import { AgentTeamForm, AgentTeamsOrgCard, AgentTeamsSection } from "./AgentTeamsPanels";
 
 /* ====================================================================== *

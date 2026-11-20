@@ -248,7 +248,8 @@ function DashboardEditorBody({ context }: { context: ScreenContext }) {
   const selected = body.tiles.find((tile) => tile.id === context.selectedId) ?? body.tiles[0];
 
   async function write(next: DashboardBody, event: string) {
-    await context.mutate.patch(record!.id, { body: next }, { event });
+    const saved = await context.mutate.patch(record!.id, { body: next }, { event });
+    if (!saved) context.toast("Change not saved", "The layout shows the stored version again.", "blocked");
   }
 
   function patchTile(id: string, patch: Partial<Tile>, event: string) {

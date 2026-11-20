@@ -6,7 +6,7 @@ import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { clausesOf, lifecycleLabel, type Clause } from "./panels";
 import { clockIso } from "@/platform/clock";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 export { RecordReview } from "./review";
 
 /* ------------------------------------------------------------------ *

@@ -17,7 +17,7 @@ import {
 } from "./interpreter";
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 
 import { ExecutionStatusCard, MilestoneTimeline, MilestonesCard, MissionBriefCard, ParticipantsPanel } from "./BriefPanels";
 import { TaskSchedule } from "./TaskSchedule";

@@ -1,5 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { commitTogether } from "@/applications/shared/commit";
+import { commitTogether } from "@/platform/commit";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Notice, Pill, Row, Select, Stack, TextArea, TextInput,

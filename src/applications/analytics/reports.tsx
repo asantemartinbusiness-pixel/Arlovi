@@ -144,7 +144,8 @@ export function ReportBuilder({ context }: { context: ScreenContext }) {
   const blockers = checks.filter((check) => !check.ok);
 
   async function write(next: ReportBody, event: string) {
-    await context.mutate.patch(record!.id, { body: next }, { event });
+    const saved = await context.mutate.patch(record!.id, { body: next }, { event });
+    if (!saved) context.toast("Change not saved", "The layout shows the stored version again.", "blocked");
   }
   function patchBlock(id: string, patch: Partial<ReportBlock>, event: string) {
     void write({ ...body, blocks: body.blocks.map((block) => (block.id === id ? { ...block, ...patch } : block)) }, event);

@@ -35,6 +35,13 @@ export default tseslint.config(
           selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
           message: "Use clockNow() for the workspace time, or wallMs() for ids and elapsed time, from @/platform/clock.",
         },
+        {
+          /* A revision-checked patch resolves to null when the record changed
+             elsewhere. Awaiting it as a bare statement drops that result, so a
+             success message can follow a write that never happened. */
+          selector: "ExpressionStatement > AwaitExpression > CallExpression[callee.property.name='patch'][callee.object.property.name='mutate']",
+          message: "Check the result of mutate.patch (null means the record changed elsewhere) before reporting success.",
+        },
       ],
     },
   },
