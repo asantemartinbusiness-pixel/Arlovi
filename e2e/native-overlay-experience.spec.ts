@@ -29,7 +29,8 @@ test("an unselected automation cannot activate an arbitrary first workflow", asy
 });
 
 test("cancelling an edited receipt asks whether to discard changes", async ({ page }) => {
-  await page.goto("/o/northline/fin/invoices/nl-invoices-001?overlay=payment%20form");
+  // nl-invoices-002 is issued with a balance outstanding; the paid invoice nl-invoices-001 now leads with the blocked state and shows no fields.
+  await page.goto("/o/northline/fin/invoices/nl-invoices-002?overlay=payment%20form");
   const dialog = page.getByRole("dialog", { name: "Record a payment" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("textbox", { name: "Amount received" }).fill("1.00");

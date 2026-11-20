@@ -1162,7 +1162,7 @@ export const projectApp = registerApp({
       overlays: [
         { id: "link project", kind: "modal", title: "Link projects to this objective", width: 520, render: ({ close, ...context }) => <LinkProject context={context} close={close} /> },
         { id: "Metric source", kind: "drawer", title: "Where this number comes from", width: 520, render: ({ ...context }) => <MetricSource context={context} /> },
-        { id: "check-in dialog", kind: "modal", title: "Check in", width: 540, render: ({ close, ...context }) => <CheckInDialog context={context} close={close} />, footer: submitFooter("pj-checkin", "Record check-in") },
+        { id: "check-in dialog", kind: "modal", title: "Check in", width: 540, presentation: { selectedRecord: true, collection: "objectives", noRecordContext: true }, render: ({ close, ...context }) => <CheckInDialog context={context} close={close} />, footer: submitFooter("pj-checkin", "Record check-in") },
         { id: "goal revision", kind: "modal", title: "Objective", width: 560, render: ({ close, ...context }) => <GoalRevision context={context} close={close} />, footer: submitFooter("pj-goal", "Save objective") },
       ],
     },

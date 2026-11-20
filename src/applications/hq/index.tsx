@@ -1512,7 +1512,7 @@ export const hqApp = registerApp({
       ],
       overlays: [
         { id: "Member inspector", kind: "drawer", title: "Member", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <MemberSummary context={context} />, render: ({ ...context }) => <MemberInspector context={context} /> },
-        { id: "change manager", kind: "modal", title: "Change reporting line", width: 480, render: ({ close, ...context }) => <ChangeManager context={context} close={close} />, footer: submitFooter("change-manager", "Apply change") },
+        { id: "change manager", kind: "modal", title: "Change reporting line", width: 480, presentation: { selectedRecord: true, collection: "members", noRecordContext: true }, render: ({ close, ...context }) => <ChangeManager context={context} close={close} />, footer: submitFooter("change-manager", "Apply change") },
         { id: "impact confirmation", kind: "modal", title: "Confirm the change", tone: "danger", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ close }) => (
           <Stack gap={3}>
             <p>Changing a reporting line changes what the chart and department views show. Assigned work stays with the member.</p>

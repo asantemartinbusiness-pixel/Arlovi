@@ -655,7 +655,7 @@ export const hrApp = registerApp({
       ],
       overlays: [
         ...kitOverlays,
-        { id: "Shift edit", kind: "modal", title: "Shift", width: 520, render: ({ close, ...context }) => <ShiftEdit context={context} close={close} />, footer: submitFooter("hr-shift", "Save shift") },
+        { id: "Shift edit", kind: "modal", title: "Shift", width: 520, presentation: { selectedRecord: true, collection: "shifts", noRecordContext: true }, render: ({ close, ...context }) => <ShiftEdit context={context} close={close} />, footer: submitFooter("hr-shift", "Save shift") },
         { id: "time review", kind: "drawer", title: "Review recorded time", width: 560, render: ({ close, ...context }) => <TimeReview context={context} close={close} /> },
         { id: "time correction", kind: "modal", title: "Correct a time entry", width: 520, render: ({ close, ...context }) => <TimeCorrection context={context} close={close} />, footer: submitFooter("hr-time-correction", "Save the correction") },
         { id: "export hours", kind: "modal", title: "Export hours", width: 520, render: ({ ...context }) => <ExportHours context={context} /> },

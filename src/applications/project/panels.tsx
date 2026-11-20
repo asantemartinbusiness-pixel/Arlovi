@@ -1432,7 +1432,7 @@ export function CheckInDialog({ context, close }: { context: ScreenContext; clos
   const objective = useRecord(payload?.id ?? context.selectedId);
   const [value, setValue] = useState("");
   const [note, setNote] = useState("");
-  if (!objective) return <Empty title="Select an objective" />;
+  if (!objective) return <Empty title="Objective not found" />;
   return (
     <form
       id="pj-checkin"

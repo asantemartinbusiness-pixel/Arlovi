@@ -170,7 +170,7 @@ export const procApp = registerApp({
         { id: "Requisition", kind: "drawer", title: "Requisition review", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
         { id: "budget check", kind: "drawer", title: "Budget and limits", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <BudgetCheck context={context} /> },
         { id: "quote comparison", kind: "drawer", title: "Supplier quotes", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <QuoteComparison context={context} /> },
-        { id: "rejection reason", kind: "modal", title: "Reject with a reason", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RejectRequisition context={context} close={close} />, footer: procFooter("reject-requisition", "Reject requisition", { tone: "danger" }) },
+        { id: "rejection reason", kind: "modal", title: "Reject with a reason", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "purchaseOrders", noRecordContext: true }, render: ({ close, ...context }) => <RejectRequisition context={context} close={close} />, footer: procFooter("reject-requisition", "Reject requisition", { tone: "danger" }) },
         { id: "PO editor", kind: "drawer", title: "Purchase order", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <PoEditor context={context} close={close} />, footer: procFooter("po-editor", "Save order") },
       ],
     },

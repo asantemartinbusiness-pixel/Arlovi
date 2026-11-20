@@ -11,6 +11,7 @@ import { freshness, wallMs } from "@/platform/clock";
 import { CapabilityLine, DiagramToggle } from "@/applications/t2_shared/pieces";
 import { usePanelFlags } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
+import { commitTogether, type TogetherChange } from "@/applications/shared/commit";
 import { internalPeople } from "./people";
 import { KnowledgeWorkspace } from "./knowledge/Workspace";
 import { KNOWLEDGE } from "./knowledge/model";
@@ -1844,23 +1845,25 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
               disabled={ledger || options.length === 0 || !chosen || !reason.trim()}
               onClick={async () => {
                 const option = options.find((item) => item.id === chosen);
-                if (!(await context.mutate.patch(conflict.id, {
-                  status: "resolved",
-                  fields: { ...conflict.fields, chosen: option?.factId ?? chosen, resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason },
-                }, { expectRevision: conflict.revision, event: `${conflict.title} resolved by ${context.actor}` }))) return;
-                let followed = true;
+                const changes: TogetherChange[] = [{
+                  record: conflict,
+                  patch: { status: "resolved", fields: { ...conflict.fields, chosen: option?.factId ?? chosen, resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason } },
+                  event: `${conflict.title} resolved by ${context.actor}`,
+                }];
                 for (const candidate of options) {
                   const fact = data.facts.find((item) => item.id === candidate.factId);
                   if (!fact) continue;
                   const verdict = candidate.id === chosen;
-                  const saved = await context.mutate.patch(fact.id, verdict
-                    ? { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }
-                    : { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor, rejectedBecause: reason } },
-                  { expectRevision: fact.revision, event: verdict ? `${fact.title} became the source of truth` : `${fact.title} rejected in favour of another source` });
-                  if (!saved) followed = false;
+                  changes.push({
+                    record: fact,
+                    patch: verdict
+                      ? { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }
+                      : { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor, rejectedBecause: reason } },
+                    event: verdict ? `${fact.title} became the source of truth` : `${fact.title} rejected in favour of another source`,
+                  });
                 }
-                if (followed) context.toast("Conflict resolved", "The chosen assertion is current; the other stays on the record as rejected evidence.");
-                else context.toast("Resolution recorded, assertions not all updated", "One assertion changed elsewhere. Check both in the fact registry.", "blocked");
+                if (!(await commitTogether(context, changes))) return;
+                context.toast("Conflict resolved", "The chosen assertion is current; the other stays on the record as rejected evidence.");
                 close();
               }}
             >
@@ -2641,7 +2644,7 @@ export const brainApp = registerApp({
         { id: "Entity inspector", kind: "drawer", title: "Entity", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <EntityInspector context={context} /> },
         { id: "merge preview", kind: "modal", title: "Review a merge", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
         { id: "split record", kind: "modal", title: "Split a merged record", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SplitRecord context={context} close={close} /> },
-        { id: "relationship editor", kind: "modal", title: "Relationship", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RelationshipEditor context={context} close={close} />, footer: submitFooter("relationship-editor", "Save relationship") },
+        { id: "relationship editor", kind: "modal", title: "Relationship", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "graphLinks", noRecordContext: true }, render: ({ close, ...context }) => <RelationshipEditor context={context} close={close} />, footer: submitFooter("relationship-editor", "Save relationship") },
       ],
     },
 
@@ -2664,6 +2667,7 @@ export const brainApp = registerApp({
         { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Assertion" />, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
         {
           id: "verification dialog", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Set an expiry" : "Verify an assertion"), width: OVERLAY_WIDTH.modal,
+          presentation: { selectedRecord: true, collection: "facts", noRecordContext: true },
           summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Assertion" />,
           render: ({ close, ...context }) => <VerificationDialog context={context} close={close} />,
           footer: ({ close, ...context }) => submitFooter("verification", (context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Record the expiry" : "Record the verification")({ close }),
@@ -2707,7 +2711,7 @@ export const brainApp = registerApp({
       overlays: [
         { id: "Decision draft", kind: "modal", title: "Record a decision", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DecisionDraft context={context} close={close} />, footer: submitFooter("decision-draft", "Record decision") },
         { id: "approval detail", kind: "drawer", title: "Decision", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <DecisionSummary context={context} />, render: ({ ...context }) => <ApprovalDetail context={context} /> },
-        { id: "impact review", kind: "modal", title: "Supersede this decision", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImpactReview context={context} close={close} />, footer: submitFooter("impact-review", "Supersede") },
+        { id: "impact review", kind: "modal", title: "Supersede this decision", width: OVERLAY_WIDTH.modal, presentation: { selectedRecord: true, collection: "decisions", noRecordContext: true }, render: ({ close, ...context }) => <ImpactReview context={context} close={close} />, footer: submitFooter("impact-review", "Supersede") },
       ],
     },
 

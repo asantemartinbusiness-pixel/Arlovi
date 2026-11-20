@@ -187,7 +187,7 @@ export function RejectRequisition({ context, close }: { context: ScreenContext; 
   const payload = context.overlayPayload as { id?: string } | undefined;
   const requisition = useRecord(payload?.id ?? context.selectedId);
   const [reason, setReason] = useState("");
-  if (!requisition) return <Empty title="Select a requisition" />;
+  if (!requisition) return <Empty title="Requisition not found" />;
   const allowed = context.can("approve_payment") || context.role === "owner";
   const pending = requisition.status === "awaiting_approval";
   return (
