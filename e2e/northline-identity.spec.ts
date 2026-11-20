@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("Northline flagship uses the supplied paper-acid type and colour system", async ({page})=>{
   await page.setViewportSize({width:1440,height:900});
-  await page.goto("/northline-collective/");
+  await page.goto("/northline-collective/index.html");
   const hero=page.locator(".hero");
   const art=page.locator(".hero-cover-art");
   await expect(page.getByRole("heading",{name:/Material.*Space.*Experience/})).toBeVisible();
@@ -27,7 +27,7 @@ test("Northline flagship uses the supplied paper-acid type and colour system", a
 for(const width of [390,820,1440]){
   test("Northline site reflows cleanly at "+width+"px",async ({page})=>{
     await page.setViewportSize({width,height:900});
-    await page.goto("/northline-collective/");
+    await page.goto("/northline-collective/index.html");
     await expect(page.locator(".hero-cover-art")).toBeVisible();
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
@@ -58,7 +58,7 @@ test("original 60-second motion study supports chapter selection, scrub, restart
 });
 
 test("native Northline hub points to the authored film and respects paper-acid visuals",async ({page})=>{
-  await page.goto("/o/northline/workspace/showcase");
+  await page.goto("/o/collective/workspace/showcase");
   const link=page.getByRole("link",{name:/Watch original motion study/});
   await expect(link).toHaveAttribute("href","/northline-collective/film.html");
   const hero=page.locator(".fs-hero");
