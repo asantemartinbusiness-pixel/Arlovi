@@ -11,7 +11,7 @@ import { useCollection, useEvents, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { assessRetry, RUN_STATUS_LABELS, type RunStatus, type StoredRun } from "./engine";
 import { JsonBlock, ReplayPlan, RunBindings, RunHeadline, RunTimeline, StepTrace, readRun } from "./panels";
-import { executeRun, useGraphRecords } from "./runner";
+import { executeRun, useGraphRecords, LiveRunRefused, useLiveRunBlocker } from "./runner";
 
 export type RunTab = "All" | "Running" | "Failed" | "Completed" | "Waiting";
 
@@ -213,7 +213,9 @@ export function RetrySafetyCheck({ context, close }: { context: ScreenContext; c
                   context.toast("Retried", `${outcome.run.status.replace(/_/g, " ")} after ${outcome.run.steps.length} steps. The new run is recorded separately.`);
                   context.navigate(`/o/${context.org.slug}/auto/runs/${outcome.runId}`);
                   close();
-                } finally {
+                } catch (error) {
+ if (!(error instanceof LiveRunRefused)) throw error;
+ } finally {
                   setBusy(false);
                 }
               }}
@@ -499,7 +501,9 @@ export function RunDetail({ context }: { context: ScreenContext }) {
                         resumeRun: run,
                       });
                       context.toast("Approved", `The run continued and finished as ${outcome.run.status.replace(/_/g, " ")} after ${outcome.run.steps.length} steps.`);
-                    } finally {
+                    } catch (error) {
+ if (!(error instanceof LiveRunRefused)) throw error;
+ } finally {
                       setBusy(false);
                     }
                   }}
@@ -522,7 +526,9 @@ export function RunDetail({ context }: { context: ScreenContext }) {
                         resumeRun: run,
                       });
                       context.toast("Rejected", `The run took the rejected branch and finished as ${outcome.run.status.replace(/_/g, " ")}.`);
-                    } finally {
+                    } catch (error) {
+ if (!(error instanceof LiveRunRefused)) throw error;
+ } finally {
                       setBusy(false);
                     }
                   }}
@@ -663,7 +669,9 @@ export function ReplayConfirmation({ context, close }: { context: ScreenContext;
                   context.toast("Replayed", `A new run was recorded as ${outcome.run.status.replace(/_/g, " ")}.`);
                   context.navigate(`/o/${context.org.slug}/auto/runs/${outcome.runId}`);
                   close();
-                } finally {
+                } catch (error) {
+ if (!(error instanceof LiveRunRefused)) throw error;
+ } finally {
                   setBusy(false);
                 }
               }}

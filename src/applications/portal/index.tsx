@@ -206,7 +206,11 @@ export const portalApp = registerApp({
     "ARL-PORTAL-007": {
       id: "ARL-PORTAL-007",
       title: () => "Access and analytics",
-      subtitle: () => "Who can sign in, what they can reach, and what has actually been recorded.",
+      record: (context) => ({
+        title: <PortalHeading context={context} part="title" />,
+        status: <PortalHeading context={context} part="status" />,
+        meta: [<PortalHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: ["Users", "Access", "Analytics", "Audit"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <PortalAdmin context={context} lens={lens} />,
@@ -232,6 +236,16 @@ export const portalApp = registerApp({
     },
   },
 });
+
+function PortalHeading({ context, part }: { context: ScreenContext; part: "title" | "status" | "meta" }) {
+  const { portal } = usePortal(context);
+  if (!portal) return part === "title" ? <>Access and analytics</> : null;
+  const users = bodyOf<PortalBody>(portal, {}).users ?? [];
+  if (part === "title") return <>{portal.title}</>;
+  if (part === "status") return <Pill tone={statusTone(portal.status)} dot>{portal.status}</Pill>;
+  const pending = Number(portal.fields.invitesPending ?? 0);
+  return <span>{[String(portal.fields.audience ?? ""), `${users.length} external ${users.length === 1 ? "user" : "users"}`, pending ? `${pending} pending` : "", `links last ${String(portal.fields.linkExpiryDays ?? 0)} days`].filter(Boolean).join(" · ")}</span>;
+}
 
 function PortalFacts({ context }: { context: ScreenContext }) {
   const data = usePortalData();

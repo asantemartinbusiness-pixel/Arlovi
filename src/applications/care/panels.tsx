@@ -680,10 +680,13 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
   return (
     <Grid>
       <div className="ds-col-12"><SlaClock ticket={ticket} policy={policy} state={state} context={context} /></div>
-      <Card span={7} eyebrow="CASE" prov="human" title="What was reported" subtitle={[String(ticket.fields.queue ?? ""), `opened ${context.relative(ticket.at)}`].filter(Boolean).join(" · ")}>
+      <Card span={7} prov="human" title="What was reported" subtitle={[String(ticket.fields.queue ?? ""), `opened ${context.relative(ticket.at)}`].filter(Boolean).join(" · ")}>
         <Stack gap={3}>
           <p>{ticket.summary}</p>
           <Properties rows={[
+            { label: "Customer", value: contact ? contact.title : "Not linked" },
+            { label: "Queue", value: String(ticket.fields.queue ?? "") || "Not set" },
+            { label: "Opened", value: <span className="ds-num">{context.dateTime(ticket.at)}</span> },
             { label: "Channel", value: String(ticket.fields.channel ?? "") || "Not recorded" },
             { label: "Satisfaction", value: Number(ticket.fields.csat ?? 0) > 0 ? `${String(ticket.fields.csat)} of 5` : "Not rated" },
           ]} />

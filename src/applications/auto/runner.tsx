@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
-import { useCollections } from "@/platform/workspace";
-import { listByCollection } from "@/platform/repo";
+import { useCollections, useRecord } from "@/platform/workspace";
+import { getRecordInOrg, listByCollection } from "@/platform/repo";
 import {
   evaluateAssertions, readGraph, runWorkflow,
   type PendingWrite, type RunResult, type StoredRun, type WorkflowGraph,
@@ -82,6 +82,27 @@ async function applyWrites(writes: PendingWrite[], context: ScreenContext, pool:
   return applied;
 }
 
+/** Why a live run may not start: a paused automation or a paused organisation (HANDOFF rule 8). */
+export function liveRunBlocker(workflow: Rec | undefined, org: Rec | undefined): string | undefined {
+  if (org?.fields.executionPaused === true) return "Execution is paused for this organisation. Resume it in the Admin autonomy centre first.";
+  if (workflow?.status === "paused") return "This automation is paused. Resume it from the activation review before a live run.";
+  if (workflow?.status === "archived") return "This automation is archived and cannot start a run.";
+  return undefined;
+}
+
+export function useLiveRunBlocker(context: ScreenContext, workflow: Rec | undefined): string | undefined {
+  const org = useRecord(context.org.id);
+  return liveRunBlocker(workflow, org);
+}
+
+/** Reads the stored records, so a stale screen cannot start a run the data forbids. */
+export async function storedLiveRunBlocker(context: ScreenContext, workflowId: string): Promise<string | undefined> {
+  const [workflow, org] = await Promise.all([getRecordInOrg(context.org.id, workflowId), getRecordInOrg(context.org.id, context.org.id)]);
+  return liveRunBlocker(workflow, org);
+}
+
+export class LiveRunRefused extends Error {}
+
 export interface ExecuteOptions {
   context: ScreenContext;
   workflow: Rec;
@@ -109,6 +130,13 @@ export interface ExecuteOutcome {
 export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcome> {
   const { context, workflow, graph, pool, mode, trigger } = options;
   const resumeStored = options.resumeRun ? readRun(options.resumeRun) : undefined;
+  if (mode === "live") {
+    const reason = await storedLiveRunBlocker(context, workflow.id);
+    if (reason) {
+      context.toast("Run not started", reason, "blocked");
+      throw new LiveRunRefused(reason);
+    }
+  }
 
   const run = runWorkflow({
     graph,

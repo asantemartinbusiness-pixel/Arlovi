@@ -6,6 +6,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/applications/shared/commit";
 import { csvList, licence, type LicenceState } from "./library-model";
 import type { Rec } from "@/domain/types";
 import { AssetPreview, AssetViewer, FileStateTag, assetPreviewUri, fileState, palette, storedBytes, uploadedFileName } from "./thumbs";
@@ -664,21 +665,13 @@ export function ReplacementImpact({ context, close }: { context: ScreenContext; 
                 if (!replacement || blocked) return;
                 setBusy(true);
                 try {
-                  const moved = await context.mutate.patch(replacement.id, {
-                    fields: { ...replacement.fields, usedIn: [...new Set([...usedIn(replacement), ...uses])].join(", "), linkedIds: [...new Set([...csvList(replacement.fields.linkedIds), ...links])].join(","), replaces: record.id },
-                  }, { event: `Asset now carries the uses of ${record.title}`, expectRevision: replacement.revision });
-                  if (!moved) return;
-                  for (const brand of data.brands.filter((row) => csvList(row.fields.assets).includes(record.id))) {
-                    const swapped = await context.mutate.patch(brand.id, {
-                      fields: { ...brand.fields, assets: [...new Set(csvList(brand.fields.assets).map((id) => (id === record.id ? replacement.id : id)))].join(",") },
-                    }, { event: `${brand.title} now uses ${replacement.title} in place of ${record.title}`, expectRevision: brand.revision });
-                    if (!swapped) return;
-                  }
-                  const archived = await context.mutate.patch(record.id, {
-                    status: "archived",
-                    fields: { ...record.fields, supersededBy: replacement.id, archivedBy: context.actor, archivedAt: clockIso() },
-                  }, { event: `Asset superseded by ${replacement.title}`, expectRevision: record.revision });
-                  if (!archived) return;
+                  const kits = data.brands.filter((row) => csvList(row.fields.assets).includes(record.id));
+                  const done = await commitTogether(context, [
+                    { record: replacement, patch: { fields: { ...replacement.fields, usedIn: [...new Set([...usedIn(replacement), ...uses])].join(", "), linkedIds: [...new Set([...csvList(replacement.fields.linkedIds), ...links])].join(","), replaces: record.id } }, event: `Asset now carries the uses of ${record.title}` },
+                    ...kits.map((brand) => ({ record: brand, patch: { fields: { ...brand.fields, assets: [...new Set(csvList(brand.fields.assets).map((id) => (id === record.id ? replacement.id : id)))].join(",") } }, event: `${brand.title} now uses ${replacement.title} in place of ${record.title}` })),
+                    { record, patch: { status: "archived", fields: { ...record.fields, supersededBy: replacement.id, archivedBy: context.actor, archivedAt: clockIso() } }, event: `Asset superseded by ${replacement.title}` },
+                  ]);
+                  if (!done) return;
                   context.toast("Replaced", `${total} ${total === 1 ? "use" : "uses"} moved to ${replacement.title}. The original is archived, not deleted.`);
                   close();
                 } finally { setBusy(false); }

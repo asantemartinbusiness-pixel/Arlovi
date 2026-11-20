@@ -12,7 +12,7 @@ import {
 } from "./engine";
 import { GraphCanvas, GraphList, NODE_KINDS, NodeInspector, NodePalette, addNode, connect, nodeSummary } from "./canvas";
 import { RunHeadline, RunTimeline, ValidationPanel, readRun } from "./panels";
-import { AUTOMATION_COLLECTIONS, executeDry, executeRun, useGraphRecords } from "./runner";
+import { AUTOMATION_COLLECTIONS, executeDry, executeRun, useGraphRecords, LiveRunRefused, useLiveRunBlocker } from "./runner";
 import { markSaved, setDraftGraph, updateDraft, useBuilderDraft } from "./store";
 import { bindingsAt } from "./schema";
 import { validateWorkflow } from "./validate";
@@ -196,7 +196,9 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
                       outcome.run.status === "failed" ? "failed" : outcome.run.status === "completed" ? "ok" : "info",
                     );
                     context.navigate(`/o/${context.org.slug}/auto/runs/${outcome.runId}`);
-                  } finally {
+                  } catch (error) {
+ if (!(error instanceof LiveRunRefused)) throw error;
+ } finally {
                     setBusy(null);
                   }
                 }}

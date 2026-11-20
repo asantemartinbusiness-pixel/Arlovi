@@ -11,7 +11,7 @@ import type { Rec } from "@/domain/types";
 import { readGraph } from "./engine";
 import { describeSchedule, nextOccurrences, readSchedule, type ScheduleSpec } from "./schedule";
 import { readRun } from "./panels";
-import { executeRun, useGraphRecords } from "./runner";
+import { executeRun, useGraphRecords, LiveRunRefused, useLiveRunBlocker } from "./runner";
 
 /* ====================================================================== *
  * ARL-AUTO-008 — Schedules & queues
@@ -908,7 +908,9 @@ export function RetryFromException({ context, close }: { context: ScreenContext;
             );
             context.navigate(`/o/${context.org.slug}/auto/runs/${outcome.runId}`);
             close();
-          } finally {
+          } catch (error) {
+ if (!(error instanceof LiveRunRefused)) throw error;
+ } finally {
             setBusy(false);
           }
         }}
