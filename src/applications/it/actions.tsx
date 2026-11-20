@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { commitTogether } from "@/applications/shared/commit";
 import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { Siren } from "lucide-react";
 import { Button, Empty, FactGrid, Field, KeyValueList, Notice, OverlayActions, Pill, Row, Select, Stack } from "@/design-system";
@@ -161,15 +162,22 @@ export const mergeIncidents = actOverlay({
           : "They are not on the same service within 24 hours of each other. They stay separate.");
     }
     const mergedFrom = [String(record.fields.mergedFrom ?? ""), duplicate.id].filter(Boolean).join(",");
-    const kept = await context.mutate.patch(record.id, {
-      summary: `${record.summary}\n\nMerged from ${duplicate.title}: ${duplicate.summary}`,
-      fields: { ...record.fields, mergedFrom, mergeEvidence: `${values.evidence}: ${values.note}` },
-    }, { expectRevision: record.revision, event: `${duplicate.title} merged into ${record.title} on evidence (${values.evidence}): ${values.note}` });
-    if (!kept) return;
-    if (!(await context.mutate.patch(duplicate.id, {
-      status: "merged",
-      fields: { ...duplicate.fields, mergedInto: record.id, mergeEvidence: `${values.evidence}: ${values.note}` },
-    }, { expectRevision: duplicate.revision, event: `${duplicate.title} closed as merged into ${record.title}` }))) throw new Error(CHANGED_ELSEWHERE);
+    // Kept and merged-away incidents change together or not at all.
+    if (!(await commitTogether(context, [
+      {
+        record,
+        patch: {
+          summary: `${record.summary}\n\nMerged from ${duplicate.title}: ${duplicate.summary}`,
+          fields: { ...record.fields, mergedFrom, mergeEvidence: `${values.evidence}: ${values.note}` },
+        },
+        event: `${duplicate.title} merged into ${record.title} on evidence (${values.evidence}): ${values.note}`,
+      },
+      {
+        record: duplicate,
+        patch: { status: "merged", fields: { ...duplicate.fields, mergedInto: record.id, mergeEvidence: `${values.evidence}: ${values.note}` } },
+        event: `${duplicate.title} closed as merged into ${record.title}`,
+      },
+    ]))) throw new Error(CHANGED_ELSEWHERE);
     return `${duplicate.title} is merged into ${record.title}. Both records are kept.`;
   },
 });

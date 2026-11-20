@@ -8,7 +8,7 @@ import { ConflictError, newRecord, revisedRecord, type NewRecordInput } from "@/
  * record the handler read; a create is a brand-new record.
  */
 export type TogetherChange =
-  | { record: Rec; patch: Partial<Rec>; event: string }
+  | { record: Rec; patch: Partial<Rec>; event: string; replaceFields?: boolean }
   | { create: Omit<NewRecordInput, "organizationId" | "currency"> & { currency?: string }; event: string };
 
 /**
@@ -30,7 +30,7 @@ export async function commitTogether(context: ScreenContext, changes: TogetherCh
       records.push(newRecord({ ...change.create, organizationId: context.org.id, currency: change.create.currency ?? context.org.currency }, write));
       eventTypes.push("create");
     } else {
-      records.push(revisedRecord(change.record, change.patch, write));
+      records.push(revisedRecord(change.record, change.patch, write, { replaceFields: change.replaceFields }));
       expectedRevisions[change.record.id] = change.record.revision;
       eventTypes.push("update");
     }

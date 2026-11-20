@@ -20,6 +20,7 @@ import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, consentLabel, Money, StagePill } from "./parts";
 import { MergeGroups } from "./actions";
 import { clockIso } from "@/platform/clock";
+import { commitTogether, type TogetherChange } from "@/applications/shared/commit";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { accountHref } from "./account";
 
@@ -370,24 +371,33 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
               else if (consents.length > 0) fields.consent = consents[0];
               fields.mergedFrom = [String(keep.fields.mergedFrom ?? ""), ...others.map((row) => row.id)].filter(Boolean).join(" ");
               fields.mergedBy = context.actor;
-              if (!(await context.mutate.patch(keep.id, {
-                status: anySuppressed ? "suppressed" : keep.status,
-                fields,
-                tags: anySuppressed ? [...new Set([...keep.tags, "suppressed"])] : keep.tags,
-              }, { replaceFields: true, expectRevision: keep.revision, event: `Contacts merged into ${keep.title}` }))) return;
+              // The survivor, every repointed deal and invoice and every merged-away
+              // contact commit in one transaction: a stale revision leaves nothing half-merged.
+              const changes: TogetherChange[] = [{
+                record: keep,
+                patch: {
+                  status: anySuppressed ? "suppressed" : keep.status,
+                  fields,
+                  tags: anySuppressed ? [...new Set([...keep.tags, "suppressed"])] : keep.tags,
+                },
+                replaceFields: true,
+                event: `Contacts merged into ${keep.title}`,
+              }];
               for (const other of others) {
                 for (const deal of dealsOfContact(data, other.id)) {
-                  if (!(await context.mutate.patch(deal.id, { fields: { ...deal.fields, contactId: keep.id } }, { event: `${deal.title} repointed to the merged contact` }))) return;
+                  changes.push({ record: deal, patch: { fields: { ...deal.fields, contactId: keep.id } }, event: `${deal.title} repointed to the merged contact` });
                 }
                 for (const invoice of invoicesOfContact(data, other.id)) {
-                  if (!(await context.mutate.patch(invoice.id, { parentId: keep.id, fields: { ...invoice.fields, contactId: keep.id } }, { event: `${invoice.title} repointed to the merged contact` }))) return;
+                  changes.push({ record: invoice, patch: { parentId: keep.id, fields: { ...invoice.fields, contactId: keep.id } }, event: `${invoice.title} repointed to the merged contact` });
                 }
                 // Keep the merged-away record as evidence: its fields, consent and history stay readable.
-                if (!(await context.mutate.patch(other.id, {
-                  status: "merged",
-                  fields: { ...other.fields, mergedInto: keep.id, mergedAt: clockIso(), mergedBy: context.actor },
-                }, { expectRevision: other.revision, event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept` }))) return;
+                changes.push({
+                  record: other,
+                  patch: { status: "merged", fields: { ...other.fields, mergedInto: keep.id, mergedAt: clockIso(), mergedBy: context.actor } },
+                  event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept`,
+                });
               }
+              if (!(await commitTogether(context, changes))) return;
               context.toast("Contacts merged", `${others.length} record${others.length === 1 ? "" : "s"} merged into ${keep.title}. ${anySuppressed ? "The suppression survived the merge." : "The earliest consent was kept."}`);
               close();
             } finally {
