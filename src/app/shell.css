@@ -105,7 +105,7 @@
 .pg-strip {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-3); min-height: var(--statusbar-h);
   padding: var(--space-1) var(--page-pad); font-size: var(--text-xs); color: var(--fg-muted);
-  border-bottom: 1px solid var(--border-subtle); background: var(--bg-inset); min-width: 0;
+  border-bottom: 1px solid var(--border-subtle); background: var(--bg-inset); min-width: 0; flex-shrink: 0;
 }
 .pg-strip > * { min-width: 0; }
 .pg-body { padding: var(--pg-body-top) var(--page-pad) var(--space-9); flex: 1; min-width: 0; }
