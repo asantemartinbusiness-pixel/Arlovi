@@ -37,6 +37,12 @@ function sourceOf(data: Record<string, Rec[]>, id: unknown): Rec | undefined {
   return (data.sources ?? []).find((source) => source.id === String(id ?? ""));
 }
 
+/** A confidence figure only when one is recorded; a word-only confidence (verified) shows no number. */
+function confidencePct(fact: Rec): string {
+  const score = Number(fact.fields.confidenceScore);
+  return Number.isFinite(score) && score > 0 ? `${score}%` : "";
+}
+
 /** Visibility is the source's sensitivity group: who and what may retrieve it. */
 function visibilityOf(source: Rec | undefined): { label: string; tone: "success" | "info" | "warning" | "neutral" } {
   if (!source) return { label: "Unknown", tone: "neutral" };
@@ -722,7 +728,19 @@ function FactRegistry({ context, view }: { context: ScreenContext; view: "Verifi
         label={`${view} assertions`}
         selectedId={context.selectedId}
         onSelect={(id) => context.select(id)}
-        onOpen={(id) => context.openOverlay("Evidence drawer", { id })}
+        card={(row) => {
+          const source = sourceOf(data, row.fields.sourceId);
+          return (
+            <>
+              <strong>{row.title}</strong>
+              <span className="ds-subtle ds-row ds-gap-2 ds-wrap">
+                <span>{String(row.fields.value ?? row.summary)}</span>
+                <span>{source?.title ?? "No source"}</span>
+                <span>{visibilityOf(source).label}</span>
+              </span>
+            </>
+          );
+        }}
         columns={[
           { key: "title", header: "Assertion", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "value", header: "Value", cell: (row) => String(row.fields.value ?? row.summary) },
@@ -735,7 +753,7 @@ function FactRegistry({ context, view }: { context: ScreenContext; view: "Verifi
           { key: "visibility", header: "Visibility", cell: (row) => { const visibility = visibilityOf(sourceOf(data, row.fields.sourceId)); return <Pill tone={visibility.tone}>{visibility.label}</Pill>; } },
           { key: "confidence", header: "Confidence", cell: (row) => {
             const open = conflictsOfFact(row, data.conflicts).length;
-            return <Row gap={2}><Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill><span className="ds-num">{String(row.fields.confidenceScore ?? 0)}%</span>{open > 0 && <span className="ds-subtle ds-num" title="Open conflicts naming this assertion">{open} open conflict{open === 1 ? "" : "s"}</span>}</Row>;
+            return <Row gap={2}><Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill>{confidencePct(row) && <span className="ds-num">{confidencePct(row)}</span>}{open > 0 && <span className="ds-subtle ds-num" title="Open conflicts naming this assertion">{open} open conflict{open === 1 ? "" : "s"}</span>}</Row>;
           }, sortValue: (row) => Number(row.fields.confidenceScore ?? 0) },
           { key: "valid", header: "Valid", cell: (row) => {
             const to = String(row.fields.validTo ?? "");
@@ -971,7 +989,7 @@ function BrandIntelligence({ context, view }: { context: ScreenContext; view: "I
           <p className="ds-prose" style={{ fontSize: "var(--text-lg)" }}>{body?.voice ?? proposalBody?.voice ?? "No voice is recorded."}</p>
         </Card>
         {voiceFact && (
-          <Card title="Registered as an assertion" subtitle={`${voiceFact.status} · ${String(voiceFact.fields.confidenceScore ?? 0)}% confidence`}>
+          <Card title="Registered as an assertion" subtitle={[voiceFact.status, confidencePct(voiceFact) && `${confidencePct(voiceFact)} confidence`].filter(Boolean).join(" · ")}>
             <Properties rows={[
               { label: "Value", value: String(voiceFact.fields.value) },
               { label: "Source", value: data.sources.find((source) => source.id === String(voiceFact.fields.sourceId))?.title ?? "No source" },
@@ -1240,7 +1258,7 @@ function KnowledgeInspector({ context }: { context: ScreenContext }) {
         <Card title={record.title} subtitle={`${record.collection} · ${record.status}`} prov={record.collection === "facts" ? "agent" : "human"}>
           <Properties rows={record.collection === "facts" ? [
             { label: "Value", value: String(record.fields.value ?? record.summary) },
-            { label: "Confidence", value: <Pill tone={CONFIDENCE_TONE[record.status] ?? "neutral"}>{record.status} · {String(record.fields.confidenceScore ?? 0)}%</Pill> },
+            { label: "Confidence", value: <Pill tone={CONFIDENCE_TONE[record.status] ?? "neutral"}>{[record.status, confidencePct(record)].filter(Boolean).join(" · ")}</Pill> },
             { label: "Source", value: sourceOf(data, record.fields.sourceId)?.title ?? "No source record" },
             { label: "Valid from", value: context.date(String(record.fields.validFrom ?? record.at)) },
             { label: "Canonical owner", value: record.ownerName },
@@ -1294,7 +1312,7 @@ function SuggestionApproval({ context, close }: { context: ScreenContext; close:
           { label: "Proposed value", value: String(fact.fields.value ?? "—") },
           { label: "Evidence", value: source?.title ?? "No source record" },
           { label: "Source state", value: source ? <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> : <Pill tone="danger">Missing</Pill> },
-          { label: "Confidence", value: `${String(fact.fields.confidenceScore ?? 0)}%` },
+          { label: "Confidence", value: confidencePct(fact) || fact.status },
         ]} />
       </Card>
       {!source && <Notice tone="danger" title="This cannot be approved">There is no source record behind the claim, so nothing could be shown to a reader who asks why it is true.</Notice>}
@@ -1716,7 +1734,7 @@ function FactSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: st
       eyebrow={eyebrow}
       title={fact.title}
       status={<Pill tone={CONFIDENCE_TONE[fact.status] ?? "neutral"}>{fact.status}</Pill>}
-      meta={[String(fact.fields.value ?? fact.summary), `${String(fact.fields.confidenceScore ?? 0)}% confidence`]}
+      meta={[String(fact.fields.value ?? fact.summary), confidencePct(fact) ? `${confidencePct(fact)} confidence` : undefined]}
     />
   );
 }
@@ -2659,11 +2677,11 @@ export const brainApp = registerApp({
         render: (context: ScreenContext) => <FactRegistry context={context} view={view} />,
       })),
       actions: [
-        { id: "Approve", placement: "primary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog") },
-        { id: "reject", placement: "secondary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => void rejectFact(context) },
-        { id: "annotate", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("Evidence drawer") },
-        { id: "set expiry", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog", { mode: "expiry" }) },
-        { id: "compare facts", placement: "overflow", run: (context) => context.openOverlay("conflict resolver") },
+        { id: "Approve", label: "Approve", placement: "primary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog") },
+        { id: "reject", label: "Reject", placement: "secondary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => void rejectFact(context) },
+        { id: "annotate", label: "Open the evidence", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("Evidence drawer") },
+        { id: "set expiry", label: "Set an expiry", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog", { mode: "expiry" }) },
+        { id: "compare facts", label: "Compare assertions", placement: "overflow", run: (context) => context.openOverlay("conflict resolver") },
       ],
       overlays: [
         { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Assertion" />, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
