@@ -1,4 +1,4 @@
-import { Avatar, Card, Pill } from "@/design-system";
+import { Card, Pill } from "@/design-system";
 import type { Rec } from "@/domain/types";
 import { AgentTeamsOf } from "./AgentTeamsPanels";
 import "./team-agent-overview.css";
@@ -19,11 +19,8 @@ interface AgentOverviewCardProps {
 export function AgentOverviewCard({
   agent, department, spendCeiling, permittedActions, grantedTools, totalTools,
 }: AgentOverviewCardProps) {
-  const role = String(agent.fields.role ?? "AI employee");
   const manager = String(agent.fields.manager ?? "Unassigned");
   const autonomy = String(agent.fields.autonomy ?? "draft").replace(/_/g, " ");
-  const status = agent.status === "active" ? "Contract active" : agent.status === "paused" ? "Contract paused" : `Contract ${agent.status}`;
-  const tone = agent.status === "active" ? "success" : agent.status === "paused" ? "warning" : "neutral";
 
   return (
     <Card
@@ -31,16 +28,7 @@ export function AgentOverviewCard({
       className="team-agent-overview"
       aria-label={`AI employee profile: ${agent.title}`}
       machine={agent.status === "active"}
-      title={(
-        <div className="team-agent-overview__heading">
-          <Avatar name={agent.title} kind="ai" size="lg" />
-          <div className="team-agent-overview__heading-text">
-            <h2>{agent.title}</h2>
-            <p>{role}</p>
-          </div>
-        </div>
-      )}
-      actions={<Pill dot tone={tone}>{status}</Pill>}
+      title="Operating contract"
     >
       <p className="team-agent-overview__summary">{agent.summary || "No contract description recorded."}</p>
 

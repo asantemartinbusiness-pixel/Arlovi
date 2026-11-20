@@ -52,7 +52,7 @@ test("a step's field is checked against the trigger's records; a fixed edit save
   await page.getByRole("button", { name: "Run local test" }).click();
   // Open the condition from the path list.
   await page.getByRole("list", { name: "Path taken" }).getByRole("button", { name: /Older than 7 days/ }).click();
-  const inspector = page.locator("section.ds-card").filter({ has: page.getByRole("heading", { name: "Node properties" }) });
+  const inspector = page.locator("section.auto-inspector");
   const field = inspector.getByRole("combobox", { name: "Field" });
   await expect(field).toHaveValue("overdueDays");
 

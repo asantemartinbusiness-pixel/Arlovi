@@ -1260,6 +1260,21 @@ function ModelRouting({ context, view }: { context: ScreenContext; view: "Provid
  * Overlays
  * ====================================================================== */
 
+/** Page-head parts of the AI employee profile: one identity block, no second name further down the page. */
+function AgentHeading({ context, part }: { context: ScreenContext; part: "avatar" | "title" | "subtitle" | "meta" }) {
+  const data = useWorkforce();
+  const asked = useRecord(context.params.id);
+  const agent = asked?.collection === "agents" ? asked : data.agents[0];
+  if (!agent) return part === "title" ? <>AI employee</> : null;
+  if (part === "avatar") return <Avatar name={agent.title} kind="ai" size="lg" />;
+  if (part === "title") return <>{agent.title}</>;
+  if (part === "subtitle") {
+    return <>{String(agent.fields.role ?? "AI employee")} · <span className="team-agent-state" data-state={agent.status}>{agent.status}</span></>;
+  }
+  const department = data.departments.find((item) => item.id === agent.fields.departmentId)?.title;
+  return <>{`Reports to ${String(agent.fields.manager ?? "nobody yet")}${department ? ` · ${department}` : ""}`}</>;
+}
+
 /** Identity block for agent-backed overlays: the one place the contract's name, role and state are shown. */
 function agentStatusTone(status: string): "success" | "warning" | "neutral" {
   return status === "active" ? "success" : status === "paused" ? "warning" : "neutral";
@@ -2410,6 +2425,12 @@ export const teamApp = registerApp({
     "ARL-TEAM-003": {
       id: "ARL-TEAM-003",
       title: () => "AI employee",
+      record: (context) => ({
+        avatar: <AgentHeading context={context} part="avatar" />,
+        title: <AgentHeading context={context} part="title" />,
+        subtitle: <AgentHeading context={context} part="subtitle" />,
+        meta: [<AgentHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: (["Overview", "Skills", "Work", "Permissions", "Performance", "History"] as const).map((view) => ({
         id: view,
         render: (context: ScreenContext) => <AgentProfile context={context} view={view} />,
