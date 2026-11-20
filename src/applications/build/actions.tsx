@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { Code2 } from "lucide-react";
 import { Button, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { Rec } from "@/domain/types";
@@ -329,7 +330,7 @@ export const validatePolicy = actOverlay({
     if (!record) return;
     const issues = validateApp(model(record)).filter((issue) => issue.area === "Access");
     const totals = issueTotals(issues);
-    await context.mutate.patch(record.id, { fields: { ...record.fields, policyCheckedAt: nowIso(context), policyWarn: totals.warn, policyFail: totals.fail } }, { expectRevision: record.revision, event: `Access policy validated on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, policyCheckedAt: nowIso(context), policyWarn: totals.warn, policyFail: totals.fail } }, { expectRevision: record.revision, event: `Access policy validated on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Policies");
     return { body: `${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing.`, tone: totals.fail || totals.warn ? "blocked" : "ok" };
   },
@@ -437,7 +438,7 @@ export const testEndpoint = actOverlay({
     } else {
       outcome = endpoint.auth === "none" ? "200 allowed: the endpoint is open to anyone" : "200 allowed by the role grant (no server executed it)";
     }
-    await context.mutate.patch(record.id, { fields: { ...record.fields, lastEndpointTest: `${endpoint.method} ${endpoint.path}: ${outcome}`, lastEndpointTestAt: nowIso(context) } }, { expectRevision: record.revision, event: `Endpoint test ${endpoint.method} ${endpoint.path} as ${role?.name ?? "anonymous"}: ${outcome}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastEndpointTest: `${endpoint.method} ${endpoint.path}: ${outcome}`, lastEndpointTestAt: nowIso(context) } }, { expectRevision: record.revision, event: `Endpoint test ${endpoint.method} ${endpoint.path} as ${role?.name ?? "anonymous"}: ${outcome}` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Runs");
     return { body: `${endpoint.method} ${endpoint.path}: ${outcome}.`, tone: outcome.startsWith("200") ? "ok" : "blocked" };
   },
@@ -534,7 +535,7 @@ export const configureProvider = actOverlay({
   submit: "Record the configuration",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, authProvider: values.method, authDomain: values.domain, authNote: values.note, authProviderState: "configuration_required" } }, { expectRevision: record.revision, event: `Sign-in provider ${values.method} configured on ${record.title}: configuration required` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, authProvider: values.method, authDomain: values.domain, authNote: values.note, authProviderState: "configuration_required" } }, { expectRevision: record.revision, event: `Sign-in provider ${values.method} configured on ${record.title}: configuration required` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`${values.method} recorded for ${record.title}; it needs a server to complete.`, { entityId: record.id, type: "capability", capability: "configuration_required" });
     context.setTab("Providers");
     return { body: `${values.method} is recorded as configuration required.`, tone: "blocked" };
@@ -557,7 +558,7 @@ export const revokeSessions = actOverlay({
   submit: "Record the revocation",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, sessionsRevokedBefore: nowIso(context), sessionsRevokedFor: values.role, sessionRevokeReason: values.reason } }, { expectRevision: record.revision, event: `Sessions for ${values.role} revoked on ${record.title}: ${values.reason}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, sessionsRevokedBefore: nowIso(context), sessionsRevokedFor: values.role, sessionRevokeReason: values.reason } }, { expectRevision: record.revision, event: `Sessions for ${values.role} revoked on ${record.title}: ${values.reason}` }))) throw new Error(CHANGED_ELSEWHERE);
     useBuildUi.getState().setPreviewRole("");
     return `Cut-off recorded for ${values.role}. No live session existed.`;
   },
@@ -649,7 +650,7 @@ export const pauseDeployments = actOverlay({
   apply: async ({ record, values, context }) => {
     if (!record) return;
     const paused = !record.fields.deploysPaused;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, deploysPaused: paused, pauseReason: values.reason, pausedBy: paused ? context.actor : "" } }, { expectRevision: record.revision, event: `Deployments ${paused ? "paused" : "resumed"} on ${record.title} by ${context.actor}: ${values.reason}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, deploysPaused: paused, pauseReason: values.reason, pausedBy: paused ? context.actor : "" } }, { expectRevision: record.revision, event: `Deployments ${paused ? "paused" : "resumed"} on ${record.title} by ${context.actor}: ${values.reason}` }))) throw new Error(CHANGED_ELSEWHERE);
     return `Deployments are ${paused ? "paused" : "resumed"}.`;
   },
 });
@@ -700,7 +701,7 @@ export const attachIntegration = actOverlay({
     if (!record) return;
     const connector = ((watched as Rec[] | undefined) ?? []).find((row) => row.id === values.connector);
     if (!connector) throw new Error("Choose a connector.");
-    await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: [...attached(record), connector.id].join(",") } }, { expectRevision: record.revision, event: `${connector.title} attached to ${record.title}; state ${connector.status}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: [...attached(record), connector.id].join(",") } }, { expectRevision: record.revision, event: `${connector.title} attached to ${record.title}; state ${connector.status}` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Connections");
     return `${connector.title} is attached. It is still not connected.`;
   },
@@ -729,7 +730,7 @@ export const testIntegrations = actOverlay({
     if (!record) return;
     const rows = ((watched as Rec[] | undefined) ?? []).filter((row) => attached(record).includes(row.id));
     const result = `${rows.length} attached; ${rows.length} records found; 0 verified with a provider call`;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, integrationTestAt: nowIso(context), integrationTestResult: result } }, { expectRevision: record.revision, event: `Integration test on ${record.title}: ${result}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, integrationTestAt: nowIso(context), integrationTestResult: result } }, { expectRevision: record.revision, event: `Integration test on ${record.title}: ${result}` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Integration test for ${record.title}: no provider was contacted.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     context.setTab("Health");
     return { body: result, tone: "blocked" };
@@ -753,7 +754,7 @@ export const rotateSecret = actOverlay({
   apply: async ({ record, values, context, watched }) => {
     if (!record) return;
     const connector = ((watched as Rec[] | undefined) ?? []).find((row) => row.id === values.connector);
-    await context.mutate.patch(record.id, { fields: { ...record.fields, rotationRequestedAt: nowIso(context), rotationRequestedFor: connector?.title ?? values.connector } }, { expectRevision: record.revision, event: `Secret rotation requested for ${connector?.title ?? values.connector} on ${record.title}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, rotationRequestedAt: nowIso(context), rotationRequestedFor: connector?.title ?? values.connector } }, { expectRevision: record.revision, event: `Secret rotation requested for ${connector?.title ?? values.connector} on ${record.title}` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Secret rotation for ${connector?.title ?? "an integration"} requested: no credential exists here, nothing was issued.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     return { title: "Requested, not rotated", body: "No secret is held here. The request is recorded.", tone: "blocked" };
   },
@@ -777,7 +778,7 @@ export const revokeIntegration = actOverlay({
   submit: "Revoke",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: attached(record).filter((id) => id !== values.connector).join(",") } }, { expectRevision: record.revision, event: `Integration ${values.connector} revoked on ${record.title}: ${values.reason}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: attached(record).filter((id) => id !== values.connector).join(",") } }, { expectRevision: record.revision, event: `Integration ${values.connector} revoked on ${record.title}: ${values.reason}` }))) throw new Error(CHANGED_ELSEWHERE);
     return "Detached and recorded.";
   },
 });
@@ -853,7 +854,7 @@ export const tuneMonitor = actOverlay({
   submit: "Save the rule",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, alertFailThreshold: Number(values.threshold), alertOnNewFail: Boolean(values.onNew) } }, { expectRevision: record.revision, event: `Monitor on ${record.title} tuned: raise at ${values.threshold} failing checks` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, alertFailThreshold: Number(values.threshold), alertOnNewFail: Boolean(values.onNew) } }, { expectRevision: record.revision, event: `Monitor on ${record.title} tuned: raise at ${values.threshold} failing checks` }))) throw new Error(CHANGED_ELSEWHERE);
     return `Saved. It raises at ${values.threshold} failing checks.`;
   },
 });

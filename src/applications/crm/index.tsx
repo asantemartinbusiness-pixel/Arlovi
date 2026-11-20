@@ -16,7 +16,7 @@ import {
   RelationshipInspector, RoutingRulesOverlay,
 } from "./companies";
 import {
-  DealDrawer, DealDrawerSummary, LostReason, PipelineBoard, PipelineForecast, PipelineList, PipelineStrip, PipelineTeam, StageChangeValidation,
+  DealContextSummary, DealDrawer, DealDrawerSummary, LostReason, PipelineBoard, PipelineForecast, PipelineList, PipelineStrip, PipelineTeam, StageChangeValidation,
 } from "./pipeline";
 import {
   ClosureConfirmation, ClosureSummary, CollaboratorPicker, DealActivity, DealDocuments, dealRecord, DealInspector, DealOverview,
@@ -158,7 +158,7 @@ export const crmApp = registerApp({
       overlays: [
         { id: "Compose message", kind: "modal", title: "Draft a message", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ComposeMessage context={context} close={close} /> },
         { id: "activity composer", kind: "modal", title: "Log an activity", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ActivityComposer context={context} close={close} /> },
-        { id: "customer merge", kind: "drawer", title: "Merge this contact", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
+        { id: "customer merge", kind: "drawer", title: "Merge this contact", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
         { id: "Contact form", kind: "modal", title: "Contact", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ContactForm context={context} close={close} /> },
         { id: "attach record", kind: "modal", title: "Attach a record", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AttachRecord context={context} close={close} /> },
       ],
@@ -234,9 +234,9 @@ export const crmApp = registerApp({
       ],
       overlays: [
         { id: "Deal drawer", kind: "drawer", title: "Deal", width: OVERLAY_WIDTH.form, summary: ({ close, ...context }) => <DealDrawerSummary context={context} close={close} />, render: ({ close, ...context }) => <DealDrawer context={context} close={close} /> },
-        { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
-        { id: "lost reason", kind: "modal", title: "Close the deal as lost", width: OVERLAY_WIDTH.modal, tone: "danger", render: ({ close, ...context }) => <LostReason context={context} close={close} /> },
-        { id: "assign owner", kind: "modal", title: "Assign an owner", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AssignOwner context={context} close={close} /> },
+        { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
+        { id: "lost reason", kind: "modal", title: "Close the deal as lost", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, tone: "danger", render: ({ close, ...context }) => <LostReason context={context} close={close} /> },
+        { id: "assign owner", kind: "modal", title: "Assign an owner", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, render: ({ close, ...context }) => <AssignOwner context={context} close={close} /> },
         { id: "quote builder", kind: "drawer", title: "Quote", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
       ],
     },
@@ -265,7 +265,7 @@ export const crmApp = registerApp({
         { id: "Quote builder", kind: "drawer", title: "Quote builder", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
         { id: "collaborator picker", kind: "drawer", title: "People and approvals", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <Stack gap={4}><CollaboratorPicker context={context} close={close} /><RequestApproval context={context} close={close} /></Stack> },
         { id: "closure confirmation", kind: "modal", title: "Close the deal", width: OVERLAY_WIDTH.record, capability: "edit_pipeline", summary: (context) => <ClosureSummary context={context} />, presentation: { selectedRecord: true, collection: "deals", guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
-        { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
+        { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
       ],
     },
 

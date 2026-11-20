@@ -187,20 +187,23 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         if (!title.trim() || duplicate) return;
         setBusy(true);
-        const fields = { industry, city, owner };
-        if (company) {
-          await context.mutate.patch(company.id, { title: title.trim(), status, summary, fields: { ...company.fields, ...fields } }, { expectRevision: company.revision, event: `Account ${title.trim()} updated` });
-          context.toast("Account saved", `${title.trim()} is ${status}.`);
-        } else {
-          const created = await context.mutate.create({
-            collection: "companies", title: title.trim(), status, summary,
-            fields: { ...fields, customerSince: clockIso().slice(0, 10) },
-          }, `Account ${title.trim()} created`);
-          context.select(created.id);
-          context.toast("Account created", `${created.title} can now hold contacts and deals.`);
+        try {
+          const fields = { industry, city, owner };
+          if (company) {
+            if (!(await context.mutate.patch(company.id, { title: title.trim(), status, summary, fields: { ...company.fields, ...fields } }, { expectRevision: company.revision, event: `Account ${title.trim()} updated` }))) return;
+            context.toast("Account saved", `${title.trim()} is ${status}.`);
+          } else {
+            const created = await context.mutate.create({
+              collection: "companies", title: title.trim(), status, summary,
+              fields: { ...fields, customerSince: clockIso().slice(0, 10) },
+            }, `Account ${title.trim()} created`);
+            context.select(created.id);
+            context.toast("Account created", `${created.title} can now hold contacts and deals.`);
+          }
+          close();
+        } finally {
+          setBusy(false);
         }
-        setBusy(false);
-        close();
       }}
     >
       <Field label="Account name" required><TextInput aria-label="Account name" value={title} invalid={duplicate} onChange={(event) => setTitle(event.target.value)} required /></Field>
@@ -699,12 +702,15 @@ export function QualificationInspector({ context, close }: { context: ScreenCont
           disabled={lead.status === "qualified" || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(lead.id, {
-              status: "qualified",
-              fields: { ...lead.fields, stage: "qualified", qualifiedBy: context.actor, score: score.total },
-            }, { expectRevision: lead.revision, event: `Lead ${lead.title} qualified with a score of ${score.total}` });
-            context.toast("Lead qualified", `${lead.title} is qualified. Converting it creates a deal linked to the contact and the account.`);
-            setBusy(false);
+            try {
+              if (!(await context.mutate.patch(lead.id, {
+                status: "qualified",
+                fields: { ...lead.fields, stage: "qualified", qualifiedBy: context.actor, score: score.total },
+              }, { expectRevision: lead.revision, event: `Lead ${lead.title} qualified with a score of ${score.total}` }))) return;
+              context.toast("Lead qualified", `${lead.title} is qualified. Converting it creates a deal linked to the contact and the account.`);
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Qualify
@@ -733,13 +739,16 @@ export function QualificationInspector({ context, close }: { context: ScreenCont
           disabled={lead.status === "disqualified"}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(lead.id, {
-              status: "disqualified",
-              fields: { ...lead.fields, stage: "disqualified", disqualifiedReason: reason, disqualifiedBy: context.actor },
-            }, { expectRevision: lead.revision, event: `Lead ${lead.title} disqualified: ${reason}` });
-            context.toast("Lead disqualified", `${lead.title} stays on the record with its reason, which is what makes a source worth analysing.`, "blocked");
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(lead.id, {
+                status: "disqualified",
+                fields: { ...lead.fields, stage: "disqualified", disqualifiedReason: reason, disqualifiedBy: context.actor },
+              }, { expectRevision: lead.revision, event: `Lead ${lead.title} disqualified: ${reason}` }))) return;
+              context.toast("Lead disqualified", `${lead.title} stays on the record with its reason, which is what makes a source worth analysing.`, "blocked");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Disqualify
@@ -757,14 +766,20 @@ function ConsentLine({ contact }: { contact: Rec }) {
 /** Converting a lead creates a real deal record linked to the contact and account. */
 export function ConvertDialog({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
-  const { now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const lead = data.leads.find((item) => item.id === (payload?.id ?? context.selectedId));
+  if (!lead) return <Empty title="Select a lead first" />;
+  // Seeds its fields from the lead, so it mounts only once the lead has loaded.
+  return <ConvertForm key={lead.id} context={context} close={close} lead={lead} />;
+}
+
+function ConvertForm({ context, close, lead }: { context: ScreenContext; close: () => void; lead: Rec }) {
+  const data = useCrmData();
+  const { now } = useWorkspace();
   const [amount, setAmount] = useState(Number(lead?.amountMinor ?? 0));
   const [owner, setOwner] = useState(String(lead?.fields.owner ?? context.actor));
   const [withQuote, setWithQuote] = useState("yes");
   const [busy, setBusy] = useState(false);
-  if (!lead) return <Empty title="Select a lead first" />;
 
   const contact = contactById(data, String(lead.fields.contactId ?? ""));
   const company = companyById(data, String(lead.fields.companyId ?? ""));
@@ -806,56 +821,56 @@ export function ConvertDialog({ context, close }: { context: ScreenContext; clos
           title={blocked}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              stage: "qualified", probability: 40, owner, leadId: lead.id, budgetConfirmed: false,
-            };
-            if (contact) fields.contactId = contact.id;
-            if (company) fields.companyId = company.id;
-            const deal = await context.mutate.create({
-              collection: "deals",
-              title: lead.title,
-              status: "qualified",
-              summary: `Converted from the ${String(lead.fields.source ?? "unknown")} lead ${lead.title}.`,
-              amountMinor: amount,
-              at: now.toISOString(),
-              parentId: company?.id,
-              fields,
-            }, `Deal created from lead ${lead.title}`);
-
-            let quoteId: string | undefined;
-            if (withQuote === "yes") {
-              const numbers = data.quotes.map((quote) => Number(/(\d+)/.exec(String(quote.fields.number ?? quote.title))?.[1] ?? 0));
-              const number = `Q-${Math.max(100, ...numbers) + 1}`;
-              const quote = await context.mutate.create({
-                collection: "quotes",
-                title: `${number} ${lead.title}`,
-                status: "draft",
-                summary: `Draft quote created when the lead ${lead.title} was converted.`,
+            try {
+              const fields: Record<string, string | number | boolean> = {
+                stage: "qualified", probability: 40, owner, leadId: lead.id, budgetConfirmed: false,
+              };
+              if (contact) fields.contactId = contact.id;
+              if (company) fields.companyId = company.id;
+              const deal = await context.mutate.create({
+                collection: "deals",
+                title: lead.title,
+                status: "qualified",
+                summary: `Converted from the ${String(lead.fields.source ?? "unknown")} lead ${lead.title}.`,
                 amountMinor: amount,
                 at: now.toISOString(),
-                dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
-                parentId: deal.id,
-                fields: {
-                  number, dealId: deal.id, contactId: contact?.id ?? "", version: 1,
-                  netMinor: amount, taxMinor: 0, customerTaxStatus: String(contact?.fields.taxStatus ?? "domestic"),
-                },
-                body: { lines: [{ id: "l1", description: lead.title, quantity: 1, unitPriceMinor: amount, taxCategory: "standard", discountBp: 0 }] },
-              }, `Quote ${number} drafted from the converted lead`);
-              quoteId = quote.id;
-              await context.mutate.patch(deal.id, { fields: { ...fields, quoteId } }, { event: `Quote ${number} linked to ${deal.title}` });
+                parentId: company?.id,
+                fields,
+              }, `Deal created from lead ${lead.title}`);
+              let quoteId: string | undefined;
+              if (withQuote === "yes") {
+                const numbers = data.quotes.map((quote) => Number(/(\d+)/.exec(String(quote.fields.number ?? quote.title))?.[1] ?? 0));
+                const number = `Q-${Math.max(100, ...numbers) + 1}`;
+                const quote = await context.mutate.create({
+                  collection: "quotes",
+                  title: `${number} ${lead.title}`,
+                  status: "draft",
+                  summary: `Draft quote created when the lead ${lead.title} was converted.`,
+                  amountMinor: amount,
+                  at: now.toISOString(),
+                  dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+                  parentId: deal.id,
+                  fields: {
+                    number, dealId: deal.id, contactId: contact?.id ?? "", version: 1,
+                    netMinor: amount, taxMinor: 0, customerTaxStatus: String(contact?.fields.taxStatus ?? "domestic"),
+                  },
+                  body: { lines: [{ id: "l1", description: lead.title, quantity: 1, unitPriceMinor: amount, taxCategory: "standard", discountBp: 0 }] },
+                }, `Quote ${number} drafted from the converted lead`);
+                quoteId = quote.id;
+                if (!(await context.mutate.patch(deal.id, { fields: { ...fields, quoteId } }, { event: `Quote ${number} linked to ${deal.title}` }))) return;
+              }
+              if (!(await context.mutate.patch(lead.id, {
+                status: "qualified",
+                fields: { ...lead.fields, stage: "converted", dealId: deal.id, convertedBy: context.actor, convertedAt: now.toISOString() },
+              }, { expectRevision: lead.revision, event: `Lead ${lead.title} converted to a deal` }))) return;
+              context.toast("Lead converted", quoteId
+                ? `${deal.title} is in Qualified with a draft quote attached, so it can advance past Proposal.`
+                : `${deal.title} is in Qualified. It will need a quote before it can advance past Proposal.`);
+              close();
+              context.navigate(`/o/${context.org.slug}/crm/deals/${deal.id}`);
+            } finally {
+              setBusy(false);
             }
-
-            await context.mutate.patch(lead.id, {
-              status: "qualified",
-              fields: { ...lead.fields, stage: "converted", dealId: deal.id, convertedBy: context.actor, convertedAt: now.toISOString() },
-            }, { expectRevision: lead.revision, event: `Lead ${lead.title} converted to a deal` });
-
-            context.toast("Lead converted", quoteId
-              ? `${deal.title} is in Qualified with a draft quote attached, so it can advance past Proposal.`
-              : `${deal.title} is in Qualified. It will need a quote before it can advance past Proposal.`);
-            setBusy(false);
-            close();
-            context.navigate(`/o/${context.org.slug}/crm/deals/${deal.id}`);
           }}
         >
           <Target size={15} aria-hidden="true" /> Convert to a deal

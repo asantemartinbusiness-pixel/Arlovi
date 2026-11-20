@@ -1129,59 +1129,62 @@ function BulkImport({ context, close }: { context: ScreenContext; close: () => v
           onChange={async (event) => {
             const files = Array.from(event.target.files ?? []);
             setBusy(true);
-            const report: { name: string; state: "ok" | "rejected"; note: string }[] = [];
-            for (const file of files) {
-              const reason = unsupportedReason(file);
-              if (reason) {
-                await context.mutate.create({
-                  collection: "photos", title: file.name, status: "unreadable",
-                  summary: reason, fields: { kind: "image", bytes: file.size, license: "Unknown" },
-                }, `${file.name} could not be imported`);
-                report.push({ name: file.name, state: "rejected", note: reason });
-                continue;
+            try {
+              const report: { name: string; state: "ok" | "rejected"; note: string }[] = [];
+              for (const file of files) {
+                const reason = unsupportedReason(file);
+                if (reason) {
+                  await context.mutate.create({
+                    collection: "photos", title: file.name, status: "unreadable",
+                    summary: reason, fields: { kind: "image", bytes: file.size, license: "Unknown" },
+                  }, `${file.name} could not be imported`);
+                  report.push({ name: file.name, state: "rejected", note: reason });
+                  continue;
+                }
+                try {
+                  const src = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result));
+                    reader.onerror = () => reject(new Error("The file could not be read."));
+                    reader.readAsDataURL(file);
+                  });
+                  const image = await loadImage(src);
+                  const doc: RasterDoc = {
+                    version: 2,
+                    width: image.naturalWidth, height: image.naturalHeight,
+                    layers: [{
+                      id: "layer-base", name: file.name, kind: "pixel",
+                      visible: true, locked: false, opacity: 1, blend: "normal",
+                      src, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight,
+                      x: 0, y: 0, w: image.naturalWidth, h: image.naturalHeight, rotation: 0,
+                    }],
+                    activeLayerId: "layer-base",
+                    presets: [],
+                    profile: "sRGB IEC61966-2.1",
+                    rights: { license: "Unknown", credit: "not recorded" },
+                    origin: `Imported from ${file.name} in this browser.`,
+                    history: [],
+                  };
+                  await context.mutate.create({
+                    collection: "photos", title: file.name, status: "imported",
+                    summary: `${image.naturalWidth} × ${image.naturalHeight}, ${(file.size / 1024).toFixed(0)} kB.`,
+                    body: doc,
+                    fields: { kind: "image", width: image.naturalWidth, height: image.naturalHeight, bytes: file.size, license: "Unknown", importedAt: clockIso() },
+                  }, `Imported ${file.name}`);
+                  report.push({ name: file.name, state: "ok", note: `${image.naturalWidth} × ${image.naturalHeight}` });
+                } catch (error) {
+                  await context.mutate.create({
+                    collection: "photos", title: file.name, status: "unreadable",
+                    summary: error instanceof Error ? error.message : "The browser could not decode this file.",
+                    fields: { kind: "image", bytes: file.size, license: "Unknown" },
+                  }, `${file.name} could not be decoded`);
+                  report.push({ name: file.name, state: "rejected", note: "The browser could not decode it." });
+                }
               }
-              try {
-                const src = await new Promise<string>((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onload = () => resolve(String(reader.result));
-                  reader.onerror = () => reject(new Error("The file could not be read."));
-                  reader.readAsDataURL(file);
-                });
-                const image = await loadImage(src);
-                const doc: RasterDoc = {
-                  version: 2,
-                  width: image.naturalWidth, height: image.naturalHeight,
-                  layers: [{
-                    id: "layer-base", name: file.name, kind: "pixel",
-                    visible: true, locked: false, opacity: 1, blend: "normal",
-                    src, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight,
-                    x: 0, y: 0, w: image.naturalWidth, h: image.naturalHeight, rotation: 0,
-                  }],
-                  activeLayerId: "layer-base",
-                  presets: [],
-                  profile: "sRGB IEC61966-2.1",
-                  rights: { license: "Unknown", credit: "not recorded" },
-                  origin: `Imported from ${file.name} in this browser.`,
-                  history: [],
-                };
-                await context.mutate.create({
-                  collection: "photos", title: file.name, status: "imported",
-                  summary: `${image.naturalWidth} × ${image.naturalHeight}, ${(file.size / 1024).toFixed(0)} kB.`,
-                  body: doc,
-                  fields: { kind: "image", width: image.naturalWidth, height: image.naturalHeight, bytes: file.size, license: "Unknown", importedAt: clockIso() },
-                }, `Imported ${file.name}`);
-                report.push({ name: file.name, state: "ok", note: `${image.naturalWidth} × ${image.naturalHeight}` });
-              } catch (error) {
-                await context.mutate.create({
-                  collection: "photos", title: file.name, status: "unreadable",
-                  summary: error instanceof Error ? error.message : "The browser could not decode this file.",
-                  fields: { kind: "image", bytes: file.size, license: "Unknown" },
-                }, `${file.name} could not be decoded`);
-                report.push({ name: file.name, state: "rejected", note: "The browser could not decode it." });
-              }
+              setResults(report);
+            } finally {
+              setBusy(false);
             }
-            setResults(report);
-            setBusy(false);
           }}
         />
       </Field>

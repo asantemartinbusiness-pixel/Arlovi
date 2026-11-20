@@ -162,7 +162,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
       summary: "Arc Lamp pair for Harrow House.",
       dueAt: "2026-10-28T00:00:00.000Z",
       parentId: "nl-contacts-001",
-      fields: { contactId: "nl-contacts-001", netMinor: 180_000, taxMinor: 36_000, journalId: "nl-journals-002", paymentJournalId: "nl-journals-003", number: "INV-1041" },
+      fields: { contactId: "nl-contacts-001", dealId: "nl-deals-001", netMinor: 180_000, taxMinor: 36_000, journalId: "nl-journals-002", paymentJournalId: "nl-journals-003", number: "INV-1041" },
       body: { lines: [{ description: "Arc Lamp", qty: 2, unitMinor: 90_000, netMinor: 180_000, taxMinor: 36_000 }] },
     }),
     rec(NORTH, "invoices", 2, "INV-1048", {
@@ -295,7 +295,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
       status: "won",
       amountMinor: 180_000,
       summary: "Closed-won. Invoice INV-1041 is paid in the local ledger.",
-      fields: { stage: "won", contactId: "nl-contacts-001", probability: 100 },
+      fields: { stage: "won", contactId: "nl-contacts-001", probability: 100, invoiceId: "nl-invoices-001" },
     }),
     rec(NORTH, "deals", 2, "Clerkenwell pendants", {
       status: "proposal",

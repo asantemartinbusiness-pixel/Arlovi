@@ -1108,18 +1108,18 @@ test("WF-13 AI workforce lifecycle: validated contract, evaluation before activa
   await expect(main(page).getByText("Ledger checker").first()).toBeVisible();
 
   // Review metrics, then suspend: a paused contract is not offered for delegation.
-  await open(page, agentUrl, "AI employee");
+  await open(page, agentUrl, /.+/); // the page head now carries the contract name, not a generic title
   await shows(page, /Ledger checker\s*Reconciliation assistant · active/);
   await page.getByRole("tab", { name: "Performance" }).click();
   await action(page, "pause");
-  await open(page, agentUrl, "AI employee");
+  await open(page, agentUrl, /.+/); // the page head now carries the contract name, not a generic title
   await shows(page, /Ledger checker\s*Reconciliation assistant · paused/);
   // A paused contract is not offered for delegation on a mission team.
   await open(page, "/mission/missions/nl-missions-001/team");
   await expect(main(page).getByText("Ledger checker")).toHaveCount(0);
 
   // Agents are not self-authorising: no seeded contract may be active with activation blockers.
-  await open(page, "/team/agents/nl-agents-001", "AI employee");
+  await open(page, "/team/agents/nl-agents-001", /.+/);
   await showsSoft(page, /Chief of Staff · active[^]*Can it be activated\?\s*(No blockers|0 blockers)/, "DEFECT: /team/agents/nl-agents-001 — Nia Okonkwo is active although her own profile lists 5 activation blockers, including an unset (unbounded) spend ceiling and no manager");
 });
 

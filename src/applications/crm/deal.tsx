@@ -119,13 +119,16 @@ function BudgetConfirmation({ context, deal }: { context: ScreenContext; deal: R
         event.preventDefault();
         if (!how.trim()) { setError("Say how the customer confirmed the budget, so the record can be checked later."); return; }
         setBusy(true);
-        const saved = await context.mutate.patch(deal.id, {
-          fields: { budgetConfirmed: true, budgetConfirmedBy: context.actor, budgetConfirmedAt: context.now.toISOString(), budgetEvidence: how.trim() },
-        }, { expectRevision: deal.revision, event: `Budget for ${deal.title} confirmed by ${context.actor}: ${how.trim()}` });
-        setBusy(false);
-        if (!saved) { setError("The deal changed after this was opened. Reload it and try again."); return; }
-        context.toast("Budget confirmed", `${deal.title} records a confirmed budget, by ${context.actor}.`);
-        setOpen(false);
+        try {
+          const saved = await context.mutate.patch(deal.id, {
+            fields: { budgetConfirmed: true, budgetConfirmedBy: context.actor, budgetConfirmedAt: context.now.toISOString(), budgetEvidence: how.trim() },
+          }, { expectRevision: deal.revision, event: `Budget for ${deal.title} confirmed by ${context.actor}: ${how.trim()}` });
+          if (!saved) { setError("The deal changed after this was opened. Reload it and try again."); return; }
+          context.toast("Budget confirmed", `${deal.title} records a confirmed budget, by ${context.actor}.`);
+          setOpen(false);
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <Field label="How the customer confirmed it" required hint={`Amount on the deal: ${context.money(Number(deal.amountMinor ?? 0))}`}>
@@ -550,12 +553,16 @@ export function CollaboratorPicker({ context, close }: { context: ScreenContext;
             disabled={!name || collaborators.some((person) => person.name === name)}
             onClick={async () => {
               setBusy(true);
-              await context.mutate.patch(deal.id, {
-                body: { ...(deal.body as object ?? {}), collaborators: [...collaborators, { name, role }] },
-              }, { expectRevision: deal.revision, event: `${name} added to ${deal.title} as ${role}` });
-              context.toast("Collaborator added", `${name} is on ${deal.title}. They are not notified: no mail provider is connected.`);
-              setBusy(false);
-              close();
+              try {
+                const saved = await context.mutate.patch(deal.id, {
+                  body: { ...(deal.body as object ?? {}), collaborators: [...collaborators, { name, role }] },
+                }, { expectRevision: deal.revision, event: `${name} added to ${deal.title} as ${role}` });
+                if (!saved) { setBusy(false); return; }
+                context.toast("Collaborator added", `${name} is on ${deal.title}. They are not notified: no mail provider is connected.`);
+                close();
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             Add to the deal
@@ -640,11 +647,15 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
     { ok: !totals.hasUnknownRate, label: "Every line has an approved tax rate", value: totals.hasUnknownRate ? "A line is UNKNOWN" : totals.byCode.map((group) => group.code.code).join(", ") || "None" },
   ];
 
+  // Every evidence row that does not hold blocks the close; none is advisory.
+  const openRow = evidence.find((item) => !item.ok);
+  const blocker = guard ?? (openRow ? `${openRow.label}: ${typeof openRow.value === "string" ? openRow.value : "not met"}. Resolve it before closing won.` : undefined);
+
   return (
     <Stack gap={4}>
       <ModalUnsavedChanges when={createInvoice !== "yes"} />
       <ModalInFlight when={busy} />
-      {guard && <Notice tone="danger" title="This deal cannot be closed won yet">{guard}</Notice>}
+      {blocker && <Notice tone="danger" title="This deal cannot be closed won yet">{blocker}</Notice>}
       <OverlaySection title="Evidence" hint="What the close rests on. The same stage validation runs here as on the board.">
         <ul className="crm-evidence" data-flush>
           {evidence.map((item) => (
@@ -683,10 +694,10 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
             <Button
               variant="primary"
               busy={busy}
-              disabled={Boolean(guard) || !context.can("edit_pipeline")}
-              title={guard}
+              disabled={Boolean(blocker) || !context.can("edit_pipeline")}
+              title={blocker}
               onClick={async () => {
-                if (guard || !contact || busy) return;
+                if (blocker || !contact || busy) return;
                 setBusy(true);
                 try {
                   const invoice = createInvoice === "yes"
@@ -773,17 +784,20 @@ export function RequestApproval({ context, close }: { context: ScreenContext; cl
             disabled={!note.trim()}
             onClick={async () => {
               setBusy(true);
-              await context.mutate.create({
-                collection: "approvals",
-                title: `Approval for ${deal.title}`,
-                status: "pending",
-                summary: note,
-                amountMinor: deal.amountMinor,
-                fields: { kind: "deal", recordId: deal.id, raisedBy: context.actor },
-              }, `Approval requested on ${deal.title}`);
-              context.toast("Approval requested", "It is on the approvals list. Nothing has been sent.");
-              setBusy(false);
-              close();
+              try {
+                await context.mutate.create({
+                  collection: "approvals",
+                  title: `Approval for ${deal.title}`,
+                  status: "pending",
+                  summary: note,
+                  amountMinor: deal.amountMinor,
+                  fields: { kind: "deal", recordId: deal.id, raisedBy: context.actor },
+                }, `Approval requested on ${deal.title}`);
+                context.toast("Approval requested", "It is on the approvals list. Nothing has been sent.");
+                close();
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             Request the approval

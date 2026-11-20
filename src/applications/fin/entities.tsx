@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Building2, Scale } from "lucide-react";
 import {
-  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -366,9 +366,6 @@ export function ConsolidationPreview({ context, close }: { context: ScreenContex
 
   return (
     <Stack gap={4}>
-      <OverlaySummary eyebrow="Consolidation preview" title={`${consolidation.columns.length} entities`}
-        status={balanced ? <Pill tone="success" dot>Group balances</Pill> : <Pill tone="danger" dot>Group does not balance</Pill>}
-        meta={["Posted journals only; entity ledgers are never changed"]} />
       {!balanced && <Notice tone="danger" title="The group column does not balance">A journal has been counted twice or an elimination has removed one side only.</Notice>}
       <StatementRow
         context={context}

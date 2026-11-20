@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -10,7 +10,7 @@ import type { Rec } from "@/domain/types";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABEL, accountCode, accountType, isDebitNormal, journalLines, periodOf, journalDate } from "@/domain/fin-ledger";
 import type { AccountType, TrialRow } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
-import { AccountTypePill, Amount, SourceNote } from "./parts";
+import { AccountTypePill, FormFooter, Amount, SourceNote } from "./parts";
 
 /* ---------------------------- FIN-002 ---------------------------- */
 
@@ -334,12 +334,6 @@ export function AccountHistory({ context, close }: { context: ScreenContext; clo
 
   return (
     <Stack gap={4}>
-      <OverlaySummary
-        eyebrow={`Account ${accountCode(account)}`}
-        title={account.title}
-        status={<AccountTypePill type={accountType(account)} />}
-        meta={[`${isDebitNormal(accountType(account)) ? "Debit" : "Credit"} normal`, account.status === "inactive" ? "Deactivated" : undefined]}
-      />
       <FactGrid columns={2} items={[
         { label: "Posted entries", value: String(rows.length), mono: true },
         { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold />, mono: true, tone: "accent" },
@@ -362,7 +356,9 @@ export function AccountHistory({ context, close }: { context: ScreenContext; clo
           onOpen={() => { context.closeOverlay(); context.navigate(`/o/${org.slug}/fin/ledger`); }}
         />
       )}
-      <CategoryMapper context={context} accountCode={accountCode(account)} />
+      <FormFooter drawer end={<Button variant="ghost" onClick={() => close?.()}>Close</Button>}>
+        <Button variant="secondary" onClick={() => { context.select(account.id); context.openOverlay("map category"); }}>Map spending categories</Button>
+      </FormFooter>
       {entries.some((journal) => journal.status === "draft") && (
         <Notice tone="info" title="Draft journals are not in this balance">
           {entries.filter((journal) => journal.status === "draft").length} draft journal mentions this account. A draft moves nothing until it is posted.
@@ -390,11 +386,6 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
   return (
     <Stack gap={4}>
       <ModalInFlight when={busy} />
-      <OverlaySummary
-        eyebrow="Deactivating"
-        title={`${accountCode(account)} ${account.title}`}
-        status={account.status === "inactive" ? <Pill tone="warning">Deactivated</Pill> : <Pill tone="success" dot>Active</Pill>}
-      />
       <FactGrid columns={3} items={[
         { label: "Posted entries", value: String(posted.length), mono: true },
         { label: "Draft entries", value: String(postings.length - posted.length), mono: true },

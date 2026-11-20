@@ -1430,7 +1430,7 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
   for (const record of [invoice, journal]) {
     if (record && openedRevisions.current[record.id] === undefined) openedRevisions.current[record.id] = record.revision;
   }
-  const paid = Number(invoice.fields.paidMinor ?? 0);
+  const paid = invoice.status === "paid" ? totals.grossMinor : Number(invoice.fields.paidMinor ?? 0);
   const creditNoteNeeded = invoice.status === "paid" || paid > 0;
 
   if (invoice.status === "void") {
@@ -1728,7 +1728,7 @@ export function InvoiceInspector({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/fin/invoices/${String(invoice.fields.creditsInvoiceId)}`)}>Open the invoice this credits</Button>
       )}
       <SourceNote>
-        {data.journals.filter((journal) => String(journal.fields.invoiceId ?? "") === invoice.id).length} ledger journals reference this invoice.
+        {data.journals.filter((journal) => String(journal.fields.invoiceId ?? "") === invoice.id || journal.id === String(invoice.fields.journalId ?? "") || journal.id === String(invoice.fields.paymentJournalId ?? "")).length} ledger journals reference this invoice.
       </SourceNote>
     </Stack>
   );

@@ -17,7 +17,7 @@ import {
   companyById, contactsOfCompany, dealsOfCompany, bookingsOfContact, dealsOfContact, invoicesOfContact, ticketsOfContact, useCrmData,
 } from "./data";
 import type { CrmData } from "./data";
-import { ActivityPill, CapabilityNotice, ConsentPill, Money, StagePill } from "./parts";
+import { ActivityPill, CapabilityNotice, ConsentPill, consentLabel, Money, StagePill } from "./parts";
 import { MergeGroups } from "./actions";
 import { clockIso } from "@/platform/clock";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
@@ -217,28 +217,31 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
         event.preventDefault();
         if (!title.trim()) return;
         setBusy(true);
-        const fields: Record<string, string | number | boolean> = { email: email.trim(), phone, role, owner: contact ? String(contact.fields.owner ?? context.actor) : context.actor };
-        if (companyId) fields.companyId = companyId;
-        if (taxStatus) fields.taxStatus = taxStatus;
-        if (suppressed) fields.suppressed = true;
-        if (consent && !suppressed) fields.consent = contact?.fields.consent ? String(contact.fields.consent) : `recorded-${clockIso().slice(0, 10)}`;
-        if (contact) {
-          await context.mutate.patch(contact.id, {
-            title: title.trim(), summary, fields,
-            tags: suppressed ? [...new Set([...contact.tags, "suppressed"])] : contact.tags.filter((tag) => tag !== "suppressed"),
-          }, { expectRevision: contact.revision, event: `Contact ${title.trim()} updated` });
-          context.toast("Contact saved", suppressed ? `${title.trim()} is suppressed and no automation will contact them.` : `${title.trim()} is updated.`);
-        } else {
-          const created = await context.mutate.create({
-            collection: "contacts", title: title.trim(), status: suppressed ? "suppressed" : "active",
-            summary, fields, tags: suppressed ? ["customer", "suppressed"] : ["customer"],
-          }, `Contact ${title.trim()} created`);
-          context.select(created.id);
-          context.toast("Contact created", taxStatus ? `${created.title} is on file with a ${taxStatus} tax status.` : `${created.title} is on file. Without a tax status an invoice to them cannot resolve a rate.`);
+        try {
+          const fields: Record<string, string | number | boolean> = { email: email.trim(), phone, role, owner: contact ? String(contact.fields.owner ?? context.actor) : context.actor };
+          if (companyId) fields.companyId = companyId;
+          if (taxStatus) fields.taxStatus = taxStatus;
+          if (suppressed) fields.suppressed = true;
+          if (consent && !suppressed) fields.consent = contact?.fields.consent ? String(contact.fields.consent) : `recorded-${clockIso().slice(0, 10)}`;
+          if (contact) {
+            if (!(await context.mutate.patch(contact.id, {
+              title: title.trim(), summary, fields,
+              tags: suppressed ? [...new Set([...contact.tags, "suppressed"])] : contact.tags.filter((tag) => tag !== "suppressed"),
+            }, { expectRevision: contact.revision, event: `Contact ${title.trim()} updated` }))) return;
+            context.toast("Contact saved", suppressed ? `${title.trim()} is suppressed and no automation will contact them.` : `${title.trim()} is updated.`);
+          } else {
+            const created = await context.mutate.create({
+              collection: "contacts", title: title.trim(), status: suppressed ? "suppressed" : "active",
+              summary, fields, tags: suppressed ? ["customer", "suppressed"] : ["customer"],
+            }, `Contact ${title.trim()} created`);
+            context.select(created.id);
+            context.toast("Contact created", taxStatus ? `${created.title} is on file with a ${taxStatus} tax status.` : `${created.title} is on file. Without a tax status an invoice to them cannot resolve a rate.`);
+          }
+          clearWorkingDraft(draftScope);
+          close();
+        } finally {
+          setBusy(false);
         }
-        clearWorkingDraft(draftScope);
-        setBusy(false);
-        close();
       }}
     >
       <Field label="Full name" required><TextInput aria-label="Full name" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
@@ -280,13 +283,17 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
 export function MergePreview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const payload = context.overlayPayload as { ids?: string[] } | undefined;
-  const [picked, setPicked] = useState<string[] | undefined>(payload?.ids);
+  const viewedId = context.params.id;
+  const groups = useMemo(() => duplicateGroups(data.contacts), [data.contacts]);
+  // On a contact page the merge is about that contact only; a single match opens straight to the comparison.
+  const viewedGroups = viewedId ? groups.filter((group) => group.rows.some((row) => row.id === viewedId)) : [];
+  const [picked, setPicked] = useState<string[] | undefined>(payload?.ids ?? (viewedGroups.length === 1 ? viewedGroups[0].rows.map((row) => row.id) : undefined));
   const rows = (picked ?? []).map((id) => data.contacts.find((contact) => contact.id === id)).filter((contact): contact is Rec => Boolean(contact));
   const [keepId, setKeepId] = useState(rows[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
-  const groups = useMemo(() => duplicateGroups(data.contacts), [data.contacts]);
 
   if (rows.length < 2) {
+    if (viewedId) return <Empty title="No duplicate of this contact">Duplicates are found by an identical name. Nothing else matches this contact.</Empty>;
     const forSelected = context.selectedId ? groups.filter((group) => group.rows.some((row) => row.id === context.selectedId)) : [];
     return <MergeGroups groups={forSelected.length ? forSelected : groups} context={context} onPick={(ids) => { setPicked(ids); setKeepId(ids[0]); }} />;
   }
@@ -352,37 +359,40 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
           disabled={!context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = { ...keep.fields };
-            for (const other of others) {
-              for (const [field, value] of Object.entries(other.fields)) {
-                if (fields[field] === undefined || fields[field] === "") fields[field] = value;
+            try {
+              const fields: Record<string, string | number | boolean> = { ...keep.fields };
+              for (const other of others) {
+                for (const [field, value] of Object.entries(other.fields)) {
+                  if (fields[field] === undefined || fields[field] === "") fields[field] = value;
+                }
               }
+              if (anySuppressed) { fields.suppressed = true; delete fields.consent; }
+              else if (consents.length > 0) fields.consent = consents[0];
+              fields.mergedFrom = [String(keep.fields.mergedFrom ?? ""), ...others.map((row) => row.id)].filter(Boolean).join(" ");
+              fields.mergedBy = context.actor;
+              if (!(await context.mutate.patch(keep.id, {
+                status: anySuppressed ? "suppressed" : keep.status,
+                fields,
+                tags: anySuppressed ? [...new Set([...keep.tags, "suppressed"])] : keep.tags,
+              }, { replaceFields: true, expectRevision: keep.revision, event: `Contacts merged into ${keep.title}` }))) return;
+              for (const other of others) {
+                for (const deal of dealsOfContact(data, other.id)) {
+                  if (!(await context.mutate.patch(deal.id, { fields: { ...deal.fields, contactId: keep.id } }, { event: `${deal.title} repointed to the merged contact` }))) return;
+                }
+                for (const invoice of invoicesOfContact(data, other.id)) {
+                  if (!(await context.mutate.patch(invoice.id, { parentId: keep.id, fields: { ...invoice.fields, contactId: keep.id } }, { event: `${invoice.title} repointed to the merged contact` }))) return;
+                }
+                // Keep the merged-away record as evidence: its fields, consent and history stay readable.
+                if (!(await context.mutate.patch(other.id, {
+                  status: "merged",
+                  fields: { ...other.fields, mergedInto: keep.id, mergedAt: clockIso(), mergedBy: context.actor },
+                }, { expectRevision: other.revision, event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept` }))) return;
+              }
+              context.toast("Contacts merged", `${others.length} record${others.length === 1 ? "" : "s"} merged into ${keep.title}. ${anySuppressed ? "The suppression survived the merge." : "The earliest consent was kept."}`);
+              close();
+            } finally {
+              setBusy(false);
             }
-            if (anySuppressed) { fields.suppressed = true; delete fields.consent; }
-            else if (consents.length > 0) fields.consent = consents[0];
-            fields.mergedFrom = [String(keep.fields.mergedFrom ?? ""), ...others.map((row) => row.id)].filter(Boolean).join(" ");
-            fields.mergedBy = context.actor;
-            await context.mutate.patch(keep.id, {
-              status: anySuppressed ? "suppressed" : keep.status,
-              fields,
-              tags: anySuppressed ? [...new Set([...keep.tags, "suppressed"])] : keep.tags,
-            }, { replaceFields: true, expectRevision: keep.revision, event: `Contacts merged into ${keep.title}` });
-            for (const other of others) {
-              for (const deal of dealsOfContact(data, other.id)) {
-                await context.mutate.patch(deal.id, { fields: { ...deal.fields, contactId: keep.id } }, { event: `${deal.title} repointed to the merged contact` });
-              }
-              for (const invoice of invoicesOfContact(data, other.id)) {
-                await context.mutate.patch(invoice.id, { parentId: keep.id, fields: { ...invoice.fields, contactId: keep.id } }, { event: `${invoice.title} repointed to the merged contact` });
-              }
-              // Keep the merged-away record as evidence: its fields, consent and history stay readable.
-              await context.mutate.patch(other.id, {
-                status: "merged",
-                fields: { ...other.fields, mergedInto: keep.id, mergedAt: clockIso(), mergedBy: context.actor },
-              }, { expectRevision: other.revision, event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept` });
-            }
-            context.toast("Contacts merged", `${others.length} record${others.length === 1 ? "" : "s"} merged into ${keep.title}. ${anySuppressed ? "The suppression survived the merge." : "The earliest consent was kept."}`);
-            setBusy(false);
-            close();
           }}
         >
           Merge into {keep.title}
@@ -437,12 +447,15 @@ export function BulkActionConfirmation({ context, close }: { context: ScreenCont
           disabled={eligible.length === 0 || !tag.trim()}
           onClick={async () => {
             setBusy(true);
-            for (const contact of eligible) {
-              await context.mutate.patch(contact.id, { tags: [...new Set([...contact.tags, tag.trim()])] }, { event: `Contact ${contact.title} tagged ${tag.trim()}` });
+            try {
+              for (const contact of eligible) {
+                if (!(await context.mutate.patch(contact.id, { tags: [...new Set([...contact.tags, tag.trim()])] }, { event: `Contact ${contact.title} tagged ${tag.trim()}` }))) return;
+              }
+              context.toast("Tagged", `${eligible.length} contact${eligible.length === 1 ? "" : "s"} tagged ${tag.trim()}. ${suppressed.length} suppressed records were skipped.`);
+              close();
+            } finally {
+              setBusy(false);
             }
-            context.toast("Tagged", `${eligible.length} contact${eligible.length === 1 ? "" : "s"} tagged ${tag.trim()}. ${suppressed.length} suppressed records were skipped.`);
-            setBusy(false);
-            close();
           }}
         >
           Tag {eligible.length} contact{eligible.length === 1 ? "" : "s"}
@@ -570,12 +583,9 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
       </PageSection>
 
       <PageSection span={4} title="Consent" hint="Decides whether anything may be sent">
-        <div className="crm-consent">
-          <ConsentPill contact={contact} />
-        </div>
         <KeyValueList items={[
           { label: "Email", value: String(contact.fields.email ?? "None on file"), mono: true },
-          { label: "Email consent", value: suppressed ? "Withdrawn" : consent || "Not recorded" },
+          { label: "Email consent", value: suppressed ? "Withdrawn" : consent ? consentLabel(consent).replace(/^[A-Za-z]+ consent, /, "Given ") : "Not recorded" },
           { label: "Messages", value: suppressed ? "Blocked" : "Drafted here, never sent" },
         ]} />
       </PageSection>
@@ -871,28 +881,31 @@ export function ComposeMessage({ context, close }: { context: ScreenContext; clo
           disabled={Boolean(blocked) || !body.trim()}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.create({
-              collection: "emailThreads",
-              title: `Draft to ${contact.title}`,
-              status: "draft",
-              summary: body.slice(0, 160),
-              fields: { to, delivery: "not_connected", contactId: contact.id, author: context.actor },
-              body: { messages: [{ at: clockIso(), from: `${context.actor} at ${org.name}`, body }] },
-            }, `Message drafted to ${contact.title}`);
-            await context.mutate.create({
-              collection: "activities",
-              title: `Email drafted to ${contact.title}`,
-              status: "draft",
-              summary: body.slice(0, 120),
-              startAt: clockIso(),
-              at: clockIso(),
-              parentId: contact.id,
-              fields: { kind: "email", contactId: contact.id, delivery: "not_connected", owner: context.actor },
-            }, `Activity logged for the draft to ${contact.title}`);
-            clearWorkingDraft(draftScope);
-            context.toast("Draft saved", `The message to ${to} is kept in this workspace and logged as an activity. No mail provider is connected.`, "info");
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.create({
+                collection: "emailThreads",
+                title: `Draft to ${contact.title}`,
+                status: "draft",
+                summary: body.slice(0, 160),
+                fields: { to, delivery: "not_connected", contactId: contact.id, author: context.actor },
+                body: { messages: [{ at: clockIso(), from: `${context.actor} at ${org.name}`, body }] },
+              }, `Message drafted to ${contact.title}`);
+              await context.mutate.create({
+                collection: "activities",
+                title: `Email drafted to ${contact.title}`,
+                status: "draft",
+                summary: body.slice(0, 120),
+                startAt: clockIso(),
+                at: clockIso(),
+                parentId: contact.id,
+                fields: { kind: "email", contactId: contact.id, delivery: "not_connected", owner: context.actor },
+              }, `Activity logged for the draft to ${contact.title}`);
+              clearWorkingDraft(draftScope);
+              context.toast("Draft saved", `The message to ${to} is kept in this workspace and logged as an activity. No mail provider is connected.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save the draft
@@ -926,25 +939,28 @@ export function ActivityComposer({ context, close }: { context: ScreenContext; c
         event.preventDefault();
         if (!title.trim()) return;
         setBusy(true);
-        const fields: Record<string, string | number | boolean> = { kind, owner: context.actor };
-        if (contact) fields.contactId = contact.id;
-        if (dealId) fields.dealId = dealId;
-        if (outcome) fields.outcome = outcome;
-        await context.mutate.create({
-          collection: "activities",
-          title: title.trim(),
-          status: new Date(when) > now ? "open" : "done",
-          summary: note,
-          startAt: new Date(when).toISOString(),
-          at: new Date(when).toISOString(),
-          parentId: dealId || contact?.id,
-          fields,
-        }, `Activity ${title.trim()} logged`);
-        context.toast("Activity logged", new Date(when) > now
-          ? `${title.trim()} is scheduled for ${context.dateTime(when)}. No calendar is connected, so nothing was invited.`
-          : `${title.trim()} is on the record with its outcome.`);
-        setBusy(false);
-        close();
+        try {
+          const fields: Record<string, string | number | boolean> = { kind, owner: context.actor };
+          if (contact) fields.contactId = contact.id;
+          if (dealId) fields.dealId = dealId;
+          if (outcome) fields.outcome = outcome;
+          await context.mutate.create({
+            collection: "activities",
+            title: title.trim(),
+            status: new Date(when) > now ? "open" : "done",
+            summary: note,
+            startAt: new Date(when).toISOString(),
+            at: new Date(when).toISOString(),
+            parentId: dealId || contact?.id,
+            fields,
+          }, `Activity ${title.trim()} logged`);
+          context.toast("Activity logged", new Date(when) > now
+            ? `${title.trim()} is scheduled for ${context.dateTime(when)}. No calendar is connected, so nothing was invited.`
+            : `${title.trim()} is on the record with its outcome.`);
+          close();
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <Row gap={3} wrap>

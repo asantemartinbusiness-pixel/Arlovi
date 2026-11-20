@@ -563,6 +563,14 @@ function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenC
     }
   }
 
+  if (state === "none" && startingAmount === 0) {
+    return (
+      <Empty title="This service takes no deposit">
+        Nothing is requested or received for {booking.title}. To ask for a deposit, set one on the service in Services &amp; Pricing.
+      </Empty>
+    );
+  }
+
   return (
     <div className="book-deposit-flow">
       <ModalUnsavedChanges when={hasUnsavedWork} />

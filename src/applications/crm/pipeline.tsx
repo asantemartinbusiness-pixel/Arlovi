@@ -4,7 +4,7 @@ import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { ArrowLeft, ArrowRight, GripVertical, Kanban } from "lucide-react";
 import {
   BarChart, Button, Card, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, Kbd, MoneyInput, Notice, OverlayActions, OverlaySection,
-  OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  OverlaySummary, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -427,37 +427,40 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
 
   const save = async () => {
     setBusy(true);
-    const fields: Record<string, string | number | boolean> = {
-      stage: stageId,
-      probability: stage.probability,
-      owner: existing ? String(existing.fields.owner ?? context.actor) : context.actor,
-    };
-    if (contactId) fields.contactId = contactId;
-    if (companyId) fields.companyId = companyId;
-    if (closeDate) fields.closeDate = closeDate;
-    if (existing) {
-      const saved = await context.mutate.patch(existing.id, {
-        title: title.trim(), summary, amountMinor: amount, status: stageId,
-        dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : existing.dueAt,
-        fields: { ...existing.fields, ...fields },
-      }, { expectRevision: existing.revision, event: `Deal ${title.trim()} updated` });
-      if (!saved) { setBusy(false); return; }
-      context.toast("Deal saved", `${title.trim()} is in ${stage.label} at ${stage.probability}%.`);
-    } else {
-      const created = await context.mutate.create({
-        collection: "deals", title: title.trim(), status: stageId, summary,
-        amountMinor: amount,
-        at: now.toISOString(),
-        dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : undefined,
-        parentId: companyId || undefined,
-        fields,
-      }, `Deal ${title.trim()} created`);
-      context.select(created.id);
-      context.toast("Deal created", `${created.title} is in ${stage.label}. Its weighted value is ${context.money(weighted)}.`);
+    try {
+      const fields: Record<string, string | number | boolean> = {
+        stage: stageId,
+        probability: stage.probability,
+        owner: existing ? String(existing.fields.owner ?? context.actor) : context.actor,
+      };
+      if (contactId) fields.contactId = contactId;
+      if (companyId) fields.companyId = companyId;
+      if (closeDate) fields.closeDate = closeDate;
+      if (existing) {
+        const saved = await context.mutate.patch(existing.id, {
+          title: title.trim(), summary, amountMinor: amount, status: stageId,
+          dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : existing.dueAt,
+          fields: { ...existing.fields, ...fields },
+        }, { expectRevision: existing.revision, event: `Deal ${title.trim()} updated` });
+        if (!saved) { setBusy(false); return; }
+        context.toast("Deal saved", `${title.trim()} is in ${stage.label} at ${stage.probability}%.`);
+      } else {
+        const created = await context.mutate.create({
+          collection: "deals", title: title.trim(), status: stageId, summary,
+          amountMinor: amount,
+          at: now.toISOString(),
+          dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : undefined,
+          parentId: companyId || undefined,
+          fields,
+        }, `Deal ${title.trim()} created`);
+        context.select(created.id);
+        context.toast("Deal created", `${created.title} is in ${stage.label}. Its weighted value is ${context.money(weighted)}.`);
+      }
+      clearWorkingDraft(draftScope);
+      close();
+    } finally {
+      setBusy(false);
     }
-    clearWorkingDraft(draftScope);
-    setBusy(false);
-    close();
   };
 
   return (
@@ -559,27 +562,40 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
   );
 }
 
+/** Head for the deal-scoped dialogs (stage change, lost reason, assign owner): the one place the deal is named. */
+export function DealContextSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useCrmData();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const deal = data.deals.find((item) => item.id === (payload?.id ?? context.selectedId ?? context.params.id));
+  if (!deal) return null;
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={deal.title}
+      status={<StagePill deal={deal} />}
+      meta={[<span className="ds-num" key="a">{context.money(Number(deal.amountMinor ?? 0))}</span>, companyOfDeal(data, deal)?.title, `Owner ${String(deal.fields.owner ?? deal.ownerName)}`]}
+    />
+  );
+}
+
 export function StageChangeValidation({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const move = useStageMove(context);
   const payload = context.overlayPayload as { id?: string } | undefined;
   const deal = data.deals.find((item) => item.id === (payload?.id ?? context.selectedId ?? context.params.id));
-  const [target, setTarget] = useState(deal ? stageOf(deal).id : "discovery");
+  // Start on the next stage, so the first verdict answers "can it advance?" rather than "can it stay?".
+  const [target, setTarget] = useState(() => (deal ? STAGES[Math.min(STAGES.length - 1, stageIndex(stageOf(deal).id) + 1)].id : "discovery"));
   const [busy, setBusy] = useState(false);
   if (!deal) return <Empty title="Select a deal first">Choose a card on the board, then validate a stage change.</Empty>;
 
   const stage = STAGES.find((item) => item.id === target)!;
-  const guard = stageGuard(deal, stage);
+  const unchanged = stage.id === stageOf(deal).id;
+  const guard = unchanged ? undefined : stageGuard(deal, stage);
   const current = stageOf(deal);
   const requirements = current.requires ?? [];
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Deal", value: deal.title },
-        { label: "Current stage", value: current.label },
-        { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
-      ]} />
       <Field label="Move to">
         <Select aria-label="Move to" value={target} onChange={(event) => setTarget(event.target.value)}>
           {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -601,14 +617,16 @@ export function StageChangeValidation({ context, close }: { context: ScreenConte
           {requirements.length === 0 && <span className="ds-subtle">This stage has no extra requirement.</span>}
         </Stack>
       </Card>
-      {guard
+      {unchanged
+        ? <p className="ds-subtle">Choose a different stage to see whether the move is allowed.</p>
+        : guard
         ? <Notice tone="danger" title="This move will be refused">{guard}</Notice>
         : <Notice tone="success" title="This move is allowed">The weighting will change from {probabilityOf(deal)}% to {stage.probability}%.</Notice>}
       <Row gap={2}>
         <Button
           variant="primary"
           busy={busy}
-          disabled={Boolean(guard)}
+          disabled={Boolean(guard) || unchanged}
           onClick={async () => { setBusy(true); await move(deal, stage); setBusy(false); close(); }}
         >
           Move to {stage.label}
@@ -634,38 +652,33 @@ export function LostReason({ context, close }: { context: ScreenContext; close: 
       <Notice tone="warning" title="Closing a deal as lost is recorded, not deleted">
         {deal.title} stays in the pipeline with its reason, which is what makes a win and loss analysis possible later.
       </Notice>
-      <Properties rows={[
-        { label: "Deal", value: deal.title },
-        { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
-        { label: "Current stage", value: stageOf(deal).label },
-      ]} />
       <Field label="Reason" required>
         <Select aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)}>
           {LOST_REASONS.map((item) => <option key={item}>{item}</option>)}
         </Select>
       </Field>
       <Field label="What happened"><TextArea aria-label="What happened" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
-      <Row gap={2}>
+      <OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={
         <Button
           variant="danger"
           busy={busy}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(deal.id, {
-              status: "lost",
-              summary: note || deal.summary,
-              fields: { ...deal.fields, stage: "lost", probability: 0, lostReason: reason, lostAt: clockIso(), lostBy: context.actor },
-            }, { expectRevision: deal.revision, event: `${deal.title} closed lost: ${reason}` });
-            context.toast("Deal closed lost", `${deal.title} is recorded as lost for ${reason.toLowerCase()}. The weighted forecast fell by ${context.money(Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100))}.`);
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(deal.id, {
+                status: "lost",
+                summary: note || deal.summary,
+                fields: { ...deal.fields, stage: "lost", probability: 0, lostReason: reason, lostAt: clockIso(), lostBy: context.actor },
+              }, { expectRevision: deal.revision, event: `${deal.title} closed lost: ${reason}` }))) return;
+              context.toast("Deal closed lost", `${deal.title} is recorded as lost for ${reason.toLowerCase()}. The weighted forecast fell by ${context.money(Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100))}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Close as lost
-        </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} />
     </Stack>
   );
 }

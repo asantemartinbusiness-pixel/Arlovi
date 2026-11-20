@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Button, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, DataGrid, Empty, Field, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -120,20 +120,23 @@ export function AssignFollowUp({ context, close }: { context: ScreenContext; clo
           onClick={async () => {
             if (!deal) return;
             setBusy(true);
-            await context.mutate.create({
-              collection: "activities",
-              title: what.trim(),
-              status: "open",
-              summary: `Follow-up on ${deal.title}, assigned by ${context.actor}.`,
-              dueAt: `${due}T17:00:00.000Z`,
-              startAt: `${due}T09:00:00.000Z`,
-              at: `${due}T09:00:00.000Z`,
-              parentId: deal.id,
-              fields: { kind: "task", dealId: deal.id, contactId: String(deal.fields.contactId ?? ""), owner, assignedBy: context.actor },
-            }, `Follow-up on ${deal.title} assigned to ${owner}`);
-            context.toast("Follow-up assigned", `${owner} owns “${what.trim()}” on ${deal.title}, due ${context.date(due)}.`);
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.create({
+                collection: "activities",
+                title: what.trim(),
+                status: "open",
+                summary: `Follow-up on ${deal.title}, assigned by ${context.actor}.`,
+                dueAt: `${due}T17:00:00.000Z`,
+                startAt: `${due}T09:00:00.000Z`,
+                at: `${due}T09:00:00.000Z`,
+                parentId: deal.id,
+                fields: { kind: "task", dealId: deal.id, contactId: String(deal.fields.contactId ?? ""), owner, assignedBy: context.actor },
+              }, `Follow-up on ${deal.title} assigned to ${owner}`);
+              context.toast("Follow-up assigned", `${owner} owns “${what.trim()}” on ${deal.title}, due ${context.date(due)}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Assign the follow-up
@@ -167,17 +170,20 @@ export function AskSales({ context, close }: { context: ScreenContext; close: ()
           disabled={!question.trim()}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.create({
-              collection: "messages",
-              title: `Question for Sales: ${question.trim().slice(0, 60)}`,
-              status: "queued_local",
-              summary: question.trim(),
-              tags: ["crm", "ask-sales"],
-              fields: { to: "Sales", askedBy: context.actor, screenId: context.screen.id, capability: "not_connected" },
-            }, `Question asked of Sales by ${context.actor}`);
-            setAsked(question.trim());
-            context.toast("Question kept", "It is stored for the Sales employee. No model is connected, so the answer below is only the records that match your words.", "info");
-            setBusy(false);
+            try {
+              await context.mutate.create({
+                collection: "messages",
+                title: `Question for Sales: ${question.trim().slice(0, 60)}`,
+                status: "queued_local",
+                summary: question.trim(),
+                tags: ["crm", "ask-sales"],
+                fields: { to: "Sales", askedBy: context.actor, screenId: context.screen.id, capability: "not_connected" },
+              }, `Question asked of Sales by ${context.actor}`);
+              setAsked(question.trim());
+              context.toast("Question kept", "It is stored for the Sales employee. No model is connected, so the answer below is only the records that match your words.", "info");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Ask Sales
@@ -248,12 +254,15 @@ export function AttachRecord({ context, close }: { context: ScreenContext; close
           onClick={async () => {
             if (!record) return;
             setBusy(true);
-            const saved = await context.mutate.patch(contact.id, {
-              body: { ...(contact.body as object ?? {}), attached: [...attached, { id: record.id, collection: record.collection, title: record.title, by: context.actor, at: clockIso() }] },
-            }, { expectRevision: contact.revision, event: `${record.title} attached to ${contact.title}` });
-            if (saved) context.toast("Record attached", `${record.title} is linked on ${contact.title}'s profile.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(contact.id, {
+                body: { ...(contact.body as object ?? {}), attached: [...attached, { id: record.id, collection: record.collection, title: record.title, by: context.actor, at: clockIso() }] },
+              }, { expectRevision: contact.revision, event: `${record.title} attached to ${contact.title}` });
+              if (saved) context.toast("Record attached", `${record.title} is linked on ${contact.title}'s profile.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Attach to {contact.title}
@@ -324,13 +333,16 @@ export function AssignLead({ context, close }: { context: ScreenContext; close: 
           disabled={Boolean(blocked) || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(lead.id, {
-              status: lead.status === "new" ? "working" : lead.status,
-              fields: { ...lead.fields, owner, assignedBy: context.actor, assignedAt: clockIso() },
-            }, { expectRevision: lead.revision, event: `Lead ${lead.title} assigned to ${owner} by ${context.actor}` });
-            if (saved) context.toast("Lead assigned", `${owner} now owns ${lead.title}. Nobody was contacted.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(lead.id, {
+                status: lead.status === "new" ? "working" : lead.status,
+                fields: { ...lead.fields, owner, assignedBy: context.actor, assignedAt: clockIso() },
+              }, { expectRevision: lead.revision, event: `Lead ${lead.title} assigned to ${owner} by ${context.actor}` });
+              if (saved) context.toast("Lead assigned", `${owner} now owns ${lead.title}. Nobody was contacted.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Assign to {owner || "…"}
@@ -385,15 +397,18 @@ export function BulkRoute({ context, close }: { context: ScreenContext; close: (
           disabled={routable.length === 0 || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            for (const row of routable) {
-              await context.mutate.patch(row.lead.id, {
-                status: row.lead.status === "new" ? "working" : row.lead.status,
-                fields: { ...row.lead.fields, owner: row.owner!, assignedBy: context.actor, routedBy: "bulk route" },
-              }, { expectRevision: row.lead.revision, event: `Lead ${row.lead.title} routed to ${row.owner}` });
+            try {
+              for (const row of routable) {
+                if (!(await context.mutate.patch(row.lead.id, {
+                  status: row.lead.status === "new" ? "working" : row.lead.status,
+                  fields: { ...row.lead.fields, owner: row.owner!, assignedBy: context.actor, routedBy: "bulk route" },
+                }, { expectRevision: row.lead.revision, event: `Lead ${row.lead.title} routed to ${row.owner}` }))) return;
+              }
+              context.toast("Leads routed", `${routable.length} assigned. ${plan.length - routable.length} skipped.`);
+              close();
+            } finally {
+              setBusy(false);
             }
-            context.toast("Leads routed", `${routable.length} assigned. ${plan.length - routable.length} skipped.`);
-            setBusy(false);
-            close();
           }}
         >
           Route {routable.length} lead{routable.length === 1 ? "" : "s"}
@@ -434,12 +449,15 @@ export function AssignOwner({ context, close }: { context: ScreenContext; close:
           disabled={Boolean(blocked) || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(deal.id, {
-              fields: { ...deal.fields, owner, previousOwner: current, ownerChangedBy: context.actor },
-            }, { expectRevision: deal.revision, event: `${deal.title} reassigned from ${current || "nobody"} to ${owner}` });
-            if (saved) context.toast("Owner assigned", `${owner} now owns ${deal.title}.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(deal.id, {
+                fields: { ...deal.fields, owner, previousOwner: current, ownerChangedBy: context.actor },
+              }, { expectRevision: deal.revision, event: `${deal.title} reassigned from ${current || "nobody"} to ${owner}` });
+              if (saved) context.toast("Owner assigned", `${owner} now owns ${deal.title}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Assign to {owner || "…"}
@@ -485,14 +503,17 @@ export function ApproveQuote({ context, close }: { context: ScreenContext; close
           disabled={Boolean(blocked) || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              ...quote.fields, approvedBy: context.actor, approvedAt: clockIso(), approvedVersion: Number(quote.fields.version ?? 1), approvedGrossMinor: totals.grossMinor,
-            };
-            delete fields.discountApproval;
-            const saved = await context.mutate.patch(quote.id, { status: "approved", fields }, { replaceFields: true, expectRevision: quote.revision, event: `Quote ${quote.title} approved by ${context.actor}` });
-            if (saved) context.toast("Quote approved", `${quote.title} is approved by ${context.actor} and can be sent.`);
-            setBusy(false);
-            close();
+            try {
+              const fields: Record<string, string | number | boolean> = {
+                ...quote.fields, approvedBy: context.actor, approvedAt: clockIso(), approvedVersion: Number(quote.fields.version ?? 1), approvedGrossMinor: totals.grossMinor,
+              };
+              delete fields.discountApproval;
+              const saved = await context.mutate.patch(quote.id, { status: "approved", fields }, { replaceFields: true, expectRevision: quote.revision, event: `Quote ${quote.title} approved by ${context.actor}` });
+              if (saved) context.toast("Quote approved", `${quote.title} is approved by ${context.actor} and can be sent.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Approve the quote
@@ -530,27 +551,30 @@ export function DuplicateQuote({ context, close }: { context: ScreenContext; clo
           disabled={!number.trim() || taken}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              ...fieldsForQuoteDuplicate(quote),
-              number: number.trim(), version: 1, duplicatedFrom: quote.id,
-            };
-            const body = duplicateQuoteBody(quote);
-            const created = await context.mutate.create({
-              collection: "quotes",
-              title: `${number.trim()} ${quote.title.replace(/^\S+\s*/, "")}`,
-              status: "draft",
-              summary: `Re-pricing copy of ${quote.title}.`,
-              amountMinor: quote.amountMinor,
-              at: now.toISOString(),
-              dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
-              parentId: quote.parentId,
-              fields,
-              body,
-            }, `Quote ${quote.title} duplicated as ${number.trim()}`);
-            context.select(created.id);
-            context.toast("Duplicated", `${created.title} is a draft copy. Open it to re-price.`);
-            setBusy(false);
-            context.openOverlay("Quote editor", { id: created.id });
+            try {
+              const fields: Record<string, string | number | boolean> = {
+                ...fieldsForQuoteDuplicate(quote),
+                number: number.trim(), version: 1, duplicatedFrom: quote.id,
+              };
+              const body = duplicateQuoteBody(quote);
+              const created = await context.mutate.create({
+                collection: "quotes",
+                title: `${number.trim()} ${quote.title.replace(/^\S+\s*/, "")}`,
+                status: "draft",
+                summary: `Re-pricing copy of ${quote.title}.`,
+                amountMinor: quote.amountMinor,
+                at: now.toISOString(),
+                dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+                parentId: quote.parentId,
+                fields,
+                body,
+              }, `Quote ${quote.title} duplicated as ${number.trim()}`);
+              context.select(created.id);
+              context.toast("Duplicated", `${created.title} is a draft copy. Open it to re-price.`);
+              context.openOverlay("Quote editor", { id: created.id });
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Duplicate and open
@@ -593,22 +617,25 @@ export function AddReminder({ context, close }: { context: ScreenContext; close:
           disabled={!title.trim() || past}
           onClick={async () => {
             setBusy(true);
-            const at = new Date(when).toISOString();
-            await context.mutate.create({
-              collection: "activities",
-              title: title.trim(),
-              status: "open",
-              summary: deal ? `Reminder on ${deal.title}.` : "Reminder.",
-              startAt: at,
-              dueAt: at,
-              at,
-              parentId: deal?.id,
-              tags: ["reminder"],
-              fields: { kind: "task", reminder: true, remindAt: at, owner: context.actor, delivery: "not_connected", ...(deal ? { dealId: deal.id } : {}) },
-            }, `Reminder set for ${context.actor}: ${title.trim()}`);
-            context.toast("Reminder set", `It appears in Follow-ups at ${context.dateTime(at)}. No calendar or phone will alert you.`, "info");
-            setBusy(false);
-            close();
+            try {
+              const at = new Date(when).toISOString();
+              await context.mutate.create({
+                collection: "activities",
+                title: title.trim(),
+                status: "open",
+                summary: deal ? `Reminder on ${deal.title}.` : "Reminder.",
+                startAt: at,
+                dueAt: at,
+                at,
+                parentId: deal?.id,
+                tags: ["reminder"],
+                fields: { kind: "task", reminder: true, remindAt: at, owner: context.actor, delivery: "not_connected", ...(deal ? { dealId: deal.id } : {}) },
+              }, `Reminder set for ${context.actor}: ${title.trim()}`);
+              context.toast("Reminder set", `It appears in Follow-ups at ${context.dateTime(at)}. No calendar or phone will alert you.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Add the reminder
@@ -646,13 +673,16 @@ export function CompleteTask({ context, close }: { context: ScreenContext; close
           onClick={async () => {
             if (!task) return;
             setBusy(true);
-            const saved = await context.mutate.patch(task.id, {
-              status: "done",
-              fields: { ...task.fields, completedBy: context.actor, completedAt: clockIso(), ...(outcome ? { outcome } : {}) },
-            }, { expectRevision: task.revision, event: `Activity ${task.title} completed by ${context.actor}` });
-            if (saved) context.toast("Task completed", `${task.title} is done and moved to History.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(task.id, {
+                status: "done",
+                fields: { ...task.fields, completedBy: context.actor, completedAt: clockIso(), ...(outcome ? { outcome } : {}) },
+              }, { expectRevision: task.revision, event: `Activity ${task.title} completed by ${context.actor}` });
+              if (saved) context.toast("Task completed", `${task.title} is done and moved to History.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Mark complete
@@ -711,17 +741,20 @@ export function AdjustAssumptions({ context, close }: { context: ScreenContext; 
           disabled={!name.trim()}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.create({
-              collection: "preferences",
-              title: `Forecast scenario · ${name.trim()}`,
-              status: "saved",
-              summary: `Every open deal shifted ${shift >= 0 ? "+" : ""}${shift} points.`,
-              amountMinor: adjusted,
-              fields: { kind: "salesForecastScenario", shift, baseMinor: base, adjustedMinor: adjusted, setBy: context.actor, openDeals: open.length },
-            }, `Forecast scenario ${name.trim()} saved by ${context.actor}`);
-            context.toast("Scenario saved", `${name.trim()}: ${context.money(adjusted)} weighted. No deal changed.`);
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.create({
+                collection: "preferences",
+                title: `Forecast scenario · ${name.trim()}`,
+                status: "saved",
+                summary: `Every open deal shifted ${shift >= 0 ? "+" : ""}${shift} points.`,
+                amountMinor: adjusted,
+                fields: { kind: "salesForecastScenario", shift, baseMinor: base, adjustedMinor: adjusted, setBy: context.actor, openDeals: open.length },
+              }, `Forecast scenario ${name.trim()} saved by ${context.actor}`);
+              context.toast("Scenario saved", `${name.trim()}: ${context.money(adjusted)} weighted. No deal changed.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save the assumption
@@ -795,19 +828,22 @@ export function ReviewForecast({ context, close }: { context: ScreenContext; clo
           busy={busy}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.create({
-              collection: "preferences",
-              title: `Forecast reviewed ${context.date(context.now)}`,
-              status: "reviewed",
-              summary: note || "Forecast reviewed with no comment.",
-              amountMinor: f.weightedMinor,
-              at: clockIso(),
-              fields: { kind: "salesForecastSnapshot", pipelineMinor: f.pipelineMinor, weightedMinor: f.weightedMinor, openCount: f.openCount, reviewedBy: context.actor },
-              body: { byStage: f.byStage.map((entry) => ({ stage: entry.stage.id, count: entry.count, amountMinor: entry.amountMinor, weightedMinor: entry.weightedMinor })) },
-            }, `Sales forecast reviewed by ${context.actor}`);
-            context.toast("Forecast reviewed", `A snapshot of ${context.money(f.weightedMinor)} weighted is kept under History.`);
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.create({
+                collection: "preferences",
+                title: `Forecast reviewed ${context.date(context.now)}`,
+                status: "reviewed",
+                summary: note || "Forecast reviewed with no comment.",
+                amountMinor: f.weightedMinor,
+                at: clockIso(),
+                fields: { kind: "salesForecastSnapshot", pipelineMinor: f.pipelineMinor, weightedMinor: f.weightedMinor, openCount: f.openCount, reviewedBy: context.actor },
+                body: { byStage: f.byStage.map((entry) => ({ stage: entry.stage.id, count: entry.count, amountMinor: entry.amountMinor, weightedMinor: entry.weightedMinor })) },
+              }, `Sales forecast reviewed by ${context.actor}`);
+              context.toast("Forecast reviewed", `A snapshot of ${context.money(f.weightedMinor)} weighted is kept under History.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record the review
@@ -862,30 +898,30 @@ export function StopRule({ context, close }: { context: ScreenContext; close: ()
       </Notice>
       {rule.status !== "active" && <Notice tone="info" title="Not running">{rule.title} is {rule.status}.</Notice>}
       <Field label="Why" required><TextInput aria-label="Why" value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
-      <Row gap={2}>
+      <OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={
         <Button
           variant="danger"
           busy={busy}
           disabled={rule.status !== "active" || !reason.trim() || !context.can("run_automation")}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(rule.id, {
-              status: "stopped",
-              fields: { ...rule.fields, stoppedBy: context.actor, stoppedAt: clockIso(), stopReason: reason.trim() },
-            }, { expectRevision: rule.revision, event: `Workflow ${rule.title} stopped by ${context.actor}: ${reason.trim()}` });
-            for (const run of queued) {
-              await context.mutate.patch(run.id, { status: "cancelled", fields: { ...run.fields, cancelledBy: context.actor } }, { event: `Run of ${rule.title} cancelled when the rule stopped` });
+            try {
+              const saved = await context.mutate.patch(rule.id, {
+                status: "stopped",
+                fields: { ...rule.fields, stoppedBy: context.actor, stoppedAt: clockIso(), stopReason: reason.trim() },
+              }, { expectRevision: rule.revision, event: `Workflow ${rule.title} stopped by ${context.actor}: ${reason.trim()}` });
+              for (const run of queued) {
+                if (!(await context.mutate.patch(run.id, { status: "cancelled", fields: { ...run.fields, cancelledBy: context.actor } }, { event: `Run of ${rule.title} cancelled when the rule stopped` }))) return;
+              }
+              if (saved) context.toast("Rule stopped", `${rule.title} is stopped. ${queued.length} queued runs cancelled.`, "blocked");
+              close();
+            } finally {
+              setBusy(false);
             }
-            if (saved) context.toast("Rule stopped", `${rule.title} is stopped. ${queued.length} queued runs cancelled.`, "blocked");
-            setBusy(false);
-            close();
           }}
         >
           Stop the rule
-        </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} />
     </Stack>
   );
 }

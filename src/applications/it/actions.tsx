@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { Siren } from "lucide-react";
 import { Button, Empty, FactGrid, Field, KeyValueList, Notice, OverlayActions, Pill, Row, Select, Stack } from "@/design-system";
 import type { Audit, Rec } from "@/domain/types";
@@ -165,10 +166,10 @@ export const mergeIncidents = actOverlay({
       fields: { ...record.fields, mergedFrom, mergeEvidence: `${values.evidence}: ${values.note}` },
     }, { expectRevision: record.revision, event: `${duplicate.title} merged into ${record.title} on evidence (${values.evidence}): ${values.note}` });
     if (!kept) return;
-    await context.mutate.patch(duplicate.id, {
+    if (!(await context.mutate.patch(duplicate.id, {
       status: "merged",
       fields: { ...duplicate.fields, mergedInto: record.id, mergeEvidence: `${values.evidence}: ${values.note}` },
-    }, { expectRevision: duplicate.revision, event: `${duplicate.title} closed as merged into ${record.title}` });
+    }, { expectRevision: duplicate.revision, event: `${duplicate.title} closed as merged into ${record.title}` }))) throw new Error(CHANGED_ELSEWHERE);
     return `${duplicate.title} is merged into ${record.title}. Both records are kept.`;
   },
 });
@@ -502,7 +503,7 @@ export const executeRunbookOverlay = actOverlay({
   apply: async ({ record, context }) => {
     if (!record) return;
     const outcome = await executeRunbook(context, runbookKey(record));
-    await context.mutate.patch(record.id, { fields: { ...record.fields, lastRunAt: nowIso(context), lastRunBy: context.actor, lastOutcome: outcome } }, { expectRevision: record.revision, event: `Runbook ${record.title} executed by ${context.actor}: ${outcome}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastRunAt: nowIso(context), lastRunBy: context.actor, lastOutcome: outcome } }, { expectRevision: record.revision, event: `Runbook ${record.title} executed by ${context.actor}: ${outcome}` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Runs");
     return outcome;
   },
@@ -695,7 +696,7 @@ export const testRelease = actOverlay({
     if (!record) return;
     const totals = await runDiagnosticsNow(context);
     const result = `${totals.pass} passed, ${totals.warn} to review, ${totals.fail} failed`;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, testedAt: nowIso(context), testedBy: context.actor, testResult: result } }, { expectRevision: record.revision, event: `Release ${record.title} tested: ${result}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, testedAt: nowIso(context), testedBy: context.actor, testResult: result } }, { expectRevision: record.revision, event: `Release ${record.title} tested: ${result}` }))) throw new Error(CHANGED_ELSEWHERE);
     return { body: `${record.title}: ${result}.`, tone: totals.fail ? "blocked" : "ok" };
   },
 });

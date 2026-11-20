@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import {
-  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Row, Select, Stack, Stat, StatRow, TextArea,
+  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, Pill, Row, Select, Stack, Stat, StatRow, TextArea,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useWorkspace } from "@/platform/workspace";
@@ -56,7 +56,7 @@ export function TaxCodesTab({ context }: { context: ScreenContext }) {
 
       {drifted.length > 0 && (
         <Notice tone="danger" title={`${drifted.length} active code record${drifted.length === 1 ? "" : "s"} disagree${drifted.length === 1 ? "s" : ""} with the engine`}>
-          {drifted.map((item) => `${item.record.title} (${item.code}): ${item.reason}`).join(" ")}
+          {drifted.map((item) => (item.code ? `${item.record.title} (${item.code}): ${item.reason}` : `${item.record.title}: ${item.reason}`)).join(" ")}
         </Notice>
       )}
 
@@ -497,12 +497,6 @@ export function ReturnReview({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <OverlaySummary
-        eyebrow="Return review"
-        title={periodLabel(period, org.locale)}
-        status={boxes.unknownDocumentIds.length > 0 ? <Pill tone="danger" dot>Validation failed</Pill> : <Pill tone="success" dot>Validation passed</Pill>}
-        meta={[org.jurisdiction, <span className="ds-num" key="p">Computed {context.dateTime(context.now)}</span>, <CapabilityPill key="f" id="tax.file" />]}
-      />
       {boxes.unknownDocumentIds.length > 0 ? (
         <Notice tone="danger" title="Validation failed">
           {boxes.unknownDocumentIds.length} document{boxes.unknownDocumentIds.length === 1 ? " has" : "s have"} a line with no approved rate. The return cannot be prepared as final while that is true.

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Banknote, FileWarning, ReceiptText, ScrollText } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, Empty, FactGrid, Grid, LineChart, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Field, TextArea,
+  BarChart, Button, Card, DataGrid, Empty, FactGrid, Grid, LineChart, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Field, TextArea,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -330,7 +330,7 @@ export function FinanceInsights({ context }: { context: ScreenContext }) {
 
 export function MetricDrilldown({ context }: { context: ScreenContext }) {
   const data = useFinData();
-  const { org, now } = useWorkspace();
+  const { org } = useWorkspace();
   const payload = context.overlayPayload as { metric?: string } | undefined;
   const metric = payload?.metric ?? "cash";
 
@@ -338,9 +338,6 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     const recon = reconcile({ accounts: data.accounts, journals: data.journals, lines: data.bankLines, bankAccountCode: "1000" });
     return (
       <Stack gap={4}>
-        <OverlaySummary eyebrow="Figure" title="Bank statement balance"
-          status={<Pill tone="warning" dot>Not verified by a provider</Pill>}
-          meta={[recon.statement ? `${recon.statement.filename}, imported by hand` : "No statement imported"]} />
         <CapabilityNotice id="bank.feed" />
         {recon.statement ? (
           <FactGrid columns={3} items={[
@@ -359,8 +356,6 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     const cashAccounts = data.accounts.filter((account) => cashFlow(data.accounts, data.journals).cashAccountIds.includes(account.id));
     return (
       <Stack gap={4}>
-        <OverlaySummary eyebrow="Figure" title="Cash on the ledger" status={<Pill tone="success">Posted</Pill>}
-          meta={["Posted debits less credits on every cash account; nothing is taken from a feed", data.cash.lastPosted ? `Last posting ${context.date(data.cash.lastPosted)} (${freshness(data.cash.lastPosted, now).days} days)` : "No posting recorded"]} />
         <StatementRow
           context={context}
           rows={[
@@ -379,8 +374,6 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     const month = trialForRange(data.accounts, data.journals, org.id, { period: data.currentPeriod });
     return (
       <Stack gap={4}>
-        <OverlaySummary eyebrow="Figure" title={`Result · ${periodLabel(data.currentPeriod, org.locale)}`} status={<Pill tone="success">Posted</Pill>}
-          meta={[`${month.journalCount} posted journals; drafts are excluded`]} />
         <StatementRow
           context={context}
           rows={month.rows.filter((row) => ["revenue", "expense"].includes(row.type) && row.balanceMinor !== 0)
@@ -395,8 +388,6 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     : openInvoices(data.invoices);
   return (
     <Stack gap={3}>
-      <OverlaySummary eyebrow="Figure" title={metric === "payable" ? "Payable" : "Receivable"} status={<Pill tone="success">Posted</Pill>}
-        meta={[`${rows.length} records summed: each row is the record the figure came from`]} />
       <DataGrid
         rows={rows}
         rowId={(row) => row.id}

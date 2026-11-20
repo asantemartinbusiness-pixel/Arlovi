@@ -38,10 +38,19 @@ export function PersonLink({ contact, context }: { contact: Rec | undefined; con
   );
 }
 
+/** "email-2026-09-12" reads as "Email consent, 12 Sep 2026"; anything else is shown as recorded. */
+export function consentLabel(raw: string): string {
+  const match = /^([a-z]+)-(\d{4})-(\d{2})-(\d{2})$/i.exec(raw);
+  if (!match) return `Consent ${raw}`;
+  const date = new Date(Date.UTC(Number(match[2]), Number(match[3]) - 1, Number(match[4])));
+  const when = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return `${match[1][0].toUpperCase()}${match[1].slice(1)} consent, ${when}`;
+}
+
 export function ConsentPill({ contact }: { contact: Rec | undefined }) {
   if (!contact) return null;
   if (contact.fields.suppressed === true) return <Pill tone="danger" dot>Suppressed</Pill>;
-  if (contact.fields.consent) return <Pill tone="success" dot>Consent {String(contact.fields.consent)}</Pill>;
+  if (contact.fields.consent) return <Pill tone="success" dot>{consentLabel(String(contact.fields.consent))}</Pill>;
   return <Pill tone="warning" dot>No consent recorded</Pill>;
 }
 

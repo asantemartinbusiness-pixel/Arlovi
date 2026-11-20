@@ -239,7 +239,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
         <Field label="Deal">
           <Select aria-label="Deal" value={dealId} onChange={(event) => { setDirty(true); setDealId(event.target.value); }} disabled={locked}>
             <option value="">Not linked</option>
-            {data.deals.map((item) => <option key={item.id} value={item.id}>{item.title} · {stageOf(item).label}</option>)}
+            {data.deals.filter((item) => stageOf(item).kind === "open" || item.id === dealId).map((item) => <option key={item.id} value={item.id}>{item.title} · {stageOf(item).label}</option>)}
           </Select>
         </Field>
         <Field label="Recipient">
@@ -350,60 +350,63 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
           disabled={locked || !dirty || !number.trim() || lines.some((line) => !line.description.trim())}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              number: number.trim(),
-              netMinor: totals.netMinor,
-              taxMinor: totals.taxMinor,
-              customerTaxStatus: effectiveStatus,
-              taxUnresolved: totals.hasUnknownRate,
-              version: Number(quote?.fields.version ?? 0) + 1,
-            };
-            if (dealId) fields.dealId = dealId;
-            if (contactId) fields.contactId = contactId;
-            if (overPolicy) fields.discountApproval = `Needs owner approval: ${(discountBpMax / 100).toFixed(1)}% exceeds the 10% ceiling.`;
-            if (quote) {
-              const saved = await context.mutate.patch(quote.id, {
-                title: `${number.trim()} ${quote.summary.split(".")[0]}`,
-                status: "draft",
-                amountMinor: totals.grossMinor,
-                dueAt: `${expires}T00:00:00.000Z`,
-                parentId: dealId || undefined,
-                body: { ...(quote.body as object ?? {}), ...writeLines(lines) },
-                fields: freshQuoteVersionFields({ ...quote.fields, ...fields }, lines),
-              }, {
-                replaceFields: true,
-                expectRevision: quote.revision,
-                event: `Quote ${number.trim()} repriced to version ${Number(quote.fields.version ?? 0) + 1}; prior approval and acceptance do not carry forward`,
-              });
-              if (!saved) { setBusy(false); return; }
-              context.toast("Quote saved as a draft", `Version ${Number(quote.fields.version ?? 0) + 1} at ${context.money(totals.grossMinor)} needs its own approval and customer acceptance. Any earlier evidence remains in the audit, not on the new version.`);
-            } else {
-              const created = await context.mutate.create({
-                collection: "quotes",
-                title: `${number.trim()} ${deal?.title ?? "quote"}`,
-                status: "draft",
-                summary: deal ? `Quote for ${deal.title}.` : "Quote drafted in this workspace.",
-                amountMinor: totals.grossMinor,
-                at: now.toISOString(),
-                dueAt: `${expires}T00:00:00.000Z`,
-                parentId: dealId || undefined,
-                fields,
-                body: writeLines(lines),
-              }, `Quote ${number.trim()} created`);
-              if (deal) {
-                await context.mutate.patch(deal.id, {
-                  fields: { ...deal.fields, quoteId: created.id },
-                }, { event: `Quote ${created.title} linked to ${deal.title}` });
+            try {
+              const fields: Record<string, string | number | boolean> = {
+                number: number.trim(),
+                netMinor: totals.netMinor,
+                taxMinor: totals.taxMinor,
+                customerTaxStatus: effectiveStatus,
+                taxUnresolved: totals.hasUnknownRate,
+                version: Number(quote?.fields.version ?? 0) + 1,
+              };
+              if (dealId) fields.dealId = dealId;
+              if (contactId) fields.contactId = contactId;
+              if (overPolicy) fields.discountApproval = `Needs owner approval: ${(discountBpMax / 100).toFixed(1)}% exceeds the 10% ceiling.`;
+              if (quote) {
+                const saved = await context.mutate.patch(quote.id, {
+                  title: `${number.trim()} ${quote.summary.split(".")[0]}`,
+                  status: "draft",
+                  amountMinor: totals.grossMinor,
+                  dueAt: `${expires}T00:00:00.000Z`,
+                  parentId: dealId || undefined,
+                  body: { ...(quote.body as object ?? {}), ...writeLines(lines) },
+                  fields: freshQuoteVersionFields({ ...quote.fields, ...fields }, lines),
+                }, {
+                  replaceFields: true,
+                  expectRevision: quote.revision,
+                  event: `Quote ${number.trim()} repriced to version ${Number(quote.fields.version ?? 0) + 1}; prior approval and acceptance do not carry forward`,
+                });
+                if (!saved) { setBusy(false); return; }
+                context.toast("Quote saved as a draft", `Version ${Number(quote.fields.version ?? 0) + 1} at ${context.money(totals.grossMinor)} needs its own approval and customer acceptance. Any earlier evidence remains in the audit, not on the new version.`);
+              } else {
+                const created = await context.mutate.create({
+                  collection: "quotes",
+                  title: `${number.trim()} ${deal?.title ?? "quote"}`,
+                  status: "draft",
+                  summary: deal ? `Quote for ${deal.title}.` : "Quote drafted in this workspace.",
+                  amountMinor: totals.grossMinor,
+                  at: now.toISOString(),
+                  dueAt: `${expires}T00:00:00.000Z`,
+                  parentId: dealId || undefined,
+                  fields,
+                  body: writeLines(lines),
+                }, `Quote ${number.trim()} created`);
+                if (deal) {
+                  if (!(await context.mutate.patch(deal.id, {
+                    fields: { ...deal.fields, quoteId: created.id },
+                  }, { event: `Quote ${created.title} linked to ${deal.title}` }))) return;
+                }
+                context.toast("Quote created", deal
+                  ? `${created.title} is linked to ${deal.title}, which can now advance past Proposal.`
+                  : `${created.title} is a draft.`);
+                context.select(created.id);
               }
-              context.toast("Quote created", deal
-                ? `${created.title} is linked to ${deal.title}, which can now advance past Proposal.`
-                : `${created.title} is a draft.`);
-              context.select(created.id);
+              clearWorkingDraft(draftScope);
+              setDirty(false);
+              close();
+            } finally {
+              setBusy(false);
             }
-            clearWorkingDraft(draftScope);
-            setDirty(false);
-            setBusy(false);
-            close();
           }}
         >
           {quote ? "Save the quote" : "Create the quote"}
@@ -521,24 +524,27 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
           disabled={Boolean(blocked)}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(quote.id, {
-              status: "sent",
-              body: { ...(quote.body as object ?? {}), sends: [...(((quote.body as { sends?: unknown[] })?.sends) ?? []), { at: clockIso(), by: context.actor, to, body: drafted }] },
-              fields: { ...quote.fields, sentAt: clockIso(), sentBy: context.actor, delivery: "queued_local" },
-            }, { expectRevision: quote.revision, event: `Quote ${quote.title} issued; the message is queued locally and was not delivered` });
-            await context.mutate.create({
-              collection: "activities",
-              title: `Quote ${String(quote.fields.number ?? quote.title)} sent`,
-              status: "draft",
-              summary: `Draft message to ${to}. Delivery is not connected, so it stays in this workspace.`,
-              startAt: clockIso(),
-              at: clockIso(),
-              parentId: String(quote.fields.dealId ?? quote.parentId ?? ""),
-              fields: { kind: "email", dealId: String(quote.fields.dealId ?? ""), contactId: String(quote.fields.contactId ?? ""), delivery: "not_connected", owner: context.actor },
-            }, `Activity logged for quote ${quote.title}`);
-            context.toast("Issued, not delivered", `The quote is issued and the message for ${to} is queued on it. No mail provider is connected, so nothing left this browser.`, "info");
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(quote.id, {
+                status: "sent",
+                body: { ...(quote.body as object ?? {}), sends: [...(((quote.body as { sends?: unknown[] })?.sends) ?? []), { at: clockIso(), by: context.actor, to, body: drafted }] },
+                fields: { ...quote.fields, sentAt: clockIso(), sentBy: context.actor, delivery: "queued_local" },
+              }, { expectRevision: quote.revision, event: `Quote ${quote.title} issued; the message is queued locally and was not delivered` }))) return;
+              await context.mutate.create({
+                collection: "activities",
+                title: `Quote ${String(quote.fields.number ?? quote.title)} sent`,
+                status: "draft",
+                summary: `Draft message to ${to}. Delivery is not connected, so it stays in this workspace.`,
+                startAt: clockIso(),
+                at: clockIso(),
+                parentId: String(quote.fields.dealId ?? quote.parentId ?? ""),
+                fields: { kind: "email", dealId: String(quote.fields.dealId ?? ""), contactId: String(quote.fields.contactId ?? ""), delivery: "not_connected", owner: context.actor },
+              }, `Activity logged for quote ${quote.title}`);
+              context.toast("Issued, not delivered", `The quote is issued and the message for ${to} is queued on it. No mail provider is connected, so nothing left this browser.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Issue and queue the message

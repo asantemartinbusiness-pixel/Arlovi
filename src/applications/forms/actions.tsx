@@ -1,4 +1,5 @@
 import { exportResultsCsv } from "./results";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { Empty, Field, KeyValueList, Notice, Pill, Select, Stack } from "@/design-system";
@@ -313,7 +314,7 @@ export const createExperiment = actOverlay({
       fields: { experimentOf: record.id, arm: "B", hypothesis: values.hypothesis, minimum: Number(values.minimum) },
       body: { ...model, settings: { ...model.settings, version: 1, closed: false } },
     }, `Experiment created on ${record.title}: ${values.hypothesis}`);
-    await context.mutate.patch(record.id, { fields: { ...record.fields, experimentId: variant.id, arm: "A", hypothesis: values.hypothesis, minimum: Number(values.minimum), experimentStartedAt: nowIso(context) } }, { expectRevision: record.revision, event: `${record.title} is arm A of an experiment with ${variant.title}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, experimentId: variant.id, arm: "A", hypothesis: values.hypothesis, minimum: Number(values.minimum), experimentStartedAt: nowIso(context) } }, { expectRevision: record.revision, event: `${record.title} is arm A of an experiment with ${variant.title}` }))) throw new Error(CHANGED_ELSEWHERE);
     return `${variant.title} is a draft. Edit it, publish it, then read the test report once each arm has ${values.minimum} submissions.`;
   },
 });

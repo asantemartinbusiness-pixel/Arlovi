@@ -1831,21 +1831,21 @@ function SkillDetail({ context }: { context: ScreenContext }) {
         { label: "Review", value: skill.fields.trusted === false ? "Sandboxed" : "Reviewed", tone: skill.fields.trusted === false ? "warning" : "success" },
         { label: "Installed on", value: users.map((agent) => agent.title).join(", ") || "No contract" },
       ]} />
-      <Card title="Contract" pad="tight">
+      <OverlaySection title="Contract">
         <Properties rows={[
           { label: "Tools required", value: (body?.tools ?? []).join(", ") || "None" },
           { label: "Takes", value: (body?.inputs ?? []).join(", ") || "Nothing" },
           { label: "Returns", value: (body?.outputs ?? []).join(", ") || "Nothing" },
         ]} />
-      </Card>
+      </OverlaySection>
       {(body?.changelog ?? []).length > 0 && (
-        <Card title="Versions" pad="tight">
+        <OverlaySection title="Versions">
           <Stack gap={1}>
             {(body?.changelog ?? []).map((entry) => (
               <Row key={entry.version} gap={2}><strong className="ds-num">v{entry.version}</strong><span className="ds-grow">{entry.note}</span><span className="ds-subtle">{context.date(entry.at)}</span></Row>
             ))}
           </Stack>
-        </Card>
+        </OverlaySection>
       )}
     </Stack>
   );
@@ -2368,12 +2368,10 @@ export const teamApp = registerApp({
     "ARL-TEAM-001": {
       id: "ARL-TEAM-001",
       title: () => "Workforce home",
-      subtitle: (context) => `${context.org.name}'s AI employees are contracts in this browser. None of them is running, because no model provider is connected.`,
       statusStrip: () => (
         <Row gap={2} wrap>
           <Pill tone="warning" dot>Model: not connected</Pill>
           <Pill tone="neutral">Provider cost recorded: 0</Pill>
-          <span className="ds-subtle">Idle is the honest state, not a placeholder.</span>
         </Row>
       ),
       tabs: (["Overview", "Activity", "Costs", "Reliability"] as const).map((view) => ({

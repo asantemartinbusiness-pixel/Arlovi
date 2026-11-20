@@ -1619,6 +1619,25 @@ function DeliverableSummary({ context }: { context: ScreenContext }) {
   );
 }
 
+/** The mission every "This mission" screen is about, named once under the page title. */
+function MissionLine({ context }: { context: ScreenContext }) {
+  const asked = useRecord(context.params.id);
+  const organisation = useRecord(context.org.id);
+  const mission = asked?.collection === "missions" ? asked : undefined;
+  if (!mission) return null;
+  const orgPaused = organisation?.fields.executionPaused === true;
+  const held = mission.status === "paused" || mission.fields.executionPaused === true;
+  return (
+    <Row gap={2} wrap>
+      <strong>{mission.title}</strong>
+      <Pill tone={missionTone(mission.status)} dot>{mission.status.replace(/_/g, " ")}</Pill>
+      {orgPaused && <Pill tone="warning">Organisation paused</Pill>}
+      {held && mission.status !== "paused" && !orgPaused && <Pill tone="warning">Dispatch held</Pill>}
+      <span className="ds-subtle">{mission.ownerName}</span>
+    </Row>
+  );
+}
+
 function MissionQuickView({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const mission = useRecord(payload?.id ?? context.selectedId);
@@ -1955,7 +1974,7 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
         { label: "Estimate", value: task.fields.estimateHours ? `${String(task.fields.estimateHours)} h` : "Not estimated", mono: Boolean(task.fields.estimateHours) },
         { label: "Risk", value: String(task.fields.risk || "None recorded") },
       ]} />
-      <Card eyebrow="DEPENDENCIES" prov="human" title="Runs after" pad="tight">
+      <OverlaySection title="Runs after">
         <Stack gap={2}>
           {deps.map((id) => (
             <Row key={id} gap={2}>
@@ -1968,7 +1987,7 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
           ))}
           {deps.length === 0 && <span className="ds-subtle">Nothing. This task can start.</span>}
         </Stack>
-      </Card>
+      </OverlaySection>
       <Field label="Add a dependency" error={cycle ? `That would create a cycle: ${cycle.map((id) => tasks.find((item) => item.id === id)?.title ?? id).join(" → ")}` : undefined}>
         <Select value={dependency} onChange={(event) => setDependency(event.target.value)}>
           <option value="">Choose a task…</option>
@@ -2037,7 +2056,7 @@ function ScopeChangeApproval({ context }: { context: ScreenContext }) {
   );
 }
 
-function TaskDetail({ context, close }: { context: ScreenContext; close: () => void }) {
+function TaskDetail({ context }: { context: ScreenContext }) {
   const { tasks } = useMission(context);
   const payload = context.overlayPayload as { id?: string } | undefined;
   const task = tasks.find((item) => item.id === (payload?.id ?? context.selectedId));
@@ -2882,6 +2901,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-003": {
       id: "ARL-MISSION-003",
       title: () => "Mission overview",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Overview", "Plan", "Team", "Deliverables", "Activity", "Results"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionOverview context={context} view={view} />,
@@ -2904,6 +2924,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-004": {
       id: "ARL-MISSION-004",
       title: () => "Plan and dependencies",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Graph", "List", "Timeline", "Risks"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <PlanDependencies context={context} view={view} />,
@@ -2924,7 +2945,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-005": {
       id: "ARL-MISSION-005",
       title: () => "Task board",
-      subtitle: () => "Drag with a mouse or move with the arrow keys. Neither passes an approval gate or an unfinished dependency.",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Board", "List", "Assignees"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <TaskBoard context={context} view={view} />,
@@ -2936,7 +2957,7 @@ export const missionApp = registerApp({
         { id: "reopen task", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a card first"), run: (context) => void reopenTask(context) },
       ],
       overlays: [
-        { id: "Task detail", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskDetail context={context} close={close} />, summary: (context) => <TaskSummary context={context} /> },
+        { id: "Task detail", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <TaskDetail context={context} />, summary: (context) => <TaskSummary context={context} /> },
         { id: "reassign", kind: "modal", title: "Reassign", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReassignTask context={context} close={close} />, summary: (context) => <TaskSummary context={context} /> },
         { id: "move impact", kind: "modal", title: "What a move changes", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MoveImpact context={context} />, summary: (context) => <TaskSummary context={context} /> },
       ],
@@ -2945,7 +2966,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-006": {
       id: "ARL-MISSION-006",
       title: () => "Execution console",
-      subtitle: () => "A local interpreter runs each step against records in this browser. A step that needs an external service stops and records why.",
+      subtitle: (context) => <MissionLine context={context} />,
       statusStrip: (context) => (
         <Row gap={2} wrap>
           <Pill tone="warning" dot>Providers: none connected</Pill>
@@ -2973,6 +2994,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-007": {
       id: "ARL-MISSION-007",
       title: () => "Mission team room",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Discussion", "Owners", "Decisions", "Reviews"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionTeamRoom context={context} view={view} />,
@@ -2994,6 +3016,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-008": {
       id: "ARL-MISSION-008",
       title: () => "Deliverables",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["All", "Draft", "Review", "Approved", "Published"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <Deliverables context={context} view={view} />,
@@ -3016,6 +3039,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-009": {
       id: "ARL-MISSION-009",
       title: () => "Mission budget",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Summary", "Ledger", "Policies", "History"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionBudget context={context} view={view} />,
@@ -3038,6 +3062,7 @@ export const missionApp = registerApp({
     "ARL-MISSION-010": {
       id: "ARL-MISSION-010",
       title: () => "Mission results",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Outcomes", "Evidence", "ROI", "Follow-up"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionResults context={context} view={view} />,

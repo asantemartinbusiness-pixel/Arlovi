@@ -434,24 +434,27 @@ export function NewLead({ context, close }: { context: ScreenContext; close: () 
         event.preventDefault();
         if (!title.trim()) return;
         setBusy(true);
-        const fields: Record<string, string | number | boolean> = { source, stage: "new", owner: context.actor };
-        if (contactId) fields.contactId = contactId;
-        if (companyId) fields.companyId = companyId;
-        const created = await context.mutate.create({
-          collection: "leads",
-          title: title.trim(),
-          status: "new",
-          summary: note || `${source} enquiry recorded in this workspace.`,
-          amountMinor: amount,
-          at: now.toISOString(),
-          fields,
-        }, `Lead ${title.trim()} created`);
-        clearWorkingDraft(draftScope);
-        context.toast("Lead created", contact
-          ? `${created.title} is in the inbox against ${contact.title}.`
-          : `${created.title} is in the inbox. Without a contact record it cannot be converted to a deal.`);
-        setBusy(false);
-        close();
+        try {
+          const fields: Record<string, string | number | boolean> = { source, stage: "new", owner: context.actor };
+          if (contactId) fields.contactId = contactId;
+          if (companyId) fields.companyId = companyId;
+          const created = await context.mutate.create({
+            collection: "leads",
+            title: title.trim(),
+            status: "new",
+            summary: note || `${source} enquiry recorded in this workspace.`,
+            amountMinor: amount,
+            at: now.toISOString(),
+            fields,
+          }, `Lead ${title.trim()} created`);
+          clearWorkingDraft(draftScope);
+          context.toast("Lead created", contact
+            ? `${created.title} is in the inbox against ${contact.title}.`
+            : `${created.title} is in the inbox. Without a contact record it cannot be converted to a deal.`);
+          close();
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <Field label="What the enquiry is" required><TextInput aria-label="What the enquiry is" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>

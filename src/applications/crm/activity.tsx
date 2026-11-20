@@ -333,37 +333,40 @@ export function ActivityEntry({ context, close }: { context: ScreenContext; clos
           disabled={!title.trim()}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = { kind, owner: context.actor, minutes: Number(minutes) || 0 };
-            if (dealId) fields.dealId = dealId;
-            if (contactId) fields.contactId = contactId;
-            if (outcome) fields.outcome = outcome;
-            const start = new Date(when);
-            const end = new Date(start.getTime() + (Number(minutes) || 0) * 60_000);
-            if (existing) {
-              await context.mutate.patch(existing.id, {
-                title: title.trim(), summary: note, startAt: start.toISOString(), endAt: end.toISOString(), at: start.toISOString(),
-                status: start > now ? "open" : existing.status === "draft" ? "draft" : "done",
-                fields: { ...existing.fields, ...fields },
-              }, { expectRevision: existing.revision, event: `Activity ${title.trim()} updated` });
-              context.toast("Activity saved", `${title.trim()} is updated.`);
-            } else {
-              await context.mutate.create({
-                collection: "activities",
-                title: title.trim(),
-                status: start > now ? "open" : "done",
-                summary: note,
-                startAt: start.toISOString(),
-                endAt: end.toISOString(),
-                at: start.toISOString(),
-                parentId: dealId || contactId || undefined,
-                fields,
-              }, `Activity ${title.trim()} logged`);
-              context.toast("Activity logged", start > now
-                ? `${title.trim()} is scheduled for ${context.dateTime(start)} in this workspace only.`
-                : `${title.trim()} is on the record.`);
+            try {
+              const fields: Record<string, string | number | boolean> = { kind, owner: context.actor, minutes: Number(minutes) || 0 };
+              if (dealId) fields.dealId = dealId;
+              if (contactId) fields.contactId = contactId;
+              if (outcome) fields.outcome = outcome;
+              const start = new Date(when);
+              const end = new Date(start.getTime() + (Number(minutes) || 0) * 60_000);
+              if (existing) {
+                if (!(await context.mutate.patch(existing.id, {
+                  title: title.trim(), summary: note, startAt: start.toISOString(), endAt: end.toISOString(), at: start.toISOString(),
+                  status: start > now ? "open" : existing.status === "draft" ? "draft" : "done",
+                  fields: { ...existing.fields, ...fields },
+                }, { expectRevision: existing.revision, event: `Activity ${title.trim()} updated` }))) return;
+                context.toast("Activity saved", `${title.trim()} is updated.`);
+              } else {
+                await context.mutate.create({
+                  collection: "activities",
+                  title: title.trim(),
+                  status: start > now ? "open" : "done",
+                  summary: note,
+                  startAt: start.toISOString(),
+                  endAt: end.toISOString(),
+                  at: start.toISOString(),
+                  parentId: dealId || contactId || undefined,
+                  fields,
+                }, `Activity ${title.trim()} logged`);
+                context.toast("Activity logged", start > now
+                  ? `${title.trim()} is scheduled for ${context.dateTime(start)} in this workspace only.`
+                  : `${title.trim()} is on the record.`);
+              }
+              close();
+            } finally {
+              setBusy(false);
             }
-            setBusy(false);
-            close();
           }}
         >
           {existing ? "Save" : "Log it"}
@@ -459,21 +462,24 @@ export function MeetingComposer({ context, close }: { context: ScreenContext; cl
           disabled={!contactId || suppressed}
           onClick={async () => {
             setBusy(true);
-            const start = new Date(when);
-            await context.mutate.create({
-              collection: "activities",
-              title: `Meeting with ${contact?.title}`,
-              status: "open",
-              summary: agenda || `Proposed meeting in ${org.name}'s workspace.`,
-              startAt: start.toISOString(),
-              endAt: new Date(start.getTime() + 45 * 60_000).toISOString(),
-              at: start.toISOString(),
-              parentId: contactId,
-              fields: { kind: "meeting", contactId, owner: context.actor, delivery: "not_connected" },
-            }, `Meeting with ${contact?.title} proposed`);
-            context.toast("Meeting recorded", `It is in your workspace diary for ${context.dateTime(start)}. Nobody has been invited, because no calendar is connected.`, "info");
-            setBusy(false);
-            close();
+            try {
+              const start = new Date(when);
+              await context.mutate.create({
+                collection: "activities",
+                title: `Meeting with ${contact?.title}`,
+                status: "open",
+                summary: agenda || `Proposed meeting in ${org.name}'s workspace.`,
+                startAt: start.toISOString(),
+                endAt: new Date(start.getTime() + 45 * 60_000).toISOString(),
+                at: start.toISOString(),
+                parentId: contactId,
+                fields: { kind: "meeting", contactId, owner: context.actor, delivery: "not_connected" },
+              }, `Meeting with ${contact?.title} proposed`);
+              context.toast("Meeting recorded", `It is in your workspace diary for ${context.dateTime(start)}. Nobody has been invited, because no calendar is connected.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record the meeting
@@ -832,12 +838,15 @@ export function OverrideReason({ context, close }: { context: ScreenContext; clo
           disabled={!reason.trim() || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(deal.id, {
-              fields: { ...deal.fields, probability: value, probabilityOverride: reason, probabilityOverrideBy: context.actor },
-            }, { expectRevision: deal.revision, event: `Weighting on ${deal.title} overridden to ${value}%: ${reason}` });
-            context.toast("Weighting overridden", `${deal.title} is weighted at ${value}%. The forecast moved by ${context.money(after - before)}.`);
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(deal.id, {
+                fields: { ...deal.fields, probability: value, probabilityOverride: reason, probabilityOverrideBy: context.actor },
+              }, { expectRevision: deal.revision, event: `Weighting on ${deal.title} overridden to ${value}%: ${reason}` }))) return;
+              context.toast("Weighting overridden", `${deal.title} is weighted at ${value}%. The forecast moved by ${context.money(after - before)}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Apply the override
@@ -1029,16 +1038,39 @@ export function FailuresTab({ context }: { context: ScreenContext }) {
   );
 }
 
+type RuleNode = { id: string; type: string; label: string; config?: { kind?: string } };
+
+/** Which designer action a saved rule's action node stands for. */
+function actionOfNode(node: RuleNode | undefined): string {
+  if (!node) return "assign";
+  const text = `${node.label} ${node.config?.kind ?? ""}`;
+  if (/sms|text message/i.test(text)) return "sms";
+  if (/e-?mail|send/i.test(text)) return "email";
+  if (/draft/i.test(text)) return "draft";
+  if (/task|follow-?up|record\.create/i.test(text)) return "task";
+  return "assign";
+}
+
 export function WorkflowDesigner({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = data.workflows.find((item) => item.id === (payload?.id ?? context.selectedId));
+  const wantedId = payload?.id ?? context.selectedId;
+  const existing = data.workflows.find((item) => item.id === wantedId);
+  // The form seeds its state once, so it must mount only after the rule has loaded.
+  if (wantedId && !existing && data.workflows.length === 0) return <Empty title="Loading the rule" />;
+  return <WorkflowDesignerForm key={existing?.id ?? "new"} context={context} close={close} existing={existing} />;
+}
+
+function WorkflowDesignerForm({ context, close, existing }: { context: ScreenContext; close: () => void; existing?: Rec }) {
+  const nodes = ((existing?.body as { nodes?: RuleNode[] } | undefined)?.nodes ?? []);
+  const initialTrigger = String(existing?.fields.trigger ?? nodes.find((node) => node.type === "trigger")?.label ?? "lead.created");
+  const initialAction = actionOfNode(nodes.find((node) => node.type === "action"));
   const [title, setTitle] = useState(existing?.title ?? "");
-  const [trigger, setTrigger] = useState(String(existing?.fields.trigger ?? "lead.created"));
-  const savedAction = ((existing?.body as { nodes?: { type: string; label: string }[] } | undefined)?.nodes ?? []).find((node) => node.type === "action")?.label;
-  const [action, setAction] = useState(() => ({ "Assign an owner": "assign", "Create a follow-up task": "task", "Draft a document": "draft", "Send an email": "email", "Send a text message": "sms" } as Record<string, string>)[savedAction ?? ""] ?? "assign");
+  const [trigger, setTrigger] = useState(initialTrigger);
+  const [action, setAction] = useState(initialAction);
   const [summary, setSummary] = useState(existing?.summary ?? "");
   const [busy, setBusy] = useState(false);
+  const changedShape = trigger !== initialTrigger || action !== initialAction;
 
   const ACTIONS = [
     { value: "assign", label: "Assign an owner", safe: true },
@@ -1055,7 +1087,7 @@ export function WorkflowDesigner({ context, close }: { context: ScreenContext; c
       <Row gap={3} wrap>
         <Field label="When">
           <Select aria-label="When" value={trigger} onChange={(event) => setTrigger(event.target.value)}>
-            {["lead.created", "deal.idle", "deal.stage_changed", "quote.accepted", "invoice.overdue"].map((item) => <option key={item}>{item}</option>)}
+            {[...new Set([initialTrigger, "lead.created", "deal.idle", "deal.stage_changed", "quote.accepted", "invoice.overdue"])].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
         <Field label="Then">
@@ -1072,9 +1104,13 @@ export function WorkflowDesigner({ context, close }: { context: ScreenContext; c
       )}
       <OverlaySection title="The rule reads as" hint="The second step is not a setting. A refusal is recorded as a blocked run so you can see it happened.">
         <ol className="crm-steps">
-          <li><strong>When</strong> {trigger}</li>
-          <li><strong>Check</strong> the contact is not suppressed</li>
-          <li><strong>Then</strong> {chosen.label.toLowerCase()}</li>
+          {existing && !changedShape && nodes.length > 0
+            ? nodes.map((node) => <li key={node.id}><span><strong>{node.type}</strong> {node.label}</span></li>)
+            : <>
+              <li><span><strong>When</strong> {trigger}</span></li>
+              <li><span><strong>Check</strong> the contact is not suppressed</span></li>
+              <li><span><strong>Then</strong> {chosen.label.toLowerCase()}</span></li>
+            </>}
         </ol>
       </OverlaySection>
       <Row gap={2}>
@@ -1085,30 +1121,35 @@ export function WorkflowDesigner({ context, close }: { context: ScreenContext; c
           title={!chosen.safe ? "Choose an action this workspace can actually perform" : undefined}
           onClick={async () => {
             setBusy(true);
-            const nodes = [
-              { id: "n1", type: "trigger", label: trigger, x: 40, y: 80 },
-              { id: "n2", type: "condition", label: "Contact is not suppressed", x: 240, y: 80 },
-              { id: "n3", type: "action", label: chosen.label, x: 460, y: 80 },
-            ];
-            if (existing) {
-              await context.mutate.patch(existing.id, {
-                title: title.trim(), summary,
-                fields: { ...existing.fields, trigger },
-                body: { nodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] },
-              }, { expectRevision: existing.revision, event: `Workflow ${title.trim()} edited` });
-            } else {
-              await context.mutate.create({
-                collection: "workflows",
-                title: title.trim(),
-                status: "draft",
-                summary: summary || `${trigger} then ${chosen.label.toLowerCase()}.`,
-                fields: { trigger, scope: "all records", runs: 0 },
-                body: { nodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] },
-              }, `Workflow ${title.trim()} created`);
+            try {
+              const builtNodes = [
+                { id: "n1", type: "trigger", label: trigger, x: 40, y: 80 },
+                { id: "n2", type: "condition", label: "Contact is not suppressed", x: 240, y: 80 },
+                { id: "n3", type: "action", label: chosen.label, x: 460, y: 80 },
+              ];
+              if (existing) {
+                // A rule whose trigger and action are unchanged keeps its saved steps and their configuration.
+                const saved = await context.mutate.patch(existing.id, {
+                  title: title.trim(), summary,
+                  fields: { ...existing.fields, trigger },
+                  ...(changedShape ? { body: { nodes: builtNodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] } } : {}),
+                }, { expectRevision: existing.revision, event: `Workflow ${title.trim()} edited` });
+                if (!saved) { setBusy(false); return; }
+              } else {
+                await context.mutate.create({
+                  collection: "workflows",
+                  title: title.trim(),
+                  status: "draft",
+                  summary: summary || `${trigger} then ${chosen.label.toLowerCase()}.`,
+                  fields: { trigger, scope: "all records", runs: 0 },
+                  body: { nodes: builtNodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] },
+                }, `Workflow ${title.trim()} created`);
+              }
+              context.toast("Rule saved as a draft", "A draft rule never runs. Activating it is a separate, recorded decision.");
+              close();
+            } finally {
+              setBusy(false);
             }
-            context.toast("Rule saved as a draft", "A draft rule never runs. Activating it is a separate, recorded decision.");
-            setBusy(false);
-            close();
           }}
         >
           {existing ? "Save the rule" : "Create as a draft"}
@@ -1187,7 +1228,7 @@ export function ActivationApproval({ context, close }: { context: ScreenContext;
       <OverlaySection title={workflow.title} hint={`Triggers on ${String(workflow.fields.trigger ?? "nothing yet")}. Approver: ${context.actor}.`}>
         {nodes.length === 0 ? <span className="ds-subtle">No steps recorded.</span> : (
           <ol className="crm-steps">
-            {nodes.map((node) => <li key={node.id}><strong>{node.type}</strong> {node.label}</li>)}
+            {nodes.map((node) => <li key={node.id}><span><strong>{node.type}</strong> {node.label}</span></li>)}
           </ol>
         )}
       </OverlaySection>
@@ -1198,13 +1239,16 @@ export function ActivationApproval({ context, close }: { context: ScreenContext;
           disabled={sends || !context.can("run_automation")}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(workflow.id, {
-              status: "active",
-              fields: { ...workflow.fields, activatedBy: context.actor, activatedAt: clockIso() },
-            }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} activated by ${context.actor}` });
-            context.toast("Rule activated", `${workflow.title} is active. ${context.actor} is recorded as the approver, and every run will be listed under Runs.`);
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(workflow.id, {
+                status: "active",
+                fields: { ...workflow.fields, activatedBy: context.actor, activatedAt: clockIso() },
+              }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} activated by ${context.actor}` }))) return;
+              context.toast("Rule activated", `${workflow.title} is active. ${context.actor} is recorded as the approver, and every run will be listed under Runs.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Activate the rule

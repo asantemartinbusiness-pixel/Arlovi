@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Empty, Field, Notice, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Empty, Field, Notice, Properties, Row, Select, Stack, TextArea, TextInput, ModalActions, OverlayActions } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useOrgRecords, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -41,8 +41,7 @@ export function AttachToSpecialist({ context, close }: { context: ScreenContext;
         </Field>
       </Row>
       {already && <Notice tone="warning" title="Already attached">This record is already in the conversation.</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!record || already}
@@ -64,9 +63,7 @@ export function AttachToSpecialist({ context, close }: { context: ScreenContext;
           }}
         >
           Attach
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -102,8 +99,7 @@ export function AssignRoomTask({ context, close }: { context: ScreenContext; clo
       {person?.collection === "agents" && (
         <Notice tone="info" title="An AI employee works within its grants">Assigning in a room does not widen what it may do. A step that needs an external tool still stops at its policy.</Notice>
       )}
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!title.trim() || !person}
@@ -133,9 +129,7 @@ export function AssignRoomTask({ context, close }: { context: ScreenContext; clo
           }}
         >
           Assign the task
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -172,8 +166,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
         </Select>
       </Field>
       {blocked && reviewer && <Notice tone="warning" title="Cannot assign">{blocked}</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !task}
@@ -189,9 +182,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
           }}
         >
           Assign the reviewer
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -219,8 +210,7 @@ export function CorrectTranscript({ context, close }: { context: ScreenContext; 
       </Field>
       <Field label="Corrected text" required><TextArea aria-label="Corrected text" value={text} rows={3} onChange={(event) => setValue(event.target.value)} /></Field>
       <Notice tone="info" title="The original is kept">The line records what it said before, who corrected it and when. A correction never triggers an action.</Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!line || !text.trim() || text === line.text}
@@ -235,9 +225,7 @@ export function CorrectTranscript({ context, close }: { context: ScreenContext; 
           }}
         >
           Save the correction
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -254,8 +242,7 @@ export function CommentOnArtifact({ context, close }: { context: ScreenContext; 
     <Stack gap={4}>
       <Field label="Comment" required><TextArea aria-label="Comment" value={text} rows={4} onChange={(event) => setText(event.target.value)} /></Field>
       <p className="ds-subtle">{comments.length} comment{comments.length === 1 ? "" : "s"} already on {artifact.title}.</p>
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!text.trim()}
@@ -270,9 +257,7 @@ export function CommentOnArtifact({ context, close }: { context: ScreenContext; 
           }}
         >
           Add the comment
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -301,8 +286,7 @@ export function HostReview({ context, close }: { context: ScreenContext; close: 
         ))}
       </Stack>
       <Notice tone="info" title="A review is decided by people">AI employees in the review contribute within their grants; a mention in the room never overrides an external tool policy.</Notice>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!topic.trim() || chosen.length === 0} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={!topic.trim() || chosen.length === 0} onClick={async () => {
           setBusy(true);
           const review = await context.mutate.create({
             collection: "meetings", title: `Review: ${topic.trim()}`, status: "scheduled", summary: `Hosted in ${room.title} by ${context.actor}.`,
@@ -317,9 +301,7 @@ export function HostReview({ context, close }: { context: ScreenContext; close: 
           context.toast("Review hosted", `${review.title} is open with ${chosen.length} participant${chosen.length === 1 ? "" : "s"}.`);
           setBusy(false);
           close();
-        }}>Host the review</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Host the review</Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -344,8 +326,7 @@ export function ResolveDisagreement({ context, close }: { context: ScreenContext
       </Field>
       {dispute && <Properties rows={[{ label: "What was said", value: dispute.summary }]} />}
       <Field label="The coordinator's decision" required><TextArea aria-label="The coordinator's decision" value={decision} rows={3} onChange={(event) => setDecision(event.target.value)} /></Field>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!dispute || !decision.trim()} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={!dispute || !decision.trim()} onClick={async () => {
           if (!dispute) return;
           setBusy(true);
           if (!(await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: clockIso(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` }))) return;
@@ -356,9 +337,7 @@ export function ResolveDisagreement({ context, close }: { context: ScreenContext
           context.toast("Resolved", "The decision is in the room and the disagreement is marked resolved.");
           setBusy(false);
           close();
-        }}>Record the decision</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Record the decision</Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }

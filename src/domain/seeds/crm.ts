@@ -289,8 +289,9 @@ registerSeed("crm", (context) => {
   for (const deal of DEALS) {
     const fields: Record<string, string | number | boolean> = {
       stage: deal.stage, contactId: deal.contactId, companyId: deal.companyId, owner: deal.owner,
-      probability: deal.probability ?? 0,
     };
+    // No recorded probability means "the stage default", not zero.
+    if (deal.probability !== undefined) fields.probability = deal.probability;
     if (deal.closeDate) fields.closeDate = deal.closeDate;
     if (deal.budgetConfirmed) fields.budgetConfirmed = true;
     if (deal.quoteId) fields.quoteId = deal.quoteId;

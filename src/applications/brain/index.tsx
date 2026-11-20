@@ -359,7 +359,8 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
                 return proposed
                   ? <Pill tone={CONFIDENCE_TONE[proposed.status] ?? "neutral"}>{proposed.status}</Pill>
                   : <Button size="sm" variant="secondary" disabled={!context.can("edit_knowledge")} onClick={async () => {
-                    await proposeFactFromLine(context, source, row.line, data.facts);
+                    const proposed = await proposeFactFromLine(context, source, row.line, data.facts);
+                    if (!proposed) { context.toast("Already proposed", "An assertion from this line is already in the fact registry.", "info"); return; }
                     context.toast("Proposed", "The line is a proposed assertion in the fact registry, pending review. It cites this source and line.");
                   }}>Propose as a fact</Button>;
               } },
@@ -2194,12 +2195,17 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
   const [pickedAgent, setPickedAgent] = useState(payload?.agentId ?? "");
   const agentId = pickedAgent || grants[0]?.agentId || data.agents[0]?.id || "";
   const current = grants.find((grant) => grant.agentId === agentId);
-  const [groups, setGroups] = useState<string[]>(current?.groups ?? ["public"]);
+  /* Edits are kept per contract and read over the recorded grant, so the form never starts from a default that
+     differs from what is on record (and saving untouched never narrows a grant). */
+  const [edited, setEdited] = useState<Record<string, string[]>>({});
+  const groups = edited[agentId] ?? current?.groups ?? ["public"];
+  const setGroups = (next: string[]) => setEdited((rows) => ({ ...rows, [agentId]: next }));
   if (!policy) return <Empty title="No grant policy recorded" />;
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={Object.keys(edited).length > 0} />
       <Field label="AI employee">
-        <Select value={agentId} onChange={(event) => { setPickedAgent(event.target.value); setGroups(grants.find((grant) => grant.agentId === event.target.value)?.groups ?? ["public"]); }}>
+        <Select value={agentId} onChange={(event) => setPickedAgent(event.target.value)}>
           {data.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.title} — {String(agent.fields.role ?? "")}</option>)}
         </Select>
       </Field>
@@ -2210,7 +2216,7 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
             key={group}
             label={`${group}${group === "confidential" ? " — most contracts are excluded from this" : ""}`}
             checked={groups.includes(group)}
-            onChange={(event) => setGroups((current2) => event.target.checked ? [...current2, group] : current2.filter((item) => item !== group))}
+            onChange={(event) => setGroups(event.target.checked ? [...groups, group] : groups.filter((item) => item !== group))}
           />
         ))}
       </Stack>
@@ -2241,7 +2247,8 @@ function SimulationReport({ context }: { context: ScreenContext }) {
   const data = useKnowledge();
   const policy = data.policies.find((item) => item.fields.kind === "grants");
   const grants = (policy?.body as { grants?: Grant[] } | undefined)?.grants ?? [];
-  const [agentId, setAgentId] = useState(grants[0]?.agentId ?? data.agents[0]?.id ?? "");
+  const [pickedAgent, setAgentId] = useState("");
+  const agentId = pickedAgent || grants[0]?.agentId || data.agents[0]?.id || "";
   const grant = grants.find((item) => item.agentId === agentId);
   const reachable = data.sources.filter((source) => (grant?.groups ?? []).includes(String(source.fields.classification ?? "internal")) && source.status === "indexed");
   const excluded = data.sources.filter((source) => !reachable.includes(source));

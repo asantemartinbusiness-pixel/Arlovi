@@ -383,6 +383,9 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
   const payableNow = (bill: Rec) => ["approved", "scheduled"].includes(bill.status) && Boolean(bill.fields.approvedBy);
   const payable = chosen.filter(payableNow);
   const excluded = chosen.filter((bill) => !payableNow(bill));
+  // The bills this run was opened with; if any of them changes, the whole run stops.
+  const openedIds = useRef<string[]>();
+  if (!openedIds.current && payable.length > 0) openedIds.current = payable.map((bill) => bill.id);
   const why = (bill: Rec) => !["approved", "scheduled"].includes(bill.status) ? `${bill.title} is ${bill.status}, not approved` : `${bill.title} has no recorded approver`;
 
   const cash = data.accounts.filter((account) => accountType(account) === "asset" && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
@@ -444,9 +447,10 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
             setBusy(true);
             try {
               // Re-read every bill now: one paid or changed elsewhere stops the whole run.
-              const live = payable.map((bill) => data.bills.find((item) => item.id === bill.id));
-              const stale = live.find((bill, index) => !bill || !payableNow(bill) || bill.revision !== openedRevisions.current[payable[index].id]);
-              if (stale !== undefined || live.some((bill) => !bill)) {
+              const ids = openedIds.current ?? payable.map((bill) => bill.id);
+              const live = ids.map((id) => data.bills.find((item) => item.id === id));
+              const stale = live.some((bill, index) => !bill || !payableNow(bill) || bill.revision !== openedRevisions.current[ids[index]]);
+              if (stale) {
                 context.toast("Payment run stopped", "A bill in this run changed or was already paid. Nothing was posted; reopen the run to review it.", "blocked");
                 return;
               }
@@ -461,7 +465,7 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
                 collection: "journals",
                 title: `Supplier payment run ${date}`,
                 status: "posted",
-                summary: `${payable.length} bills settled: ${payable.map((bill) => bill.title).join(", ")}.`,
+                summary: `${ids.length} bills settled: ${(live as Rec[]).map((bill) => bill.title).join(", ")}.`,
                 amountMinor: total,
                 at: `${date}T09:00:00.000Z`,
                 tags: ["ledger", "payment"],
@@ -476,7 +480,7 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
               await context.mutate.putMany(
                 [journal, ...paid],
                 [`Supplier payment run posted for ${context.money(total)}`, ...paid.map((bill) => `Bill ${bill.title} marked paid`)],
-                Object.fromEntries(payable.map((bill) => [bill.id, openedRevisions.current[bill.id]])),
+                Object.fromEntries(ids.map((id) => [id, openedRevisions.current[id]])),
                 ["create", ...paid.map(() => "update" as const)],
               );
               context.toast("Payment recorded", `${context.money(total)} posted against payables and cash. ${payable.length} bills are marked paid.`);
@@ -688,17 +692,10 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
   const receipt = (expense.body as { receipt?: { filename?: string; capturedAt?: string } | null } | undefined)?.receipt;
   const tax = recoverableTax(expense, context.org.jurisdiction, context.now);
   const blocked = expense.fields.hasReceipt === false ? "No receipt is attached." : undefined;
-  const journal = data.journals.find((item) => item.id === String(expense.fields.journalId ?? ""));
 
   return (
     <Stack gap={4}>
       <DrawerUnsavedChanges when={busy} />
-      <OverlaySummary
-        eyebrow="Expense claim"
-        title={expense.title}
-        status={<Pill tone={expense.status === "reimbursed" ? "success" : expense.status === "rejected" ? "danger" : "neutral"} dot>{expense.status}</Pill>}
-        meta={[String(expense.fields.claimant ?? expense.ownerName), <span className="ds-num" key="d">{context.date(expense.at)}</span>, journal ? `Posted: ${journal.title}` : "Nothing posted to the ledger"]}
-      />
       {blocked && <Notice tone="danger" title="Cannot be approved">{blocked} Ask the claimant to add the receipt name.</Notice>}
       <FactGrid columns={3} items={[
         { label: "Amount", value: <Amount minor={expense.amountMinor} context={context} bold />, mono: true, tone: "accent" },

@@ -138,7 +138,9 @@ test("CARE triage: SLA view, saved draft, unsent reply, triage moves and resolut
   await open(page, "/legal/contracts", "Contract Library");
   await page.getByRole("tab", { name: "Active" }).click();
   await expect(main(page).getByText("Mutual NDA — Delacroix").first()).toBeVisible();
-  await open(page, "/care/tickets/nl-tickets-041", "Case");
+  // The case title is the page heading; the clock sits above the cards.
+  await open(page, "/care/tickets/nl-tickets-041");
+  await expect(page.getByRole("region", { name: "SLA clock" })).toBeVisible();
   const triage = card(page, "Triage");
   await triage.getByLabel("Case priority").selectOption("urgent");
   await triage.getByRole("button", { name: "Assign to me" }).click();
@@ -147,6 +149,8 @@ test("CARE triage: SLA view, saved draft, unsent reply, triage moves and resolut
   await expect(triage.getByText("Waiting on customer").first()).toBeVisible();
   const resolution = card(page, "Resolution");
   await resolution.getByLabel("Resolution reason").selectOption("Replacement arranged");
+  await expect(resolution.getByRole("button", { name: "Mark resolved" })).toBeDisabled();
+  await resolution.getByLabel("Resolution note").fill("Replacement shade ordered and confirmed with the customer.");
   await dismissToasts(page);
   await resolution.getByRole("button", { name: "Mark resolved" }).click();
   await expect(resolution.getByText("Replacement arranged")).toBeVisible();
