@@ -47,3 +47,24 @@ for(const width of [390,820,1440]){
     expect(overflow).toBeLessThanOrEqual(1);
   });
 }
+
+test("the native CRM, Projects and Finance surfaces return to the Lighthouse casefile",async ({page})=>{
+  await page.goto("/o/northline/crm/deals/nl-deals-910");
+  const dealLink=page.getByRole("button",{name:"Open connected Lighthouse casefile"});
+  await expect(dealLink).toBeVisible();
+  await dealLink.click();
+  await expect(page).toHaveURL(/\/workspace\/showcase\/lighthouse$/);
+
+  await page.goto("/o/northline/project/projects/nl-projects-900");
+  const projectLink=page.getByRole("button",{name:"Open cross-application casefile"});
+  await expect(projectLink).toBeVisible();
+  await projectLink.click();
+  await expect(page).toHaveURL(/\/workspace\/showcase\/lighthouse$/);
+
+  await page.goto("/o/northline/fin/invoices/nl-invoices-900");
+  await expect(page.getByRole("heading",{name:"Fictional financial draft — not posted"})).toBeVisible();
+  await expect(page.getByText(/No real invoice, cash receipt or recognised revenue/)).toBeVisible();
+  const invoiceLink=page.getByRole("button",{name:/Follow Lighthouse's linked project casefile/});
+  await invoiceLink.click();
+  await expect(page).toHaveURL(/\/workspace\/showcase\/lighthouse$/);
+});
