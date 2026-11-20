@@ -63,3 +63,14 @@ The **native showcase hub** is accessible at `/o/northline/workspace/showcase` t
 `tests/unit/flagship-studio.test.ts` checks structural integrity, editable scene graphs, publication stories, video source references, and rights status. `e2e/flagship-showcase.spec.ts` exercises native navigation, cross-tenant denial, responsive reflow and the local download-only form.
 
 **Independent sign-off remains required.** Confirm that the Video Studio generated source preview behaves correctly and that the layout's print preflight reports rather than conceals overset. Visual review in browser and quality gates are not replaced by the existence of fixtures. The production site is unchanged until reviewed and merged.
+
+
+## Lighthouse Hotels — interactive end-to-end casefile
+
+The Northline workspace showcase now opens `/o/northline/workspace/showcase/lighthouse`. This browser-local casefile provides five switchable lenses: project trail, design and research, client review, supply and delivery, and commercial. Each native work item opens the correct source application or, for collections without detail screens, the actual filtered workspace/collection rather than a generic home. Counts, statuses, scoped documents and financial value resolve from seeded records in the current organisation; missing data is reported as *not loaded* instead of replaced by fabricated numbers.
+
+A new additive contributor `flagship-lighthouse-review` creates a canonical `nl-portals-1600` review portal that supersedes the original `nl-portals-900` concept via `canonicalFor` without overwriting a user's older record. It contains five real native portal pages, the explicit scope of three client-review documents, no external user identities and no invitations. The source project, editable design file, draft quote, invoice, contract and procurement concept remain linked to the original Northline records. Internal work is modelled with eight tasks, five pending human review decisions, a sample requisition, two risks, a support scenario and a proposed meeting agenda.
+
+**Privacy and trust:** The portal is a *draft* and cannot be misrepresented as customer-visible. No external client views are assigned, no real email or payment has been sent, and no approval or procurement receipt has been fabricated. The casefile and the main Northline showcase are hidden from a local Client role preview and other demo organisations. This is still browser-local role visibility, **not** backend-enforced access control.
+
+Validation is added in `tests/unit/flagship-lighthouse.test.ts` and `e2e/flagship-lighthouse.spec.ts`, alongside the existing site, editor and finance coverage. Manual testing still needs to verify native Portal Builder appearance, expected record resolution, keyboard navigation, dynamic updates, and mobile horizontal overflow. Await CI and browser QA for the exact final head before merging.
