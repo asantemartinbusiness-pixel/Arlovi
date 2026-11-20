@@ -315,7 +315,8 @@ export function EntityConfig({ context, close }: { context: ScreenContext; close
         const fields: Record<string, string | number | boolean> = { number, country, currency };
         if (parentId) fields.parentId = parentId;
         if (existing) {
-          await context.mutate.patch(existing.id, { title: title.trim(), summary, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Entity ${title.trim()} updated` });
+          const saved1 = await context.mutate.patch(existing.id, { title: title.trim(), summary, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Entity ${title.trim()} updated` });
+          if (!saved1) return;
         } else {
           await context.mutate.create({ collection: "legalEntities", title: title.trim(), status: "active", summary, fields }, `Entity ${title.trim()} recorded`);
         }

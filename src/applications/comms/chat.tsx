@@ -130,9 +130,9 @@ export function Conversation({
     const reactions = parseReactions(message.fields.reactions);
     const names = reactions[emoji] ?? [];
     reactions[emoji] = names.includes(context.actor) ? names.filter((name) => name !== context.actor) : [...names, context.actor];
-    await context.mutate.patch(message.id, {
+    if (!(await context.mutate.patch(message.id, {
       fields: { ...message.fields, reactions: formatReactions(reactions) },
-    }, { event: `${context.actor} reacted ${emoji} to ${message.title}` });
+    }, { event: `${context.actor} reacted ${emoji} to ${message.title}` }))) return;
   }
 
   async function send() {
@@ -216,10 +216,10 @@ export function Conversation({
               size="sm"
               variant="ghost"
               onClick={async () => {
-                await context.mutate.patch(message.id, {
+                if (!(await context.mutate.patch(message.id, {
                   status: message.fields.pinned === true ? "sent" : "pinned",
                   fields: { ...message.fields, pinned: message.fields.pinned !== true },
-                }, { event: `${message.title} ${message.fields.pinned === true ? "unpinned" : "pinned"} by ${context.actor}` });
+                }, { event: `${message.title} ${message.fields.pinned === true ? "unpinned" : "pinned"} by ${context.actor}` }))) return;
               }}
             >
               {message.fields.pinned === true ? "Unpin" : "Pin"}

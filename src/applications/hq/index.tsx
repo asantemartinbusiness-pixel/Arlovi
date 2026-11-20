@@ -1140,7 +1140,7 @@ function GoalEditor({ context, close }: { context: ScreenContext; close: () => v
         event.preventDefault();
         const fields = { measure, target: Number(target) || 0, current: Number(current) || 0 };
         if (existing) {
-          await context.mutate.patch(existing.id, { title, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: "Objective updated" });
+          if (!(await context.mutate.patch(existing.id, { title, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: "Objective updated" }))) return;
         } else {
           await context.mutate.create({ collection: "objectives", title, status: "active", summary: `${measure} to ${target}`, fields }, "Objective created");
         }
@@ -1217,7 +1217,7 @@ function ChangeManager({ context, close }: { context: ScreenContext; close: () =
       onSubmit={async (event) => {
         event.preventDefault();
         if (cycle) return;
-        await context.mutate.patch(member.id, { fields: { ...member.fields, departmentId: deptId } }, { expectRevision: member.revision, event: `Reporting line changed for ${member.title}` });
+        if (!(await context.mutate.patch(member.id, { fields: { ...member.fields, departmentId: deptId } }, { expectRevision: member.revision, event: `Reporting line changed for ${member.title}` }))) return;
         context.toast("Reporting line changed", `${member.title} now reports into ${departments.find((dept) => dept.id === deptId)?.title}.`);
         close();
       }}
@@ -1280,7 +1280,7 @@ function LocationForm({ context, close }: { context: ScreenContext; close: () =>
       onSubmit={async (event) => {
         event.preventDefault();
         if (duplicate) return;
-        if (existing) await context.mutate.patch(existing.id, { title, summary: hours, fields: { ...existing.fields, timezone } }, { expectRevision: existing.revision, event: "Location updated" });
+        if (existing) if (!(await context.mutate.patch(existing.id, { title, summary: hours, fields: { ...existing.fields, timezone } }, { expectRevision: existing.revision, event: "Location updated" }))) return;
         else await context.mutate.create({ collection: "locations", title, status: "active", summary: hours, fields: { timezone, kind: "office" } }, "Location added");
         context.toast("Location saved", `${title} uses ${timezone}.`);
         close();

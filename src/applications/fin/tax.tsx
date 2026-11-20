@@ -461,10 +461,11 @@ export function TaxConfiguration({ context }: { context: ScreenContext; close?: 
                   onClick={async () => {
                     setBusy(true);
                     try {
-                      await context.mutate.patch(record.id, {
+                      const saved18 = await context.mutate.patch(record.id, {
                         status: "superseded",
                         fields: { ...record.fields, supersededBy: "tax engine", supersededAt: clockIso() },
                       }, { expectRevision: record.revision, event: `Tax code record ${record.title} marked superseded` });
+                      if (!saved18) return;
                       context.toast("Marked superseded", `${record.title} no longer claims to be current. No computed figure changed, because the engine was always the source.`);
                     } catch (error) {
                       context.toast("Not marked", error instanceof Error ? error.message : "The record changed. Reopen and retry.", "failed");

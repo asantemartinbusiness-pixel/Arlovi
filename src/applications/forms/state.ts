@@ -20,5 +20,5 @@ export const useFormsUi = create<FormsUi>((set) => ({
 /** Save the form model. Other keys kept on the body (preview runs) survive the save. */
 export async function saveForm(context: ScreenContext, record: Rec, next: FormModel, label: string): Promise<void> {
   const body = record.body && typeof record.body === "object" && !Array.isArray(record.body) ? record.body as Record<string, unknown> : {};
-  await context.mutate.patch(record.id, { body: { ...body, ...next } }, { expectRevision: record.revision, event: label });
+  if (!(await context.mutate.patch(record.id, { body: { ...body, ...next } }, { expectRevision: record.revision, event: label }))) return;
 }

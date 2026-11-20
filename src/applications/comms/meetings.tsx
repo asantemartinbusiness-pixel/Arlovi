@@ -329,8 +329,8 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
     const recordAnswer = async (name: string, answer: Answer) => {
       const next = { ...responses, [name]: { answer, recordedBy: context.actor, at: context.now.toISOString() } };
       const accepted = attendees.filter((person) => (next[person]?.answer ?? "invited") === "accepted").length;
-      await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, accepted }, body: { ...body, responses: next } },
-        { expectRevision: meeting.revision, event: `${context.actor} recorded ${name} as ${answer} for ${meeting.title}` });
+      if (!(await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, accepted }, body: { ...body, responses: next } },
+        { expectRevision: meeting.revision, event: `${context.actor} recorded ${name} as ${answer} for ${meeting.title}` }))) return;
     };
     return (
       <Grid>
@@ -359,8 +359,8 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
                       <Button size="sm" variant="ghost" iconOnly icon={<Trash2 size={14} />} aria-label={`Remove ${name}`} onClick={async () => {
                         const rest = { ...responses };
                         delete rest[name];
-                        await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, attendees: attendees.filter((person) => person !== name).join(",") }, body: { ...body, responses: rest } },
-                          { expectRevision: meeting.revision, event: `${name} removed from ${meeting.title} by ${context.actor}` });
+                        if (!(await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, attendees: attendees.filter((person) => person !== name).join(",") }, body: { ...body, responses: rest } },
+                          { expectRevision: meeting.revision, event: `${name} removed from ${meeting.title} by ${context.actor}` }))) return;
                         context.toast("Removed", `${name} is no longer on ${meeting.title}. Nobody was notified.`);
                       }} />
                     )}
@@ -400,7 +400,7 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
             {meeting.status !== "finished" && <Button variant="primary" onClick={() => context.openOverlay("edit event", { id: meeting.id })}>Edit details</Button>}
             <Button variant="secondary" onClick={() => context.openOverlay("recording consent")}>Record consent</Button>
             <Button variant="outline-danger" disabled={meeting.status === "finished"} onClick={async () => {
-              await context.mutate.patch(meeting.id, { status: "finished" }, { expectRevision: meeting.revision, event: `${meeting.title} marked finished by ${context.actor}` });
+              if (!(await context.mutate.patch(meeting.id, { status: "finished" }, { expectRevision: meeting.revision, event: `${meeting.title} marked finished by ${context.actor}` }))) return;
               context.toast("Meeting closed", "The record is marked finished.");
             }}>End the meeting</Button>
           </Row>

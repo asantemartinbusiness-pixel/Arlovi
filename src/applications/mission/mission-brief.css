@@ -53,3 +53,20 @@
 @media (max-width: 599px) { .mission-tl-label { max-width: 110px; } }
 .mission-tl-due > span { inset-inline-start: auto; inset-inline-end: 4px; }
 .mission-pt-exec { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+
+/* Mission builder: the steps a mission must pass, in the order they are taken. */
+.mission-builder-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.mission-builder-steps button {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%;
+  padding: 4px var(--space-2); border: 0; border-radius: var(--radius-sm, 6px);
+  background: transparent; color: var(--fg-muted); font: inherit; text-align: start; cursor: pointer;
+}
+.mission-builder-steps button > span[aria-hidden] {
+  display: inline-grid; place-items: center; inline-size: 1.4em; block-size: 1.4em;
+  border-radius: 50%; border: 1px solid var(--border-default);
+  font-family: var(--font-mono); font-size: var(--text-xs);
+}
+.mission-builder-steps li[data-done] button { color: var(--fg-default); }
+.mission-builder-steps li[data-done] button > span[aria-hidden] { background: var(--success-soft); border-color: var(--success-border); color: var(--success); }
+.mission-builder-steps li[data-current] button { color: var(--fg-strong); font-weight: 600; }
+.mission-builder-steps button:hover { background: var(--bg-inset); }

@@ -1268,9 +1268,9 @@ export function AssigneePicker({ context, close }: { context: ScreenContext; clo
       onSubmit={async (event) => {
         event.preventDefault();
         if (!chosen) return;
-        await context.mutate.patch(task.id, {
+        if (!(await context.mutate.patch(task.id, {
           fields: { ...task.fields, assignee: chosen.title, delegatedToAgent: isAgent },
-        }, { expectRevision: task.revision, event: `${task.title} assigned to ${chosen.title} by ${context.actor}` });
+        }, { expectRevision: task.revision, event: `${task.title} assigned to ${chosen.title} by ${context.actor}` }))) return;
         context.toast("Owner changed", `${task.title} is now with ${chosen.title}. Earlier work keeps its attribution.`);
         close();
       }}
@@ -1319,9 +1319,9 @@ export function DependencySelector({ context, close }: { context: ScreenContext;
         event.preventDefault();
         if (!choice || cycle) return;
         const current = dependenciesOf(task);
-        await context.mutate.patch(task.id, {
+        if (!(await context.mutate.patch(task.id, {
           fields: { ...task.fields, dependsOn: [...new Set([...current, choice])].join(",") },
-        }, { expectRevision: task.revision, event: `${task.title} now depends on ${chosen?.title ?? choice}` });
+        }, { expectRevision: task.revision, event: `${task.title} now depends on ${chosen?.title ?? choice}` }))) return;
         context.toast("Dependency saved", `${task.title} waits for ${chosen?.title ?? "the linked task"}.`);
         close();
       }}
@@ -1366,11 +1366,11 @@ export function DateEdit({ context, close }: { context: ScreenContext; close: ()
       onSubmit={async (event) => {
         event.preventDefault();
         if (backwards || blockers.length > 0) return;
-        await context.mutate.patch(task.id, {
+        if (!(await context.mutate.patch(task.id, {
           startAt: new Date(`${startValue}T09:00:00.000Z`).toISOString(),
           endAt: new Date(`${endValue}T09:00:00.000Z`).toISOString(),
           dueAt: new Date(`${endValue}T09:00:00.000Z`).toISOString(),
-        }, { expectRevision: task.revision, event: `${task.title} rescheduled` });
+        }, { expectRevision: task.revision, event: `${task.title} rescheduled` }))) return;
         context.toast("Dates saved", `${task.title} now runs ${context.date(startValue)} to ${context.date(endValue)}.`);
         close();
       }}
@@ -1441,10 +1441,10 @@ export function CheckInDialog({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         const checkIns = (objective.body as { checkIns?: CheckIn[] } | undefined)?.checkIns ?? [];
         const next = [...checkIns, { at: clockIso(), by: context.actor, note, value: Number(value) || 0 }];
-        await context.mutate.patch(objective.id, {
+        if (!(await context.mutate.patch(objective.id, {
           fields: { ...objective.fields, current: Number(value) || Number(objective.fields.current ?? 0) },
           body: { ...(objective.body as object ?? {}), checkIns: next },
-        }, { expectRevision: objective.revision, event: `Check-in on ${objective.title} by ${context.actor}` });
+        }, { expectRevision: objective.revision, event: `Check-in on ${objective.title} by ${context.actor}` }))) return;
         context.toast("Check-in recorded", `${objective.title} is at ${value} ${String(objective.fields.measure ?? "")}.`);
         close();
       }}

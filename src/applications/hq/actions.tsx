@@ -33,7 +33,7 @@ export async function writePref(
 ): Promise<void> {
   const existing = await readPref(context, kind);
   if (existing) {
-    await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields, kind } }, { skipHistory: true });
+    if (!(await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields, kind } }, { skipHistory: true }))) return;
     return;
   }
   await context.mutate.create({ collection: "preferences", title, status: "active", fields: { ...fields, kind } });
@@ -166,9 +166,9 @@ export async function prioritizeTask(context: ScreenContext): Promise<void> {
     return;
   }
   const high = task.fields.priority === "high";
-  await context.mutate.patch(task.id, {
+  if (!(await context.mutate.patch(task.id, {
     fields: { ...task.fields, priority: high ? "normal" : "high", prioritizedBy: context.actor },
-  }, { expectRevision: task.revision, event: `${task.title} ${high ? "returned to normal priority" : "prioritised"} by ${context.actor}` });
+  }, { expectRevision: task.revision, event: `${task.title} ${high ? "returned to normal priority" : "prioritised"} by ${context.actor}` }))) return;
   context.toast(high ? "Priority lowered" : "Prioritised", `${task.title} is now ${high ? "normal" : "high"} priority.`);
 }
 
@@ -180,9 +180,9 @@ export async function pinTask(context: ScreenContext): Promise<void> {
     return;
   }
   const pinned = task.tags.includes("pinned");
-  await context.mutate.patch(task.id, {
+  if (!(await context.mutate.patch(task.id, {
     tags: pinned ? task.tags.filter((tag) => tag !== "pinned") : [...task.tags, "pinned"],
-  }, { skipHistory: true, event: `${task.title} ${pinned ? "unpinned" : "pinned"}` });
+  }, { skipHistory: true, event: `${task.title} ${pinned ? "unpinned" : "pinned"}` }))) return;
   context.toast(pinned ? "Unpinned" : "Pinned", pinned ? `${task.title} left Saved.` : `${task.title} is under Saved.`);
 }
 
@@ -256,7 +256,7 @@ export function AssignLeader({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         if (!dept || !lead) return;
-        await context.mutate.patch(dept.id, { fields: { ...dept.fields, lead } }, { expectRevision: dept.revision, event: `${lead} assigned to lead ${dept.title}` });
+        if (!(await context.mutate.patch(dept.id, { fields: { ...dept.fields, lead } }, { expectRevision: dept.revision, event: `${lead} assigned to lead ${dept.title}` }))) return;
         context.toast("Leader assigned", `${lead} now leads ${dept.title}.`);
         close();
       }}
@@ -326,7 +326,7 @@ export function ReorderDepartments({ context, close }: { context: ScreenContext;
         for (const [index, id] of ids.entries()) {
           const dept = departments.find((item) => item.id === id);
           if (dept && Number(dept.fields.order ?? -1) !== index) {
-            await context.mutate.patch(id, { fields: { ...dept.fields, order: index } }, { skipHistory: true });
+            if (!(await context.mutate.patch(id, { fields: { ...dept.fields, order: index } }, { skipHistory: true }))) return;
           }
         }
         context.toast("Directory reordered", "Departments now appear in this order everywhere they are listed.");
@@ -515,7 +515,7 @@ export function LinkMission({ context, close }: { context: ScreenContext; close:
         event.preventDefault();
         if (!objective || !missionId) return;
         const mission = data.missions.find((item) => item.id === missionId);
-        await context.mutate.patch(objective.id, { fields: { ...objective.fields, missionId } }, { expectRevision: objective.revision, event: `${mission?.title ?? "Mission"} linked to ${objective.title}` });
+        if (!(await context.mutate.patch(objective.id, { fields: { ...objective.fields, missionId } }, { expectRevision: objective.revision, event: `${mission?.title ?? "Mission"} linked to ${objective.title}` }))) return;
         context.toast("Mission linked", `${mission?.title} now counts towards ${objective.title}.`);
         close();
       }}
@@ -548,9 +548,9 @@ export function ReviewGoal({ context, close }: { context: ScreenContext; close: 
       onSubmit={async (event) => {
         event.preventDefault();
         if (!objective) return;
-        await context.mutate.patch(objective.id, {
+        if (!(await context.mutate.patch(objective.id, {
           fields: { ...objective.fields, reviewedAt: clockIso(), reviewedBy: context.actor, confidence, reviewNote: note.trim() },
-        }, { expectRevision: objective.revision, event: `${objective.title} reviewed by ${context.actor}: ${confidence.replace(/_/g, " ")}` });
+        }, { expectRevision: objective.revision, event: `${objective.title} reviewed by ${context.actor}: ${confidence.replace(/_/g, " ")}` }))) return;
         context.toast("Review recorded", `${objective.title} reviewed as ${confidence.replace(/_/g, " ")}.`);
         close();
       }}
@@ -595,9 +595,9 @@ export function SetPrimaryOffice({ context, close }: { context: ScreenContext; c
           const isPrimary = location.id === id;
           const has = location.tags.includes("primary");
           if (isPrimary !== has) {
-            await context.mutate.patch(location.id, {
+            if (!(await context.mutate.patch(location.id, {
               tags: isPrimary ? [...location.tags, "primary"] : location.tags.filter((tag) => tag !== "primary"),
-            }, { event: isPrimary ? `${location.title} set as primary office` : undefined });
+            }, { event: isPrimary ? `${location.title} set as primary office` : undefined }))) return;
           }
         }
         context.toast("Primary office set", `${locations.find((item) => item.id === id)?.title} is the primary office.`);

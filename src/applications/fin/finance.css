@@ -67,6 +67,12 @@
 }
 
 /* Status strip content: wraps inside the page strip instead of overflowing it. */
-.fin-strip { flex: 1 1 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); padding-block: var(--space-1); }
+.fin-strip { flex: 0 0 100%; width: 100%; box-sizing: border-box; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); padding-block: var(--space-1); }
 .fin-strip > .ds-grow { flex: 1 1 0; }
 @media (max-width: 599px) { .fin-strip > .ds-grow { display: none; } }
+.pg-strip:has(> .fin-strip) { flex-shrink: 0; }
+
+.fin-recon-head { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 7.5em minmax(0, 1fr) auto; gap: var(--space-3); align-items: baseline; cursor: pointer; border-radius: var(--radius-sm); }
+@media (max-width: 599px) { .fin-recon-head { grid-template-columns: minmax(0, 1fr) auto; } }
+.fin-recon-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fin-recon-line[data-selected] { background: var(--selection-soft, var(--bg-hover)); }

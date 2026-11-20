@@ -126,7 +126,7 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
           checkedIn: false,
         };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: name,
             status: hold ? "hold" : "confirmed",
             startAt: start.toISOString(),
@@ -134,7 +134,7 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
             at: start.toISOString(),
             amountMinor: service?.amountMinor ?? 0,
             fields: { ...existing.fields, ...fields },
-          }, { expectRevision: existing.revision, event: `${name} rescheduled by ${actor}` });
+          }, { expectRevision: existing.revision, event: `${name} rescheduled by ${actor}` }))) return;
         } else {
           await context.mutate.create({
             collection: "bookings",
@@ -472,9 +472,9 @@ export function CustomerMessage({ context, close }: { context: ScreenContext; cl
         event.preventDefault();
         if (!text.trim()) return;
         const body = bodyOf<BookingBody>(booking, {});
-        await context.mutate.patch(booking.id, {
+        if (!(await context.mutate.patch(booking.id, {
           body: { ...body, messages: [...(body.messages ?? []), { at: now.toISOString(), direction: "out", body: text.trim() }] },
-        }, { expectRevision: booking.revision, event: `Message recorded against ${booking.title}` });
+        }, { expectRevision: booking.revision, event: `Message recorded against ${booking.title}` }))) return;
         context.toast("Recorded against the booking", "No mail or telephony provider is connected, so the message is a local record rather than something that was sent.");
         close();
       }}
@@ -684,11 +684,11 @@ export function ServiceEditor({ context, close }: { context: ScreenContext; clos
           cancellationFeeBp: Number(existing?.fields.cancellationFeeBp ?? 0),
         };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: title.trim(), amountMinor: price,
             fields: { ...existing.fields, ...fields },
             body: { ...existingBody, resources },
-          }, { expectRevision: existing.revision, event: `Service ${title.trim()} edited` });
+          }, { expectRevision: existing.revision, event: `Service ${title.trim()} edited` }))) return;
         } else {
           await context.mutate.create({
             collection: "services", title: title.trim(), status: "active", amountMinor: price,
@@ -827,7 +827,7 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
         if (invalid) return;
         const fields = { kind, capacity, workingHours: hours.trim(), timezone: org.timezone, linkedResourceId: linked, bookable };
         if (existing) {
-          await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Resource ${title.trim()} edited` });
+          if (!(await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Resource ${title.trim()} edited` }))) return;
         } else {
           await context.mutate.create({ collection: "resources", title: title.trim(), status: "active", summary: "", fields, body: { blackouts: [] } }, `Resource ${title.trim()} created`);
         }
@@ -886,9 +886,9 @@ export function Recurrence({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         if (!reason.trim() || affected.length > 0) return;
         const body = bodyOf<ResourceBody>(resource, {});
-        await context.mutate.patch(resource.id, {
+        if (!(await context.mutate.patch(resource.id, {
           body: { ...body, blackouts: [...(body.blackouts ?? []), { from: startIso, to: endIso, reason: reason.trim() }] },
-        }, { expectRevision: resource.revision, event: `${resource.title} blocked from ${from} to ${to}` });
+        }, { expectRevision: resource.revision, event: `${resource.title} blocked from ${from} to ${to}` }))) return;
         context.toast("Period blocked", `${resource.title} is unavailable ${from} to ${to}. The calendar shades it and the public page will not offer it.`);
         close();
       }}
@@ -929,9 +929,9 @@ export function FormFieldInspector({ context, close }: { context: ScreenContext;
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(page.id, {
+        if (!(await context.mutate.patch(page.id, {
           body: { ...body, fields: (body.fields ?? []).map((item) => (item.id === field.id ? { ...item, label: label.trim() || item.label, required } : item)) },
-        }, { expectRevision: page.revision, event: `Public booking field "${field.label}" edited` });
+        }, { expectRevision: page.revision, event: `Public booking field "${field.label}" edited` }))) return;
         context.toast("Field saved", `${label || field.label} is ${required ? "required" : "optional"} on the public page.`);
         close();
       }}
@@ -973,7 +973,7 @@ export function PublishBookingPage({ context, close }: { context: ScreenContext;
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(page.id, { status: "published", fields: { ...page.fields, published: true, exportedAt: clockIso() } }, { expectRevision: page.revision, event: `${page.title} exported locally` });
+          if (!(await context.mutate.patch(page.id, { status: "published", fields: { ...page.fields, published: true, exportedAt: clockIso() } }, { expectRevision: page.revision, event: `${page.title} exported locally` }))) return;
           context.toast("Exported", "The page is marked exported in this workspace. No public URL exists.");
           close();
         }}
@@ -1023,7 +1023,7 @@ export function ReminderTemplateEditor({ context, close }: { context: ScreenCont
         if (invalid) return;
         const fields = { kind: "reminder", channel, offsetHours: Number(offset), approval: "awaiting_approval", delivery: "not_connected", enabled: existing ? existing.fields.enabled === true : false };
         if (existing) {
-          await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields }, body: { subject, body: text } }, { expectRevision: existing.revision, event: `Reminder ${title.trim()} edited` });
+          if (!(await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields }, body: { subject, body: text } }, { expectRevision: existing.revision, event: `Reminder ${title.trim()} edited` }))) return;
         } else {
           await context.mutate.create({ collection: "templates", title: title.trim(), status: "review", summary: `${channel} reminder ${offset} hours before.`, tags: ["reminder"], fields, body: { subject, body: text } }, `Reminder ${title.trim()} created`);
         }

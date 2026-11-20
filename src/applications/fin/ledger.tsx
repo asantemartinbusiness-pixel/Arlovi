@@ -470,7 +470,8 @@ export function LedgerJournals({ context }: { context: ScreenContext }) {
                 if (journal.status !== "draft") continue;
                 const check = checkPosting({ lines: journalLines(journal), period: periodOf(journalDate(journal)), locked: data.locked, accounts: data.accounts });
                 if (check.reason) { refused += 1; continue; }
-                await context.mutate.patch(journal.id, { status: "posted", fields: { ...journal.fields, postedBy: context.actor, postedAt: clockIso() } }, { expectRevision: journal.revision, event: `Posted journal ${journal.title}` });
+                const saved24 = await context.mutate.patch(journal.id, { status: "posted", fields: { ...journal.fields, postedBy: context.actor, postedAt: clockIso() } }, { expectRevision: journal.revision, event: `Posted journal ${journal.title}` });
+                if (!saved24) return;
                 posted += 1;
               }
               context.toast(

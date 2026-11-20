@@ -426,9 +426,9 @@ export async function retestAudit(context: ScreenContext): Promise<void> {
   if (!record) { context.toast("No site", "Create a site first.", "blocked"); return; }
   const counts = issueCounts(auditSite(readSite(record), Object.fromEntries(forms.map((form) => [form.id, form.title]))));
   const before = record.fields.lastAuditAt ? { fail: Number(record.fields.auditFail ?? 0), warn: Number(record.fields.auditWarn ?? 0) } : undefined;
-  await context.mutate.patch(record.id, {
+  if (!(await context.mutate.patch(record.id, {
     fields: { ...record.fields, lastAuditAt: nowIso(context), auditFail: counts.fail, auditWarn: counts.warn, auditPass: counts.pass, previousAuditFail: before?.fail ?? "", previousAuditWarn: before?.warn ?? "" },
-  }, { expectRevision: record.revision, event: `Audit re-run: ${counts.fail} failing, ${counts.warn} to review, ${counts.pass} passing${before ? ` (was ${before.fail} failing, ${before.warn} to review)` : ""}` });
+  }, { expectRevision: record.revision, event: `Audit re-run: ${counts.fail} failing, ${counts.warn} to review, ${counts.pass} passing${before ? ` (was ${before.fail} failing, ${before.warn} to review)` : ""}` }))) return;
   context.toast("Retested", before ? `Failing ${before.fail} → ${counts.fail}, to review ${before.warn} → ${counts.warn}.` : `${counts.fail} failing, ${counts.warn} to review. This is the first recorded run.`, counts.fail ? "blocked" : "ok");
 }
 
@@ -511,7 +511,7 @@ export function ChartBuilder({ context }: { context: ScreenContext }) {
       </Row>
       <BarChart title={title} height={220} format={(value) => String(Math.round(value))} series={[{ name: title, points }]} footer="Every bar is a count of records or audit events in this workspace. No visit or rate is estimated." />
       <Button variant="secondary" onClick={async () => {
-        await context.mutate.patch(record.id, { fields: { ...record.fields, savedChart: JSON.stringify({ measure, group, title }) } }, { expectRevision: record.revision, event: `Analytics chart saved: ${title}` });
+        if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, savedChart: JSON.stringify({ measure, group, title }) } }, { expectRevision: record.revision, event: `Analytics chart saved: ${title}` }))) return;
         context.toast("Chart saved", `${title} is saved on the site.`);
       }}>Save this chart on the site</Button>
     </Stack>

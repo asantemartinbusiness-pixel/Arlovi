@@ -55,7 +55,7 @@ function ChannelArchive({ context, close }: { context: ScreenContext; close: () 
         variant="confirm"
         end={<Button variant="ghost" onClick={close}>Cancel</Button>}
         primary={<Button variant="danger" onClick={async () => {
-          await context.mutate.patch(channel.id, { status: "archived" }, { expectRevision: channel.revision, event: `${channel.title} archived by ${context.actor}` });
+          if (!(await context.mutate.patch(channel.id, { status: "archived" }, { expectRevision: channel.revision, event: `${channel.title} archived by ${context.actor}` }))) return;
           context.toast("Channel archived", "The messages are kept and the channel is out of the list.");
           close();
         }}>Archive the channel</Button>}
@@ -217,12 +217,12 @@ function ReplyEditor({ context, close }: { context: ScreenContext; close: () => 
           body: String(form.get("body") ?? ""),
           external: false,
         };
-        await context.mutate.patch(thread.id, {
+        if (!(await context.mutate.patch(thread.id, {
           status: "draft",
           summary: reply.body.slice(0, 160),
           body: { ...(thread.body as object ?? {}), messages: [...existing, reply] },
           fields: { ...thread.fields, folder: "drafts", messageCount: existing.length + 1 },
-        }, { expectRevision: thread.revision, event: `Reply drafted on ${thread.title} by ${context.actor}` });
+        }, { expectRevision: thread.revision, event: `Reply drafted on ${thread.title} by ${context.actor}` }))) return;
         context.toast("Reply saved as a draft", "It is on the thread with your name and the time. Nothing was sent.");
         close();
       }}
@@ -294,9 +294,9 @@ function AudienceSelector({ context, close }: { context: ScreenContext; close: (
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(post.id, {
+        if (!(await context.mutate.patch(post.id, {
           fields: { ...post.fields, audience: String(form.get("audience") ?? "Everyone"), requiresAck: form.get("ack") === "on" },
-        }, { expectRevision: post.revision, event: `Audience set on ${post.title}` });
+        }, { expectRevision: post.revision, event: `Audience set on ${post.title}` }))) return;
         context.toast("Audience saved", "It is on the announcement record.");
         close();
       }}
@@ -408,7 +408,7 @@ function SignatureEditor({ context, close }: { context: ScreenContext; close: ()
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(record.id, { fields: { ...record.fields, signature: String(form.get("signature") ?? "") } }, { expectRevision: record.revision, event: `Signature updated by ${context.actor}` });
+        if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, signature: String(form.get("signature") ?? "") } }, { expectRevision: record.revision, event: `Signature updated by ${context.actor}` }))) return;
         context.toast("Signature saved", "It is on your preference record in this browser.");
         close();
       }}
@@ -620,7 +620,7 @@ export const commsApp = registerApp({
             summary: `Raised from the email thread “${thread.title}” by ${context.actor}.`,
             fields: { stage: "ready", assignee: context.actor, priority: "normal", estimateHours: 1, loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false, sourceThreadId: thread.id },
           }, `Task raised from ${thread.title} by ${context.actor}`);
-          await context.mutate.patch(thread.id, { fields: { ...thread.fields, taskId: task.id } }, { event: `Thread linked to task ${task.title}` });
+          if (!(await context.mutate.patch(thread.id, { fields: { ...thread.fields, taskId: task.id } }, { event: `Thread linked to task ${task.title}` }))) return;
           context.toast("Task created", "It is in Projects, assigned to you, with a link back to this thread.");
         } },
         { id: "add CC", label: "Add a CC", placement: "overflow", run: (context) => context.openOverlay("add cc") },

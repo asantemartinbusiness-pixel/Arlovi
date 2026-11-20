@@ -293,21 +293,21 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
         if (decision === "changes") {
           if (alreadyApproved) { setError("An approved plan is not sent back here; duplicate it as a draft to change it."); return; }
           if (reason.trim().length < 5) { setError("Say what needs to change so the owner can act on it."); return; }
-          await context.mutate.patch(campaign.id, {
+          if (!(await context.mutate.patch(campaign.id, {
             status: campaign.status === "active" ? "active" : "draft",
             fields: { ...campaign.fields, approval: "changes_requested", changesRequestedBy: actor, changesRequestedAt: now.toISOString() },
             body: nextBody,
-          }, { expectRevision: campaign.revision, event: `Changes requested on ${campaign.title} by ${actor}: ${reason.trim()}` });
+          }, { expectRevision: campaign.revision, event: `Changes requested on ${campaign.title} by ${actor}: ${reason.trim()}` }))) return;
           context.toast("Changes requested", `${campaign.title} is back with ${campaign.ownerName || "its owner"} as a draft, with your note.`);
           close();
           return;
         }
         if (blocked) return;
-        await context.mutate.patch(campaign.id, {
+        if (!(await context.mutate.patch(campaign.id, {
           status: campaign.status === "active" ? "active" : "approved",
           fields: { ...campaign.fields, approval: "approved", approvedBy: actor, approvedAt: now.toISOString() },
           body: nextBody,
-        }, { expectRevision: campaign.revision, event: `Plan approved for ${campaign.title} by ${actor}` });
+        }, { expectRevision: campaign.revision, event: `Plan approved for ${campaign.title} by ${actor}` }))) return;
         context.toast("Plan approved", `${campaign.title} is recorded as approved by ${actor}. It is not live until a launch is recorded. No provider was told.`);
         close();
       }}
@@ -491,7 +491,7 @@ export function LaunchApproval({ context, close }: { context: ScreenContext; clo
           context.toast(`Launch blocked: ${attention} ${attention === 1 ? "check needs" : "checks need"} attention`, "Record a plan approval and approve every creative first.", "blocked");
           return;
         }
-        await context.mutate.patch(campaign.id, { status: "active", fields: { ...campaign.fields, launchedBy: actor, launchedAt: now.toISOString() } }, { expectRevision: campaign.revision, event: `${campaign.title} launched locally by ${actor}` });
+        if (!(await context.mutate.patch(campaign.id, { status: "active", fields: { ...campaign.fields, launchedBy: actor, launchedAt: now.toISOString() } }, { expectRevision: campaign.revision, event: `${campaign.title} launched locally by ${actor}` }))) return;
         context.toast("Launch recorded", `${campaign.title} is active in this workspace. Nothing was published.`);
         close();
       }}
@@ -530,9 +530,9 @@ export function PauseConsequence({ context, close }: { context: ScreenContext; c
           <Button
             variant="danger"
             onClick={async () => {
-              await context.mutate.patch(campaign.id, { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, { expectRevision: campaign.revision, event: `${campaign.title} paused` });
+              if (!(await context.mutate.patch(campaign.id, { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, { expectRevision: campaign.revision, event: `${campaign.title} paused` }))) return;
               for (const post of posts) {
-                await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, { event: `${post.title} held because its campaign was paused` });
+                if (!(await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, { event: `${post.title} held because its campaign was paused` }))) return;
               }
               context.toast("Paused", `${campaign.title} is paused and ${posts.length} queued item${posts.length === 1 ? " was" : "s were"} returned to drafts.`);
               close();
@@ -569,12 +569,12 @@ export function PostEditor({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         if (over || !when) return;
         const iso = new Date(when).toISOString();
-        await context.mutate.patch(post.id, {
+        if (!(await context.mutate.patch(post.id, {
           startAt: iso,
           at: iso,
           fields: { ...post.fields, network },
           body: { ...body, caption },
-        }, { expectRevision: post.revision, event: `${post.title} edited` });
+        }, { expectRevision: post.revision, event: `${post.title} edited` }))) return;
         context.toast("Saved", `${post.title} is queued for ${context.dateTime(iso)} in ${org.timezone}.`);
         close();
       }}
@@ -616,7 +616,7 @@ export function AssetPicker({ context, close }: { context: ScreenContext; close:
             onClick={async () => {
               if (!post) return;
               const body = bodyOf<PostBody>(post, {});
-              await context.mutate.patch(post.id, { fields: { ...post.fields, mediaName: chosen }, body: { ...body, media: [{ name: chosen, kind: "image" }] } }, { expectRevision: post.revision, event: `Media attached to ${post.title}` });
+              if (!(await context.mutate.patch(post.id, { fields: { ...post.fields, mediaName: chosen }, body: { ...body, media: [{ name: chosen, kind: "image" }] } }, { expectRevision: post.revision, event: `Media attached to ${post.title}` }))) return;
               context.toast("Attached", `${chosen} is referenced by ${post.title}.`);
               close();
             }}
@@ -656,7 +656,7 @@ export function PublishPreview({ context, close }: { context: ScreenContext; clo
             variant="primary"
             disabled={over}
             onClick={async () => {
-              await context.mutate.patch(post.id, { status: "scheduled", fields: { ...post.fields, delivery: "queued_local", approval: "approved", error: "" } }, { expectRevision: post.revision, event: `${post.title} queued locally for ${post.startAt}` });
+              if (!(await context.mutate.patch(post.id, { status: "scheduled", fields: { ...post.fields, delivery: "queued_local", approval: "approved", error: "" } }, { expectRevision: post.revision, event: `${post.title} queued locally for ${post.startAt}` }))) return;
               context.toast("Queued locally", "The item is approved and queued in this browser. It has not been published.");
               close();
             }}
@@ -723,11 +723,11 @@ export function PostComposer({ context, close }: { context: ScreenContext; close
         if (invalid) return;
         const iso = new Date(when).toISOString();
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: title.trim(), startAt: iso, at: iso,
             fields: { ...existing.fields, network: networks[0], campaignId },
             body: { ...existingBody, caption },
-          }, { expectRevision: existing.revision, event: `${title.trim()} edited in the composer` });
+          }, { expectRevision: existing.revision, event: `${title.trim()} edited in the composer` }))) return;
         } else {
           for (const network of networks) {
             await context.mutate.create({
@@ -858,11 +858,11 @@ function EmailBuilderForm({ context, close, campaign, templateId }: { context: S
         event.preventDefault();
         if (invalid) return;
         if (campaign) {
-          await context.mutate.patch(campaign.id, {
+          if (!(await context.mutate.patch(campaign.id, {
             startAt: new Date(when).toISOString(),
             fields: { ...campaign.fields, audienceId, emailSubject: subject },
             body: { ...bodyOf<CampaignBody>(campaign, {}), brief: bodyText || campaign.summary },
-          }, { expectRevision: campaign.revision, event: `Email content saved for ${campaign.title}` });
+          }, { expectRevision: campaign.revision, event: `Email content saved for ${campaign.title}` }))) return;
         } else {
           await context.mutate.create({
             collection: "campaigns",
@@ -953,17 +953,17 @@ export function SendReview({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         if (!confirmed) return;
         if (testMode) {
-          await context.mutate.patch(campaign.id, {
+          if (!(await context.mutate.patch(campaign.id, {
             fields: { ...campaign.fields, testSendState: "queued_local", testSendTo: actor, testSendAt: now.toISOString() },
-          }, { expectRevision: campaign.revision, event: `Test send of ${campaign.title} to ${actor} held locally` });
+          }, { expectRevision: campaign.revision, event: `Test send of ${campaign.title} to ${actor} held locally` }))) return;
           await context.mutate.log(`Test send of ${campaign.title} to ${actor} queued locally; no mail provider is connected.`, { entityId: campaign.id, type: "email.test_queued_local", capability: "queued_local" });
           context.toast("Test send held locally", `The test to ${actor} is recorded against ${campaign.title}. It was not delivered: no mail provider is connected.`);
           close();
           return;
         }
-        await context.mutate.patch(campaign.id, {
+        if (!(await context.mutate.patch(campaign.id, {
           fields: { ...campaign.fields, recipientsApprovedBy: actor, recipientsApprovedAt: now.toISOString(), recipientCount: result.members.length },
-        }, { expectRevision: campaign.revision, event: `Recipients approved for ${campaign.title}: ${result.members.length} contacts` });
+        }, { expectRevision: campaign.revision, event: `Recipients approved for ${campaign.title}: ${result.members.length} contacts` }))) return;
         await context.mutate.log(`Send held locally for ${campaign.title}: ${result.members.length} recipients, ${result.excluded.length} held back.`, { entityId: campaign.id, type: "email.queued_local", capability: "queued_local" });
         context.toast("Recipients approved", `${result.members.length} recipients recorded against ${campaign.title}. Nothing was sent: no mail provider is connected.`);
         close();
@@ -1024,7 +1024,7 @@ export function SuppressionCheck({ context }: { context: ScreenContext }) {
   const { loaded, rows, missing } = useSuppressionState();
   async function addRule(audience: Rec) {
     const body = bodyOf<AudienceBody>(audience, {});
-    await context.mutate.patch(audience.id, { body: { ...body, exclusions: [...new Set([...(body.exclusions ?? []), "suppressed"])] } }, { expectRevision: audience.revision, event: `Suppression rule added to ${audience.title} by ${context.actor}` });
+    if (!(await context.mutate.patch(audience.id, { body: { ...body, exclusions: [...new Set([...(body.exclusions ?? []), "suppressed"])] } }, { expectRevision: audience.revision, event: `Suppression rule added to ${audience.title} by ${context.actor}` }))) return;
     context.toast("Suppression rule added", `${audience.title} now holds back suppressed contacts.`);
   }
   if (!loaded) return <div role="status" aria-live="polite"><Empty title="Reading contacts" /></div>;
@@ -1075,12 +1075,12 @@ export function SegmentBuilder({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         if (invalid) return;
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: title.trim(),
             summary: `${rules.length} rule${rules.length === 1 ? "" : "s"} over contact records.`,
             fields: { ...existing.fields, lastCountedAt: now.toISOString() },
             body: { rules, exclusions },
-          }, { expectRevision: existing.revision, event: `Segment ${title.trim()} rules changed` });
+          }, { expectRevision: existing.revision, event: `Segment ${title.trim()} rules changed` }))) return;
         } else {
           await context.mutate.create({
             collection: "audiences",
@@ -1278,11 +1278,11 @@ export function SpendApproval({ context, close }: { context: ScreenContext; clos
       onSubmit={async (event) => {
         event.preventDefault();
         if (invalid) return;
-        await context.mutate.patch(campaign.id, {
+        if (!(await context.mutate.patch(campaign.id, {
           amountMinor: total,
           fields: { ...campaign.fields, budgetMinor: total, allocationApprovedBy: actor },
           body: { ...body, channels: (body.channels ?? []).map((channel) => ({ ...channel, budgetMinor: Number(allocations[channel.network]) || 0 })) },
-        }, { expectRevision: campaign.revision, event: `Budget allocation changed on ${campaign.title} to ${total}` });
+        }, { expectRevision: campaign.revision, event: `Budget allocation changed on ${campaign.title} to ${total}` }))) return;
         context.toast("Allocation saved", `${context.money(total)} planned with ${context.money(reserve)} held in reserve. No authorisation was issued.`);
         close();
       }}
@@ -1362,9 +1362,9 @@ export function AuditIssue({ context, close }: { context: ScreenContext; close: 
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(audit.id, {
+        if (!(await context.mutate.patch(audit.id, {
           body: { ...body, issues: (body.issues ?? []).map((item) => (item.id === issue.id ? { ...item, assignee } : item)) },
-        }, { expectRevision: audit.revision, event: `Audit issue "${issue.title}" assigned to ${assignee || "nobody"}` });
+        }, { expectRevision: audit.revision, event: `Audit issue "${issue.title}" assigned to ${assignee || "nobody"}` }))) return;
         context.toast("Issue assigned", `${issue.title} is now owned by ${assignee || "nobody"}.`);
         close();
       }}
@@ -1403,7 +1403,7 @@ export function PageMetadataEditor({ context, close }: { context: ScreenContext;
       onSubmit={async (event) => {
         event.preventDefault();
         if (!page) return;
-        await context.mutate.patch(page.id, { fields: { ...page.fields, metaTitle, metaDescription } }, { expectRevision: page.revision, event: `Metadata edited for ${page.title}` });
+        if (!(await context.mutate.patch(page.id, { fields: { ...page.fields, metaTitle, metaDescription } }, { expectRevision: page.revision, event: `Metadata edited for ${page.title}` }))) return;
         context.toast("Metadata saved", `${page.title} has a ${metaTitle.length} character title. Search engines may still rewrite it.`);
         close();
       }}
@@ -1533,10 +1533,10 @@ export function PublishConfirm({ context, close }: { context: ScreenContext; clo
         variant="primary"
         disabled={failing.length > 0}
         onClick={async () => {
-          await context.mutate.patch(page.id, {
+          if (!(await context.mutate.patch(page.id, {
             status: "published",
             fields: { ...page.fields, published: true, exportedAt: context.now.toISOString(), publishedBy: context.actor },
-          }, { expectRevision: page.revision, event: `${page.title} exported as HTML from this browser` });
+          }, { expectRevision: page.revision, event: `${page.title} exported as HTML from this browser` }))) return;
           context.toast("Exported", `${page.title} is marked exported. No hosting provider was contacted, so no public URL exists.`);
           close();
         }}
@@ -1686,12 +1686,12 @@ export function TemplateEditor({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         if (invalid) return;
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: title.trim(), summary,
             status: "review",
             fields: { ...existing.fields, kind, approval: "awaiting_approval", version: Number(existing.fields.version ?? 1) + 1, brandChecked: false },
             body: { ...existingBody, ...(kind === "email" ? { subject } : { caption: subject }) },
-          }, { expectRevision: existing.revision, event: `Template ${title.trim()} edited to version ${Number(existing.fields.version ?? 1) + 1}` });
+          }, { expectRevision: existing.revision, event: `Template ${title.trim()} edited to version ${Number(existing.fields.version ?? 1) + 1}` }))) return;
           context.toast("Template saved for review", "A new version needs approval before anything uses it. Live items keep the version they were built with.");
         } else {
           await context.mutate.create({
@@ -1736,10 +1736,10 @@ export function TemplateApproval({ context, close }: { context: ScreenContext; c
       onSubmit={async (event) => {
         event.preventDefault();
         if (!brandChecked) return;
-        await context.mutate.patch(template.id, {
+        if (!(await context.mutate.patch(template.id, {
           status: "approved",
           fields: { ...template.fields, approval: "approved", brandChecked: true, approvedBy: actor },
-        }, { expectRevision: template.revision, event: `Template ${template.title} approved by ${actor}` });
+        }, { expectRevision: template.revision, event: `Template ${template.title} approved by ${actor}` }))) return;
         context.toast("Template approved", `${template.title} version ${template.fields.version ?? 1} is available to use.`);
         close();
       }}

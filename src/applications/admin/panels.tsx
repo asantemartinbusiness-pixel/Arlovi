@@ -179,9 +179,9 @@ export function IdentityForm({ context, close }: { context: ScreenContext; close
   async function save() {
     setBusy(true);
     try {
-      await context.mutate.patch(record!.id, {
+      if (!(await context.mutate.patch(record!.id, {
         fields: { ...record!.fields, legalName, tradingName, companyNumber },
-      }, { event: `Organisation profile updated${legalChanged ? " (legal identity changed)" : ""}`, expectRevision: record!.revision });
+      }, { event: `Organisation profile updated${legalChanged ? " (legal identity changed)" : ""}`, expectRevision: record!.revision }))) return;
       context.toast("Profile saved", legalChanged ? "The legal identity change is in the audit trail." : "The organisation record is updated.");
       close();
     } finally {
@@ -879,7 +879,7 @@ export function PolicyEditor({ context, close }: { context: ScreenContext; close
         setError("");
         const fields = { kind: "role", basedOn, capabilities: caps.join(","), deny: deny.join(","), apps: "", holders: Number(existing?.fields.holders ?? 0), author: context.actor };
         if (existing) {
-          await context.mutate.patch(existing.id, { title, summary: `Based on ${ROLE_LABELS[basedOn]}, ${caps.length} capabilities.`, fields: { ...existing.fields, ...fields } }, { event: `Role draft updated: ${title}`, expectRevision: existing.revision });
+          if (!(await context.mutate.patch(existing.id, { title, summary: `Based on ${ROLE_LABELS[basedOn]}, ${caps.length} capabilities.`, fields: { ...existing.fields, ...fields } }, { event: `Role draft updated: ${title}`, expectRevision: existing.revision }))) return;
           context.toast("Role saved", `${title} is a ${existing.status} role.`);
         } else {
           await context.mutate.create({
@@ -1016,7 +1016,7 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    await context.mutate.patch(role.id, { status: "published", fields: { ...role.fields, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `Role published: ${role.title}`, expectRevision: role.revision });
+                    if (!(await context.mutate.patch(role.id, { status: "published", fields: { ...role.fields, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `Role published: ${role.title}`, expectRevision: role.revision }))) return;
                     context.toast("Published", `${role.title} is live in the interface and the change is in the audit trail.`);
                     close();
                   } finally {
@@ -1274,11 +1274,11 @@ export function GrantEditor({ context, close }: { context: ScreenContext; close:
             setBusy(true);
             try {
               if (existing) {
-                await context.mutate.patch(existing.id, {
+                if (!(await context.mutate.patch(existing.id, {
                   summary: `${mode.replace(/_/g, " ")} up to ${context.money(cap)}.`,
                   amountMinor: cap,
                   fields: { ...existing.fields, mode, maxSpendMinor: cap, requiresApproval: requires.join(","), author: context.actor },
-                }, { event: `Autonomy grant updated: ${existing.title}`, expectRevision: existing.revision });
+                }, { event: `Autonomy grant updated: ${existing.title}`, expectRevision: existing.revision }))) return;
                 context.toast("Grant saved", `${existing.title} is now ${mode.replace(/_/g, " ")} with a cap of ${context.money(cap)}.`);
               } else {
                 await context.mutate.create({
@@ -1378,7 +1378,7 @@ export function AutonomyRevoke({ context, close }: { context: ScreenContext; clo
           onClick={async () => {
             setBusy(true);
             try {
-              await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: false, pausedBy: context.actor } }, { event: "Automation resumed from the autonomy centre" });
+              if (!(await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: false, pausedBy: context.actor } }, { event: "Automation resumed from the autonomy centre" }))) return;
               context.toast("Resumed", "Agents and missions may take steps again.");
               close();
             } finally { setBusy(false); }
@@ -1395,7 +1395,7 @@ export function AutonomyRevoke({ context, close }: { context: ScreenContext; clo
         onConfirm={async () => {
           setBusy(true);
           try {
-            await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: true, pausedBy: context.actor } }, { event: "Automation paused from the autonomy centre" });
+            if (!(await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: true, pausedBy: context.actor } }, { event: "Automation paused from the autonomy centre" }))) return;
             context.toast("Paused", "Every agent and mission step is held, and the organisation record carries the pause.", "blocked");
             close();
           } finally { setBusy(false); }
@@ -1418,7 +1418,7 @@ export function AutonomyRevoke({ context, close }: { context: ScreenContext; clo
       onConfirm={async () => {
         setBusy(true);
         try {
-          await context.mutate.patch(grant.id, { status: "revoked", fields: { ...grant.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Autonomy grant revoked: ${grant.title}`, expectRevision: grant.revision });
+          if (!(await context.mutate.patch(grant.id, { status: "revoked", fields: { ...grant.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Autonomy grant revoked: ${grant.title}`, expectRevision: grant.revision }))) return;
           context.toast("Revoked", `${grant.title} no longer applies. Anything it allowed now needs a person.`);
           close();
         } finally { setBusy(false); }
@@ -1611,7 +1611,7 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
             setBusy(true);
             try {
               if (existing) {
-                await context.mutate.patch(existing.id, { amountMinor: cap }, { event: `Quota set to ${context.money(cap)} on ${existing.title}`, expectRevision: existing.revision });
+                if (!(await context.mutate.patch(existing.id, { amountMinor: cap }, { event: `Quota set to ${context.money(cap)} on ${existing.title}`, expectRevision: existing.revision }))) return;
                 context.toast("Quota saved", `${existing.title} is capped at ${context.money(cap)}.`);
               } else {
                 await context.mutate.create({
@@ -1668,7 +1668,7 @@ export function CostAllocation({ context, close }: { context: ScreenContext; clo
             setBusy(true);
             try {
               if (target) {
-                await context.mutate.patch(target.id, { amountMinor: Number(target.amountMinor ?? 0) + amount }, { event: `Allocated ${context.money(amount)} to ${target.title}`, expectRevision: target.revision });
+                if (!(await context.mutate.patch(target.id, { amountMinor: Number(target.amountMinor ?? 0) + amount }, { event: `Allocated ${context.money(amount)} to ${target.title}`, expectRevision: target.revision }))) return;
               } else {
                 const name = data.departments.find((row) => row.id === department)?.title ?? "Department";
                 await context.mutate.create({

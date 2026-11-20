@@ -244,10 +244,11 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
         try {
         const tags = cash ? [type, "cash"] : [type];
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          const saved14 = await context.mutate.patch(existing.id, {
             title: title.trim(), summary, tags,
             fields: { ...existing.fields, code: code.trim(), type },
           }, { expectRevision: existing.revision, event: `Account ${code.trim()} updated` });
+          if (!saved14) return;
           context.toast("Account saved", `${code.trim()} ${title.trim()} is updated in the chart of accounts.`);
         } else {
           const created = await context.mutate.create({
@@ -424,7 +425,8 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
           disabled={account.status === "inactive"}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(account.id, { status: "inactive" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} deactivated` });
+            const saved15 = await context.mutate.patch(account.id, { status: "inactive" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} deactivated` });
+            if (!saved15) { setBusy(false); return; }
             context.toast("Account deactivated", `${account.title} stays in the history and no longer appears on new journal lines.`);
             setBusy(false);
             close();
@@ -438,7 +440,8 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
             busy={busy}
             onClick={async () => {
               setBusy(true);
-              await context.mutate.patch(account.id, { status: "active" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} reactivated` });
+              const saved16 = await context.mutate.patch(account.id, { status: "active" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} reactivated` });
+              if (!saved16) { setBusy(false); return; }
               context.toast("Account reactivated", `${account.title} can be used on a journal line again.`);
               setBusy(false);
               close();
@@ -515,7 +518,8 @@ export function CategoryMapper({ context, accountCode: fixedCode, close }: { con
           onClick={async () => {
             setBusy(true);
             for (const expense of current) {
-              await context.mutate.patch(expense.id, { fields: { ...expense.fields, accountCode: target } }, { event: `Category ${category} mapped to ${target}` });
+              const saved17 = await context.mutate.patch(expense.id, { fields: { ...expense.fields, accountCode: target } }, { event: `Category ${category} mapped to ${target}` });
+              if (!saved17) { setBusy(false); return; }
             }
             context.toast("Mapping applied", `${current.length} ${current.length === 1 ? "claim" : "claims"} now code to ${target}.`);
             setBusy(false);

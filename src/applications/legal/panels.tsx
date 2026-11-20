@@ -970,7 +970,7 @@ export function ObligationQuickView({ context }: { context: ScreenContext }) {
             variant="primary"
             disabled={done}
             onClick={async () => {
-              await context.mutate.patch(obligation.id, { status: "done", fields: { ...obligation.fields, completedBy: context.actor, completedAt: clockIso() } }, { expectRevision: obligation.revision, event: `${obligation.title} completed by ${context.actor}` });
+              if (!(await context.mutate.patch(obligation.id, { status: "done", fields: { ...obligation.fields, completedBy: context.actor, completedAt: clockIso() } }, { expectRevision: obligation.revision, event: `${obligation.title} completed by ${context.actor}` }))) return;
               context.toast("Marked complete", "The record changed, with your name and the date against it.");
             }}
           >
@@ -1007,12 +1007,12 @@ export function DeadlineEditor({ context, close }: { context: ScreenContext; clo
           reminderDays: 14,
         };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: String(form.get("title") ?? existing.title),
             summary: String(form.get("detail") ?? existing.summary),
             dueAt: new Date(`${date}T09:00:00.000Z`).toISOString(),
             fields: { ...existing.fields, ...fields },
-          }, { expectRevision: existing.revision, event: `${existing.title} rescheduled by ${context.actor}` });
+          }, { expectRevision: existing.revision, event: `${existing.title} rescheduled by ${context.actor}` }))) return;
         } else {
           await context.mutate.create({
             collection: "obligations",
@@ -1084,13 +1084,13 @@ export function ScoreRationale({ context, close }: { context: ScreenContext; clo
         const form = new FormData(event.currentTarget);
         const impact = String(form.get("impact") ?? "low");
         const likelihood = String(form.get("likelihood") ?? "low");
-        await context.mutate.patch(risk.id, {
+        if (!(await context.mutate.patch(risk.id, {
           summary: String(form.get("why") ?? risk.summary),
           fields: {
             ...risk.fields, impact, likelihood, score: scoreOf(impact) * scoreOf(likelihood),
             aiSuggested: false, reviewedAt: clockIso().slice(0, 10), scoredBy: context.actor,
           },
-        }, { expectRevision: risk.revision, event: `${risk.title} scored by ${context.actor}` });
+        }, { expectRevision: risk.revision, event: `${risk.title} scored by ${context.actor}` }))) return;
         context.toast("Score recorded", `${risk.title} is scored by ${context.actor}, with the reasoning on the record.`);
         close();
       }}

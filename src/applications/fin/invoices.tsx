@@ -602,7 +602,7 @@ export function LineEditor({ context, close, withApproval }: { context: ScreenCo
   const save = async () => {
     setBusy(true);
     try {
-      await context.mutate.patch(invoice.id, {
+      const saved25 = await context.mutate.patch(invoice.id, {
         amountMinor: totals.grossMinor,
         body: { ...(invoice.body as object ?? {}), ...writeLines(state.lines) },
         fields: {
@@ -613,6 +613,7 @@ export function LineEditor({ context, close, withApproval }: { context: ScreenCo
           taxUnresolved: totals.hasUnknownRate,
         },
       }, { expectRevision: invoice.revision, event: `Lines edited on ${invoice.title}` });
+      if (!saved25) return;
       context.toast("Lines saved", `${state.lines.length} lines, ${context.money(totals.netMinor)} net and ${context.money(totals.taxMinor)} tax across ${totals.byCode.length} tax ${totals.byCode.length === 1 ? "code" : "codes"}.`);
       setDirty(false);
       close?.();
@@ -1169,10 +1170,11 @@ export function EmailPreview({ context, close }: { context: ScreenContext; close
               setBusy(true);
               try {
                 const existing = ((invoice.body as { reminders?: unknown[] })?.reminders ?? []) as unknown[];
-                await context.mutate.patch(invoice.id, {
+                const saved26 = await context.mutate.patch(invoice.id, {
                   body: { ...(invoice.body as object ?? {}), reminders: [...existing, { at: clockIso(), by: context.actor, to, body: drafted }] },
                   fields: { ...invoice.fields, lastReminderAt: clockIso(), reminderCount: existing.length + 1 },
                 }, { expectRevision: invoice.revision, event: `Reminder drafted for ${invoice.title}` });
+                if (!saved26) return;
                 context.toast("Kept as a draft", `The message for ${to} is stored on the invoice. No mail provider is connected, so nothing was sent.`, "info");
                 close();
               } catch (error) {
@@ -1614,7 +1616,7 @@ export function BulkActionPreview({ context, close }: { context: ScreenContext; 
             for (const invoice of eligible) {
               const to = String(contactOf(data, invoice)?.fields.email ?? "");
               const existing = ((invoice.body as { reminders?: unknown[] })?.reminders ?? []) as unknown[];
-              await context.mutate.patch(invoice.id, {
+              const saved27 = await context.mutate.patch(invoice.id, {
                 body: {
                   ...(invoice.body as object ?? {}),
                   reminders: [...existing, {
@@ -1626,6 +1628,7 @@ export function BulkActionPreview({ context, close }: { context: ScreenContext; 
                 },
                 fields: { ...invoice.fields, lastReminderAt: clockIso(), reminderCount: existing.length + 1 },
               }, { event: `Reminder drafted for ${invoice.title}` });
+              if (!saved27) return;
             }
             context.toast("Reminders drafted", `${eligible.length} drafts are stored on their invoices. Nothing has been sent.`, "info");
             close();

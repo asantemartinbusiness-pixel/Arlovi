@@ -158,9 +158,9 @@ function PriorityChange({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(project.id, {
+        if (!(await context.mutate.patch(project.id, {
           fields: { ...project.fields, priority: String(form.get("priority") ?? "normal"), health: String(form.get("health") ?? project.fields.health) },
-        }, { expectRevision: project.revision, event: `${project.title} priority and health set by ${context.actor}` });
+        }, { expectRevision: project.revision, event: `${project.title} priority and health set by ${context.actor}` }))) return;
         context.toast("Priority saved", `${project.title} is now ${String(form.get("priority"))} priority.`);
         close();
       }}
@@ -223,10 +223,10 @@ function ProjectSettings({ context, close }: { context: ScreenContext; close: ()
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(project.id, {
+        if (!(await context.mutate.patch(project.id, {
           status: String(form.get("status") ?? project.status),
           fields: { ...project.fields, automationPaused: form.get("paused") === "on", programme: String(form.get("programme") ?? project.fields.programme) },
-        }, { expectRevision: project.revision, event: `${project.title} settings changed by ${context.actor}` });
+        }, { expectRevision: project.revision, event: `${project.title} settings changed by ${context.actor}` }))) return;
         context.toast("Settings saved", form.get("paused") === "on" ? "Automation configured on this project is paused. Unrelated work keeps running." : "Settings saved on the project record.");
         close();
       }}
@@ -341,7 +341,7 @@ function BatchReview({ context, close }: { context: ScreenContext; close: () => 
           disabled={candidates.length === 0}
           onClick={async () => {
             for (const task of candidates) {
-              await context.mutate.patch(task.id, { status: "review", fields: { ...task.fields, stage: "review" } }, { event: `${task.title} moved to review in a batch by ${context.actor}` });
+              if (!(await context.mutate.patch(task.id, { status: "review", fields: { ...task.fields, stage: "review" } }, { event: `${task.title} moved to review in a batch by ${context.actor}` }))) return;
             }
             context.toast("Batch applied", `${candidates.length} tasks moved to Review, each with its own audit entry.`);
             close();
@@ -485,7 +485,7 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
         });
         const fields = { kind: "project", scope: String(form.get("scope") ?? "Company"), phases: parsed.length, tasks: parsed.reduce((sum, phase) => sum + phase.tasks.length, 0) };
         if (existing) {
-          await context.mutate.patch(existing.id, { title: String(form.get("title") ?? existing.title), summary: String(form.get("summary") ?? ""), fields: { ...existing.fields, ...fields }, body: { phases: parsed } }, { expectRevision: existing.revision, event: `Template updated: ${existing.title}` });
+          if (!(await context.mutate.patch(existing.id, { title: String(form.get("title") ?? existing.title), summary: String(form.get("summary") ?? ""), fields: { ...existing.fields, ...fields }, body: { phases: parsed } }, { expectRevision: existing.revision, event: `Template updated: ${existing.title}` }))) return;
         } else {
           await context.mutate.create({ collection: "templates", title: String(form.get("title") ?? "Template"), status: "published", summary: String(form.get("summary") ?? ""), fields, body: { phases: parsed } }, `Template created: ${String(form.get("title") ?? "")}`);
         }
@@ -563,7 +563,7 @@ function RevisionConfirm({ context, close }: { context: ScreenContext; close: ()
       </p>
       <OverlayActions
         primary={<Button variant="primary" onClick={async () => {
-          await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, revisedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} revision published by ${context.actor}` });
+          if (!(await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, revisedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} revision published by ${context.actor}` }))) return;
           context.toast("Revision published", "Existing projects are untouched.");
           close();
         }}>Publish the revision</Button>}
@@ -587,7 +587,7 @@ function GoalRevision({ context, close }: { context: ScreenContext; close: () =>
           current: Number(objective?.fields.current ?? 0), scope: String(form.get("scope") ?? "Company"), projectIds: String(objective?.fields.projectIds ?? ""),
         };
         if (objective) {
-          await context.mutate.patch(objective.id, { title: String(form.get("title") ?? objective.title), fields: { ...objective.fields, ...fields } }, { expectRevision: objective.revision, event: `Target changed on ${objective.title} by ${context.actor}` });
+          if (!(await context.mutate.patch(objective.id, { title: String(form.get("title") ?? objective.title), fields: { ...objective.fields, ...fields } }, { expectRevision: objective.revision, event: `Target changed on ${objective.title} by ${context.actor}` }))) return;
         } else {
           await context.mutate.create({ collection: "objectives", title: String(form.get("title") ?? "Objective"), status: "active", summary: String(form.get("why") ?? ""), fields, body: { checkIns: [] } }, `Objective created by ${context.actor}`);
         }
@@ -774,7 +774,7 @@ function ArchiveImpact({ context, close }: { context: ScreenContext; close: () =
         <Button variant="ghost" onClick={close}>Cancel</Button>
         <span className="ds-grow" />
         <Button variant="danger" onClick={async () => {
-          await context.mutate.patch(project.id, { status: "archived" }, { expectRevision: project.revision, event: `${project.title} archived by ${context.actor}` });
+          if (!(await context.mutate.patch(project.id, { status: "archived" }, { expectRevision: project.revision, event: `${project.title} archived by ${context.actor}` }))) return;
           context.toast("Project archived", "It is out of the live directory and still in the history.");
           close();
         }}>Archive {project.title}</Button>
@@ -1217,7 +1217,7 @@ function CompletionFooter({ context, close }: { context: ScreenContext; close: (
           variant="primary"
           disabled={blockers.length > 0}
           onClick={async () => {
-            await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", completedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} completed by ${context.actor}` });
+            if (!(await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", completedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} completed by ${context.actor}` }))) return;
             context.toast("Task complete", "The stage changed on the record, with your name against it.");
             close();
           }}

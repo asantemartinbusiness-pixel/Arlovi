@@ -59,7 +59,7 @@ export const useWebUi = create<WebUi>((set, get) => ({
 /** Every structural write goes through here so undo and the audit event exist. */
 export async function saveSite(context: ScreenContext, record: Rec, next: SiteModel, label: string): Promise<void> {
   useWebUi.getState().pushUndo({ siteId: record.id, body: record.body, label });
-  await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: label });
+  if (!(await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: label }))) return;
 }
 
 export async function undoSite(context: ScreenContext, record: Rec): Promise<boolean> {

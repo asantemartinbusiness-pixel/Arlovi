@@ -172,7 +172,7 @@ export const formsApp = registerApp({
           id: "archive", label: "Archive", placement: "overflow", tone: "danger",
           guard: (context) => (context.selectedId ? undefined : "Select a form first"),
           run: async (context) => {
-            await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Form archived" });
+            if (!(await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Form archived" }))) return;
             context.toast("Form archived", "Its submissions are kept and stay readable.");
           },
         },

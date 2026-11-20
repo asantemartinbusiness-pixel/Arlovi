@@ -395,14 +395,8 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
 
   return (
     <Stack gap={4}>
-      <Row gap={2} wrap>
-        {WIZARD_STEPS.map((item, index) => {
-          const done = wizardProblems(draft, item).length === 0;
-          return <Pill key={item} tone={item === step ? "accent" : done ? "success" : "neutral"} dot={item === step}>{index + 1}. {item}{done ? " ✓" : ""}</Pill>;
-        })}
-      </Row>
       <Grid>
-        <Card span={8} eyebrow="MISSION BUILDER" title={step} subtitle={`Step ${WIZARD_STEPS.indexOf(step) + 1} of ${WIZARD_STEPS.length}`}>
+        <Card span={8} title={step} subtitle={`Step ${WIZARD_STEPS.indexOf(step) + 1} of ${WIZARD_STEPS.length}`}>
           <Stack gap={4}>
             {body()}
             {problems.length > 0 && (
@@ -418,7 +412,21 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
             </Row>
           </Stack>
         </Card>
-        <Card span={4} eyebrow="DRAFT" prov="human" title="Mission so far">
+        <Card span={4} prov="human" title="Mission so far">
+          <Stack gap={3}>
+          <ol className="mission-builder-steps" aria-label="Step completion">
+            {WIZARD_STEPS.map((item, index) => {
+              const done = wizardProblems(draft, item).length === 0;
+              return (
+                <li key={item} data-done={done || undefined} data-current={item === step || undefined}>
+                  <button type="button" onClick={() => context.setTab(item)} aria-current={item === step ? "step" : undefined}>
+                    <span aria-hidden="true">{done ? "✓" : index + 1}</span>
+                    {item}<span className="ds-sr-only">{done ? ", complete" : ", incomplete"}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
           <Properties rows={[
             { label: "Goal", value: draft.goal ? `${draft.goal.slice(0, 48)}…` : "—" },
             { label: "Context", value: String(draft.contextIds.length) },
@@ -426,6 +434,7 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
             { label: "Steps", value: String(draft.steps.length) },
             { label: "Ceiling", value: context.money(draft.budgetMinor) },
           ]} />
+          </Stack>
         </Card>
       </Grid>
     </Stack>
@@ -1247,40 +1256,35 @@ function Deliverables({ context, view }: { context: ScreenContext; view: string 
     return <Empty title={`No ${view.toLowerCase()} deliverable`} icon={<FileText size={20} />}>A deliverable is produced by a draft step or written by a person. Running the plan's draft steps creates one.</Empty>;
   }
 
+  const approvalLabel = (item: Rec) => String(item.fields.approval ?? item.status).replace(/_/g, " ");
+  const versionsOf = (item: Rec) => ((item.body as { versions?: unknown[] } | undefined)?.versions ?? []).length || 1;
   return (
-    <Grid>
-      {rows.map((item) => {
-        const body = item.body as { text?: string; versions?: { version: number; at: string; author: string; summary: string }[] } | undefined;
-        const producedByAgent = String(item.fields.producedBy ?? "").includes("interpreter") || item.ownerName.includes("Nia") || item.ownerName.includes("Sable");
-        return (
-          <Card
-            key={item.id}
-            span={6}
-            eyebrow="DELIVERABLE"
-            prov={item.status === "published" ? "posted" : producedByAgent ? "agent" : "human"}
-            title={item.title}
-            subtitle={`v${String(item.fields.version ?? 1)} · ${item.ownerName}`}
-            actions={<Pill tone={item.status === "approved" ? "success" : item.status === "published" ? "info" : "neutral"}>{item.status}</Pill>}
-            footer={<>
-              <Button size="sm" variant="secondary" onClick={() => { context.select(item.id); context.openOverlay("Artifact preview", { id: item.id }); }}>Preview</Button>
-              <Button size="sm" variant="ghost" disabled={item.status === "approved" || item.status === "published"} onClick={() => { context.select(item.id); context.openOverlay("approval", { id: item.id }); }}>Approve</Button>
-              <Button size="sm" variant="ghost" onClick={() => { context.select(item.id); context.openOverlay("version diff", { id: item.id }); }}>Versions</Button>
-              <span className="ds-grow" />
-              <Button size="sm" variant="ghost" onClick={() => { context.select(item.id); context.openOverlay("publish verification", { id: item.id }); }}>Publish</Button>
-            </>}
-          >
-            <Stack gap={2}>
-              <p className="ds-subtle" style={{ whiteSpace: "pre-wrap", maxHeight: 110, overflow: "hidden" }}>{body?.text ?? item.summary}</p>
-              <Properties rows={[
-                { label: "Approval", value: String(item.fields.approval ?? item.status) },
-                { label: "Versions", value: String(body?.versions?.length ?? 1) },
-                { label: "Published outside", value: <Pill tone="warning">Not possible — no hosting connected</Pill> },
-              ]} />
-            </Stack>
-          </Card>
-        );
-      })}
-    </Grid>
+    <Stack gap={3}>
+      <DataGrid
+        rows={rows}
+        rowId={(row) => row.id}
+        label="Deliverables"
+        selectedId={context.selectedId}
+        onSelect={(id) => context.select(id)}
+        onOpen={(id) => { context.select(id); context.openOverlay("Artifact preview", { id }); }}
+        columns={[
+          { key: "title", header: "Deliverable", primary: true, cell: (row) => row.title, filterValue: (row) => row.title, sortValue: (row) => row.title },
+          { key: "version", header: "Version", align: "end", cell: (row) => <span className="ds-num">v{String(row.fields.version ?? 1)} · {versionsOf(row)} saved</span>, sortValue: (row) => Number(row.fields.version ?? 1) },
+          { key: "owner", header: "Written by", cell: (row) => <Row gap={2}><Avatar name={row.ownerName} size="sm" />{row.ownerName}</Row>, filterValue: (row) => row.ownerName },
+          { key: "approval", header: "Approval", cell: (row) => <Pill tone={row.status === "approved" ? "success" : row.status === "published" ? "info" : row.status === "draft" ? "neutral" : "warning"} dot>{approvalLabel(row)}</Pill>, sortValue: (row) => row.status },
+          { key: "act", header: "", align: "end", cell: (row) => (
+            <Row gap={1}>
+              <Button size="sm" variant="ghost" disabled={row.status === "approved" || row.status === "published"} onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("approval", { id: row.id }); }}>Approve</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("version diff", { id: row.id }); }}>Versions</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("publish verification", { id: row.id }); }}>Publish</Button>
+            </Row>
+          ) },
+        ]}
+      />
+      <Notice tone="info" title="Nothing is published outside this workspace">
+        No hosting is connected, so every deliverable stays here. Publish explains what a verified release would need and changes nothing.
+      </Notice>
+    </Stack>
   );
 }
 
@@ -1569,6 +1573,52 @@ function MissionTemplates({ context, view }: { context: ScreenContext; view: str
  * Overlays
  * ====================================================================== */
 
+/* Identity blocks for the overlay head (OverlayDef.summary): the one place a record is named. */
+function MissionSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const asked = useRecord(payload?.id ?? context.selectedId ?? context.params.id);
+  const mission = asked?.collection === "missions" ? asked : undefined;
+  if (!mission) return null;
+  const held = mission.status === "paused" || mission.fields.executionPaused === true;
+  return (
+    <OverlaySummary
+      eyebrow="Mission"
+      title={mission.title}
+      status={<Pill tone={missionTone(mission.status)} dot>{mission.status.replace(/_/g, " ")}</Pill>}
+      meta={[mission.ownerName, `Ceiling ${context.money(Number(mission.fields.budgetMinor ?? 0))}`, held && mission.status !== "paused" ? "Dispatch held" : ""]}
+    />
+  );
+}
+
+function TaskSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const asked = useRecord(payload?.id ?? context.selectedId);
+  const task = asked?.collection === "missionTasks" ? asked : undefined;
+  if (!task) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Task"
+      title={task.title}
+      status={<Pill tone="neutral" dot>{String(task.fields.stage ?? task.status).replace(/_/g, " ")}</Pill>}
+      meta={[String(task.fields.assignee ?? task.ownerName), task.fields.approvalRequired === true ? "Approval gate" : ""]}
+    />
+  );
+}
+
+function DeliverableSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const item = useRecord(payload?.id ?? context.selectedId);
+  if (!item) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Deliverable"
+      title={item.title}
+      status={<Pill tone={item.status === "approved" ? "success" : item.status === "published" ? "info" : "neutral"} dot>{String(item.fields.approval ?? item.status).replace(/_/g, " ")}</Pill>}
+      meta={[`v${String(item.fields.version ?? 1)}`, item.ownerName]}
+    />
+  );
+}
+
 function MissionQuickView({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const mission = useRecord(payload?.id ?? context.selectedId);
@@ -1577,13 +1627,11 @@ function MissionQuickView({ context }: { context: ScreenContext }) {
   const criteria = criteriaOf(mission);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: <Pill tone={missionTone(mission.status)} dot>{mission.status}</Pill> },
-        { label: "Owner", value: mission.ownerName },
-        { label: "Ceiling", value: context.money(Number(mission.fields.budgetMinor ?? 0)) },
-        { label: "Committed", value: context.money(Number(mission.fields.committedMinor ?? 0)) },
-        { label: "Tasks", value: `${tasks.filter((task) => String(task.fields.stage) === "verified").length} verified of ${tasks.length}` },
-        { label: "Criteria", value: `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length} verified` },
+      <FactGrid items={[
+        { label: "Committed", value: context.money(Number(mission.fields.committedMinor ?? 0)), mono: true },
+        { label: "Due", value: mission.dueAt ? context.date(mission.dueAt) : "No date", mono: Boolean(mission.dueAt) },
+        { label: "Tasks verified", value: `${tasks.filter((task) => String(task.fields.stage) === "verified").length} of ${tasks.length}`, mono: true },
+        { label: "Criteria verified", value: `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length}`, mono: true },
       ]} />
       <p className="ds-prose">{mission.summary}</p>
       <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>} secondary={<><Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}/execution`)}>Execution</Button></>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
@@ -1903,11 +1951,8 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
   const cycle = dependency ? wouldCycle(tasks, dependency, task.id) : null;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
-        { label: "Stage", value: String(task.fields.stage ?? task.status) },
-        { label: "Estimate", value: task.fields.estimateHours ? `${String(task.fields.estimateHours)} h` : "Not estimated" },
-        { label: "Approval gate", value: task.fields.approvalRequired === true ? "Yes" : "No" },
+      <FactGrid items={[
+        { label: "Estimate", value: task.fields.estimateHours ? `${String(task.fields.estimateHours)} h` : "Not estimated", mono: Boolean(task.fields.estimateHours) },
         { label: "Risk", value: String(task.fields.risk || "None recorded") },
       ]} />
       <Card eyebrow="DEPENDENCIES" prov="human" title="Runs after" pad="tight">
@@ -2001,12 +2046,7 @@ function TaskDetail({ context, close }: { context: ScreenContext; close: () => v
   const body = task.body as { evidence?: string[] } | undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
-        { label: "Lane", value: String(task.fields.stage ?? task.status) },
-        { label: "Approval gate", value: task.fields.approvalRequired === true ? "Yes" : "No" },
-        { label: "Evidence attached", value: String((body?.evidence ?? []).length) },
-      ]} />
+      <FactGrid items={[{ label: "Evidence attached", value: String((body?.evidence ?? []).length), mono: true }]} />
       <p className="ds-prose">{task.summary}</p>
       <Field label="Attach evidence" hint="The id of a record in this workspace that shows the work was done.">
         <TextInput value={evidence} onChange={(event) => setEvidence(event.target.value)} placeholder="nl-documents-060" />
@@ -2282,11 +2322,7 @@ function ArtifactPreviewOverlay({ context }: { context: ScreenContext }) {
   const body = item.body as { text?: string } | undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: item.status },
-        { label: "Version", value: String(item.fields.version ?? 1) },
-        { label: "Produced by", value: String(item.fields.producedBy ?? item.ownerName) },
-      ]} />
+      <FactGrid items={[{ label: "Produced by", value: String(item.fields.producedBy ?? item.ownerName) }]} />
       <article className="ds-panel ds-prose" style={{ padding: "var(--space-4)", whiteSpace: "pre-wrap" }}>{body?.text ?? item.summary}</article>
       <DrawerActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/documents/${item.id}`)}>Open in Documents</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
@@ -2807,9 +2843,9 @@ export const missionApp = registerApp({
         { id: "bulk tag", placement: "overflow", run: (context) => context.openOverlay("bulk tag") },
       ],
       overlays: [
-        { id: "Mission quick view", kind: "drawer", title: "Mission", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MissionQuickView context={context} /> },
+        { id: "Mission quick view", kind: "drawer", title: "Mission", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MissionQuickView context={context} />, summary: (context) => <MissionSummary context={context} /> },
         { id: "create mission", kind: "modal", title: "Create a mission", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <CreateMissionOverlay context={context} /> },
-        { id: "archive confirmation", kind: "modal", title: "Archive this mission", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionArchive context={context} close={close} /> },
+        { id: "archive confirmation", kind: "modal", title: "Archive this mission", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionArchive context={context} close={close} />, summary: (context) => <MissionSummary context={context} /> },
         { id: "bulk tag", kind: "modal", title: "Tag missions", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BulkTagMissions context={context} close={close} /> },
       ],
     },
@@ -2858,8 +2894,8 @@ export const missionApp = registerApp({
         { id: "cancel", label: "Cancel the mission", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("cancel mission") },
       ],
       overlays: [
-        { id: "Status explanation", kind: "drawer", title: "How this status is computed", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <StatusExplanation context={context} /> },
-        { id: "pause dialog", kind: "modal", title: "Pause execution", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PauseDialog context={context} close={close} /> },
+        { id: "Status explanation", kind: "drawer", title: "How this status is computed", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <StatusExplanation context={context} />, summary: (context) => <MissionSummary context={context} /> },
+        { id: "pause dialog", kind: "modal", title: "Pause execution", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PauseDialog context={context} close={close} />, summary: (context) => <MissionSummary context={context} /> },
         { id: "amendment request", kind: "modal", title: "Request an amendment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AmendmentRequest context={context} close={close} />, footer: submitFooter("amendment", "Record the request") },
         { id: "cancel mission", kind: "modal", title: "Cancel this mission?", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <CancelMission context={context} close={close} /> },
       ],
@@ -2879,7 +2915,7 @@ export const missionApp = registerApp({
         { id: "compare versions", placement: "overflow", run: (context) => context.openOverlay("plan revision") },
       ],
       overlays: [
-        { id: "Task inspector", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskInspector context={context} close={close} /> },
+        { id: "Task inspector", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskInspector context={context} close={close} />, summary: (context) => <TaskSummary context={context} /> },
         { id: "plan revision", kind: "modal", title: "Revise the plan", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PlanRevision context={context} close={close} /> },
         { id: "scope change approval", kind: "modal", title: "Scope change", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ScopeChangeApproval context={context} /> },
       ],
@@ -2900,9 +2936,9 @@ export const missionApp = registerApp({
         { id: "reopen task", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a card first"), run: (context) => void reopenTask(context) },
       ],
       overlays: [
-        { id: "Task detail", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskDetail context={context} close={close} /> },
-        { id: "reassign", kind: "modal", title: "Reassign", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReassignTask context={context} close={close} /> },
-        { id: "move impact", kind: "modal", title: "What a move changes", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MoveImpact context={context} /> },
+        { id: "Task detail", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskDetail context={context} close={close} />, summary: (context) => <TaskSummary context={context} /> },
+        { id: "reassign", kind: "modal", title: "Reassign", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReassignTask context={context} close={close} />, summary: (context) => <TaskSummary context={context} /> },
+        { id: "move impact", kind: "modal", title: "What a move changes", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MoveImpact context={context} />, summary: (context) => <TaskSummary context={context} /> },
       ],
     },
 
@@ -2970,10 +3006,10 @@ export const missionApp = registerApp({
         { id: "share", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a deliverable first"), run: (context) => context.openOverlay("publish verification") },
       ],
       overlays: [
-        { id: "Artifact preview", kind: "drawer", title: "Deliverable", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ArtifactPreviewOverlay context={context} /> },
-        { id: "approval", kind: "modal", title: "Approve the deliverable", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DeliverableApproval context={context} close={close} /> },
-        { id: "version diff", kind: "modal", title: "Versions", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <VersionDiff context={context} /> },
-        { id: "publish verification", kind: "modal", title: "Publishing outside this workspace", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PublishVerification context={context} /> },
+        { id: "Artifact preview", kind: "drawer", title: "Deliverable", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ArtifactPreviewOverlay context={context} />, summary: (context) => <DeliverableSummary context={context} /> },
+        { id: "approval", kind: "modal", title: "Approve the deliverable", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DeliverableApproval context={context} close={close} />, summary: (context) => <DeliverableSummary context={context} /> },
+        { id: "version diff", kind: "modal", title: "Versions", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <VersionDiff context={context} />, summary: (context) => <DeliverableSummary context={context} /> },
+        { id: "publish verification", kind: "modal", title: "Publishing outside this workspace", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PublishVerification context={context} />, summary: (context) => <DeliverableSummary context={context} /> },
       ],
     },
 

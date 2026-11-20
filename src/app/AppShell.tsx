@@ -275,7 +275,7 @@ export function AppShell() {
     const app = APP_ENTRIES[activeCode];
     if (!app) return;
     if (activePreference) {
-      await mutate.patch(activePreference.id, { fields: { pinned: !activePinned } }, { event: `${app.short} ${activePinned ? "removed from" : "added to"} favourites` });
+      if (!(await mutate.patch(activePreference.id, { fields: { pinned: !activePinned } }, { event: `${app.short} ${activePinned ? "removed from" : "added to"} favourites` }))) return;
     } else {
       await mutate.create({ collection: "preferences", title: `App preference: ${app.short}`, status: "active",
         fields: { app: app.short, pinned: true, mode: "native_local" },

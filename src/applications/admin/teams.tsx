@@ -52,8 +52,8 @@ export function TeamsManager({ context, members, departments }: { context: Scree
             actions={group.department && canEdit ? (
               <Select aria-label={`Lead of ${group.department.title}`} value={String(group.department.fields.lead ?? "")} onChange={async (event) => {
                 const department = group.department!;
-                await context.mutate.patch(department.id, { fields: { ...department.fields, lead: event.target.value } },
-                  { expectRevision: department.revision, event: `${event.target.value || "No one"} named lead of ${department.title} by ${context.actor}` });
+                if (!(await context.mutate.patch(department.id, { fields: { ...department.fields, lead: event.target.value } },
+                  { expectRevision: department.revision, event: `${event.target.value || "No one"} named lead of ${department.title} by ${context.actor}` }))) return;
               }}>
                 <option value="">No lead named</option>
                 {[...new Set([...humans.map((member) => member.title), String(group.department.fields.lead ?? "")])].filter(Boolean).map((person) => <option key={person}>{person}</option>)}

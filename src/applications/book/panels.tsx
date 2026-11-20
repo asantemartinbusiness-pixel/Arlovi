@@ -232,10 +232,10 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
     const booking = data.bookings.find((item) => item.id === bookingId);
     if (!booking) return;
     const nextResource = bookable.some((resource) => resource.id === columnId) ? columnId : String(booking.fields.resourceId);
-    await context.mutate.patch(bookingId, {
+    if (!(await context.mutate.patch(bookingId, {
       startAt, endAt, at: startAt,
       fields: { ...booking.fields, resourceId: nextResource },
-    }, { expectRevision: booking.revision, event: `${booking.title} rescheduled to ${startAt}` });
+    }, { expectRevision: booking.revision, event: `${booking.title} rescheduled to ${startAt}` }))) return;
     context.toast("Booking moved", `${booking.title} is now ${context.dateTime(startAt)}. The slot was checked for a conflict before the move.`);
   };
 

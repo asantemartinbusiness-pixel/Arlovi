@@ -399,10 +399,10 @@ export function MentorAssign({ context, close }: { context: ScreenContext; close
         event.preventDefault();
         const mentor = String(new FormData(event.currentTarget).get("mentor") ?? "");
         if (!starter || !mentor) return;
-        await context.mutate.patch(starter.id, { fields: { ...starter.fields, mentor } }, { expectRevision: starter.revision, event: `${mentor} assigned as mentor to ${starter.title} by ${context.actor}` });
+        if (!(await context.mutate.patch(starter.id, { fields: { ...starter.fields, mentor } }, { expectRevision: starter.revision, event: `${mentor} assigned as mentor to ${starter.title} by ${context.actor}` }))) return;
         const intro = data.tasks.find((task) => task.fields.employeeId === starter.id && task.title.startsWith("Mentor introduction"));
         if (intro) {
-          await context.mutate.patch(intro.id, { title: `Mentor introduction with ${mentor}`, fields: { ...intro.fields, assignee: mentor } }, { event: `Mentor introduction reassigned to ${mentor}` });
+          if (!(await context.mutate.patch(intro.id, { title: `Mentor introduction with ${mentor}`, fields: { ...intro.fields, assignee: mentor } }, { event: `Mentor introduction reassigned to ${mentor}` }))) return;
         } else {
           await context.mutate.create({ collection: "tasks", title: `Mentor introduction with ${mentor}`, status: "ready", summary: `Manager step for ${starter.title}.`, parentId: starter.id, fields: { kind: "onboarding", employeeId: starter.id, stage: "ready", assignee: mentor, group: "Manager" } }, `Mentor introduction added for ${starter.title}`);
         }
@@ -451,7 +451,7 @@ export async function verifyCompletion(context: ScreenContext): Promise<void> {
         body: `Records that ${context.actor} checked all ${steps.length} steps for ${employee.title}. Access grants stay as they were recorded; verification grants nothing.`,
         confirm: "Verify completion",
         run: async () => {
-          await context.mutate.patch(employee.id, { fields: { ...employee.fields, onboardingVerifiedBy: context.actor, onboardingVerifiedAt: clockIso() } }, { expectRevision: employee.revision, event: `Onboarding for ${employee.title} verified complete by ${context.actor}` });
+          if (!(await context.mutate.patch(employee.id, { fields: { ...employee.fields, onboardingVerifiedBy: context.actor, onboardingVerifiedAt: clockIso() } }, { expectRevision: employee.revision, event: `Onboarding for ${employee.title} verified complete by ${context.actor}` }))) return;
           context.toast("Onboarding verified", `${employee.title}'s checklist is verified by ${context.actor}.`);
         },
       });
@@ -556,7 +556,7 @@ export function BalanceAdjust({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         if (!employee || invalid || !reason.trim()) return;
         const allowance = Number(employee.fields.leaveAllowance ?? 0) + change;
-        await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveAllowance: allowance, lastBalanceAdjustment: `${change > 0 ? "+" : ""}${change} days by ${context.actor}: ${reason.trim()}` } }, { expectRevision: employee.revision, event: `Leave allowance for ${employee.title} adjusted by ${change} days by ${context.actor}: ${reason.trim()}` });
+        if (!(await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveAllowance: allowance, lastBalanceAdjustment: `${change > 0 ? "+" : ""}${change} days by ${context.actor}: ${reason.trim()}` } }, { expectRevision: employee.revision, event: `Leave allowance for ${employee.title} adjusted by ${change} days by ${context.actor}: ${reason.trim()}` }))) return;
         context.toast("Balance adjusted", `${employee.title}'s allowance is now ${allowance} days, with the reason on the record.`);
         close();
       }}
@@ -768,7 +768,7 @@ export async function prepareRun(context: ScreenContext, runs: Rec[], employees:
   const existing = runs.find((row) => row.status === "draft" && String(row.fields.period ?? "") === period);
   let id: string;
   if (existing) {
-    await context.mutate.patch(existing.id, { amountMinor: gross, fields: { ...existing.fields, people: lines.length, grossMinor: gross, netMinor: net, preparedBy: context.actor, preparedAt: clockIso() } }, { expectRevision: existing.revision, event: `Payroll ${period} re-prepared by ${context.actor}` });
+    if (!(await context.mutate.patch(existing.id, { amountMinor: gross, fields: { ...existing.fields, people: lines.length, grossMinor: gross, netMinor: net, preparedBy: context.actor, preparedAt: clockIso() } }, { expectRevision: existing.revision, event: `Payroll ${period} re-prepared by ${context.actor}` }))) return;
     id = existing.id;
   } else {
     const created = await context.mutate.create({ collection: "payrollRuns", title: `Payroll ${period}`, status: "draft", amountMinor: gross, summary: "Prepared locally from employee records. Nothing filed or paid.", fields: { period, people: lines.length, grossMinor: gross, netMinor: net, preparedBy: context.actor, filed: false, banked: false } }, `Payroll ${period} prepared by ${context.actor}`);
@@ -784,7 +784,7 @@ export async function validateRun(context: ScreenContext, runs: Rec[], employees
   const exceptions = payrollSalaryGaps(employees).length
     + shifts.filter((row) => row.fields.kind === "time"
       && (row.fields.approved !== true || row.status !== "approved")).length;
-  await context.mutate.patch(run.id, { fields: { ...run.fields, validatedBy: context.actor, validatedAt: clockIso(), exceptions, jurisdictionValidated: false } }, { expectRevision: run.revision, event: `${run.title} validated by ${context.actor}: ${exceptions} data exceptions; ${context.org.jurisdiction} rules not validated` });
+  if (!(await context.mutate.patch(run.id, { fields: { ...run.fields, validatedBy: context.actor, validatedAt: clockIso(), exceptions, jurisdictionValidated: false } }, { expectRevision: run.revision, event: `${run.title} validated by ${context.actor}: ${exceptions} data exceptions; ${context.org.jurisdiction} rules not validated` }))) return;
   context.toast(exceptions ? "Exceptions found" : "No data exceptions", `${exceptions} exception${exceptions === 1 ? "" : "s"} recorded on the run. ${context.org.jurisdiction} rules still need a payroll provider.`, exceptions ? "blocked" : "ok");
   context.openOverlay("exception report");
 }
@@ -937,7 +937,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         const reviewer = String(new FormData(event.currentTarget).get("reviewer") ?? "");
         if (!review || !reviewer) return;
-        await context.mutate.patch(review.id, { fields: { ...review.fields, reviewer, reviewerAssignedBy: context.actor } }, { expectRevision: review.revision, event: `${reviewer} assigned to review ${String(review.fields.employeeName ?? "")} by ${context.actor}` });
+        if (!(await context.mutate.patch(review.id, { fields: { ...review.fields, reviewer, reviewerAssignedBy: context.actor } }, { expectRevision: review.revision, event: `${reviewer} assigned to review ${String(review.fields.employeeName ?? "")} by ${context.actor}` }))) return;
         context.toast("Reviewer assigned", `${reviewer} now owns ${review.title}.`);
         close();
       }}
@@ -989,7 +989,7 @@ export function submitReview(context: ScreenContext): Promise<void> {
       body: `${review.title} becomes visible to the next manager up and can no longer be edited by the reviewer alone.`,
       confirm: "Submit the review",
       run: async () => {
-        await context.mutate.patch(review.id, { status: "submitted", fields: { ...review.fields, submittedBy: context.actor, submittedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} submitted by ${context.actor}` });
+        if (!(await context.mutate.patch(review.id, { status: "submitted", fields: { ...review.fields, submittedBy: context.actor, submittedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} submitted by ${context.actor}` }))) return;
         context.toast("Review submitted", `${review.title} is submitted by ${context.actor}.`);
       },
     });
@@ -1002,7 +1002,7 @@ export function acknowledgeReview(context: ScreenContext): Promise<void> {
     body: `Records that ${context.actor} has read ${review.title}. Acknowledging is not agreeing; a comment can still be added.`,
     confirm: "Acknowledge",
     run: async () => {
-      await context.mutate.patch(review.id, { status: "acknowledged", fields: { ...review.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} acknowledged by ${context.actor}` });
+      if (!(await context.mutate.patch(review.id, { status: "acknowledged", fields: { ...review.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} acknowledged by ${context.actor}` }))) return;
       context.toast("Review acknowledged", `Recorded against ${review.title}.`);
     },
   }));
@@ -1085,9 +1085,9 @@ export function completeModule(context: ScreenContext): void {
       confirm: "Mark complete",
       run: async () => {
         const { getRecord } = await import("@/platform/repo");
-        await context.mutate.patch(record.id, { status: "complete", fields: { ...record.fields, completedAt: clockIso() } }, { expectRevision: record.revision, event: `${record.title} completed` });
+        if (!(await context.mutate.patch(record.id, { status: "complete", fields: { ...record.fields, completedAt: clockIso() } }, { expectRevision: record.revision, event: `${record.title} completed` }))) return;
         const course = await getRecord(String(record.fields.courseId ?? ""));
-        if (course) await context.mutate.patch(course.id, { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, { expectRevision: course.revision, event: `${course.title} completion recorded for ${context.actor}` });
+        if (course) if (!(await context.mutate.patch(course.id, { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, { expectRevision: course.revision, event: `${course.title} completion recorded for ${context.actor}` }))) return;
         context.toast("Module complete", "The completion and the course count both changed.");
       },
     }),

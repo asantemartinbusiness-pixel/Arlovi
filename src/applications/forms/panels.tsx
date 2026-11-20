@@ -954,7 +954,7 @@ export function PublishReviewForm({ context, close }: { context: ScreenContext; 
           try {
             const next = { ...model, settings: { ...model.settings, version: model.settings.version + 1 } };
             await saveForm(context, record, next, `Form version ${next.settings.version} recorded locally`);
-            await context.mutate.patch(record.id, { status: "live" }, { event: `Form ${record.title} marked live locally at version ${next.settings.version}` });
+            if (!(await context.mutate.patch(record.id, { status: "live" }, { event: `Form ${record.title} marked live locally at version ${next.settings.version}` }))) return;
             context.toast("Local status recorded", `Version ${next.settings.version} is marked live in this workspace. No public form was hosted.`, "info");
             close();
           } catch {

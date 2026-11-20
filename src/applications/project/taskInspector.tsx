@@ -93,10 +93,10 @@ export function ChecklistProgress({ context, task, editable = true }: { context:
   const done = checklist.filter((item) => item.done).length;
   async function toggle(index: number, value: boolean) {
     const next = checklist.map((entry, position) => (position === index ? { ...entry, done: value } : entry));
-    await context.mutate.patch(task.id, { body: { ...(task.body as object ?? {}), checklist: next } }, {
+    if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object ?? {}), checklist: next } }, {
       expectRevision: task.revision,
       event: `Subtask "${checklist[index].label}" ${value ? "ticked" : "unticked"} on ${task.title} by ${context.actor}`,
-    });
+    }))) return;
   }
   if (checklist.length === 0) return <span className="ds-subtle">No checklist. Add steps from the Subtasks tab.</span>;
   return (

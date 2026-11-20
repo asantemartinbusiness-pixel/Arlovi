@@ -143,7 +143,7 @@ export function QualityReport({ context, area }: { context: ScreenContext; area:
                       const applied = applyFix(site, issue);
                       if (!applied) { context.toast("No fix applied", "There was nothing in the model to copy the value from.", "blocked"); return; }
                       await saveSite(context, record, applied.next, applied.label);
-                      await context.mutate.patch(record.id, { fields: { ...record.fields, lastAuditAt: now.toISOString() } }, { event: `Audit fix applied: ${applied.label}` });
+                      if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastAuditAt: now.toISOString() } }, { event: `Audit fix applied: ${applied.label}` }))) return;
                       context.toast("Fix applied", `${applied.label}. Re-run the audit to see the new figures.`);
                     }}
                   >
@@ -214,7 +214,7 @@ export function CodeDiffPanel({ context }: { context: ScreenContext }) {
       {applied && (
         <Button variant="primary" onClick={async () => {
           await saveSite(context, record, applied.next, applied.label);
-          await context.mutate.patch(record.id, { fields: { ...record.fields, lastFixAt: context.now.toISOString() } }, { event: `Proposed fix applied: ${applied.label}` });
+          if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastFixAt: context.now.toISOString() } }, { event: `Proposed fix applied: ${applied.label}` }))) return;
           context.toast("Fix applied", `${applied.label}. Retest to record the new figures; undo is available in the builder.`);
           context.closeOverlay();
         }}>Apply this fix</Button>

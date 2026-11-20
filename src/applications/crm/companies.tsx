@@ -587,7 +587,7 @@ export function LeadsBoard({ context, tab }: { context: ScreenContext; tab: stri
               for (const row of selected) {
                 const contact = contactById(data, String(row.lead.fields.contactId ?? ""));
                 if (contact?.fields.suppressed === true) { skipped += 1; continue; }
-                await context.mutate.patch(row.lead.id, { fields: { ...row.lead.fields, owner: context.actor } }, { event: `Lead ${row.lead.title} routed to ${context.actor}` });
+                if (!(await context.mutate.patch(row.lead.id, { fields: { ...row.lead.fields, owner: context.actor } }, { event: `Lead ${row.lead.title} routed to ${context.actor}` }))) return;
                 routed += 1;
               }
               context.toast(routed ? "Leads routed" : "Nothing routed",

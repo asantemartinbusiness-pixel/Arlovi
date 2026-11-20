@@ -291,7 +291,7 @@ function ImportSvgOverlay({ context, close }: { context: ScreenContext; close: (
                     activePageId: report.page.id,
                     unsupported: [...new Set([...doc.unsupported, ...report.unsupported, ...report.fontsMissing.map((font) => `substituted font: ${font}`)])],
                   };
-                  await context.mutate.patch(target.id, { body: next }, { event: `Imported ${fileName}` });
+                  if (!(await context.mutate.patch(target.id, { body: next }, { event: `Imported ${fileName}` }))) return;
                   context.toast("Imported", `${report.count} layers added to ${target.title} as a new page.`);
                 } else {
                   const doc = starterDoc(fileName || "Imported SVG");
@@ -2688,7 +2688,7 @@ registerApp({
           id: "archive", label: "Archive", placement: "overflow", tone: "danger",
           guard: (context) => (context.selectedId ? undefined : "Select a file first"),
           run: async (context) => {
-            await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Design file archived" });
+            if (!(await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Design file archived" }))) return;
             context.toast("Archived", "The record keeps its full document and history; it is out of the Recent tab.");
           },
         },
@@ -3087,7 +3087,7 @@ function SharingPanel({ context, id }: { context: ScreenContext; id?: string }) 
               disabled={!people.trim()}
               onClick={async () => {
                 const next = [...new Set([...current, ...people.split(",").map((item) => item.trim()).filter(Boolean)])];
-                await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: next.join(", ") } }, { expectRevision: record.revision, event: `Shared ${record.title} with ${people}` });
+                if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: next.join(", ") } }, { expectRevision: record.revision, event: `Shared ${record.title} with ${people}` }))) return;
                 setPeople("");
                 context.toast("Collaborators recorded", "The file lists them. No mail provider is connected, so no invitation was sent.");
               }}

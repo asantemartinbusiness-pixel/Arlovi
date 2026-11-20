@@ -273,7 +273,7 @@ export const webApp = registerApp({
           id: "archive", label: "Archive", placement: "overflow", tone: "danger",
           guard: (context) => (context.selectedId ? undefined : "Select a site first"),
           run: async (context) => {
-            await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Site archived" });
+            if (!(await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Site archived" }))) return;
             context.toast("Site archived", "It stays in the Archived tab with its pages intact.");
           },
         },

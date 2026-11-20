@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Paperclip, Receipt, Upload } from "lucide-react";
 import {
   Button, Card, DataGrid, DrawerActions, DrawerUnsavedChanges, Empty, FactGrid, Field, ModalActions, ModalInFlight, MoneyInput, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
+import { clockIso } from "@/platform/clock";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import type { Rec } from "@/domain/types";
 import { accountCode, accountType, ageBuckets, daysOverdue, periodOf } from "@/domain/fin-ledger";
 import type { JLine } from "@/domain/fin-ledger";
@@ -87,7 +89,8 @@ export function BillsTable({ context, tab }: { context: ScreenContext; tab: stri
               let refused = 0;
               for (const bill of selected) {
                 if (bill.status === "paid" || bill.fields.exception || !bill.fields.supplierId) { refused += 1; continue; }
-                await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { event: `Bill ${bill.title} approved` });
+                const saved2 = await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { event: `Bill ${bill.title} approved` });
+                if (!saved2) return;
                 approved += 1;
               }
               context.toast(approved ? "Bills approved" : "Nothing approved",
@@ -275,10 +278,11 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
       onClick={() => run(async () => {
         const fields: Record<string, string | number | boolean> = { ...bill.fields, supplierId };
         if (String(fields.exception ?? "") === "No supplier match") delete fields.exception;
-        await context.mutate.patch(bill.id, {
+        const saved3 = await context.mutate.patch(bill.id, {
           status: fields.exception ? bill.status : "inbox",
           fields,
         }, { replaceFields: true, expectRevision: bill.revision, event: `Bill ${bill.title} matched to a supplier` });
+        if (!saved3) return;
         context.toast("Supplier matched", `${bill.title} now belongs to ${data.suppliers.find((item) => item.id === supplierId)?.title}.`);
       }, "The match was not saved")}
     >
@@ -292,7 +296,8 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
       disabled={!canApprove}
       title={bill.fields.exception ? String(bill.fields.exception) : needsMatch ? "Match a supplier first" : undefined}
       onClick={() => run(async () => {
-        await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { expectRevision: bill.revision, event: `Bill ${bill.title} approved` });
+        const saved4 = await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { expectRevision: bill.revision, event: `Bill ${bill.title} approved` });
+        if (!saved4) return;
         context.toast("Bill approved", `${bill.title} is approved for payment by ${context.actor}. No money has moved.`);
       }, "The bill was not approved")}
     >
@@ -347,7 +352,8 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
               busy={busy}
               disabled={bill.status === "paid"}
               onClick={() => run(async () => {
-                await context.mutate.patch(bill.id, { status: "exception", fields: { ...bill.fields, exception: "Held for query" } }, { expectRevision: bill.revision, event: `Bill ${bill.title} held for query` });
+                const saved5 = await context.mutate.patch(bill.id, { status: "exception", fields: { ...bill.fields, exception: "Held for query" } }, { expectRevision: bill.revision, event: `Bill ${bill.title} held for query` });
+                if (!saved5) return;
                 context.toast("Held for query", `${bill.title} is in exceptions until someone clears it.`, "blocked");
               }, "The bill was not held")}
             >
@@ -371,14 +377,21 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState("");
   const [busy, setBusy] = useState(false);
+  // Revisions as they were when this dialog opened; a bill changed since then is a conflict.
+  const openedRevisions = useRef<Record<string, number>>({});
+  for (const bill of chosen) if (openedRevisions.current[bill.id] === undefined) openedRevisions.current[bill.id] = bill.revision;
+  const payableNow = (bill: Rec) => ["approved", "scheduled"].includes(bill.status) && Boolean(bill.fields.approvedBy);
+  const payable = chosen.filter(payableNow);
+  const excluded = chosen.filter((bill) => !payableNow(bill));
+  const why = (bill: Rec) => !["approved", "scheduled"].includes(bill.status) ? `${bill.title} is ${bill.status}, not approved` : `${bill.title} has no recorded approver`;
 
   const cash = data.accounts.filter((account) => accountType(account) === "asset" && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
   const ap = data.accounts.find((account) => accountCode(account) === "2000");
-  const total = chosen.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0);
+  const total = payable.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0);
   const blocked = !ap
     ? "The chart of accounts has no 2000 payables account."
-    : chosen.length === 0
-      ? "No approved bill is selected."
+    : payable.length === 0
+      ? "No selected bill is approved with a recorded approver."
       : data.locked.includes(periodOf(date))
         ? `${periodOf(date)} is a closed period.`
         : undefined;
@@ -397,8 +410,13 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
           </Select>
         </Field>
       </div>
+      {excluded.length > 0 && (
+        <Notice tone="warning" title={`${excluded.length} bill${excluded.length === 1 ? " is" : "s are"} left out of this run`}>
+          {excluded.map(why).join("; ")}. Approve {excluded.length === 1 ? "it" : "them"} from the bill drawer first.
+        </Notice>
+      )}
       <DataGrid
-        rows={chosen}
+        rows={payable}
         rowId={(row) => row.id}
         label="Bills to pay"
         filterable={false}
@@ -420,34 +438,54 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
           disabled={Boolean(blocked) || !context.can("approve_payment") || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
-            if (!ap) return;
-            setBusy(true);
+            if (!ap || busy) return;
             const from = accountId || cash[0]?.id;
-            if (!from) { setBusy(false); return; }
-            const lines: JLine[] = [
-              { accountId: ap.id, debitMinor: total, creditMinor: 0, memo: `Paid ${chosen.length} bills` },
-              { accountId: from, debitMinor: 0, creditMinor: total, memo: `Paid ${chosen.length} bills` },
-            ];
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Supplier payment run ${date}`,
-              status: "posted",
-              summary: `${chosen.length} bills settled: ${chosen.map((bill) => bill.title).join(", ")}.`,
-              amountMinor: total,
-              at: `${date}T09:00:00.000Z`,
-              tags: ["ledger", "payment"],
-              fields: { date, source: "payment-run" },
-              body: { date, memo: `Supplier payment run`, lines },
-            }, `Supplier payment run posted for ${context.money(total)}`);
-            for (const bill of chosen) {
-              await context.mutate.patch(bill.id, {
+            if (!from) return;
+            setBusy(true);
+            try {
+              // Re-read every bill now: one paid or changed elsewhere stops the whole run.
+              const live = payable.map((bill) => data.bills.find((item) => item.id === bill.id));
+              const stale = live.find((bill, index) => !bill || !payableNow(bill) || bill.revision !== openedRevisions.current[payable[index].id]);
+              if (stale !== undefined || live.some((bill) => !bill)) {
+                context.toast("Payment run stopped", "A bill in this run changed or was already paid. Nothing was posted; reopen the run to review it.", "blocked");
+                return;
+              }
+              const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+              const lines: JLine[] = [
+                { accountId: ap.id, debitMinor: total, creditMinor: 0, memo: `Paid ${payable.length} bills` },
+                { accountId: from, debitMinor: 0, creditMinor: total, memo: `Paid ${payable.length} bills` },
+              ];
+              const journal = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Supplier payment run ${date}`,
+                status: "posted",
+                summary: `${payable.length} bills settled: ${payable.map((bill) => bill.title).join(", ")}.`,
+                amountMinor: total,
+                at: `${date}T09:00:00.000Z`,
+                tags: ["ledger", "payment"],
+                fields: { date, source: "payment-run" },
+                body: { date, memo: `Supplier payment run`, lines },
+              }, ctx);
+              const paid = (live as Rec[]).map((bill) => revisedRecord(bill, {
                 status: "paid",
                 fields: { ...bill.fields, paymentJournalId: journal.id, paidAt: `${date}T09:00:00.000Z` },
-              }, { event: `Bill ${bill.title} marked paid` });
+              }, ctx));
+              // Journal and every bill commit together, against the revisions this dialog opened with.
+              await context.mutate.putMany(
+                [journal, ...paid],
+                [`Supplier payment run posted for ${context.money(total)}`, ...paid.map((bill) => `Bill ${bill.title} marked paid`)],
+                Object.fromEntries(payable.map((bill) => [bill.id, openedRevisions.current[bill.id]])),
+                ["create", ...paid.map(() => "update" as const)],
+              );
+              context.toast("Payment recorded", `${context.money(total)} posted against payables and cash. ${payable.length} bills are marked paid.`);
+              close();
+            } catch (error) {
+              context.toast("Payment not recorded", error instanceof Error ? error.message : "A bill changed. Reopen the run and retry.", "failed");
+            } finally {
+              setBusy(false);
             }
-            context.toast("Payment recorded", `${context.money(total)} posted against payables and cash. ${chosen.length} bills are marked paid.`);
-            setBusy(false);
-            close();
           }}
         >
           Record the payment of {context.money(total)}
@@ -529,7 +567,8 @@ export function ExpensesTable({ context, tab }: { context: ScreenContext; tab: s
               let refused = 0;
               for (const expense of selected) {
                 if (expense.fields.hasReceipt === false) { refused += 1; continue; }
-                await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { event: `Expense ${expense.title} approved` });
+                const saved6 = await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { event: `Expense ${expense.title} approved` });
+                if (!saved6) return;
                 approved += 1;
               }
               context.toast(approved ? "Claims approved" : "Nothing approved", `${approved} approved. ${refused} refused for want of a receipt.`, refused && !approved ? "blocked" : "ok");
@@ -682,7 +721,8 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
           title={blocked}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} approved` });
+            const saved7 = await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} approved` });
+            if (!saved7) { setBusy(false); return; }
             context.toast("Claim approved", `${expense.title} is approved by ${context.actor}. Reimbursement posts the ledger entry.`);
             setBusy(false);
             close();
@@ -695,38 +735,51 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
           busy={busy}
           disabled={expense.status !== "approved" || !context.can("post_journal")}
           onClick={async () => {
-            setBusy(true);
             const account = data.accounts.find((item) => accountCode(item) === String(expense.fields.accountCode ?? "6000"));
             const cash = data.accounts.find((item) => accountCode(item) === "1000");
             if (!account || !cash) {
               context.toast("Cannot post", "The expense account or the cash account is missing from the chart of accounts.", "failed");
-              setBusy(false);
               return;
             }
-            const amount = Number(expense.amountMinor ?? 0);
-            const lines: JLine[] = [
-              { accountId: account.id, debitMinor: amount, creditMinor: 0, memo: expense.title },
-              { accountId: cash.id, debitMinor: 0, creditMinor: amount, memo: `Reimbursed ${String(expense.fields.claimant ?? expense.ownerName)}` },
-            ];
-            const journalRecord = await context.mutate.create({
-              collection: "journals",
-              title: `Reimburse ${expense.title}`,
-              status: "posted",
-              summary: `Expense claim reimbursed to ${String(expense.fields.claimant ?? expense.ownerName)}.`,
-              amountMinor: amount,
-              at: context.now.toISOString(),
-              parentId: expense.id,
-              tags: ["ledger", "expense"],
-              fields: { date: context.now.toISOString().slice(0, 10), source: "expense", expenseId: expense.id },
-              body: { date: context.now.toISOString().slice(0, 10), memo: expense.title, lines },
-            }, `Expense ${expense.title} reimbursed`);
-            await context.mutate.patch(expense.id, {
-              status: "reimbursed",
-              fields: { ...expense.fields, journalId: journalRecord.id, reimbursedAt: context.now.toISOString() },
-            }, { event: `Expense ${expense.title} marked reimbursed` });
-            context.toast("Reimbursed", `${context.money(amount)} posted to ${accountCode(account)} and out of cash.`);
-            setBusy(false);
-            close();
+            setBusy(true);
+            try {
+              const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+              const amount = Number(expense.amountMinor ?? 0);
+              const date = context.now.toISOString().slice(0, 10);
+              const lines: JLine[] = [
+                { accountId: account.id, debitMinor: amount, creditMinor: 0, memo: expense.title },
+                { accountId: cash.id, debitMinor: 0, creditMinor: amount, memo: `Reimbursed ${String(expense.fields.claimant ?? expense.ownerName)}` },
+              ];
+              const journalRecord = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Reimburse ${expense.title}`,
+                status: "posted",
+                summary: `Expense claim reimbursed to ${String(expense.fields.claimant ?? expense.ownerName)}.`,
+                amountMinor: amount,
+                at: context.now.toISOString(),
+                parentId: expense.id,
+                tags: ["ledger", "expense"],
+                fields: { date, source: "expense", expenseId: expense.id },
+                body: { date, memo: expense.title, lines },
+              }, ctx);
+              const reimbursed = revisedRecord(expense, {
+                status: "reimbursed",
+                fields: { ...expense.fields, journalId: journalRecord.id, reimbursedAt: context.now.toISOString() },
+              }, ctx);
+              await context.mutate.putMany(
+                [journalRecord, reimbursed],
+                [`Expense ${expense.title} reimbursed`, `Expense ${expense.title} marked reimbursed`],
+                { [expense.id]: expense.revision }, ["create", "update"],
+              );
+              context.toast("Reimbursed", `${context.money(amount)} posted to ${accountCode(account)} and out of cash.`);
+              close();
+            } catch (error) {
+              context.toast("Reimbursement not recorded", error instanceof Error ? error.message : "The claim changed. Reopen it and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Reimburse and post
@@ -738,7 +791,8 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
           disabled={expense.status === "reimbursed"}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(expense.id, { status: "rejected", fields: { ...expense.fields, rejectedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} rejected` });
+            const saved9 = await context.mutate.patch(expense.id, { status: "rejected", fields: { ...expense.fields, rejectedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} rejected` });
+            if (!saved9) { setBusy(false); return; }
             context.toast("Claim rejected", `${expense.title} is rejected and stays on the record.`, "blocked");
             setBusy(false);
             close();

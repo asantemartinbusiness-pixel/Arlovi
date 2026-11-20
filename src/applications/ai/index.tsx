@@ -11,7 +11,7 @@ import {
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useOrgRecords, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness, wallMs } from "@/platform/clock";
-import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
+import { capabilityById } from "@/platform/capability";
 import { composeAnswer, suggestions } from "@/applications/t2_shared/engine";
 import {
   AttachmentPicker, AttachTool, CapabilityLine, Composer, ScopeChips, TurnList,
@@ -435,31 +435,6 @@ const REMIT: Record<string, string> = {
   "Chief of Staff": "missions", Quality: "workforce", "Legal review": "knowledge",
 };
 
-function SpecialistHeader({ context, agent }: { context: ScreenContext; agent?: Rec }) {
-  if (!agent) return null;
-  const body = agent.body as { tools?: { label: string; granted: boolean }[]; authority?: string[] } | undefined;
-  const granted = (body?.tools ?? []).filter((tool) => tool.granted).length;
-  return (
-    <Card
-      machine
-      title={<Row gap={3}><Avatar name={agent.title} kind="ai" size="lg" /><span>{agent.title}</span></Row>}
-      subtitle={`${String(agent.fields.role ?? "Specialist")} · reports to ${String(agent.fields.manager ?? "unassigned")}`}
-      actions={<Row gap={2}>
-        <Pill tone={agent.status === "active" ? "success" : "warning"} dot>{agent.status}</Pill>
-        <Pill tone="warning">Model: {CAPABILITY_LABELS.not_connected}</Pill>
-      </Row>}
-      footer={<>
-        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Agent profile drawer", { id: agent.id })}>Profile</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("permission explainer", { id: agent.id })}>Tool scope ({granted} granted)</Button>
-        <span className="ds-grow" />
-        <span className="ds-subtle">Autonomy: {String(agent.fields.autonomy ?? "draft")}</span>
-      </>}
-    >
-      <p className="ds-prose">{agent.summary}</p>
-    </Card>
-  );
-}
-
 function SpecialistChat({ context }: { context: ScreenContext }) {
   const records = useChatRecords();
   const { actor, org } = useWorkspace();
@@ -510,8 +485,8 @@ function SpecialistChat({ context }: { context: ScreenContext }) {
         </Empty>
       ) : (
         <Stack gap={4}>
-          <CapabilityLine id="model.inference" title={`${agent.title} answers from records only`}>
-            This specialist is bounded to {String(agent.fields.role ?? "its role")} work recorded in this workspace.
+          <CapabilityLine id="model.inference" title={`No model is connected: ${agent.title} answers from records only`}>
+            Bounded to {String(agent.fields.role ?? "its role")} work recorded in this workspace.
           </CapabilityLine>
           <TurnList
             turns={readTurns(conversation)}
@@ -2957,7 +2932,12 @@ export const aiApp = registerApp({
     "ARL-AI-003": {
       id: "ARL-AI-003",
       title: () => "Specialist chat",
-      header: (context) => <SpecialistHeaderWrapper context={context} />,
+      record: (context) => ({
+        title: <SpecialistHeading context={context} part="title" />,
+        avatar: <SpecialistHeading context={context} part="avatar" />,
+        status: <SpecialistHeading context={context} part="status" />,
+        meta: [<SpecialistHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: [
         { id: "Conversation", render: (context) => <SpecialistChat context={context} /> },
         { id: "Work", render: (context) => <SpecialistWork context={context} /> },
@@ -2971,8 +2951,8 @@ export const aiApp = registerApp({
         { id: "review tool scope", placement: "overflow", run: (context) => context.openOverlay("permission explainer", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Agent profile drawer", kind: "drawer", title: "Specialist", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="Specialist" />, render: ({ ...context }) => <AgentProfileDrawer context={context} /> },
-        { id: "permission explainer", kind: "drawer", title: "Tool scope", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="Tool scope" />, render: ({ ...context }) => <PermissionExplainer context={context} /> },
+        { id: "Agent profile drawer", kind: "drawer", title: "Specialist", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="AI employee" />, render: ({ ...context }) => <AgentProfileDrawer context={context} /> },
+        { id: "permission explainer", kind: "drawer", title: "Tool scope", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="AI employee" />, render: ({ ...context }) => <PermissionExplainer context={context} /> },
         { id: "mission escalation", kind: "modal", title: "Hand this to the coordinator", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionEscalation context={context} close={close} />, footer: submitFooter("mission-escalation", "Record the handoff") },
         { id: "attach record", kind: "modal", title: "Attach a record", width: 560, render: ({ close, ...context }) => <AttachToSpecialist context={context} close={close} /> },
       ],
@@ -3153,9 +3133,14 @@ function MissionHeading({ context, part }: { context: ScreenContext; part: "titl
   );
 }
 
-function SpecialistHeaderWrapper({ context }: { context: ScreenContext }) {
+function SpecialistHeading({ context, part }: { context: ScreenContext; part: "title" | "avatar" | "status" | "meta" }) {
   const agent = useRecord(context.params.id);
-  return <SpecialistHeader context={context} agent={agent?.collection === "agents" ? agent : undefined} />;
+  if (!agent || agent.collection !== "agents") return part === "title" ? <>Specialist chat</> : null;
+  if (part === "title") return <>{agent.title}</>;
+  if (part === "avatar") return <Avatar name={agent.title} kind="ai" size="lg" />;
+  if (part === "status") return <Pill tone={agent.status === "active" ? "success" : "warning"} dot>{agent.status}</Pill>;
+  const granted = ((agent.body as { tools?: { granted: boolean }[] } | undefined)?.tools ?? []).filter((tool) => tool.granted).length;
+  return <>{String(agent.fields.role ?? "Specialist")} · reports to {String(agent.fields.manager ?? "unassigned")} · autonomy {String(agent.fields.autonomy ?? "draft")} · {granted} tool{granted === 1 ? "" : "s"} granted</>;
 }
 
 /* ---- toolbar handlers that write records ---- */

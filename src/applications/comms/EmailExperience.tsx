@@ -133,11 +133,11 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
   const compose = (id?: string) => context.openOverlay("Compose window", id ? { id } : undefined);
   const changeFolder = (next: EmailArea) => { setSelectedId(null); setShowReader(false); setQuery(""); setView("all"); context.setTab(next); };
   const archive = async (row: Rec) => {
-    await context.mutate.patch(row.id, { status: "archive", fields: { ...row.fields, folder: "archive" } }, { event: `Email “${row.title}” archived by ${context.actor}` });
+    if (!(await context.mutate.patch(row.id, { status: "archive", fields: { ...row.fields, folder: "archive" } }, { event: `Email “${row.title}” archived by ${context.actor}` }))) return;
     setSelectedId(null); setShowReader(false);
   };
   const markRead = async (row: Rec) => {
-    await context.mutate.patch(row.id, { fields: { ...row.fields, unread: false } }, { event: `Email “${row.title}” marked read by ${context.actor}` });
+    if (!(await context.mutate.patch(row.id, { fields: { ...row.fields, unread: false } }, { event: `Email “${row.title}” marked read by ${context.actor}` }))) return;
   };
 
   return (

@@ -341,7 +341,8 @@ export function BudgetApprovalTab({ context }: { context: ScreenContext }) {
                   title={!context.can("approve_payment") ? "Approving a budget needs the Finance or Owner role view" : undefined}
                   onClick={async () => {
                     setBusy(budget.id);
-                    await context.mutate.patch(budget.id, { status: "approved", fields: { ...budget.fields, approvedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} approved` });
+                    const saved10 = await context.mutate.patch(budget.id, { status: "approved", fields: { ...budget.fields, approvedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} approved` });
+                    if (!saved10) { setBusy(undefined); return; }
                     context.toast("Budget approved", `${budget.title} is now used for variance in ${String(budget.fields.period ?? "its period")}.`);
                     setBusy(undefined);
                   }}
@@ -354,7 +355,8 @@ export function BudgetApprovalTab({ context }: { context: ScreenContext }) {
                   busy={busy === budget.id}
                   onClick={async () => {
                     setBusy(budget.id);
-                    await context.mutate.patch(budget.id, { status: "returned", fields: { ...budget.fields, returnedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} returned` });
+                    const saved11 = await context.mutate.patch(budget.id, { status: "returned", fields: { ...budget.fields, returnedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} returned` });
+                    if (!saved11) { setBusy(undefined); return; }
                     context.toast("Returned", `${budget.title} goes back to ${String(budget.fields.submittedBy ?? "its author")} unapproved.`, "blocked");
                     setBusy(undefined);
                   }}
@@ -424,9 +426,10 @@ export function ModelAssumptions({ context, close }: { context: ScreenContext; c
           onClick={async () => {
             setBusy(true);
             try {
-              await context.mutate.patch(record.id, {
+              const saved12 = await context.mutate.patch(record.id, {
                 body: { ...(record.body as object ?? {}), assumptions: rows },
               }, { expectRevision: record.revision, event: `Assumptions edited on ${record.title}` });
+              if (!saved12) return;
               context.toast("Assumptions saved", `${record.title} now projects from ${rows.length} named assumptions.`);
               close();
             } catch (error) {
@@ -562,9 +565,10 @@ export function VarianceDrilldown({ context }: { context: ScreenContext }) {
               setBusy(true);
               try {
                 const value = note.trim();
-                await context.mutate.patch(budget.id, {
+                const saved13 = await context.mutate.patch(budget.id, {
                   fields: { ...budget.fields, varianceNote: value, varianceNoteBy: context.actor, varianceNoteAt: clockIso() },
                 }, { expectRevision: budget.revision, event: `Variance on ${budget.title} explained by ${context.actor}` });
+                if (!saved13) return;
                 setSaved({ budgetId: budget.id, value });
                 setDraft(null);
                 context.toast("Explanation saved", `${budget.title} now carries the explanation. No figure changed.`);

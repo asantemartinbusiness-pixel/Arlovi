@@ -173,10 +173,10 @@ export function ObligationsCard({ context, contract, obligations }: { context: S
                   aria-label={`${obligation.status === "done" ? "Reopen" : "Complete"} ${obligation.title}`}
                   onClick={async () => {
                     const reopening = obligation.status === "done";
-                    await context.mutate.patch(obligation.id, {
+                    if (!(await context.mutate.patch(obligation.id, {
                       status: reopening ? "upcoming" : "done",
                       fields: { ...obligation.fields, completedBy: reopening ? "" : context.actor, completedAt: reopening ? "" : clockIso() },
-                    }, { expectRevision: obligation.revision, event: `${obligation.title} ${reopening ? "reopened" : "completed"} by ${context.actor}` });
+                    }, { expectRevision: obligation.revision, event: `${obligation.title} ${reopening ? "reopened" : "completed"} by ${context.actor}` }))) return;
                     context.toast(reopening ? "Obligation reopened" : "Obligation completed", reopening ? "It is back on the calendar." : "Recorded with your name and the time. Attach evidence from the obligation calendar if it needs proving.");
                   }}
                 >
@@ -345,7 +345,7 @@ export function LinksCard({ context, contract }: { context: ScreenContext; contr
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             const next = { companyId: chosenCompany, dealId: String(form.get("deal") ?? ""), projectId: String(form.get("project") ?? "") };
-            await context.mutate.patch(contract.id, { fields: { ...contract.fields, ...next } }, { expectRevision: contract.revision, event: `Links on ${contract.title} updated by ${context.actor}` });
+            if (!(await context.mutate.patch(contract.id, { fields: { ...contract.fields, ...next } }, { expectRevision: contract.revision, event: `Links on ${contract.title} updated by ${context.actor}` }))) return;
             context.toast("Links saved", "The contract now points at those records.");
             setEditing(false);
           }}
@@ -440,10 +440,10 @@ export function AddVersion({ context, contract, versions }: { context: ScreenCon
             return;
           }
           const version: Version = { label: label.trim(), at: clockIso(), author: context.actor, text: text.trim() };
-          await context.mutate.patch(contract.id, {
+          if (!(await context.mutate.patch(contract.id, {
             fields: { ...contract.fields, versions: versions.length + 1 },
             body: { ...(contract.body as object ?? {}), versions: [...versions, version] },
-          }, { expectRevision: contract.revision, event: `${contract.title}: version "${version.label}" stored by ${context.actor}` });
+          }, { expectRevision: contract.revision, event: `${contract.title}: version "${version.label}" stored by ${context.actor}` }))) return;
           context.toast("Version stored", contract.fields.immutableSigned === true ? "Stored beside the signed text, which is unchanged." : "Compare it with the previous one on the Redline tab.");
           setOpen(false);
         }}

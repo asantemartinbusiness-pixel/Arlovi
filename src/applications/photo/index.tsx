@@ -1784,7 +1784,7 @@ function TagImage({ context, close }: { context: ScreenContext; close: () => voi
       onSubmit={async (event) => {
         event.preventDefault();
         const tags = [...new Set(text.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean))];
-        await context.mutate.patch(record.id, { tags }, { expectRevision: record.revision, event: `Tagged ${record.title}: ${tags.join(", ") || "no tags"}` });
+        if (!(await context.mutate.patch(record.id, { tags }, { expectRevision: record.revision, event: `Tagged ${record.title}: ${tags.join(", ") || "no tags"}` }))) return;
         close();
       }}
     >

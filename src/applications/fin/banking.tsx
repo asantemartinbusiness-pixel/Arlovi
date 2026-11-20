@@ -505,6 +505,8 @@ export function useReconciliation(code: string): Reconciliation {
 
 export function ReconciliationStrip({ context }: { context: ScreenContext }) {
   const recon = useReconciliation("1000");
+  // The first tab carries the equation card; the strip is for the other tabs only.
+  if (context.tab === "To reconcile") return null;
   return (
     <div className="fin-strip">
       <span>Unexplained <Amount minor={recon.unexplainedMinor} context={context} bold tone={recon.unexplainedMinor ? "danger" : "success"} zero="0" /></span>
@@ -568,15 +570,15 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
         <Card prov="posted" title={`Open statement lines (${open.length})`} subtitle="Matching only links a line to a posted journal; nothing is posted." pad="none">
           <ul className="fin-recon">
             {open.map(({ line, candidates }) => (
-              <li key={line.id} className="fin-recon-line">
-                <div className="fin-recon-head">
+              <li key={line.id} className="fin-recon-line" data-selected={context.selectedId === line.id || undefined}>
+                <button type="button" className="fin-recon-head" aria-pressed={context.selectedId === line.id} onClick={() => context.select(context.selectedId === line.id ? undefined : line.id)}>
                   <span className="fin-recon-date">{context.date(line.at)}</span>
                   <div className="fin-recon-title">
                     <strong>{line.title}</strong>
                     <span className="ds-subtle">{String(line.fields.reference ?? "")}</span>
                   </div>
                   <Amount minor={line.amountMinor} context={context} bold />
-                </div>
+                </button>
                 {candidates.length > 0 ? (
                   <div className="fin-recon-body">
                     {candidates.slice(0, 3).map((candidate) => (

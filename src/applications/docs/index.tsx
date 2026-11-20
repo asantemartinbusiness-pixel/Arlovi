@@ -1590,7 +1590,7 @@ function PublishTab({ context, tab }: { context: ScreenContext; tab: "Export" | 
                   || openSuggestions(editor.model).length > 0}
                 onClick={() => context.openOverlay("approve document")}>Review and publish…</Button>
               <Button variant="secondary" disabled={record.status !== "published" || !context.can("edit_knowledge")} onClick={async () => {
-                await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` });
+                if (!(await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` }))) return;
               }}>Unpublish</Button>
             </Row>
           </Stack>
@@ -1946,7 +1946,7 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
           }, `Document ${title.trim()} created`);
           if (template) {
             try {
-              await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision });
+              if (!(await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }))) return;
             } catch {
               context.toast("Document created", "The document was saved. The template usage counter could not be updated.", "info");
             }
@@ -2001,7 +2001,7 @@ function FolderSelector({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         for (const record of targets) {
-          await context.mutate.patch(record.id, { fields: { ...record.fields, folder } }, { expectRevision: record.revision, event: `${record.title} moved to ${folder}` });
+          if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, folder } }, { expectRevision: record.revision, event: `${record.title} moved to ${folder}` }))) return;
         }
         context.toast("Moved", `${targets.length} document${targets.length === 1 ? "" : "s"} moved to ${folder}.`);
         close();
@@ -2610,11 +2610,11 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
         setSaving(true);
         setError("");
         try {
-          await context.mutate.patch(record.id, {
+          if (!(await context.mutate.patch(record.id, {
             status: "in_review",
             fields: { ...record.fields, reviewers: chosen.join("|"), reviewMandatory: mandatory, reviewReason: reviewReason.trim(),
               reviewAssignedBy: context.actor, reviewAssignedAt: context.now.toISOString(), notificationStatus: "not_sent" },
-          }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title} by ${context.actor}: ${chosen.join(", ")}` });
+          }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title} by ${context.actor}: ${chosen.join(", ")}` }))) return;
           context.toast("Reviewers recorded", `${chosen.length} local reviewer assignment${chosen.length === 1 ? "" : "s"} saved. No invitations or emails were sent.`);
           close();
         } catch (cause) {
@@ -2679,7 +2679,7 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
             fields: { folder: "Unfiled", templateId: template.id, templateSourceRevision: template.revision, kind: "document", confidential: false },
             body: readDoc(template.body, context.actor, context.now.toISOString()),
           }, `Document created from ${template.title}`);
-          try { await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }); }
+          try { if (!(await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }))) return; }
           catch { context.toast("Document saved", "Template usage count could not be refreshed.", "info"); }
           close();
           context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
@@ -2709,10 +2709,10 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
         event.preventDefault();
         if (!title.trim()) return;
         if (template) {
-          await context.mutate.patch(template.id, {
+          if (!(await context.mutate.patch(template.id, {
             title: title.trim(), summary,
             fields: { ...template.fields, scope, tokens },
-          }, { expectRevision: template.revision, event: `Template ${title.trim()} updated` });
+          }, { expectRevision: template.revision, event: `Template ${title.trim()} updated` }))) return;
           const created = documents.filter((record) => record.fields.templateId === template.id);
           context.toast("Master updated", created.length
             ? `${created.length} existing document${created.length === 1 ? "" : "s"} were left exactly as they are.`
@@ -2769,7 +2769,7 @@ function TokenMapping({ context, close }: { context: ScreenContext; close: () =>
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(template.id, { fields: { ...template.fields, tokenMap: JSON.stringify(map) } }, { expectRevision: template.revision, event: `Token mapping updated on ${template.title}` });
+        if (!(await context.mutate.patch(template.id, { fields: { ...template.fields, tokenMap: JSON.stringify(map) } }, { expectRevision: template.revision, event: `Token mapping updated on ${template.title}` }))) return;
         context.toast("Mapping saved", "Tokens with a workspace source are filled when a document is created; the rest stay as tokens.");
         close();
       }}
@@ -2916,9 +2916,9 @@ function SignatureRequest({ context, close }: { context: ScreenContext; close: (
       onSubmit={async (event) => {
         event.preventDefault();
         if (signatories.length === 0) return;
-        await context.mutate.patch(record.id, {
+        if (!(await context.mutate.patch(record.id, {
           fields: { ...record.fields, signatureStatus: "requested", signatories: signatories.join(", ") },
-        }, { expectRevision: record.revision, event: `Signature requested on ${record.title} from ${signatories.join(", ")}` });
+        }, { expectRevision: record.revision, event: `Signature requested on ${record.title} from ${signatories.join(", ")}` }))) return;
         void context.mutate.log(`Signature request queued locally for ${record.title}`, { entityId: record.id, type: "capability", capability: "queued_local" });
         context.toast("Request recorded locally", "The signatories and the document are on the record. Nothing was sent, because no signature provider is connected.", "info");
         close();
@@ -3024,7 +3024,7 @@ function StyleSettings({ context, close }: { context: ScreenContext; close: () =
       onSubmit={async (event) => {
         event.preventDefault();
         if (existing) {
-          await context.mutate.patch(existing.id, { fields: { ...existing.fields, banned, maxWords: Number(maxWords) || 90 } }, { expectRevision: existing.revision, event: "House style updated" });
+          if (!(await context.mutate.patch(existing.id, { fields: { ...existing.fields, banned, maxWords: Number(maxWords) || 90 } }, { expectRevision: existing.revision, event: "House style updated" }))) return;
         } else {
           await context.mutate.create({
             collection: "preferences", title: "Documents house style", status: "active",
@@ -3307,10 +3307,10 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
           const fresh = await import("@/platform/repo").then((module) => module.getRecord(record.id));
           if (!fresh || fresh.organizationId !== context.org.id || fresh.collection !== "documents") throw new Error("The document is no longer available in this workspace.");
           if (fresh.status === "published") throw new Error("This document has already been published.");
-          await context.mutate.patch(record.id, {
+          if (!(await context.mutate.patch(record.id, {
             status: "published",
             fields: { ...fresh.fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}${note.trim() ? ` ${note.trim()}` : ""}`].join("|") },
-          }, { expectRevision: fresh.revision, event: `${record.title} approved by ${context.actor}` });
+          }, { expectRevision: fresh.revision, event: `${record.title} approved by ${context.actor}` }))) return;
           context.toast("Approved in Arlovi", `${record.title} is published in this local workspace. No external distribution was performed.`);
           close();
         } catch (cause) {
@@ -3614,7 +3614,7 @@ registerApp({
           run: async (context) => {
             const id = context.selectedId;
             if (!id) return;
-            await context.mutate.patch(id, { status: "retired" }, { event: "Template retired" });
+            if (!(await context.mutate.patch(id, { status: "retired" }, { event: "Template retired" }))) return;
             context.toast("Retired", "It can no longer be used for a new document. Documents already created keep their own body.");
           },
         },

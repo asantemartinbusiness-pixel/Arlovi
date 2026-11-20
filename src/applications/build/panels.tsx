@@ -928,9 +928,9 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
         </Grid>
         <Row gap={2}>
           <Button variant="primary" onClick={async () => {
-            await context.mutate.patch(record.id, {
+            if (!(await context.mutate.patch(record.id, {
               fields: { ...record.fields, lastCheckAt: now.toISOString(), checkFail: totals.fail, checkWarn: totals.warn, checkPass: totals.pass },
-            }, { event: `Model checks run: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` });
+            }, { event: `Model checks run: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` }))) return;
             context.toast("Checks recorded", `${issues.length} checks computed. ${totals.fail} failing.`, totals.fail ? "blocked" : "ok");
           }}>Run the suites</Button>
           <Button variant="secondary" onClick={() => {

@@ -128,12 +128,12 @@ function ChangeEditor({ context, record }: { context: ScreenContext; record: Rec
   const remote = changeFactors(record).target === "remote";
 
   async function save(extra: Partial<Rec> = {}, event = `Change request ${draft.title} saved`) {
-    await context.mutate.patch(record.id, {
+    if (!(await context.mutate.patch(record.id, {
       title: draft.title.trim() || "Untitled change",
       summary: draft.plan.slice(0, 140),
       ...extra,
       fields: { ...record.fields, ...draft, risk: risk.level, riskScore: risk.score, ...(extra.fields ?? {}) },
-    }, { expectRevision: record.revision, event });
+    }, { expectRevision: record.revision, event }))) return;
   }
 
   return (
@@ -482,9 +482,9 @@ function ReviewDetail({ context, record }: { context: ScreenContext; record: Rec
 
   async function decide(index: number, decision: Decision, note: string) {
     const next = entries.map((entry, at) => (at === index ? { ...entry, decision, note, decidedBy: context.actor, decidedAt: clockIso() } : entry));
-    await context.mutate.patch(record.id, {
+    if (!(await context.mutate.patch(record.id, {
       body: { ...(record.body as Record<string, unknown>), entries: next },
-    }, { expectRevision: record.revision, event: `Access review: ${decision} for ${entries[index].subject}${note ? ` (${note})` : ""}` });
+    }, { expectRevision: record.revision, event: `Access review: ${decision} for ${entries[index].subject}${note ? ` (${note})` : ""}` }))) return;
   }
 
   return (

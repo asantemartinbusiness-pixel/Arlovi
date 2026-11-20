@@ -774,7 +774,9 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
   const data = useKnowledge();
   const status = view === "In review" ? "in_review" : view.toLowerCase();
   const rows = data.conflicts.filter((conflict) => conflict.status === status);
-  const domains = [...new Set(rows.map((conflict) => String(conflict.fields.domain ?? "general")))];
+  const domains = [...new Set(rows.map((conflict) => String(conflict.fields.domain ?? "general")))]
+    .sort((a, b) => Number(rows.some((conflict) => String(conflict.fields.domain ?? "general") === b && conflictOptions(conflict).length > 0))
+      - Number(rows.some((conflict) => String(conflict.fields.domain ?? "general") === a && conflictOptions(conflict).length > 0)));
 
   if (rows.length === 0) {
     return <Empty title={`No ${view.toLowerCase()} conflict`} icon={<Scale size={20} />}>A conflict is recorded when two sources disagree about the same assertion.</Empty>;
@@ -819,8 +821,8 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
                       <Button
                         size="sm"
                         variant="primary"
-                        disabled={ledger || view === "Resolved"}
-                        title={ledger ? "A ledger review decides this one" : undefined}
+                        disabled={ledger || view === "Resolved" || options.length === 0}
+                        title={ledger ? "A ledger review decides this one" : options.length === 0 ? "No competing versions are recorded, so there is nothing to choose between" : undefined}
                         onClick={() => { context.select(conflict.id); context.openOverlay("resolution dialog", { id: conflict.id }); }}
                       >
                         Choose the source of truth
@@ -1394,7 +1396,7 @@ function SourceSummary({ context }: { context: ScreenContext }) {
   if (!source || source.collection !== "sources") return null;
   return (
     <OverlaySummary
-      eyebrow="Source"
+      eyebrow="Knowledge source"
       title={source.title}
       status={<Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill>}
       meta={[String(source.fields.kind ?? "file"), visibilityOf(source).label, `Fresh ${context.date(String(source.fields.freshness ?? source.updatedAt))}`]}
@@ -1809,6 +1811,10 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
           <Notice tone="danger" title="This is a financial mismatch">
             A figure cannot be chosen here. It goes to an accounting review so the ledger and the record agree for a reason that can be audited.
           </Notice>
+        ) : options.length === 0 ? (
+          <Notice tone="info" title="Nothing to choose between">
+            No competing versions are recorded on this conflict. Compare the two sources it names, then record the versions before choosing one.
+          </Notice>
         ) : (
           <Stack gap={3}>
             {options.map((option) => {
@@ -1834,7 +1840,7 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
           primary={(
             <Button
               variant="primary"
-              disabled={ledger || !chosen || !reason.trim()}
+              disabled={ledger || options.length === 0 || !chosen || !reason.trim()}
               onClick={async () => {
                 const option = options.find((item) => item.id === chosen);
                 if (!(await context.mutate.patch(conflict.id, {
@@ -1898,6 +1904,11 @@ function ComparisonDrawer({ context }: { context: ScreenContext }) {
           It touches a financial figure. Choosing a side here would change the figure without a posting behind it, so it goes to accounting.
         </Notice>
       )}
+      {options.length === 0 && (
+        <Notice tone="info" title="No competing versions are recorded">
+          {conflict.summary} Nothing is recorded on this conflict to set side by side, so there is nothing to choose between yet.
+        </Notice>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, Math.min(options.length, 2))}, minmax(0, 1fr))`, gap: "var(--space-3)" }}>
         {options.map((option, index) => {
           const source = sourceOf(data, option.sourceId);
@@ -1922,7 +1933,7 @@ function ComparisonDrawer({ context }: { context: ScreenContext }) {
       <p className="ds-subtle">Evidence against evidence: the newer record is not automatically right.</p>
       <DrawerActions>
         <OverlayActions
-          primary={<Button variant="primary" disabled={ledger || closed || !context.can("edit_knowledge")} onClick={() => { context.closeOverlay(); context.openOverlay("resolution dialog", { id: conflict.id }); }}>Choose the source of truth</Button>}
+          primary={<Button variant="primary" disabled={ledger || closed || options.length === 0 || !context.can("edit_knowledge")} onClick={() => { context.closeOverlay(); context.openOverlay("resolution dialog", { id: conflict.id }); }}>Choose the source of truth</Button>}
           secondary={ledger
             ? <Button variant="outline-danger" onClick={() => { context.closeOverlay(); context.openOverlay("escalation", { id: conflict.id }); }}>Send to ledger review</Button>
             : !closed ? <Button variant="secondary" onClick={() => { context.select(conflict.id); void deferConflict(context); context.closeOverlay(); }}>Defer</Button> : undefined}
@@ -2017,7 +2028,7 @@ function DecisionSummary({ context }: { context: ScreenContext }) {
   if (!decision) return null;
   return (
     <OverlaySummary
-      eyebrow="Decision"
+      eyebrow="Decision register"
       title={decision.title}
       status={<Pill tone={decision.status === "approved" ? "success" : decision.status === "superseded" ? "neutral" : "info"}>{decision.status}</Pill>}
       meta={[decision.fields.approvers ? `Approved by ${String(decision.fields.approvers)}` : "Not approved", decision.fields.approvedAt ? context.date(String(decision.fields.approvedAt)) : undefined]}
@@ -2643,10 +2654,10 @@ export const brainApp = registerApp({
         { id: "compare facts", placement: "overflow", run: (context) => context.openOverlay("conflict resolver") },
       ],
       overlays: [
-        { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Evidence" />, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
+        { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Assertion" />, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
         {
           id: "verification dialog", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Set an expiry" : "Verify an assertion"), width: OVERLAY_WIDTH.modal,
-          summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow={(context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Expiry" : "Verification"} />,
+          summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Assertion" />,
           render: ({ close, ...context }) => <VerificationDialog context={context} close={close} />,
           footer: ({ close, ...context }) => submitFooter("verification", (context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Record the expiry" : "Record the verification")({ close }),
         },

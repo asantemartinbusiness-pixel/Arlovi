@@ -5,6 +5,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import { capabilityById, CAPABILITY_LABELS } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import { buildReturn } from "@/domain/fin-invoice";
@@ -180,11 +181,13 @@ export function MapCategory({ context, close }: { context: ScreenContext; close:
               const other = elsewhere(category);
               if (!other) continue;
               const rest = String(other.fields.mappedCategories ?? "").split(",").map((item) => item.trim()).filter((item) => item && item !== category);
-              await context.mutate.patch(other.id, { fields: { ...other.fields, mappedCategories: rest.join(",") } }, { expectRevision: other.revision, event: `Category ${category} unmapped from ${accountCode(other)}` });
+              const saved19 = await context.mutate.patch(other.id, { fields: { ...other.fields, mappedCategories: rest.join(",") } }, { expectRevision: other.revision, event: `Category ${category} unmapped from ${accountCode(other)}` });
+              if (!saved19) { setBusy(false); return; }
             }
-            await context.mutate.patch(account.id, {
+            const saved20 = await context.mutate.patch(account.id, {
               fields: { ...account.fields, mappedCategories: chosen.join(","), mappedBy: context.actor },
             }, { expectRevision: account.revision, event: `Categories mapped to ${accountCode(account)}: ${chosen.join(", ") || "none"}` });
+            if (!saved20) { setBusy(false); return; }
             context.toast("Mapping saved", `${chosen.length} categor${chosen.length === 1 ? "y posts" : "ies post"} to ${accountCode(account)} ${account.title}.`);
             setBusy(false);
             close();
@@ -263,13 +266,14 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
           onClick={async () => {
             setBusy(true);
             const at = clockIso();
-            await context.mutate.patch(invoice.id, {
+            const saved21 = await context.mutate.patch(invoice.id, {
               body: {
                 ...(invoice.body as object ?? {}),
                 sends: [...sends, { version: issuedVersion, revision: invoice.revision, at, by: context.actor, to, grossMinor: totals.grossMinor, state: "queued_local" }],
               },
               fields: { ...invoice.fields, sendState: "queued_local", lastQueuedAt: at, sentVersion: issuedVersion },
             }, { expectRevision: invoice.revision, event: `${invoice.title} queued to send to ${to}. Not sent: no mail provider is connected` });
+            if (!saved21) { setBusy(false); return; }
             await context.mutate.log(`Send of ${invoice.title} held at the mail provider boundary`, { entityId: invoice.id, type: "finance.send", capability: "queued_local" });
             context.toast("Queued, not sent", `${invoice.title} version ${issuedVersion} is queued locally for ${to}. No mail provider is connected, so nothing left this browser.`, "info");
             setBusy(false);
@@ -429,10 +433,11 @@ export function SchedulePayment({ context, close }: { context: ScreenContext; cl
           onClick={async () => {
             setBusy(true);
             for (const bill of rows) {
-              await context.mutate.patch(bill.id, {
+              const saved22 = await context.mutate.patch(bill.id, {
                 status: "scheduled",
                 fields: { ...bill.fields, scheduledFor: date, scheduledBy: context.actor, paymentState: "queued_local" },
               }, { expectRevision: bill.revision, event: `Payment of ${bill.title} scheduled for ${date} by ${context.actor}. No money moved` });
+              if (!saved22) { setBusy(false); return; }
             }
             await context.mutate.log(`${rows.length} supplier payments scheduled for ${date}; held locally, no bank mandate`, { type: "finance.payment", capability: "queued_local" });
             context.toast("Payment scheduled", `${rows.length} bill${rows.length === 1 ? "" : "s"} for ${context.money(total)} scheduled for ${context.date(date)}. Nothing was paid: there is no bank connection.`, "info");
@@ -616,28 +621,42 @@ export function ReimburseExpense({ context, close }: { context: ScreenContext; c
           disabled={Boolean(blocked) || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
-            if (!expense) return;
+            if (!expense || busy) return;
             setBusy(true);
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Reimburse ${expense.title}`,
-              status: "posted",
-              summary: `Reimbursement to ${String(expense.fields.claimant ?? expense.ownerName)} recorded locally. Payment itself is made outside this workspace.`,
-              amountMinor: amount,
-              at: `${date}T09:00:00.000Z`,
-              parentId: expense.id,
-              tags: ["ledger", "expense"],
-              fields: { date, source: "expense", expenseId: expense.id, postedBy: context.actor },
-              body: { date, memo: expense.title, lines },
-            }, `Expense ${expense.title} reimbursement posted`);
-            await context.mutate.patch(expense.id, {
-              status: "reimbursed",
-              fields: { ...expense.fields, journalId: journal.id, reimbursedAt: clockIso(), reimbursedBy: context.actor, paymentState: "awaiting_external_confirmation" },
-            }, { expectRevision: expense.revision, event: `Expense ${expense.title} reimbursed by ${context.actor}; payment awaits external confirmation` });
-            await context.mutate.log(`Reimbursement of ${expense.title} held at the payment boundary`, { entityId: expense.id, type: "finance.payment", capability: "awaiting_external_confirmation" });
-            context.toast("Reimbursement recorded", `${context.money(amount)} is posted as a balanced journal. No money moved: pay the claimant from your bank.`, "info");
-            setBusy(false);
-            close();
+            try {
+              const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+              const journal = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Reimburse ${expense.title}`,
+                status: "posted",
+                summary: `Reimbursement to ${String(expense.fields.claimant ?? expense.ownerName)} recorded locally. Payment itself is made outside this workspace.`,
+                amountMinor: amount,
+                at: `${date}T09:00:00.000Z`,
+                parentId: expense.id,
+                tags: ["ledger", "expense"],
+                fields: { date, source: "expense", expenseId: expense.id, postedBy: context.actor },
+                body: { date, memo: expense.title, lines },
+              }, ctx);
+              const reimbursed = revisedRecord(expense, {
+                status: "reimbursed",
+                fields: { ...expense.fields, journalId: journal.id, reimbursedAt: ctx.now, reimbursedBy: context.actor, paymentState: "awaiting_external_confirmation" },
+              }, ctx);
+              // Journal and claim commit together; a claim changed elsewhere writes nothing.
+              await context.mutate.putMany(
+                [journal, reimbursed],
+                [`Expense ${expense.title} reimbursement posted`, `Expense ${expense.title} reimbursed by ${context.actor}; payment awaits external confirmation`],
+                { [expense.id]: expense.revision }, ["create", "update"],
+              );
+              await context.mutate.log(`Reimbursement of ${expense.title} held at the payment boundary`, { entityId: expense.id, type: "finance.payment", capability: "awaiting_external_confirmation" });
+              context.toast("Reimbursement recorded", `${context.money(amount)} is posted as a balanced journal. No money moved: pay the claimant from your bank.`, "info");
+              close();
+            } catch (error) {
+              context.toast("Reimbursement not recorded", error instanceof Error ? error.message : "The claim changed. Reopen it and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record the reimbursement

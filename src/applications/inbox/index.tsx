@@ -1006,10 +1006,10 @@ function ApprovalReview({ context, close }: { context: ScreenContext; close: () 
   async function decide(decision: "denied" | "changes_requested") {
     setBusy(true);
     try {
-      await context.mutate.patch(record!.id, {
+      if (!(await context.mutate.patch(record!.id, {
         status: decision,
         fields: { ...record!.fields, decision, decisionNote: note, decidedBy: actor },
-      }, { event: `${decision === "denied" ? "Denied" : "Changes requested on"} ${record!.title}${note ? `: ${note}` : ""}`, expectRevision: record!.revision });
+      }, { event: `${decision === "denied" ? "Denied" : "Changes requested on"} ${record!.title}${note ? `: ${note}` : ""}`, expectRevision: record!.revision }))) return;
       context.toast(decision === "denied" ? "Denied" : "Sent back for changes", "The request record now carries the decision and the note.");
       close();
     } finally {
@@ -1088,7 +1088,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
         fields: { ...record!.fields, decision: "approved", decidedBy: actor, decidedPlanVersion: planVersion },
       }, { event: `Approved ${record!.title} at plan version ${planVersion}`, expectRevision: record!.revision });
       if (!saved) {
-        if (target) await context.mutate.patch(target.id, { fields: { ...target.fields } }, { event: `Approval withdrawn from ${target.title}: the request changed` });
+        if (target) if (!(await context.mutate.patch(target.id, { fields: { ...target.fields } }, { event: `Approval withdrawn from ${target.title}: the request changed` }))) return;
         context.toast("Not approved", "The request changed while you were confirming. Reopen it and review it again.", "blocked");
         return;
       }
@@ -1286,7 +1286,7 @@ async function convertToTask(context: ScreenContext, message: Rec | undefined) {
     summary: message.summary,
     fields: { stage: "ready", assignee: String(message.fields.assignee ?? context.actor), sourceMessageId: message.id, origin: "Messages inbox" },
   }, `Task created from the message "${message.title}"`);
-  await context.mutate.patch(message.id, { fields: { ...message.fields, taskId: task.id, unread: false } }, { event: `Converted to task ${task.id}` });
+  if (!(await context.mutate.patch(message.id, { fields: { ...message.fields, taskId: task.id, unread: false } }, { event: `Converted to task ${task.id}` }))) return;
   context.toast("Task created", `"${task.title}" is in Projects and the thread now links to it.`);
 }
 
@@ -1347,7 +1347,7 @@ function MessageInspector({ context, close }: { context: ScreenContext; close: (
         parentId: message!.id,
         fields: { author: context.actor, authorKind: "human", channel: String(message!.fields.channel ?? "Direct"), kind: "chat", unread: false, deliveryState: "ready_local", threadId: String(message!.fields.threadId ?? message!.id) },
       }, `Reply drafted in the thread "${message!.title}"`);
-      await context.mutate.patch(message!.id, { fields: { ...message!.fields, unread: false, replies: Number(message!.fields.replies ?? 0) + 1 } }, { event: "Reply added to the thread" });
+      if (!(await context.mutate.patch(message!.id, { fields: { ...message!.fields, unread: false, replies: Number(message!.fields.replies ?? 0) + 1 } }, { event: "Reply added to the thread" }))) return;
       context.toast("Reply saved to the thread", "It is a record in this workspace. No mail provider is connected, so nothing was sent.");
       setReply("");
       close();
@@ -1402,9 +1402,9 @@ function Reassignment({ context, close }: { context: ScreenContext; close: () =>
       if (!to || busy) return;
       setBusy(true);
       try {
-        await context.mutate.patch(message.id, {
+        if (!(await context.mutate.patch(message.id, {
           fields: { ...message.fields, assignee: to, handoverNote: note, handoverBy: context.actor },
-        }, { event: `Thread reassigned to ${to}${note ? `: ${note}` : ""}`, expectRevision: message.revision });
+        }, { event: `Thread reassigned to ${to}${note ? `: ${note}` : ""}`, expectRevision: message.revision }))) return;
         context.toast("Reassigned", `${to} now owns the thread, and the note is on the record.`);
         close();
       } finally {
@@ -1452,7 +1452,7 @@ function MuteThread({ context, close }: { context: ScreenContext; close: () => v
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(message.id, { fields: { ...message.fields, muted: true, mutedScope: scope, mutedBy: context.actor } }, { event: `Muted ${scope === "thread" ? "thread" : `channel ${String(message.fields.channel ?? "")}`}` });
+          if (!(await context.mutate.patch(message.id, { fields: { ...message.fields, muted: true, mutedScope: scope, mutedBy: context.actor } }, { event: `Muted ${scope === "thread" ? "thread" : `channel ${String(message.fields.channel ?? "")}`}` }))) return;
           context.toast("Muted", scope === "thread" ? "This thread will not raise new items for you." : "The channel will not raise new items for you.");
           close();
         }}
@@ -1675,7 +1675,7 @@ function IncidentBoard({ context, tab }: { context: ScreenContext; tab: Incident
                         variant="secondary"
                         disabled={Boolean(row.fields.acknowledgedBy)}
                         onClick={async () => {
-                          await context.mutate.patch(row.id, { status: row.status === "urgent" ? "waiting" : row.status, fields: { ...row.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() } }, { event: `Incident acknowledged: ${row.title}`, expectRevision: row.revision });
+                          if (!(await context.mutate.patch(row.id, { status: row.status === "urgent" ? "waiting" : row.status, fields: { ...row.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() } }, { event: `Incident acknowledged: ${row.title}`, expectRevision: row.revision }))) return;
                           context.toast("Acknowledged", "The incident record now names you and the time.");
                         }}
                       >
@@ -1723,7 +1723,7 @@ function IncidentFooter({ context }: { context: ScreenContext }) {
         variant="primary"
         disabled={record.status === "resolved"}
         onClick={async () => {
-          await context.mutate.patch(record.id, { status: "resolved", fields: { ...record.fields, resolvedBy: context.actor, resolvedAt: clockIso() } }, { event: `Incident resolved: ${record.title}`, expectRevision: record.revision });
+          if (!(await context.mutate.patch(record.id, { status: "resolved", fields: { ...record.fields, resolvedBy: context.actor, resolvedAt: clockIso() } }, { event: `Incident resolved: ${record.title}`, expectRevision: record.revision }))) return;
           context.toast("Resolved", "The incident moved to Resolved with your name and the time.");
         }}
       >
@@ -1776,9 +1776,9 @@ function OwnerHandoff({ context, close }: { context: ScreenContext; close: () =>
       event.preventDefault();
       setTried(true);
       if (!to || !brief.trim()) return;
-      await context.mutate.patch(record.id, {
+      if (!(await context.mutate.patch(record.id, {
         fields: { ...record.fields, owner: to, handoverBrief: brief, handoverBy: context.actor, handoverAt: clockIso() },
-      }, { event: `Incident handed to ${to}: ${brief}`, expectRevision: record.revision });
+      }, { event: `Incident handed to ${to}: ${brief}`, expectRevision: record.revision }))) return;
       context.toast("Handed over", `${to} owns the incident and the brief is on the record.`);
       close();
     }}>
@@ -1821,7 +1821,7 @@ function EmergencyPause({ context, close }: { context: ScreenContext; close: () 
           onClick={async () => {
             setBusy(true);
             try {
-              await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: false, pausedBy: context.actor } }, { event: "Automation resumed from an incident" });
+              if (!(await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: false, pausedBy: context.actor } }, { event: "Automation resumed from an incident" }))) return;
               context.toast("Resumed", "Agents and missions may take steps again.");
               close();
             } finally { setBusy(false); }
@@ -1841,7 +1841,7 @@ function EmergencyPause({ context, close }: { context: ScreenContext; close: () 
             onClick={async () => {
               setBusy(true);
               try {
-                await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: true, pausedBy: context.actor } }, { event: "Automation paused from an incident" });
+                if (!(await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: true, pausedBy: context.actor } }, { event: "Automation paused from an incident" }))) return;
                 context.toast("Paused", "Every agent and mission step is held. The organisation record carries the pause.", "blocked");
                 close();
               } finally { setBusy(false); }
@@ -1881,7 +1881,7 @@ function ChannelSettings({ context }: { context: ScreenContext }) {
                         context.toast("Cannot be turned off", "The in-app inbox is the only channel that always works, so it stays on.", "blocked");
                         return;
                       }
-                      await context.mutate.patch(channel.id, { fields: { ...channel.fields, enabled: next } }, { event: `${channel.title} ${next ? "enabled" : "disabled"}`, expectRevision: channel.revision });
+                      if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, enabled: next } }, { event: `${channel.title} ${next ? "enabled" : "disabled"}`, expectRevision: channel.revision }))) return;
                       context.toast(next ? "Channel on" : "Channel off", `${channel.title} is ${next ? "on" : "off"} for this workspace.`);
                     }}
                   />
@@ -1890,7 +1890,7 @@ function ChannelSettings({ context }: { context: ScreenContext }) {
                   <Select
                     value={String(channel.fields.minPriority ?? "P3")}
                     onChange={async (event) => {
-                      await context.mutate.patch(channel.id, { fields: { ...channel.fields, minPriority: event.target.value } }, { event: `${channel.title} floor set to ${event.target.value}` });
+                      if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, minPriority: event.target.value } }, { event: `${channel.title} floor set to ${event.target.value}` }))) return;
                       context.toast("Floor changed", `${channel.title} now delivers ${event.target.value} and above.`);
                     }}
                   >
@@ -1935,7 +1935,7 @@ function CategorySettings({ context }: { context: ScreenContext }) {
                 label={`Email for ${row.title}`}
                 checked={row.fields.email === true}
                 onChange={async (event) => {
-                  await context.mutate.patch(row.id, { fields: { ...row.fields, email: event.target.checked } }, { event: `${row.title}: email ${event.target.checked ? "on" : "off"}` });
+                  if (!(await context.mutate.patch(row.id, { fields: { ...row.fields, email: event.target.checked } }, { event: `${row.title}: email ${event.target.checked ? "on" : "off"}` }))) return;
                 }}
               />
             ),
@@ -1947,7 +1947,7 @@ function CategorySettings({ context }: { context: ScreenContext }) {
                 checked={row.fields.push === true}
                 disabled={row.fields.securityFloor === true}
                 onChange={async (event) => {
-                  await context.mutate.patch(row.id, { fields: { ...row.fields, push: event.target.checked } }, { event: `${row.title}: push ${event.target.checked ? "on" : "off"}` });
+                  if (!(await context.mutate.patch(row.id, { fields: { ...row.fields, push: event.target.checked } }, { event: `${row.title}: push ${event.target.checked ? "on" : "off"}` }))) return;
                 }}
               />
             ),
@@ -1989,7 +1989,7 @@ function ScheduleSettings({ context }: { context: ScreenContext }) {
                   variant="ghost"
                   onClick={async () => {
                     const next = window.status === "active" ? "paused" : "active";
-                    await context.mutate.patch(window.id, { status: next }, { event: `${window.title} ${next}`, expectRevision: window.revision });
+                    if (!(await context.mutate.patch(window.id, { status: next }, { event: `${window.title} ${next}`, expectRevision: window.revision }))) return;
                     context.toast(next === "active" ? "Window on" : "Window paused", `${window.title} is ${next}.`);
                   }}
                 >
@@ -2282,11 +2282,11 @@ function DigestEditor({ context, close }: { context: ScreenContext; close: () =>
         if (sections.length === 0) { setError("Choose at least one section; an empty digest would say nothing."); return; }
         setError("");
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title,
             summary: `${sections.length} sections, ${cadence} at ${sendAt}.`,
             fields: { ...existing.fields, cadence, sendAt, sections: sections.join(",") },
-          }, { event: `Digest updated: ${title}`, expectRevision: existing.revision });
+          }, { event: `Digest updated: ${title}`, expectRevision: existing.revision }))) return;
           context.toast("Digest saved", `${title} now has ${sections.length} sections.`);
         } else {
           await context.mutate.create({
@@ -2357,7 +2357,7 @@ function DigestAudience({ context, close }: { context: ScreenContext; close: () 
         primary={<Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(digest.id, { fields: { ...digest.fields, recipients: chosen.join(",") } }, { event: `Digest audience set to ${chosen.join(", ") || "nobody"}`, expectRevision: digest.revision });
+            if (!(await context.mutate.patch(digest.id, { fields: { ...digest.fields, recipients: chosen.join(",") } }, { event: `Digest audience set to ${chosen.join(", ") || "nobody"}`, expectRevision: digest.revision }))) return;
             context.toast("Audience saved", `${chosen.length} ${chosen.length === 1 ? "person" : "people"} on ${digest.title}.`);
             close();
           }}
@@ -2395,7 +2395,7 @@ function DigestSchedule({ context, close }: { context: ScreenContext; close: () 
         primary={<Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(digest.id, { fields: { ...digest.fields, sendAt } }, { event: `Digest schedule set to ${sendAt}`, expectRevision: digest.revision });
+            if (!(await context.mutate.patch(digest.id, { fields: { ...digest.fields, sendAt } }, { event: `Digest schedule set to ${sendAt}`, expectRevision: digest.revision }))) return;
             context.toast("Schedule saved", `${digest.title} is set for ${sendAt}.`);
             close();
           }}
@@ -2420,7 +2420,7 @@ async function buildDigestPreview(context: ScreenContext, digest: Rec | undefine
     body: { text: body },
   }, `Digest composed: ${name}`);
   if (digest) {
-    await context.mutate.patch(digest.id, { fields: { ...digest.fields, lastBuiltAt: clockIso() } }, { event: `Digest built: ${name}` });
+    if (!(await context.mutate.patch(digest.id, { fields: { ...digest.fields, lastBuiltAt: clockIso() } }, { event: `Digest built: ${name}` }))) return;
   }
   context.toast("Digest composed", `It is a draft document in Documents, with ${lines.filter((line) => !line.known).length} lines marked unavailable.`);
 }
@@ -2605,11 +2605,11 @@ function DelegationGrant({ context, close }: { context: ScreenContext; close: ()
           authorityCap: capMinor, enabled: backupCan, scope: condition.replace("capability:", "").replace(/_/g, " "),
         };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: `${owner} → ${backup}`,
             summary: `${condition} escalates to ${backup} after ${Number(timer) / 60} hours.`,
             fields: { ...existing.fields, ...fields },
-          }, { event: `Delegation updated: ${owner} → ${backup}`, expectRevision: existing.revision });
+          }, { event: `Delegation updated: ${owner} → ${backup}`, expectRevision: existing.revision }))) return;
         } else {
           await context.mutate.create({
             collection: "preferences",

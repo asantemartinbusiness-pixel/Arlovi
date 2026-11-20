@@ -90,7 +90,7 @@ export function ReleaseApproval({ context, close }: { context: ScreenContext; cl
                     note: "Checks passed. Stopped at the runtime boundary: nothing hosts this app.",
                     actor: context.actor,
                   };
-                  await context.mutate.patch(record.id, { body: { ...model, releases: [...model.releases, release] } }, { expectRevision: record.revision, event: `Promotion to ${environment} recorded as blocked at the runtime boundary` });
+                  if (!(await context.mutate.patch(record.id, { body: { ...model, releases: [...model.releases, release] } }, { expectRevision: record.revision, event: `Promotion to ${environment} recorded as blocked at the runtime boundary` }))) return;
                   context.toast("Recorded as not promoted", "The attempt is in the release history as blocked. Nothing was deployed.", "blocked");
                   close();
                 } finally {
@@ -229,7 +229,7 @@ export function RollbackImpact({ context, close }: { context: ScreenContext; clo
                     ...targetModel,
                     releases: model.releases.map((release) => (release.id === latest.id ? { ...release, state: "rolled_back" as const, note: "Rolled back to an earlier model revision." } : release)),
                   };
-                  await context.mutate.patch(record.id, { body: restored }, { expectRevision: record.revision, event: `Model rolled back to the revision saved ${target.at}` });
+                  if (!(await context.mutate.patch(record.id, { body: restored }, { expectRevision: record.revision, event: `Model rolled back to the revision saved ${target.at}` }))) return;
                   context.toast("Model rolled back", "The earlier revision is now the model and the latest release is marked rolled back. The previous model is in the revision list.");
                   close();
                 } finally {

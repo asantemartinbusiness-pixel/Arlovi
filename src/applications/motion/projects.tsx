@@ -387,7 +387,7 @@ export function AssetLibrary({ context }: { context: ScreenContext }) {
   if (!record) return <Notice tone="warning" title="Select a composition first">The asset library lists the assets linked from one composition.</Notice>;
   const doc = parseMotion(record.body);
   const save = async (assets: MotionAsset[], event: string) => {
-    await context.mutate.patch(record.id, { body: { ...doc, assets } }, { expectRevision: record.revision, event });
+    if (!(await context.mutate.patch(record.id, { body: { ...doc, assets } }, { expectRevision: record.revision, event }))) return;
   };
   const linked = new Set(doc.assets.map((asset) => asset.recordId));
   const candidates = lookup.candidates.filter((item) => item.id !== record.id && !linked.has(item.id));

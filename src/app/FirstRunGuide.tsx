@@ -66,7 +66,7 @@ export function FirstRunGuide() {
 
   async function dismiss() {
     if (preference) {
-      await mutations.patch(preference.id, { fields: { dismissed: true } }, { event: "Getting-started guidance dismissed" });
+      if (!(await mutations.patch(preference.id, { fields: { dismissed: true } }, { event: "Getting-started guidance dismissed" }))) return;
     } else {
       await mutations.create({
         collection: "preferences", title: "Getting-started guidance", status: "active",

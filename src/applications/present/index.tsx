@@ -1913,7 +1913,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             )}
             <Row gap={2} wrap>
               <Button variant="primary" disabled={record.status === "published"} onClick={async () => {
-                await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
+                if (!(await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` }))) return;
                 context.toast("Status recorded", "This browser now lists the deck as published. No external access was granted.");
               }}>Mark as published locally</Button>
               <Button variant="secondary" onClick={() => {
@@ -2587,7 +2587,7 @@ function DatasetPicker({ context, close }: { context: ScreenContext; close: () =
             };
             editor.commitSlide(addObject(editor.slide, object), "Insert chart");
             editor.setSelectedIds([object.id]);
-            await context.mutate.patch(record.id, { fields: { ...record.fields, pendingChart: "" } }, { skipHistory: true });
+            if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, pendingChart: "" } }, { skipHistory: true }))) return;
             context.toast("Chart inserted", `Snapshot from ${queued.sourceSheetName}!${queued.sourceRef}, captured ${context.dateTime(queued.capturedAt)}.`);
             close();
             return;

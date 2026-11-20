@@ -240,7 +240,7 @@ export const itApp = registerApp({
           const record = context.params.id ? await repo.getRecord(context.params.id) : undefined;
           if (!record) return;
           if (record.fields.acknowledgedAt) { context.toast("Already acknowledged", `${String(record.fields.acknowledgedBy)} acknowledged it.`, "info"); return; }
-          await context.mutate.patch(record.id, { status: record.status === "open" ? "investigating" : record.status, ownerName: context.actor, fields: { ...record.fields, owner: context.actor, acknowledgedBy: context.actor, acknowledgedAt: context.now.toISOString() } }, { expectRevision: record.revision, event: `${context.actor} acknowledged and took ${record.title}` });
+          if (!(await context.mutate.patch(record.id, { status: record.status === "open" ? "investigating" : record.status, ownerName: context.actor, fields: { ...record.fields, owner: context.actor, acknowledgedBy: context.actor, acknowledgedAt: context.now.toISOString() } }, { expectRevision: record.revision, event: `${context.actor} acknowledged and took ${record.title}` }))) return;
           context.toast("Acknowledged", `${record.title} is acknowledged, assigned to you and marked investigating.`);
         } },
         { id: "approve repair", label: "Approve the repair", placement: "secondary", capability: "approve_mission", run: openAct("Remediation approval") },

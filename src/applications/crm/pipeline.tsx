@@ -265,7 +265,7 @@ export function PipelineList({ context }: { context: ScreenContext }) {
           label: "Assign to me",
           onRun: async (selected) => {
             for (const deal of selected) {
-              await context.mutate.patch(deal.id, { fields: { ...deal.fields, owner: context.actor } }, { event: `${deal.title} assigned to ${context.actor}` });
+              if (!(await context.mutate.patch(deal.id, { fields: { ...deal.fields, owner: context.actor } }, { event: `${deal.title} assigned to ${context.actor}` }))) return;
             }
             context.toast("Owner changed", `${selected.length} ${selected.length === 1 ? "deal" : "deals"} now belong to ${context.actor}.`);
           },

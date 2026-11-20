@@ -55,7 +55,7 @@ async function writeRender(recordId: string, change: (doc: MotionDoc) => MotionD
   const record = await db.records.get(recordId);
   if (!record) return;
   const { parseMotion } = await import("./model");
-  await context.mutate.patch(recordId, { body: change(parseMotion(record.body)) }, { event: label });
+  if (!(await context.mutate.patch(recordId, { body: change(parseMotion(record.body)) }, { event: label }))) return;
 }
 
 /** Write a text export to a file and record it. */

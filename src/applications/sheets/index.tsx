@@ -1367,9 +1367,9 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
                   footer={<Button size="sm" variant="secondary" disabled={!data || decks.length === 0} onClick={async () => {
                     const deck = decks[0];
                     if (!deck || !data) return;
-                    await context.mutate.patch(deck.id, {
+                    if (!(await context.mutate.patch(deck.id, {
                       fields: { ...deck.fields, pendingChart: JSON.stringify({ title: chart.title, kind: chart.kind, series: data.series, sourceWorkbookId: record.id, sourceSheetName: sheet.name, sourceRef: chart.ref, capturedAt: context.now.toISOString(), linked: true }) },
-                    }, { event: `${chart.title} queued for ${deck.title}` });
+                    }, { event: `${chart.title} queued for ${deck.title}` }))) return;
                     editor.commit({ ...editor.workbook, charts: editor.workbook.charts.map((item) => (item.id === chart.id ? { ...item, snapshotAt: context.now.toISOString() } : item)) }, "Snapshot chart");
                     context.toast("Queued for the deck", `Insert it on a slide in ${deck.title} from Charts & data. The snapshot time travels with it.`);
                   }}>Send to a deck</Button>}
@@ -1941,7 +1941,7 @@ function ShareWorkbook({ context, close }: { context: ScreenContext; close: () =
         setSaving(true);
         setError("");
         try {
-          await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: chosen.join("|") } }, { expectRevision: record.revision, event: `${record.title} sharing list updated` });
+          if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: chosen.join("|") } }, { expectRevision: record.revision, event: `${record.title} sharing list updated` }))) return;
           context.toast("Sharing recorded", "The local workbook list was updated. No invitations were sent.");
           close();
         } catch (cause) {
@@ -2698,7 +2698,7 @@ function RestoreConfirmation({ context, close }: { context: ScreenContext; close
         setSaving(true);
         setError("");
         try {
-          await context.mutate.patch(record.id, { body: stored }, { expectRevision: record.revision, event: `Workbook restored to the version saved ${snapshot.at}` });
+          if (!(await context.mutate.patch(record.id, { body: stored }, { expectRevision: record.revision, event: `Workbook restored to the version saved ${snapshot.at}` }))) return;
           context.toast("Version restored", `Replaced the workbook content with the version saved ${context.dateTime(snapshot.at)}.`);
           close();
         } catch (cause) {
@@ -2775,7 +2775,7 @@ registerApp({
           run: async (context) => {
             if (!context.selectedId) return;
             const record = await import("@/platform/repo").then((module) => module.getRecord(context.selectedId!));
-            await context.mutate.patch(context.selectedId, { status: "archived" }, { expectRevision: record?.revision, event: "Workbook archived" });
+            if (!(await context.mutate.patch(context.selectedId, { status: "archived" }, { expectRevision: record?.revision, event: "Workbook archived" }))) return;
             context.toast("Archived", "It stays in this browser and can be reopened from the library.");
           },
         },

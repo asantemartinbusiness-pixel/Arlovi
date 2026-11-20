@@ -40,9 +40,9 @@ export function LeaverChecklist({ context, employee, tasks }: { context: ScreenC
                   onChange={async (event) => {
                     if (!canEdit || admin) return;
                     const next = event.target.checked ? "done" : "ready";
-                    await context.mutate.patch(step.id, {
+                    if (!(await context.mutate.patch(step.id, {
                       status: next, fields: { ...step.fields, stage: next, completedBy: context.actor, completedAt: clockIso() },
-                    }, { expectRevision: step.revision, event: `Leaver step “${step.title}” for ${employee.title} ${next === "done" ? "completed" : "reopened"} by ${context.actor}` });
+                    }, { expectRevision: step.revision, event: `Leaver step “${step.title}” for ${employee.title} ${next === "done" ? "completed" : "reopened"} by ${context.actor}` }))) return;
                   }}
                 />
                 <div className="hr-onboarding-step-meta">

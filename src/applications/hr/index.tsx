@@ -196,7 +196,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
             setError("");
             try {
               const recordedAt = clockIso();
-              await context.mutate.patch(employee.id, {
+              if (!(await context.mutate.patch(employee.id, {
                 status: "alumni",
                 endAt: recordedAt,
                 fields: {
@@ -207,7 +207,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
                   offboardingAssetsReviewed: true,
                   externalAccessRevocation: "manual_follow_up_required",
                 },
-              }, { expectRevision: employee.revision, event: `${employee.title} departure authorised by ${context.actor}; external access revocation not verified` });
+              }, { expectRevision: employee.revision, event: `${employee.title} departure authorised by ${context.actor}; external access revocation not verified` }))) return;
               try {
                 const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
                 for (const step of steps) {
@@ -900,11 +900,11 @@ function ITAccess({ context }: { context: ScreenContext }) {
                 setSavingId(request.id);
                 setError("");
                 try {
-                  await context.mutate.patch(request.id, { status: "done", fields: {
+                  if (!(await context.mutate.patch(request.id, { status: "done", fields: {
                     ...request.fields, stage: "done", reviewedBy: context.actor, reviewedAt: clockIso(),
                     externalProvisioning: "not_verified",
                   } }, { expectRevision: request.revision,
-                    event: `${request.title} local review recorded by ${context.actor}; external access not verified` });
+                    event: `${request.title} local review recorded by ${context.actor}; external access not verified` }))) return;
                   context.toast("Local review recorded",
                     `${request.title} was reviewed in Arlovi. Check external provisioning separately.`);
                   setConfirmedId(null);

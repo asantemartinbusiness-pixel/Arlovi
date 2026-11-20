@@ -428,9 +428,9 @@ export function SendChartToDeck({ context, close }: { context: ScreenContext; cl
       onSubmit={async (event) => {
         event.preventDefault();
         if (!sheet || !data || !record) return;
-        await context.mutate.patch(deck.id, {
+        if (!(await context.mutate.patch(deck.id, {
           fields: { ...deck.fields, pendingChart: JSON.stringify({ title: chart.title, kind: chart.kind, series: data.series, sourceWorkbookId: record.id, sourceSheetName: sheet.name, sourceRef: chart.ref, capturedAt: context.now.toISOString(), linked: true }) },
-        }, { expectRevision: deck.revision, event: `${chart.title} published to ${deck.title}` });
+        }, { expectRevision: deck.revision, event: `${chart.title} published to ${deck.title}` }))) return;
         editor.commit({ ...editor.workbook, charts: editor.workbook.charts.map((item) => (item.id === chart.id ? { ...item, snapshotAt: context.now.toISOString() } : item)) }, "Publish a chart snapshot");
         context.toast("Published to the deck", `${chart.title} waits in ${deck.title}: insert it from Charts & data. The snapshot time travels with it.`);
         close();
@@ -530,7 +530,7 @@ export function PublishWorkbook({ context, close }: { context: ScreenContext; cl
         setError("");
         try {
         if (scope === "workspace") {
-          await context.mutate.patch(record.id, { status: "published", fields: { ...record.fields, publishedAt: context.now.toISOString(), publishedBy: context.actor } }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
+          if (!(await context.mutate.patch(record.id, { status: "published", fields: { ...record.fields, publishedAt: context.now.toISOString(), publishedBy: context.actor } }, { expectRevision: record.revision, event: `${record.title} published in the workspace` }))) return;
           context.toast("Workspace status updated", "The workbook is marked published in this local workspace. This does not create server-side read-only permissions.");
         } else {
           editor.commit({ ...editor.workbook, io: [{ id: nextId("io"), at: context.now.toISOString(), kind: "export", format: "Publish to the web", note: `${CAPABILITY_LABELS.queued_local}: no hosting is connected, nothing was published.`, warnings: ["Not connected"] }, ...editor.workbook.io] }, "Request web publishing");

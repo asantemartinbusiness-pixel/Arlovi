@@ -183,11 +183,11 @@ function ReviewerPicker({ context, close }: { context: ScreenContext; close: () 
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const reviewer = String(form.get("reviewer") ?? "");
-        await context.mutate.patch(contract.id, {
+        if (!(await context.mutate.patch(contract.id, {
           status: "in_review",
           fields: { ...contract.fields, reviewer, reviewRequestedBy: context.actor, reviewRequestedAt: clockIso() },
           body: { ...(contract.body as object ?? {}), reviews: startRound(reviewsOf(contract), reviewer, context.actor, clockIso(), crypto.randomUUID()) },
-        }, { expectRevision: contract.revision, event: `${contract.title} sent for review to ${reviewer} by ${context.actor}` });
+        }, { expectRevision: contract.revision, event: `${contract.title} sent for review to ${reviewer} by ${context.actor}` }))) return;
         context.toast("Review requested", `${contract.title} is in review with ${reviewer}.`);
         close();
       }}
@@ -432,11 +432,11 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
         const due = clockNow();
         due.setFullYear(due.getFullYear() + 1);
         if (existing && existing.status === "draft") {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: String(form.get("title") ?? existing.title),
             summary: String(form.get("summary") ?? existing.summary),
             fields: { ...existing.fields, acknowledgementRequired: fields.acknowledgementRequired, audience: fields.audience },
-          }, { expectRevision: existing.revision, event: `Draft ${existing.title} v${current} edited by ${context.actor}` });
+          }, { expectRevision: existing.revision, event: `Draft ${existing.title} v${current} edited by ${context.actor}` }))) return;
         } else if (existing) {
           await context.mutate.create({
             collection: "policies",
@@ -572,7 +572,7 @@ function EvidenceUpload({ context, close }: { context: ScreenContext; close: () 
           },
         }, `Evidence pack assembled by ${context.actor}`);
         if (obligation) {
-          await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, evidenceId: created.id } }, { event: `Evidence linked to ${obligation.title}` });
+          if (!(await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, evidenceId: created.id } }, { event: `Evidence linked to ${obligation.title}` }))) return;
         }
         context.toast("Evidence recorded", "The pack is in the evidence directory with a content hash and your name on it.");
         close();
@@ -685,10 +685,10 @@ function LegalHold({ context, close }: { context: ScreenContext; close: () => vo
             onClick={async () => {
               setBusy(true);
               try {
-                await context.mutate.patch(pack.id, {
+                if (!(await context.mutate.patch(pack.id, {
                   status: held ? "assembled" : "held",
                   fields: { ...pack.fields, legalHold: !held, exportable: held, holdChangedBy: context.actor },
-                }, { expectRevision: pack.revision, event: `${held ? "Legal hold lifted" : "Legal hold placed"} on ${pack.title} by ${context.actor}` });
+                }, { expectRevision: pack.revision, event: `${held ? "Legal hold lifted" : "Legal hold placed"} on ${pack.title} by ${context.actor}` }))) return;
                 context.toast(held ? "Hold lifted" : "Hold placed", held ? `${pack.title} can be exported again.` : `${pack.title} cannot be deleted or exported while the hold is on.`);
                 close();
               } finally { setBusy(false); }
@@ -759,10 +759,10 @@ function Escalation({ context, close }: { context: ScreenContext; close: () => v
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(obligation.id, {
+        if (!(await context.mutate.patch(obligation.id, {
           status: "escalated",
           fields: { ...obligation.fields, escalatedTo: String(form.get("to") ?? ""), escalatedBy: context.actor, escalationReason: String(form.get("why") ?? "") },
-        }, { expectRevision: obligation.revision, event: `${obligation.title} escalated to ${String(form.get("to") ?? "")} by ${context.actor}` });
+        }, { expectRevision: obligation.revision, event: `${obligation.title} escalated to ${String(form.get("to") ?? "")} by ${context.actor}` }))) return;
         context.toast("Escalated", "The record says who escalated it, to whom and why.");
         close();
       }}
@@ -798,7 +798,7 @@ function ControlAssignment({ context, close }: { context: ScreenContext; close: 
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(risk.id, {
+        if (!(await context.mutate.patch(risk.id, {
           status: String(form.get("status") ?? risk.status),
           fields: {
             ...risk.fields,
@@ -806,7 +806,7 @@ function ControlAssignment({ context, close }: { context: ScreenContext; close: 
             mitigation: String(form.get("mitigation") ?? ""),
             owner: String(form.get("owner") ?? risk.fields.owner ?? risk.ownerName),
           },
-        }, { expectRevision: risk.revision, event: `Control assigned on ${risk.title} by ${context.actor}` });
+        }, { expectRevision: risk.revision, event: `Control assigned on ${risk.title} by ${context.actor}` }))) return;
         context.toast("Control recorded", "The mitigation, its control and its owner are on the register.");
         close();
       }}

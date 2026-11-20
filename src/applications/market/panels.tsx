@@ -83,11 +83,11 @@ export function MarketingOverview({ context, lens }: { context: ScreenContext; l
             const length = campaign.endAt && campaign.startAt
               ? new Date(campaign.endAt).getTime() - new Date(campaign.startAt).getTime()
               : 14 * 86_400_000;
-            await context.mutate.patch(
+            if (!(await context.mutate.patch(
               id,
               { startAt: nextIso, endAt: new Date(new Date(nextIso).getTime() + length).toISOString(), at: nextIso },
               { expectRevision: campaign.revision, event: `Campaign ${campaign.title} rescheduled` },
-            );
+            ))) return;
             context.toast("Campaign moved", `${campaign.title} now starts ${context.date(nextIso)}. The window length was kept.`);
           }}
         />

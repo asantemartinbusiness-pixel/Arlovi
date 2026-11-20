@@ -67,7 +67,7 @@ export const bookApp = registerApp({
         { id: "Create booking", label: "New booking", placement: "primary", run: (context) => context.openOverlay("Quick booking") },
         { id: "check in", label: "Check in", placement: "secondary", guard: needsSelection, run: async (context) => {
           const id = context.selectedId!;
-          await context.mutate.patch(id, { fields: { checkedIn: true }, status: "completed" }, { event: "Guest checked in" });
+          if (!(await context.mutate.patch(id, { fields: { checkedIn: true }, status: "completed" }, { event: "Guest checked in" }))) return;
           context.toast("Checked in", "The appointment is marked completed on its record.");
         } },
         { id: "reschedule", label: "Reschedule selected", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("Reschedule", { id: context.selectedId }) },

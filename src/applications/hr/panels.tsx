@@ -3139,7 +3139,7 @@ export function PositionEditor({ context, close }: { context: ScreenContext; clo
           salaryHighMinor: Math.round(Number(high) * 100), openings: 1,
         };
         if (existing) {
-          await context.mutate.patch(existing.id, { title, summary, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Job spec updated for ${title}` });
+          if (!(await context.mutate.patch(existing.id, { title, summary, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Job spec updated for ${title}` }))) return;
         } else {
           await context.mutate.create({ collection: "positions", title, status: "open", summary, fields }, `Position opened: ${title}`);
         }

@@ -172,7 +172,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
                   variant={device.status === "trusted" ? "ghost" : "secondary"}
                   onClick={async () => {
                     const next = device.status === "trusted" ? "untrusted" : "trusted";
-                    await context.mutate.patch(device.id, { status: next, fields: { ...device.fields, trusted: next === "trusted", changedBy: context.actor } }, { event: `Device marked ${next}: ${device.title}`, expectRevision: device.revision });
+                    if (!(await context.mutate.patch(device.id, { status: next, fields: { ...device.fields, trusted: next === "trusted", changedBy: context.actor } }, { event: `Device marked ${next}: ${device.title}`, expectRevision: device.revision }))) return;
                     context.toast(next === "trusted" ? "Device trusted" : "Trust removed", `${device.title} is now ${next}.`);
                   }}
                 >
@@ -395,7 +395,7 @@ export function SecurityReview({ context, close }: { context: ScreenContext; clo
       onConfirm={async () => {
         setBusy(true);
         try {
-          await context.mutate.patch(policy.id, { fields: { ...policy.fields, [setting]: !current, changedBy: context.actor } }, { event: `${label[setting] ?? setting} ${current ? "disabled" : "enabled"}`, expectRevision: policy.revision });
+          if (!(await context.mutate.patch(policy.id, { fields: { ...policy.fields, [setting]: !current, changedBy: context.actor } }, { event: `${label[setting] ?? setting} ${current ? "disabled" : "enabled"}`, expectRevision: policy.revision }))) return;
           context.toast("Policy changed", "The sign-in policy record carries the change, and the audit trail names you.");
           close();
         } finally { setBusy(false); }
@@ -1307,11 +1307,11 @@ export function CheckoutOverlay({ context, close }: { context: ScreenContext; cl
           disabled={!subscription || seats < used}
           onClick={async () => {
             if (!subscription) return;
-            await context.mutate.patch(subscription.id, {
+            if (!(await context.mutate.patch(subscription.id, {
               summary: `${String(subscription.fields.plan)} plan, ${seats} seats, ${String(subscription.fields.term)}. Nothing is charged from this browser.`,
               amountMinor: seats * perSeat,
               fields: { ...subscription.fields, seatsIncluded: seats, changedBy: context.actor },
-            }, { event: `Subscription seats set to ${seats}`, expectRevision: subscription.revision });
+            }, { event: `Subscription seats set to ${seats}`, expectRevision: subscription.revision }))) return;
             context.toast("Plan record updated", `${seats} seats on the subscription record. No payment was taken.`, "info");
             close();
           }}
@@ -1339,7 +1339,7 @@ export function CancellationOverlay({ context, close }: { context: ScreenContext
         if (!subscription) return;
         setBusy(true);
         try {
-          await context.mutate.patch(subscription.id, { status: "cancelled", fields: { ...subscription.fields, cancelledBy: context.actor, cancelledAt: clockIso() } }, { event: "Subscription cancellation recorded", expectRevision: subscription.revision });
+          if (!(await context.mutate.patch(subscription.id, { status: "cancelled", fields: { ...subscription.fields, cancelledBy: context.actor, cancelledAt: clockIso() } }, { event: "Subscription cancellation recorded", expectRevision: subscription.revision }))) return;
           context.toast("Cancellation recorded", "The subscription record says cancelled. Your records stay in this browser and can be exported.", "info");
           close();
         } finally { setBusy(false); }
@@ -1960,7 +1960,7 @@ export function CallbackTester({ context, close: _close }: { context: ScreenCont
           primary={<Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(hook.id, { fields: { ...hook.fields, lastTestAt: clockIso(), lastTestBy: context.actor } }, { event: `Webhook payload inspected: ${hook.title}` });
+            if (!(await context.mutate.patch(hook.id, { fields: { ...hook.fields, lastTestAt: clockIso(), lastTestBy: context.actor } }, { event: `Webhook payload inspected: ${hook.title}` }))) return;
             await context.mutate.log(`Webhook test on ${hook.title}: payload shown, nothing delivered.`, { entityId: hook.id, type: "developer.webhook_test", capability: "not_connected" });
             setResult("Recorded as inspected. No delivery was attempted, so there is no response code to show.");
           }}

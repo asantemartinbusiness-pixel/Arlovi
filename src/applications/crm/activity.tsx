@@ -134,7 +134,7 @@ export function AllActivity({ context }: { context: ScreenContext }) {
               for (const activity of selected) {
                 if (activity.status === "done") continue;
                 if (activity.status === "draft") continue;
-                await context.mutate.patch(activity.id, { status: "done", fields: { ...activity.fields, completedBy: context.actor } }, { event: `Activity ${activity.title} completed` });
+                if (!(await context.mutate.patch(activity.id, { status: "done", fields: { ...activity.fields, completedBy: context.actor } }, { event: `Activity ${activity.title} completed` }))) return;
                 done += 1;
               }
               context.toast(done ? "Marked complete" : "Nothing changed", `${done} completed. A drafted message is not completed here, because it has not been sent.`, done ? "ok" : "blocked");
@@ -184,7 +184,7 @@ export function FollowUps({ context }: { context: ScreenContext }) {
             { key: "owner", header: "Who", cell: (row) => String(row.fields.owner ?? row.ownerName) },
             { key: "action", header: "", cell: (row) => (
               <Button size="sm" variant="ghost" onClick={async () => {
-                await context.mutate.patch(row.id, { status: "done", fields: { ...row.fields, completedBy: context.actor } }, { expectRevision: row.revision, event: `Activity ${row.title} completed` });
+                if (!(await context.mutate.patch(row.id, { status: "done", fields: { ...row.fields, completedBy: context.actor } }, { expectRevision: row.revision, event: `Activity ${row.title} completed` }))) return;
                 context.toast("Completed", `${row.title} is marked done by ${context.actor}.`);
               }}>Complete</Button>
             ) },
@@ -901,7 +901,7 @@ export function WorkflowsTab({ context }: { context: ScreenContext }) {
                     disabled={!context.can("run_automation")}
                     onClick={async () => {
                       setBusy(workflow.id);
-                      await context.mutate.patch(workflow.id, { status: "stopped", fields: { ...workflow.fields, stoppedBy: context.actor } }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} stopped` });
+                      if (!(await context.mutate.patch(workflow.id, { status: "stopped", fields: { ...workflow.fields, stoppedBy: context.actor } }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} stopped` }))) return;
                       context.toast("Stopped", `${workflow.title} will not run again until it is activated.`, "blocked");
                       setBusy(undefined);
                     }}

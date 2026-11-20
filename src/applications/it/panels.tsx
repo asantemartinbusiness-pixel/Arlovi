@@ -430,9 +430,9 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
             onSubmit={async (event) => {
               event.preventDefault();
               const data = new FormData(event.currentTarget);
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 fields: { ...record.fields, postmortem: String(data.get("text") ?? ""), verifiedBy: context.actor },
-              }, { expectRevision: record.revision, event: `Postmortem written for ${record.title}` });
+              }, { expectRevision: record.revision, event: `Postmortem written for ${record.title}` }))) return;
               context.toast("Postmortem saved", "It is on the incident record and in the postmortems tab.");
             }}
           >
@@ -524,11 +524,11 @@ export function RemediationPanel({ context, record }: { context: ScreenContext; 
             disabled={!verified || record.status === "resolved"}
             title={!verified ? "Run the workspace diagnostics after the incident was opened first" : undefined}
             onClick={async () => {
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 status: "resolved",
                 endAt: clockIso(),
                 fields: { ...record.fields, verifiedBy: context.actor },
-              }, { expectRevision: record.revision, event: `Incident ${record.title} resolved after a verified check` });
+              }, { expectRevision: record.revision, event: `Incident ${record.title} resolved after a verified check` }))) return;
               context.toast("Resolved", "The record carries the check that verified it.");
             }}
           >

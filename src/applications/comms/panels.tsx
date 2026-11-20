@@ -240,7 +240,7 @@ export function ChannelConversation({ context, lens }: { context: ScreenContext;
         {pinned.map((message) => (
           <Card key={message.id} title={String(message.fields.author ?? "")} subtitle={context.dateTime(message.at)} actions={<Pill tone="info">Pinned</Pill>}
             footer={<Button size="sm" variant="ghost" onClick={async () => {
-              await context.mutate.patch(message.id, { status: "sent", fields: { ...message.fields, pinned: false } }, { event: `${message.title} unpinned by ${context.actor}` });
+              if (!(await context.mutate.patch(message.id, { status: "sent", fields: { ...message.fields, pinned: false } }, { event: `${message.title} unpinned by ${context.actor}` }))) return;
             }}>Unpin</Button>}>
             <p>{message.summary}</p>
           </Card>
@@ -613,9 +613,9 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
               event.preventDefault();
               const form = new FormData(event.currentTarget);
               if (!record) return;
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 fields: { ...record.fields, workingStart: String(form.get("start") ?? ""), workingEnd: String(form.get("end") ?? ""), presence: String(form.get("presence") ?? "") },
-              }, { expectRevision: record.revision, event: `Working hours changed by ${context.actor}` });
+              }, { expectRevision: record.revision, event: `Working hours changed by ${context.actor}` }))) return;
               context.toast("Saved", "Your hours are on the preference record.");
             }}
           >
@@ -685,9 +685,9 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
             onSubmit={async (event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 fields: { ...record.fields, displayName: String(form.get("display") ?? ""), signature: String(form.get("signature") ?? "") },
-              }, { expectRevision: record.revision, event: `Mail identity updated by ${context.actor}` });
+              }, { expectRevision: record.revision, event: `Mail identity updated by ${context.actor}` }))) return;
               context.toast("Identity saved", "It is on the preference record in this browser.");
             }}
           >
@@ -809,7 +809,7 @@ export function MemberManagement({ context }: { context: ScreenContext }) {
             <span className="ds-grow">{member}</span>
             <Button size="sm" variant="ghost" onClick={async () => {
               const next = members.filter((name) => name !== member);
-              await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${member} removed from ${channel.title}` });
+              if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${member} removed from ${channel.title}` }))) return;
             }}>Remove</Button>
           </Row>
         ))}
@@ -822,7 +822,7 @@ export function MemberManagement({ context }: { context: ScreenContext }) {
               const name = event.target.value;
               if (!name) return;
               const next = [...members, name];
-              await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${name} added to ${channel.title}` });
+              if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${name} added to ${channel.title}` }))) return;
               context.toast("Member added", `${name} can see this channel.`);
             }}
           >
@@ -851,7 +851,7 @@ export function PhishingReport({ context, close }: { context: ScreenContext; clo
       </Notice>
       <OverlayActions variant="confirm"
         primary={<Button variant="danger" onClick={async () => {
-          await context.mutate.patch(thread.id, { status: "spam", fields: { ...thread.fields, folder: "spam", risk: "phishing", reportedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} reported as phishing by ${context.actor}` });
+          if (!(await context.mutate.patch(thread.id, { status: "spam", fields: { ...thread.fields, folder: "spam", risk: "phishing", reportedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} reported as phishing by ${context.actor}` }))) return;
           context.toast("Reported", "The thread is in Spam and the report is on the record.");
           close();
         }}>Report and move to Spam</Button>}
