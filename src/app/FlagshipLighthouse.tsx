@@ -111,7 +111,7 @@ export default function FlagshipLighthouse(){
       </div>
     </header>
     <div className="lh-measure" aria-label="Fictional project scope and status">
-      <div><span>PROPOSED SCOPE</span><strong>{value(project?.amountMinor??18500000)}</strong><small>Illustrative / not accepted revenue</small></div>
+      <div><span>PROPOSED SCOPE</span><strong>{typeof project?.amountMinor==="number"?value(project.amountMinor):"Not loaded"}</strong><small>Illustrative / not accepted revenue</small></div>
       <div><span>ROOMS IN CONCEPT</span><strong>45</strong><small>Three room typologies</small></div>
       <div><span>LINKED TASKS</span><strong>{work.length? `${completed}/${work.length}`:"—"}</strong><small>Fictional task progression</small></div>
       <div><span>APPROVAL GATES</span><strong>{verifiedGates}/{allGates.length||5}</strong><small>Verified decisions</small></div>
