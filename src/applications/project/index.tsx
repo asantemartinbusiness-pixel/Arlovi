@@ -1122,7 +1122,7 @@ export const projectApp = registerApp({
       ],
       overlays: [
         { id: "Workload detail", kind: "drawer", title: "What this person holds", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <WorkloadSummary context={context} />, render: ({ ...context }) => <WorkloadDetail context={context} /> },
-        { id: "allocation editor", kind: "modal", title: "Owner and estimate", width: 520, render: ({ close, ...context }) => <AllocationEditor context={context} close={close} />, footer: submitFooter("pj-allocation", "Save") },
+        { id: "allocation editor", kind: "modal", title: "Owner and estimate", width: 520, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <AllocationEditor context={context} close={close} />, footer: submitFooter("pj-allocation", "Save") },
         { id: "over-capacity alert", kind: "drawer", title: "Over capacity", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <OverCapacity context={context} /> },
       ],
     },
@@ -1183,7 +1183,7 @@ export const projectApp = registerApp({
       overlays: [
         ...kitOverlays,
         { id: "Timer", kind: "modal", title: "Log time", width: 520, render: ({ close, ...context }) => <TimerOverlay context={context} close={close} />, footer: submitFooter("pj-timer", "Save entry") },
-        { id: "timesheet correction", kind: "modal", title: "Correct a time entry", width: 520, render: ({ close, ...context }) => <TimesheetCorrection context={context} close={close} />, footer: submitFooter("pj-correction", "Save correction") },
+        { id: "timesheet correction", kind: "modal", title: "Correct a time entry", width: 520, presentation: { selectedRecord: true, collection: "shifts", noRecordContext: true }, render: ({ close, ...context }) => <TimesheetCorrection context={context} close={close} />, footer: submitFooter("pj-correction", "Save correction") },
         { id: "billing link", kind: "drawer", title: "Billable time", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <BillingLink context={context} /> },
       ],
     },

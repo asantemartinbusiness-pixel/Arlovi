@@ -1001,7 +1001,7 @@ export const careApp = registerApp({
         ...kitOverlays,
         { id: "sla report", kind: "drawer", title: "SLA report", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <SlaReport context={context} /> },
         { id: "reassign case", kind: "modal", title: "Reassign a breached case", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReassignCase context={context} close={close} />, footer: submitFooter("cr-reassign", "Reassign") },
-        { id: "SLA form", kind: "modal", title: "Policy", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SlaForm context={context} close={close} />, footer: submitFooter("cr-sla", "Save policy") },
+        { id: "SLA form", kind: "modal", title: "Policy", width: OVERLAY_WIDTH.modal, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <SlaForm context={context} close={close} />, footer: submitFooter("cr-sla", "Save policy") },
         { id: "schedule exception", kind: "modal", title: "When the clock does not run", width: OVERLAY_WIDTH.modal, render: () => <ScheduleException /> },
         { id: "policy impact", kind: "drawer", title: "Impact of a change", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <PolicyImpact context={context} /> },
       ],

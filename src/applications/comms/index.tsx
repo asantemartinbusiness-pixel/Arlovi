@@ -728,7 +728,7 @@ export const commsApp = registerApp({
       ],
       overlays: [
         { id: "draft announcement", kind: "modal", title: "Draft an announcement", width: 600, render: ({ close, ...context }) => <DraftAnnouncement context={context} close={close} />, footer: submitFooter("cm-draft", "Save the draft") },
-        { id: "Audience selector", kind: "modal", title: "Audience", width: 520, render: ({ close, ...context }) => <AudienceSelector context={context} close={close} />, footer: submitFooter("cm-audience", "Save audience") },
+        { id: "Audience selector", kind: "modal", title: "Audience", width: 520, presentation: { selectedRecord: true, collection: "announcements", noRecordContext: true }, render: ({ close, ...context }) => <AudienceSelector context={context} close={close} />, footer: submitFooter("cm-audience", "Save audience") },
         { id: "post preview", kind: "modal", title: "Preview", width: 620, render: ({ ...context }) => <PostPreview context={context} /> },
         { id: "publish review", kind: "modal", title: "Publish this announcement", width: OVERLAY_WIDTH.form, summary: (context) => <PublishReviewSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
       ],

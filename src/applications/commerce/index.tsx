@@ -4,7 +4,7 @@ import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { confirmOverlay } from "@/applications/market/kit";
-import { commerceFooter, OrderHeading, orderMeta, ProductHeading } from "./kit";
+import { commerceFooter, hasPayloadIds, OrderHeading, orderMeta, ProductHeading } from "./kit";
 import { RequisitionForm, ScanOverlay } from "@/applications/proc/overlays";
 import {
   archiveProduct, AssignOrder, BuyerMessage, Categorise, ChangePrice, CheckoutPolicy, createLabel, CustomerSegments,
@@ -237,7 +237,7 @@ export const commerceApp = registerApp({
         { id: "fulfil lines", kind: "drawer", title: "Fulfil lines", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <FulfilLines context={context} close={close} />, footer: commerceFooter("fulfil-lines", "Start shipment") },
         { id: "advance shipment", kind: "modal", title: "Update shipment", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <AdvanceShipment context={context} close={close} />, footer: commerceFooter("advance-shipment", "Record") },
         { id: "raise return", kind: "modal", title: "Raise a return", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: commerceFooter("raise-return", "Raise return") },
-        { id: "refund authorization", kind: "modal", title: "Record a refund", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: commerceFooter("record-refund", "Record refund") },
+        { id: "refund authorization", kind: "modal", title: "Record a refund", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "returns", noRecordContext: true }, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: commerceFooter("record-refund", "Record refund") },
         { id: "cancellation impact", kind: "modal", title: "What cancelling does", tone: "danger", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <CancellationImpact context={context} close={close} /> },
         { id: "refund confirmation", kind: "drawer", title: "Refund", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <RefundConfirmation context={context} /> },
         { id: "refund approval", kind: "modal", title: "Propose a refund", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RefundApproval context={context} close={close} />, footer: commerceFooter("refund-approval", "Record proposal") },
@@ -313,7 +313,7 @@ export const commerceApp = registerApp({
         { id: "report exception", label: "Record an exception", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("delivery exception", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Carrier selector", kind: "modal", title: "Choose a carrier", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CarrierSelector context={context} close={close} />, footer: commerceFooter("carrier-selector", "Assign carrier") },
+        { id: "Carrier selector", kind: "modal", title: "Choose a carrier", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CarrierSelector context={context} close={close} />, footer: commerceFooter("carrier-selector", "Assign carrier", { ready: hasPayloadIds }) },
         { id: "label preview", kind: "drawer", title: "Label preview", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <LabelPreview context={context} /> },
         { id: "delivery exception", kind: "modal", title: "Delivery exception", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DeliveryException context={context} close={close} />, footer: commerceFooter("delivery-exception", "Record decision") },
         { id: "scan parcel", kind: "drawer", title: "Scan", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ScanParcel context={context} /> },
@@ -341,8 +341,8 @@ export const commerceApp = registerApp({
       ],
       overlays: [
         { id: "Return inspector", kind: "drawer", title: "Return", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ReturnInspector context={context} close={close} /> },
-        { id: "restock assessment", kind: "modal", title: "Restocking", width: OVERLAY_WIDTH.modal, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RestockAssessment context={context} close={close} />, footer: commerceFooter("restock-assessment", "Save assessment") },
-        { id: "refund authorization", kind: "modal", title: "Record a refund", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: commerceFooter("record-refund", "Record refund") },
+        { id: "restock assessment", kind: "modal", title: "Restocking", width: OVERLAY_WIDTH.modal, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RestockAssessment context={context} close={close} />, footer: commerceFooter("restock-assessment", "Save assessment", { ready: hasPayloadIds }) },
+        { id: "refund authorization", kind: "modal", title: "Record a refund", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "returns", noRecordContext: true }, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: commerceFooter("record-refund", "Record refund") },
         { id: "raise return", kind: "modal", title: "Raise a return", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: commerceFooter("raise-return", "Raise return") },
         { id: "buyer message", kind: "modal", title: "Message the customer", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BuyerMessage context={context} close={close} />, footer: commerceFooter("buyer-message", "Keep as a draft") },
       ],

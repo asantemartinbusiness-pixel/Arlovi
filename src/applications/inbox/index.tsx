@@ -2918,7 +2918,7 @@ export const inboxApp = registerApp({
       ],
       overlays: [
         { id: "Message inspector", kind: "drawer", title: "Thread", width: OVERLAY_WIDTH.record, summary: ({ ...context }) => <ThreadSummary context={context} />, render: ({ close, ...context }) => <MessageInspector context={context} close={close} />, footer: (context) => <ThreadFooter context={context} /> },
-        { id: "reassignment", kind: "modal", title: "Reassign the thread", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <ThreadOwnerSummary context={context} />, render: ({ close, ...context }) => <Reassignment context={context} close={close} />, footer: submitFooter("ib-reassign", "Reassign thread") },
+        { id: "reassignment", kind: "modal", title: "Reassign the thread", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true }, summary: ({ ...context }) => <ThreadOwnerSummary context={context} />, render: ({ close, ...context }) => <Reassignment context={context} close={close} />, footer: submitFooter("ib-reassign", "Reassign thread") },
         { id: "mute", kind: "modal", title: "Mute", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <MuteThread context={context} close={close} /> },
       ],
     },
@@ -2968,7 +2968,7 @@ export const inboxApp = registerApp({
       ],
       overlays: [
         { id: "Incident summary", kind: "drawer", title: "Incident", width: OVERLAY_WIDTH.record, summary: ({ ...context }) => <IncidentHead context={context} />, render: ({ close: _close, ...context }) => <IncidentSummary context={context} />, footer: (context) => <IncidentFooter context={context} /> },
-        { id: "owner handoff", kind: "modal", title: "Hand over the incident", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <IncidentOwnerSummary context={context} />, render: ({ close, ...context }) => <OwnerHandoff context={context} close={close} />, footer: submitFooter("ib-handoff", "Hand over") },
+        { id: "owner handoff", kind: "modal", title: "Hand over the incident", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "incidents" }, summary: ({ ...context }) => <IncidentOwnerSummary context={context} />, render: ({ close, ...context }) => <OwnerHandoff context={context} close={close} />, footer: submitFooter("ib-handoff", "Hand over") },
         { id: "emergency pause", kind: "modal", title: "Emergency pause", tone: "danger", width: 520, blocking: true, render: ({ close, ...context }) => <EmergencyPause context={context} close={close} /> },
         { id: "acknowledge incident", kind: "modal", title: "Acknowledge an incident", width: 540, render: ({ close, ...context }) => <AcknowledgeIncident context={context} close={close} /> },
         { id: "escalate incident", kind: "modal", title: "Escalate an incident", width: 580, tone: "danger", render: ({ close, ...context }) => <EscalateIncident context={context} close={close} /> },

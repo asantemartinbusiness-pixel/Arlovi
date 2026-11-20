@@ -5,6 +5,8 @@ import {
   Properties, Row, Select, Stack, Stat, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
+import { useLiveQuery } from "dexie-react-hooks";
+import { listByCollection } from "@/platform/repo";
 import { useCollection, useCollections, useWorkspace } from "@/platform/workspace";
 import { freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
@@ -64,6 +66,16 @@ export function useAnalytics(): { records: Rec[]; context: QueryContext } {
     void customCount;
     return { records, context: { records, byId, now, locale: org.locale } };
   }, [data, now, org.locale, customCount]);
+}
+
+/** True once every collection the analytics layer reads has been read from storage; before that a verdict would rest on partial data. */
+export function useAnalyticsReady(): boolean {
+  const { org } = useWorkspace();
+  const done = useLiveQuery(async () => {
+    await Promise.all([...ANALYTICS_COLLECTIONS, "dataModels"].map((name) => listByCollection(org.id, name)));
+    return true;
+  }, [org.id]);
+  return done === true;
 }
 
 export function useQuery(spec: QuerySpec): QueryResult {

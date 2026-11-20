@@ -923,7 +923,7 @@ export const legalApp = registerApp({
       overlays: [
         { id: "draft contract", kind: "modal", title: "Draft a contract", width: 640, render: ({ close, ...context }) => <DraftContract context={context} close={close} />, footer: submitFooter("lg-draft", "Create the draft") },
         { id: "Contract upload", kind: "modal", title: "Add a contract", width: 680, render: ({ close, ...context }) => <ContractUpload context={context} close={close} />, footer: submitFooter("lg-contract", "Add contract") },
-        { id: "reviewer picker", kind: "modal", title: "Send for review", width: 560, render: ({ close, ...context }) => <ReviewerPicker context={context} close={close} />, footer: submitFooter("lg-reviewer", "Request review") },
+        { id: "reviewer picker", kind: "modal", title: "Send for review", width: 560, presentation: { selectedRecord: true, collection: "contracts", noRecordContext: true }, render: ({ close, ...context }) => <ReviewerPicker context={context} close={close} />, footer: submitFooter("lg-reviewer", "Request review") },
         { id: "e-sign request", kind: "modal", title: "Signature handover", width: 520, capability: "view_legal", presentation: { noRecordContext: true, guidance: "Select an approved contract and record an awaiting-signature handover; nothing is delivered to a signing provider." }, render: ({ close, ...context }) => <ESignRequest context={context} close={close} /> },
       ],
     },
@@ -1024,8 +1024,8 @@ export const legalApp = registerApp({
       overlays: [
         { id: "risk review", kind: "modal", title: "Review a risk", width: 580, render: ({ close, ...context }) => <RiskReview context={context} close={close} />, footer: submitFooter("lg-risk-review", "Record the review") },
         { id: "Risk form", kind: "modal", title: "Add a risk", width: 600, render: ({ close, ...context }) => <RiskForm context={context} close={close} />, footer: submitFooter("lg-issue", "Add risk") },
-        { id: "score rationale", kind: "modal", title: "Score and why", width: 600, render: ({ close, ...context }) => <ScoreRationale context={context} close={close} />, footer: submitFooter("lg-score", "Record the score") },
-        { id: "control assignment", kind: "modal", title: "Mitigation and control", width: 600, render: ({ close, ...context }) => <ControlAssignment context={context} close={close} />, footer: submitFooter("lg-control", "Save control") },
+        { id: "score rationale", kind: "modal", title: "Score and why", width: 600, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <ScoreRationale context={context} close={close} />, footer: submitFooter("lg-score", "Record the score") },
+        { id: "control assignment", kind: "modal", title: "Mitigation and control", width: 600, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <ControlAssignment context={context} close={close} />, footer: submitFooter("lg-control", "Save control") },
       ],
     },
 

@@ -14,7 +14,7 @@ import {
   ANALYTICS_COLLECTIONS, DIMENSIONS, allMeasures, formatMeasure, joinCheck,
   measureById, provenanceFor, qualityChecks, runQuery, type MeasureDef,
 } from "./metrics";
-import { MetricLineage, UnavailableList, useAnalytics } from "./panels";
+import { MetricLineage, UnavailableList, useAnalytics, useAnalyticsReady } from "./panels";
 import { readDashboard } from "./dashboards";
 import { readReport } from "./reports";
 
@@ -969,7 +969,9 @@ export function JoinProperties({ context }: { context: ScreenContext }) {
   const models = useCollection("dataModels");
   const relations = readRelations(models[0]);
   const { records } = useAnalytics();
+  const ready = useAnalyticsReady();
   const relation = relations.find((item) => item.id === context.selectedId) ?? relations[0];
+  if (!ready) return <Empty title="Reading the records">No verdict is shown until every collection the join uses has loaded.</Empty>;
   if (!relation) return <Empty title="No relation" />;
   const check = joinCheck(relation.from, relation.to, relation.key, records);
   return (
@@ -1064,7 +1066,9 @@ export function ModelTest({ context: _context }: { context: ScreenContext }) {
   const models = useCollection("dataModels");
   const relations = readRelations(models[0]);
   const { records } = useAnalytics();
+  const ready = useAnalyticsReady();
   const { now } = useWorkspace();
+  if (!ready) return <Empty title="Reading the records">No verdict is shown until every collection the joins use has loaded.</Empty>;
   const results = relations.map((relation) => ({ relation, check: joinCheck(relation.from, relation.to, relation.key, records) }));
   const quality = ANALYTICS_COLLECTIONS.flatMap((collection) => qualityChecks(collection, records, now).filter((check) => check.failing.length > 0).map((check) => ({ collection, check })));
 

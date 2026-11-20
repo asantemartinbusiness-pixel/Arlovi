@@ -2789,7 +2789,7 @@ registerApp({
         { id: "new workbook", kind: "modal", title: "New workbook", width: OVERLAY_WIDTH.form, footer: formFooter("new-workbook", "Create", false), render: (context) => <NewWorkbook context={context} close={context.close} /> },
         { id: "Import mapper", kind: "drawer", summary: workbookSummary, title: "Import CSV", width: OVERLAY_WIDTH.record, footer: formFooter("import-wizard", "Import", false), render: (context) => <ImportMapper context={context} close={context.close} /> },
         { id: "search workbooks", kind: "modal", title: "Search workbooks", width: OVERLAY_WIDTH.modal, render: (context) => <SearchWorkbooks context={context} close={context.close} /> },
-        { id: "share", kind: "modal", title: "Share workbook", width: OVERLAY_WIDTH.compact, footer: formFooter("share-workbook", "Save", false), render: (context) => <ShareWorkbook context={context} close={context.close} /> },
+        { id: "share", kind: "modal", title: "Share workbook", width: OVERLAY_WIDTH.compact, presentation: { selectedRecord: true, noRecordContext: true }, footer: formFooter("share-workbook", "Save", false), render: (context) => <ShareWorkbook context={context} close={context.close} /> },
       ],
     },
 
@@ -2932,7 +2932,7 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "share", kind: "modal", title: "Workbook sharing", width: OVERLAY_WIDTH.compact, footer: formFooter("share-workbook", "Save", false), render: (context) => <ShareWorkbook context={context} close={context.close} /> },
+        { id: "share", kind: "modal", title: "Workbook sharing", width: OVERLAY_WIDTH.compact, presentation: { selectedRecord: true, noRecordContext: true }, footer: formFooter("share-workbook", "Save", false), render: (context) => <ShareWorkbook context={context} close={context.close} /> },
         { id: "Conflict resolver", kind: "drawer", summary: workbookSummary, title: "Conflict", width: OVERLAY_WIDTH.form, render: (context) => <ConflictResolver context={context} close={context.close} /> },
         { id: "protected range", kind: "modal", summary: workbookSummary, title: "Protect a range", width: OVERLAY_WIDTH.form, footer: formFooter("protected-range", "Protect", false), render: (context) => <ProtectedRangeOverlay context={context} close={context.close} /> },
         { id: "comment cell", kind: "modal", title: "Comment on a cell", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-comment", "Comment"), render: (context) => <CommentCell context={context} close={context.close} /> },

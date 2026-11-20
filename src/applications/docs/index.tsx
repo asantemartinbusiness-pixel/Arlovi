@@ -3124,6 +3124,12 @@ function docFooter(form: string, label: string, danger = false, dismiss = "Cance
   );
 }
 
+/** The folder selector needs documents chosen in the list; without them its footer offers only Close. */
+function hasDocumentTargets(context: ScreenContext): boolean {
+  const ids = (context.overlayPayload as { ids?: unknown } | undefined)?.ids;
+  return Array.isArray(ids) ? ids.length > 0 : Boolean(context.selectedId);
+}
+
 function focusPage(context: ScreenContext): void {
   const editor = docEditorFor(context);
   const root = document.querySelector<HTMLElement>(".dx-page [contenteditable='true'], [contenteditable='true'].dx-page, .dx-canvas [contenteditable='true'], [contenteditable='true']");
@@ -3576,7 +3582,7 @@ registerApp({
       overlays: [
         { id: "search documents", kind: "modal", title: "Search documents", width: OVERLAY_WIDTH.modal, render: (context) => <SearchDocuments context={context} close={context.close} /> },
         { id: "New doc", kind: "modal", title: "New document", width: OVERLAY_WIDTH.form, footer: docFooter("new-doc", "Create", false), render: (context) => <NewDocumentOverlay context={context} close={context.close} /> },
-        { id: "folder selector", kind: "modal", title: "Move to folder", width: OVERLAY_WIDTH.compact, footer: docFooter("folder-selector", "Move", false), render: (context) => <FolderSelector context={context} close={context.close} /> },
+        { id: "folder selector", kind: "modal", title: "Move to folder", width: OVERLAY_WIDTH.compact, footer: (context) => (hasDocumentTargets(context) ? docFooter("folder-selector", "Move", false)(context) : <OverlayActions primary={<Button variant="ghost" onClick={context.close}>Close</Button>} />), render: (context) => <FolderSelector context={context} close={context.close} /> },
         { id: "sharing", kind: "drawer", summary: docSummary, title: "Sharing", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "documents", guidance: "Review this document’s classification, existing sharing entries and local permission record. No public URL is created." }, render: (context) => <SharingOverlay context={context} close={context.close} /> },
         { id: "trash confirm", kind: "modal", title: "Delete documents", tone: "danger", blocking: true, width: OVERLAY_WIDTH.form, footer: docFooter("trash-confirm", "Delete", true, "Keep them"), render: (context) => <TrashConfirm context={context} close={context.close} /> },
       ],

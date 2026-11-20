@@ -109,7 +109,7 @@ export const bookApp = registerApp({
       overlays: [
         { id: "Booking form", kind: "drawer", title: "Booking", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BookingForm context={context} close={close} />, footer: submitFooter("booking-form", "Save booking") },
         { id: "conflict review", kind: "drawer", title: "Conflicts", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ConflictReview context={context} /> },
-        { id: "reschedule notice", kind: "modal", title: "Reschedule notice", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleNotice context={context} close={close} />, footer: submitFooter("reschedule-notice", "Keep as a draft") },
+        { id: "reschedule notice", kind: "modal", title: "Reschedule notice", width: OVERLAY_WIDTH.modal, presentation: { selectedRecord: true, collection: "bookings", noRecordContext: true }, render: ({ close, ...context }) => <RescheduleNotice context={context} close={close} />, footer: submitFooter("reschedule-notice", "Keep as a draft") },
         { id: "Reschedule", kind: "modal", title: "Move booking", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleBooking context={context} close={close} />, footer: submitFooter("reschedule", "Move booking") },
         { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking", { tone: "danger" }) },
         confirmOverlay,

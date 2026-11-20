@@ -171,7 +171,7 @@ export const marketApp = registerApp({
         { id: "attach media", label: "Attach media", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("asset picker", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Post editor", kind: "modal", title: "Scheduled item", width: 620, render: ({ close, ...context }) => <PostEditor context={context} close={close} />, footer: submitFooter("post-editor", "Save schedule") },
+        { id: "Post editor", kind: "modal", title: "Scheduled item", width: 620, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <PostEditor context={context} close={close} />, footer: submitFooter("post-editor", "Save schedule") },
         { id: "asset picker", kind: "modal", title: "Attach media", width: 560, render: ({ close, ...context }) => <AssetPicker context={context} close={close} /> },
         { id: "publish preview", kind: "drawer", title: "Publish preview", width: 560, render: ({ close, ...context }) => <PublishPreview context={context} close={close} /> },
       ],
@@ -365,7 +365,7 @@ export const marketApp = registerApp({
       ],
       overlays: [
         { id: "Template editor", kind: "drawer", title: "Template", width: 600, render: ({ close, ...context }) => <TemplateEditor context={context} close={close} />, footer: submitFooter("template-editor", "Save version") },
-        { id: "approval", kind: "modal", title: "Template approval", width: 560, render: ({ close, ...context }) => <TemplateApproval context={context} close={close} />, footer: submitFooter("template-approval", "Approve template") },
+        { id: "approval", kind: "modal", title: "Template approval", width: 560, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <TemplateApproval context={context} close={close} />, footer: submitFooter("template-approval", "Approve template") },
         { id: "global update impact", kind: "drawer", title: "What a change affects", width: 620, render: ({ ...context }) => <GlobalUpdateImpact context={context} /> },
         confirmOverlay,
       ],

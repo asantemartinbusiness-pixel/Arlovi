@@ -5,12 +5,23 @@ import { useRecord } from "@/platform/workspace";
 import { statusTone, paymentTone, paymentLabel, bodyOf, marginOf, onHandFor, useCommerceData, type OrderBody } from "./data";
 
 /** Footer for a form overlay: submit first on the left, Cancel at the end. */
-export const commerceFooter = (formId: string, label: string, options?: { tone?: "danger" }) => ({ close }: { close: () => void }) => (
-  <OverlayActions
-    primary={<Button variant={options?.tone === "danger" ? "danger" : "primary"} type="submit" form={formId}>{label}</Button>}
-    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
-  />
+export const commerceFooter = (formId: string, label: string, options?: { tone?: "danger"; ready?: (context: ScreenContext) => boolean }) => (context: ScreenContext & { close: () => void }) => (
+  options?.ready && !options.ready(context)
+    /* The body says nothing is chosen; the footer offers only a way out, never an action that does nothing. */
+    ? <OverlayActions primary={<Button variant="ghost" onClick={context.close}>Close</Button>} />
+    : (
+      <OverlayActions
+        primary={<Button variant={options?.tone === "danger" ? "danger" : "primary"} type="submit" form={formId}>{label}</Button>}
+        end={<Button variant="ghost" onClick={context.close}>Cancel</Button>}
+      />
+    )
 );
+
+/** True when the overlay was opened with at least one record id in its payload. */
+export const hasPayloadIds = (context: ScreenContext): boolean => {
+  const ids = (context.overlayPayload as { ids?: unknown } | undefined)?.ids;
+  return Array.isArray(ids) && ids.length > 0;
+};
 
 type Part = "title" | "status" | "subtitle" | "meta";
 
