@@ -85,3 +85,12 @@ test("easing: Edit easing enables as soon as a segment is chosen", async ({ page
   await page.locator("button.mo-layer").first().click();
   await expect(page.getByRole("button", { name: "Edit easing" })).toBeEnabled();
 });
+
+test("blend picker previews differ and target a layer that has a blend mode", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/o/northline/photo/photos/nl-photos-001/layers?overlay=Blend%20picker&${CLOCK}`);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("is an adjustment layer and has no blend mode");
+  const srcs = await expect.poll(async () => (await dialog.locator("img").evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src))).filter(Boolean).length, { timeout: 20_000 }).toBeGreaterThan(3).then(async () => dialog.locator("img").evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src)));
+  expect(new Set(srcs).size).toBeGreaterThan(1);
+});

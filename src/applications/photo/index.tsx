@@ -1546,10 +1546,13 @@ function BlendPicker({ context, close }: { context: ScreenContext; close: () => 
   const { record, handle, bank } = usePhotoDoc(context);
   if (!record || !handle.doc) return <Empty title="Open an image first" />;
   const doc = handle.doc;
-  const layer = layerById(doc, doc.activeLayerId);
-  if (!layer) return <Empty title="Select a layer" />;
+  const active = layerById(doc, doc.activeLayerId);
+  /* An adjustment layer has no blend mode of its own (it rewrites what is below it), so the picker works on the top pixel or fill layer instead. */
+  const layer = active && active.kind !== "adjustment" ? active : [...doc.layers].reverse().find((item) => item.kind === "pixel" || item.kind === "fill");
+  if (!layer) return <Empty title="No layer to blend">Only pixel and fill layers have a blend mode.</Empty>;
   return (
     <Stack gap={3}>
+      {active?.kind === "adjustment" && <p className="vx-mini">{active.name} is an adjustment layer and has no blend mode, so this shows {layer.name}, the top layer that does.</p>}
       <p className="ds-prose">Each preview is the real composite with that mode applied to <strong>{layer.name}</strong>. Now: <strong>{layer.blend}</strong>.</p>
       <Grid>
         {["normal", "multiply", "screen", "overlay", "darken", "lighten", "soft-light", "difference", "luminosity"].map((mode) => (
