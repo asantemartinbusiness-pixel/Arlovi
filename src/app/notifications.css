@@ -64,7 +64,7 @@
 .nt-pref-provider button{align-self:flex-start}
 .nt-pref-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .nt-pref-foot>span{font-size:10px;color:var(--fg-subtle)}
-@media(max-width:599px){.nt-tabs{padding-bottom:6px}.nt-item{padding:11px}.nt-drawer-footer span{display:none}.nt-summary>div{padding:9px}.nt-pref-category{padding:11px 9px}}
+@media(max-width:599px){.nt-tabs{padding-bottom:6px}.nt-item{padding:11px}.nt-drawer-footer{flex-wrap:wrap}.nt-drawer-footer span{flex:1 1 100%}.nt-summary>div{padding:9px}.nt-pref-category{padding:11px 9px}}
 @media(prefers-reduced-motion:reduce){.nt-item,.nt-tabs button{transition:none}}
 
 /* Toasts live above the execution tray and the mobile safe area. */

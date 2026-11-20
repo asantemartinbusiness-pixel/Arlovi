@@ -87,7 +87,10 @@ test("Every employee-profile tab shares one identity head, company scope and rec
   await page.goto("/o/northline/hr/employees/nl-employees-023?tab=Overview");
   await expect(main.getByText("What is open for this person")).toBeVisible();
   await expect(main.getByText("Next leave").or(main.getByText("Latest leave")).first()).toBeVisible();
-  await page.getByRole("navigation", { name: "People navigation" }).getByText("Employee Directory").click();
+  // Tablet and phone keep the application navigation behind the header menu.
+  const openNav = page.getByRole("button", { name: "Open navigation" });
+  if (await openNav.isVisible()) await openNav.click();
+  await page.getByRole("navigation", { name: "People navigation" }).getByRole("link", { name: "Employee Directory" }).click();
   await expect(main.locator(".hr-bar")).toBeVisible();
 });
 

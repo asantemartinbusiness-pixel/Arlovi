@@ -279,3 +279,12 @@ Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint c
   which the picker explains and a B3 spec asserts; left as is.
 - Re-runs: growth suites and the new spec 43/43, journeys 24/24, deep MARKET/COMMERCE pass. The background
   deep sweep run alongside other suites failed CONNECT and IT once; both pass when re-run alone (2/2).
+
+## Browser QA workflow (desktop / tablet / mobile)
+
+- This workflow (`browser-qa.yml`, `playwright.qa.config.ts`) was not in the earlier gate runs. On `main` it fails 4
+  (role-view stranding on all three sizes, phone notifications footer). This branch already fixes the role-view one.
+- The People profile spec (rewritten in A4) clicked the app sidebar, which tablet and phone keep behind
+  "Open navigation"; it now opens the menu as a person on those devices would.
+- The phone notifications drawer hid "Reading is not approval." to save width; the footer now wraps and keeps it.
+- Local re-run of the whole Browser QA config: 306/306 on desktop, tablet and mobile.
