@@ -47,3 +47,12 @@ test("standalone editorial website exports a local enquiry instead of pretending
   expect(download.suggestedFilename()).toBe("northline-collective-demo-brief.txt");
   await expect(page.getByRole("status")).toContainText("Nothing was sent");
 });
+
+test("flagship showcase reads its 12-month financial scenario from records, not hardcoded KPIs",async ({page})=>{
+  await page.goto("/o/northline/workspace/showcase");
+  await expect(page.getByRole("heading",{name:/The business, in numbers/})).toBeVisible();
+  await expect(page.locator(".fs-bar-item")).toHaveCount(12);
+  await expect(page.locator(".fs-scenario-total")).toContainText("£9,600,000");
+  await expect(page.locator(".fs-scenario-heading")).toContainText("not recognised revenue");
+  await expect(page.locator(".fs-scenario-division")).toContainText("Read-only simulation");
+});
