@@ -875,7 +875,6 @@ export function DataRequestOverlay({ context, close: _close }: { context: Screen
       <DrawerInFlight when={busy} />
       <Properties rows={[
         { label: "Subject", value: subject || "Missing subject identity" },
-        { label: "Request", value: request.title },
         { label: "Kind", value: String(request.fields.type ?? "Not recorded") },
         { label: "Received", value: context.dateTime(request.at) },
         { label: "Due", value: request.dueAt
@@ -914,31 +913,9 @@ export function DataRequestOverlay({ context, close: _close }: { context: Screen
         label="I independently verified the requester's identity and confirmed the collection scope before preparing a copy." />
       {error && <Notice tone="danger" title="Privacy action could not be completed">{error}</Notice>}
       <DrawerActions>
-        <OverlayCancel disabled={busy}>Close review</OverlayCancel>
-        <span className="ds-grow" />
-        <Button variant="secondary" busy={busy} disabled={!canRestrict}
-          title={!context.can("manage_policy") ? "Policy-management permission required" : undefined}
-          onClick={async () => {
-            if (!canRestrict) return;
-            setBusy(true);
-            setError("");
-            try {
-              const saved = await context.mutate.patch(request.id, {
-                status: "restricted",
-                fields: { ...request.fields, restrictedBy: context.actor,
-                  restrictedAt: context.now.toISOString() },
-              }, { event: `Local processing restriction flag recorded for ${subject}`,
-                expectRevision: request.revision });
-              if (!saved) { setError("The request changed. Reopen the latest version before trying again."); return; }
-              context.toast("Local restriction recorded",
-                "The request was marked restricted here. External processors and other systems were not automatically restricted.");
-            } catch (cause) {
-              setError(cause instanceof Error ? cause.message : "Review the request before retrying.");
-            } finally { setBusy(false); }
-          }}>
-          Mark locally restricted
-        </Button>
-        <Button variant="primary" busy={busy} disabled={!canExport}
+        <OverlayActions
+          busy={busy}
+          primary={<Button variant="primary" busy={busy} disabled={!canExport}
           title={!context.can("export_data") ? "Export permission required" : !ready ? "Identify the subject and finish counting records first" : undefined}
           onClick={async () => {
             if (!canExport) return;
@@ -966,12 +943,35 @@ export function DataRequestOverlay({ context, close: _close }: { context: Screen
             } finally { setBusy(false); }
           }}>
           Export scoped CSV
-        </Button>
-        <Button variant="outline-danger" disabled={!canDelete}
+        </Button>}
+          secondary={<Button variant="secondary" busy={busy} disabled={!canRestrict}
+          title={!context.can("manage_policy") ? "Policy-management permission required" : undefined}
+          onClick={async () => {
+            if (!canRestrict) return;
+            setBusy(true);
+            setError("");
+            try {
+              const saved = await context.mutate.patch(request.id, {
+                status: "restricted",
+                fields: { ...request.fields, restrictedBy: context.actor,
+                  restrictedAt: context.now.toISOString() },
+              }, { event: `Local processing restriction flag recorded for ${subject}`,
+                expectRevision: request.revision });
+              if (!saved) { setError("The request changed. Reopen the latest version before trying again."); return; }
+              context.toast("Local restriction recorded",
+                "The request was marked restricted here. External processors and other systems were not automatically restricted.");
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "Review the request before retrying.");
+            } finally { setBusy(false); }
+          }}>
+          Mark locally restricted
+        </Button>}
+          end={<><OverlayCancel disabled={busy}>Close review</OverlayCancel><Button variant="outline-danger" disabled={!canDelete}
           title={hold ? "Legal hold recorded" : !context.can("delete_records") ? "Deletion permission required" : !ready ? "Finish counting the records and verify the subject" : undefined}
           onClick={() => context.openOverlay("deletion impact", { id: request.id })}>
           Review deletion impact…
-        </Button>
+        </Button></>}
+        />
       </DrawerActions>
     </Stack>
   );
@@ -1588,8 +1588,9 @@ export function RestoreImpact({ context, close }: { context: ScreenContext; clos
             checked={planApproved}
             onChange={(event) => setPlanApproved(event.target.checked)}
           />
-          <Row gap={2} wrap>
-            <Button
+          <ModalActions>
+            <OverlayActions
+              primary={<Button
               variant="primary"
               busy={busy}
               onClick={async () => {
@@ -1621,9 +1622,10 @@ export function RestoreImpact({ context, close }: { context: ScreenContext; clos
               }}
             >
               Rehearse the restore
-            </Button>
-            <Button variant="ghost" onClick={close}>Cancel</Button>
-          </Row>
+            </Button>}
+              end={<OverlayCancel>Cancel</OverlayCancel>}
+            />
+          </ModalActions>
           <Notice tone="info" title="A real restore needs a server">
             This build rehearses and records. Writing a whole snapshot back over live records is exactly the operation that should not
             be a single button in a browser.
@@ -1950,8 +1952,9 @@ export function CallbackTester({ context, close }: { context: ScreenContext; clo
         A browser cannot sign and post this without exposing the secret, and there is no server to do it from. The payload shape is
         shown so an endpoint can be written against it.
       </Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           onClick={async () => {
             await context.mutate.patch(hook.id, { fields: { ...hook.fields, lastTestAt: clockIso(), lastTestBy: context.actor } }, { event: `Webhook payload inspected: ${hook.title}` });
@@ -1960,10 +1963,10 @@ export function CallbackTester({ context, close }: { context: ScreenContext; clo
           }}
         >
           Record the test
-        </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </ModalActions>
       {result && <Notice tone="info" title="Result">{result}</Notice>}
     </Stack>
   );

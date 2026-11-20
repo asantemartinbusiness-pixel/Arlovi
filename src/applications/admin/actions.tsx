@@ -274,8 +274,9 @@ export function AuditRetention({ context, close }: { context: ScreenContext; clo
       <Field label="Keep audit entries for, years" hint={shorter ? "Shorter than the current promise: refused." : undefined}>
         <TextInput aria-label="Keep audit entries for, years" type="number" min={1} value={String(years)} onChange={(event) => setYears(Math.max(1, Number(event.target.value) || 1))} />
       </Field>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={shorter || years === current || !context.can("manage_policy")}
@@ -289,10 +290,11 @@ export function AuditRetention({ context, close }: { context: ScreenContext; clo
           }}
         >
           Save retention
-        </Button>
-        <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/admin/privacy`); }}>Other retention schedules</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          secondary={<Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/admin/privacy`); }}>Other retention schedules</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

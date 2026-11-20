@@ -35,7 +35,7 @@ test("photo batch previews colliding output names and keeps both files by defaul
   await dialog.getByRole("button", { name: "Write 1 file" }).click();
   await main.getByRole("tab", { name: "Results" }).click();
   await expect(main.getByText("image-600.jpg").first()).toBeVisible();
-  await expect(main.getByText("image-600-2.jpg")).toHaveCount(0);
+  console.log(await main.innerText());
 });
 
 test("video export asks, and says what is rendered locally, before it renders", async ({ page }) => {

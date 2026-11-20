@@ -551,6 +551,22 @@ export function InviteWizard({ context, close }: { context: ScreenContext; close
   );
 }
 
+export function RoleImpactSummary({ context }: { context: ScreenContext }) {
+  const data = useAdmin();
+  const member = data.members.find((row) => row.id === context.selectedId);
+  if (!member) return null;
+  const isAgent = member.fields.kind === "ai";
+  return (
+    <OverlaySummary
+      eyebrow="Role view change"
+      avatar={<Avatar name={member.title} kind={isAgent ? "ai" : "human"} />}
+      title={member.title}
+      status={<Pill tone={member.status === "active" ? "success" : "warning"}>{member.status}</Pill>}
+      meta={[String(member.fields.title ?? member.summary ?? ""), data.departments.find((department) => department.id === member.fields.departmentId)?.title]}
+    />
+  );
+}
+
 export function RoleImpact({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const member = data.members.find((row) => row.id === context.selectedId);
@@ -574,19 +590,11 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
   const needsReason = changed && widens;
   const trimmed = reason.trim();
   const canApply = changed && context.can("manage_policy") && (!needsReason || trimmed.length >= 8) && !busy;
-  const isAgent = member.fields.kind === "ai";
 
   return (
     <Stack gap={4}>
       <DrawerUnsavedChanges when={changed || trimmed.length > 0} />
       <DrawerInFlight when={busy} />
-      <OverlaySummary
-        eyebrow="Role view change"
-        avatar={<Avatar name={member.title} kind={isAgent ? "ai" : "human"} />}
-        title={member.title}
-        status={<Pill tone={member.status === "active" ? "success" : "warning"}>{member.status}</Pill>}
-        meta={[String(member.fields.title ?? member.summary ?? ""), data.departments.find((department) => department.id === member.fields.departmentId)?.title]}
-      />
       <OverlaySection title="Proposed change"><Stack gap={3}>
         <Field label="Role view">
           <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
@@ -1682,7 +1690,7 @@ export function CostAllocation({ context, close }: { context: ScreenContext; clo
 
 export function BudgetWarning({ context }: { context: ScreenContext }) {
   const data = useAdmin();
-  const budget = data.budgets.find((row) => row.id === context.selectedId) ?? data.budgets[0];
+  const budget = data.budgets.find((row) => row.id === context.selectedId);
   if (!budget) return <Empty title="No limit selected" icon={<KeyRound size={20} />}>Choose a limit to inspect its headroom.</Empty>;
   const total = Number(budget.amountMinor ?? 0);
   const committed = Number(budget.fields.committedMinor ?? 0);

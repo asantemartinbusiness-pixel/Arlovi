@@ -2,12 +2,12 @@ import {
   AlertTriangle, Building2, CreditCard, Database, FileClock, KeyRound, Lock, Scale,
   ShieldCheck, SlidersHorizontal, Users, Wallet,
 } from "lucide-react";
-import { Button, Empty, OverlayActions } from "@/design-system";
+import { Button, Empty, OVERLAY_WIDTH, OverlayActions } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import {
   ActionSimulator, AutonomyRevoke, AutonomyScreen, BudgetScreen, BudgetWarning, BusinessHoursForm,
   CostAllocation, DomainVerify, EffectiveRights, GrantEditor, IdentityForm, ImpactReview,
-  InviteWizard, MembersScreen, OrganizationSettings, PolicyEditor, RegionChangeImpact, RoleImpact,
+  InviteWizard, MembersScreen, OrganizationSettings, PolicyEditor, RegionChangeImpact, RoleImpact, RoleImpactSummary,
   RevokeConfirmation, RolesScreen, SpendLimit,
 } from "./panels";
 import {
@@ -106,7 +106,7 @@ export const adminApp = registerApp({
       ],
       overlays: [
         { id: "Invite wizard", kind: "modal", title: "Invite someone", width: 600, render: ({ close, ...context }) => <InviteWizard context={context} close={close} /> },
-        { id: "role impact", kind: "drawer", title: "What a role change does", width: 600, capability: "manage_policy", presentation: { selectedRecord: true, collection: "members", guidance: "Compare current and proposed access, give a reason, then apply." }, render: ({ close, ...context }) => <RoleImpact context={context} close={close} /> },
+        { id: "role impact", kind: "drawer", title: "What a role change does", width: OVERLAY_WIDTH.record, capability: "manage_policy", summary: (context) => <RoleImpactSummary context={context} />, presentation: { selectedRecord: true, collection: "members", guidance: "Compare current and proposed access, give a reason, then apply." }, render: ({ close, ...context }) => <RoleImpact context={context} close={close} /> },
         { id: "revoke confirmation", kind: "modal", title: "Offboard", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
         { id: "suspend member", kind: "modal", title: "Suspend a member", tone: "danger", width: 540, render: ({ close, ...context }) => <SuspendMember context={context} close={close} /> },
         { id: "export members", kind: "modal", title: "Export the member list", width: 500, render: ({ close, ...context }) => <MembersExport context={context} close={close} /> },
@@ -173,7 +173,7 @@ export const adminApp = registerApp({
       overlays: [
         { id: "Spend limit", kind: "modal", title: "Spend limit", width: 520, render: ({ close, ...context }) => <SpendLimit context={context} close={close} /> },
         { id: "cost allocation", kind: "modal", title: "Allocate budget", width: 520, render: ({ close, ...context }) => <CostAllocation context={context} close={close} /> },
-        { id: "budget warning", kind: "drawer", title: "Headroom", width: 500, render: ({ close: _close, ...context }) => <BudgetWarning context={context} /> },
+        { id: "budget warning", kind: "drawer", title: "Headroom", width: OVERLAY_WIDTH.compact, presentation: { selectedRecord: true, collection: "budgets", guidance: "Cap, committed and reserved for one limit." }, render: ({ close: _close, ...context }) => <BudgetWarning context={context} /> },
         { id: "approve increase", kind: "modal", title: "Approve a budget increase", width: 580, render: ({ close, ...context }) => <ApproveIncrease context={context} close={close} /> },
       ],
     },
@@ -215,7 +215,7 @@ export const adminApp = registerApp({
       overlays: [
         { id: "Audit detail", kind: "drawer", title: "Audit entry", width: 520, render: ({ close: _close, ...context }) => <AuditDetail context={context} /> },
         { id: "export authorization", kind: "modal", title: "Authorise an export", width: 560, render: ({ close, ...context }) => <ExportAuthorization context={context} close={close} /> },
-        { id: "event chain", kind: "drawer", title: "Everything on this record", width: 560, render: ({ close: _close, ...context }) => <EventChain context={context} /> },
+        { id: "event chain", kind: "drawer", title: "Everything on this record", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, guidance: "Every audit entry that names the selected record." }, render: ({ close: _close, ...context }) => <EventChain context={context} /> },
         { id: "audit filter", kind: "drawer", title: "Narrow the trail", width: 440, render: ({ close: _close, ...context }) => <AuditFilter context={context} /> },
         { id: "audit retention", kind: "modal", title: "Audit retention", width: 540, render: ({ close, ...context }) => <AuditRetention context={context} close={close} /> },
       ],
@@ -236,7 +236,7 @@ export const adminApp = registerApp({
         { id: "jurisdiction", label: "Limits of this page", placement: "overflow", run: (context) => context.openOverlay("jurisdiction disclaimer") },
       ],
       overlays: [
-        { id: "Data request", kind: "drawer", title: "Subject request", width: 580, render: ({ close, ...context }) => <DataRequestOverlay context={context} close={close} /> },
+        { id: "Data request", kind: "drawer", title: "Subject request", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <DataRequestOverlay context={context} close={close} /> },
         { id: "deletion impact", kind: "modal", title: "What deletion would remove", tone: "danger", width: 620, blocking: true, render: ({ close, ...context }) => <DeletionImpact context={context} close={close} /> },
         { id: "jurisdiction disclaimer", kind: "modal", title: "What this console does not do", width: 540, render: ({ close: _close, ...context }) => <JurisdictionDisclaimer context={context} /> },
       ],
@@ -314,7 +314,7 @@ export const adminApp = registerApp({
         { id: "callback tester", kind: "modal", title: "Endpoint test", width: 620, render: ({ close, ...context }) => <CallbackTester context={context} close={close} /> },
         { id: "webhook form", kind: "modal", title: "Add an endpoint", width: 560, render: ({ close, ...context }) => <WebhookForm context={context} close={close} /> },
         { id: "rotate key", kind: "modal", title: "Rotate an API key", width: 560, render: ({ close, ...context }) => <RotateKey context={context} close={close} /> },
-        { id: "revoke key", kind: "modal", title: "Revoke an API key", width: 560, tone: "danger", blocking: true, render: ({ close, ...context }) => <RevokeKey context={context} close={close} /> },
+        { id: "revoke key", kind: "modal", title: "Revoke an API key", width: OVERLAY_WIDTH.form, tone: "danger", blocking: true, presentation: { selectedRecord: true, collection: "apiKeys", guidance: "Revoking stops the key working and is recorded." }, render: ({ close, ...context }) => <RevokeKey context={context} close={close} /> },
       ],
     },
   },

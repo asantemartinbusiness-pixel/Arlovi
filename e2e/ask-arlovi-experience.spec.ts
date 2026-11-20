@@ -34,7 +34,7 @@ test.describe("Ask Arlovi workspace assistant", () => {
     await dialog.getByRole("button", { name: /Finance/ }).click();
     await dialog.getByRole("button", { name: "New conversation" }).click();
     await dialog.getByRole("button", { name: "Conversation history" }).click();
-    await dialog.getByRole("button", { name: /Which invoices are awaiting payment/ }).click();
+    await dialog.getByRole("button", { name: /^Which invoices are awaiting payment\?/ }).click();
     await expect(dialog.getByRole("log", { name: "Conversation" })).toContainText("Which invoices are awaiting payment?");
   });
 
@@ -52,7 +52,7 @@ test.describe("Ask Arlovi workspace assistant", () => {
     await page.getByRole("button", { name: "Ask Arlovi" }).click();
     dialog = page.getByRole("dialog", { name: "Ask Arlovi" });
     await dialog.getByRole("button", { name: "Conversation history" }).click();
-    await expect(dialog.getByRole("button", { name: /Which invoices are awaiting payment/ })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^Which invoices are awaiting payment\?/ })).toBeVisible();
   });
 
   test("Enter sends, Shift+Enter adds a line, and empty submissions are disabled", async ({ page }) => {

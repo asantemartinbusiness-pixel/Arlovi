@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import * as repo from "@/platform/repo";
-import { Button, Field, Notice, Pill, Properties, Row, Stack, TextInput } from "@/design-system";
+import { Button, Field, ModalActions, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Stack, TextInput } from "@/design-system";
 import { applications } from "@/app/catalog";
 import { canOpen, can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
 import { useCollections, useWorkspace } from "@/platform/workspace";
@@ -82,14 +82,22 @@ export function StepUp({
       <Field label={`Type ${word} to confirm`} required>
         <TextInput value={phrase} onChange={(event) => setPhrase(event.target.value.toUpperCase())} autoComplete="off" />
       </Field>
-      <Button
-        variant={tone === "danger" ? "outline-danger" : "primary"}
-        busy={busy}
-        disabled={phrase !== word}
-        onClick={() => void onConfirm()}
-      >
-        {label}
-      </Button>
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          primary={
+            <Button
+              variant={tone === "danger" ? "danger" : "primary"}
+              busy={busy}
+              disabled={phrase !== word}
+              onClick={() => void onConfirm()}
+            >
+              {label}
+            </Button>
+          }
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
