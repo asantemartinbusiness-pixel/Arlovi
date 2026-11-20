@@ -23,7 +23,7 @@ describe("Northline native Web site identity contract",()=>{
     const site=readSite(siteRecord);
     const css=themeCss(site.theme);
     expect(css).toContain("font-family:Manrope, Arial, sans-serif");
-    expect(css).toContain("--acid");
+    expect(css).toContain("--accent:#dfff3f");
     expect(css).not.toContain("undefined");
     for(const font of ["Newsreader","DM Mono"] as const){
       const value=themeCss({...site.theme,font});
@@ -33,7 +33,7 @@ describe("Northline native Web site identity contract",()=>{
   });
   it("keeps legacy fallback and other tenants' choices intact",()=>{
     const site=readSite(siteRecord);
-    expect(readSite({...siteRecord!,body:{...siteRecord!.body as object,theme:{...site.theme,font:"nonexistent font"}}}).theme.font).toBe("Inter");
+    expect(readSite({...siteRecord!,body:{...(siteRecord!.body as Record<string,unknown>),theme:{...site.theme,font:"nonexistent font"}}}).theme.font).toBe("Inter");
     expect(themeCss({...site.theme,font:"Inter"})).toContain("Inter, system-ui, sans-serif");
   });
 });
