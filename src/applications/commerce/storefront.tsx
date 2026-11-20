@@ -119,7 +119,7 @@ export function StorefrontPreview({ context, products, moves, orders, promotions
             </Card>
           </div>
         </div>
-        <ProviderBoundary id="payment.capture" />
+        <ProviderBoundary id="payment.capture" kept="The basket as a held order with its full line detail." />
       </Stack>
     );
   }

@@ -396,7 +396,7 @@ function BuyerMessageForm({ context, close, subject, to, name }: { context: Scre
       <Field label="Subject" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Message" required><TextArea rows={5} value={text} onChange={(event) => setText(event.target.value)} /></Field>
       {!to && <Notice tone="danger" title="There is no address to write to">Record the buyer's email on their contact first.</Notice>}
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary id="email.send" kept="The message, as a draft on the order. Nothing is sent." />
     </form>
   );
 }

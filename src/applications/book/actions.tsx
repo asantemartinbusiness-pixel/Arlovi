@@ -216,7 +216,7 @@ function RescheduleNoticeForm({ context, close, booking, data }: { context: Scre
       <Field label="Notice" required><TextArea rows={4} value={text} onChange={(event) => setText(event.target.value)} /></Field>
       {!contact && <Notice tone="warning" title="Nobody to notify">Link a customer to the booking first.</Notice>}
       {contact && !allowed && <Notice tone="info">A notice about an existing appointment is a service message, so it can be kept without marketing consent; the customer's preference is still shown here.</Notice>}
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" />
     </form>
   );
 }
@@ -655,7 +655,7 @@ export function ScheduleReport({ context, close }: { context: ScreenContext; clo
       <Field label="Measure"><Select value={measure} onChange={(event) => setMeasure(event.target.value)}>{["Utilisation", "Booked value", "No-show rate", "Seats and slots"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       <Field label="Every"><Select value={every} onChange={(event) => setEvery(event.target.value)}>{["Monday morning", "First of the month", "Friday afternoon"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       <Field label="Deliver to"><Select value={to} onChange={(event) => setTo(event.target.value)}>{["Maya Chen", "Priya Shah", "Theo Marsh", "Jonah Adeyemi"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" />
     </form>
   );
 }

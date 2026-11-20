@@ -84,7 +84,7 @@ function CancelBookingForm({ context, close, booking }: { context: ScreenContext
           <span>Waive the {context.money(fee.feeMinor)} late-cancellation fee</span>
         </label>
       )}
-      <ProviderBoundary id={depositPaid ? "payment.capture" : "email.send"} title={depositPaid ? "Returning the deposit cannot be done here" : "The customer is not notified automatically"} />
+      <ProviderBoundary kept={"the deposit is recorded on the booking as requested or received; no card was charged."} id={depositPaid ? "payment.capture" : "email.send"} title={depositPaid ? "Returning the deposit cannot be done here" : "The customer is not notified automatically"} />
     </form>
   );
 }

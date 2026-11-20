@@ -833,7 +833,7 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
       <Totals totals={totals} money={context.money} label="Order" />
       {!approved && <Notice tone="danger" title="This order is not approved">An unapproved order cannot be issued. Approve the requisition behind it, or have it approved on its own.</Notice>}
       {alreadySent && <Notice tone="warning" title="Already issued">It was issued on {context.date(String(order.fields.sentAt))}. Issuing again would re-send the same number; record a revision instead.</Notice>}
-      <ProviderBoundary id="email.send" title="The order cannot be transmitted" />
+      <ProviderBoundary id="email.send" title="The order cannot be transmitted" kept="The order marked as issued, with who recorded it and when." />
       <DrawerActions>
         <OverlayActions
           primary={
@@ -1563,7 +1563,7 @@ export function ThreeWayMatch({ context, close }: { context: ScreenContext; clos
         <Notice tone="success" title="Order, receipt and invoice agree">Every line was ordered, received and billed at the same quantity and price.</Notice>
       )}
 
-      <ProviderBoundary id="payment.capture" title="Payment itself happens outside this workspace" />
+      <ProviderBoundary id="payment.capture" title="Payment itself happens outside this workspace" kept="The match result and who approved the invoice for payment." />
 
       <DrawerActions>
         <OverlayActions

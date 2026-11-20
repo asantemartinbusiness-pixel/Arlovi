@@ -199,21 +199,45 @@ function LinkedRecords({ context, facts }: { context: ScreenContext; facts: Task
 
 /* ------------------------------ board drawer ------------------------------ */
 
-export function TaskInspector({ context, close }: { context: ScreenContext; close?: () => void }) {
+export function TaskSummary({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const task = useRecord(payload?.id ?? context.selectedId);
   const facts = useTaskFacts(task);
-  const { org } = useWorkspace();
-  if (!task || task.collection !== "tasks" || !facts) return <Empty title="Select a task">Choose a card on the board to inspect it.</Empty>;
+  if (!task || task.collection !== "tasks" || !facts) return null;
   const priority = String(task.fields.priority ?? "normal");
   return (
+    <OverlaySummary
+      eyebrow={facts.project?.title}
+      title={task.title}
+      status={<StagePill task={task} />}
+      meta={[priority === "high" ? <Pill key="p" tone="danger">High priority</Pill> : null, facts.waitingOn.length > 0 ? <Pill key="w" tone="warning" dot>Waiting on {facts.waitingOn.length}</Pill> : null]}
+    />
+  );
+}
+
+export function TaskDrawerFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const task = useRecord(payload?.id ?? context.selectedId);
+  const { org } = useWorkspace();
+  if (!task || task.collection !== "tasks") return null;
+  return (
+    <OverlayActions
+      primary={<Button variant="primary" onClick={() => { close(); context.navigate(`/o/${org.slug}/project/tasks/${task.id}`); }}>Open the task</Button>}
+      secondary={<>
+        <Button variant="secondary" onClick={() => context.openOverlay("move task", { id: task.id })}>Move to another stage</Button>
+        <Button variant="secondary" onClick={() => context.openOverlay("Assignee picker", { id: task.id })}>Reassign</Button>
+      </>}
+    />
+  );
+}
+
+export function TaskInspector({ context }: { context: ScreenContext; close?: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const task = useRecord(payload?.id ?? context.selectedId);
+  const facts = useTaskFacts(task);
+  if (!task || task.collection !== "tasks" || !facts) return <Empty title="Select a task">Choose a card on the board to inspect it.</Empty>;
+  return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow={facts.project ? `Task in ${facts.project.title}` : "Task"}
-        title={task.title}
-        status={<StagePill task={task} />}
-        meta={[priority === "high" ? <Pill key="p" tone="danger">High priority</Pill> : null, facts.waitingOn.length > 0 ? <Pill key="w" tone="warning" dot>Waiting on {facts.waitingOn.length}</Pill> : null]}
-      />
       {task.summary && <p className="pj-summary">{task.summary}</p>}
       <FactGrid columns={3} items={taskFactItems(context, task, facts)} />
       <OverlaySection title="Dependencies" hint={`${facts.before.length} before · ${facts.after.length} after`}
@@ -224,13 +248,6 @@ export function TaskInspector({ context, close }: { context: ScreenContext; clos
       <OverlaySection title="Linked records"><LinkedRecords context={context} facts={facts} /></OverlaySection>
       <OverlaySection title="Recent activity"><ActivityList context={context} facts={facts} /></OverlaySection>
       <OverlaySection title="Comment"><CommentEntry context={context} task={task} /></OverlaySection>
-      <OverlayActions
-        primary={<Button variant="primary" onClick={() => { close?.(); context.navigate(`/o/${org.slug}/project/tasks/${task.id}`); }}>Open the task</Button>}
-        secondary={<>
-          <Button variant="secondary" onClick={() => context.openOverlay("move task", { id: task.id })}>Move to another stage</Button>
-          <Button variant="secondary" onClick={() => context.openOverlay("Assignee picker", { id: task.id })}>Reassign</Button>
-        </>}
-      />
     </Stack>
   );
 }

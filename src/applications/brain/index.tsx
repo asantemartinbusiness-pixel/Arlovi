@@ -1251,7 +1251,7 @@ function SuggestionApproval({ context, close }: { context: ScreenContext; close:
           variant="primary"
           disabled={!source || source.status === "quarantined"}
           onClick={async () => {
-            await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10) } }, { expectRevision: fact.revision, event: `${fact.title} verified by ${context.actor}` });
+            if (!(await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10) } }, { expectRevision: fact.revision, event: `${fact.title} verified by ${context.actor}` }))) return;
             context.toast("Verified", `${fact.title} is authoritative, with ${source?.title} as its evidence.`);
             close();
           }}
@@ -1259,7 +1259,7 @@ function SuggestionApproval({ context, close }: { context: ScreenContext; close:
           Verify with this evidence
         </Button>
         <Button variant="ghost" onClick={async () => {
-          await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` });
+          if (!(await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` }))) return;
           context.toast("Rejected", "It stays in the registry marked rejected, with who rejected it.");
           close();
         }}>Reject</Button>
@@ -1385,7 +1385,7 @@ function RetentionDialog({ context, close }: { context: ScreenContext; close: ()
       <Button
         variant="danger"
         onClick={async () => {
-          await context.mutate.patch(source.id, { status: "retired", fields: { ...source.fields, indexing: "retired", retiredBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} retired from retrieval` });
+          if (!(await context.mutate.patch(source.id, { status: "retired", fields: { ...source.fields, indexing: "retired", retiredBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} retired from retrieval` }))) return;
           context.toast("Retired", "It is out of retrieval and still on the record for its retention period.");
           close();
         }}
@@ -1425,13 +1425,13 @@ function CorrectionForm({ context, close }: { context: ScreenContext; close: () 
         const corrections = body?.corrections ?? [];
         const extracted = body?.extracted ?? [];
         const correction: Correction = { id: `corr-${wallMs()}`, at: context.now.toISOString(), by: context.actor, from: original, to: annotate ? original : value, note };
-        await context.mutate.patch(source.id, {
+        if (!(await context.mutate.patch(source.id, {
           body: {
             ...(source.body as object),
             extracted: annotate ? extracted : extracted.map((line) => (line === original ? value : line)),
             corrections: [...corrections, correction],
           },
-        }, { expectRevision: source.revision, event: annotate ? `Annotation added to ${source.title}` : `Extraction corrected on ${source.title}` });
+        }, { expectRevision: source.revision, event: annotate ? `Annotation added to ${source.title}` : `Extraction corrected on ${source.title}` }))) return;
         context.toast(annotate ? "Annotation recorded" : "Correction recorded", "The original line and who changed it are kept in the correction history.");
         close();
       }}
@@ -1465,7 +1465,7 @@ function PermissionEditor({ context, close }: { context: ScreenContext; close: (
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(source.id, { fields: { ...source.fields, classification } }, { expectRevision: source.revision, event: `${source.title} reclassified as ${classification}` });
+          if (!(await context.mutate.patch(source.id, { fields: { ...source.fields, classification } }, { expectRevision: source.revision, event: `${source.title} reclassified as ${classification}` }))) return;
           context.toast("Classification changed", `${source.title} is now ${classification}.`);
           close();
         }}
@@ -1594,7 +1594,7 @@ function MergePreview({ context, close }: { context: ScreenContext; close: () =>
           variant="primary"
           disabled={!confirmed}
           onClick={async () => {
-            await context.mutate.patch(link.id, { status: "confirmed", fields: { ...link.fields, confidence: 100, confirmedBy: context.actor, confirmedAt: context.now.toISOString(), mergedFromConfidence: Number(link.fields.confidence ?? 0) } }, { expectRevision: link.revision, event: `${link.title} confirmed as the same entity by ${context.actor}` });
+            if (!(await context.mutate.patch(link.id, { status: "confirmed", fields: { ...link.fields, confidence: 100, confirmedBy: context.actor, confirmedAt: context.now.toISOString(), mergedFromConfidence: Number(link.fields.confidence ?? 0) } }, { expectRevision: link.revision, event: `${link.title} confirmed as the same entity by ${context.actor}` }))) return;
             context.toast("Link confirmed", "The two records are recorded as the same entity, with who confirmed it.");
             close();
           }}
@@ -1602,7 +1602,7 @@ function MergePreview({ context, close }: { context: ScreenContext; close: () =>
           Confirm the link
         </Button>
         <Button variant="ghost" onClick={async () => {
-          await context.mutate.patch(link.id, { status: "rejected" }, { expectRevision: link.revision, event: `${link.title} rejected` });
+          if (!(await context.mutate.patch(link.id, { status: "rejected" }, { expectRevision: link.revision, event: `${link.title} rejected` }))) return;
           context.toast("Rejected", "The candidate is recorded as not a match.");
           close();
         }}>Not a match</Button>
@@ -1623,7 +1623,7 @@ function RelationshipEditor({ context, close }: { context: ScreenContext; close:
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(link.id, { fields: { ...link.fields, kind, confidence: Number(confidence) || 0 } }, { expectRevision: link.revision, event: `${link.title} relationship updated` });
+        if (!(await context.mutate.patch(link.id, { fields: { ...link.fields, kind, confidence: Number(confidence) || 0 } }, { expectRevision: link.revision, event: `${link.title} relationship updated` }))) return;
         context.toast("Relationship saved", "The link and its confidence are recorded.");
         close();
       }}
@@ -1682,10 +1682,10 @@ function VerificationDialog({ context, close }: { context: ScreenContext; close:
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(fact.id, {
+        if (!(await context.mutate.patch(fact.id, {
           status: payload?.mode === "expiry" ? fact.status : "verified",
           fields: { ...fact.fields, validTo: expiry, note, verifiedBy: payload?.mode === "expiry" ? String(fact.fields.verifiedBy ?? "") : context.actor },
-        }, { expectRevision: fact.revision, event: payload?.mode === "expiry" ? `Expiry set on ${fact.title}` : `${fact.title} verified by ${context.actor}` });
+        }, { expectRevision: fact.revision, event: payload?.mode === "expiry" ? `Expiry set on ${fact.title}` : `${fact.title} verified by ${context.actor}` }))) return;
         context.toast(payload?.mode === "expiry" ? "Expiry recorded" : "Verified", payload?.mode === "expiry" ? "The assertion expires on that date and will be shown as expired afterwards." : `${fact.title} is authoritative.`);
         close();
       }}
@@ -1739,14 +1739,14 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
         disabled={ledger || !chosen || !reason.trim()}
         onClick={async () => {
           const option = options.find((item) => item.id === chosen);
-          await context.mutate.patch(conflict.id, {
+          if (!(await context.mutate.patch(conflict.id, {
             status: "resolved",
             fields: { ...conflict.fields, chosen: option?.factId ?? chosen, resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason },
-          }, { expectRevision: conflict.revision, event: `${conflict.title} resolved by ${context.actor}` });
+          }, { expectRevision: conflict.revision, event: `${conflict.title} resolved by ${context.actor}` }))) return;
           if (option?.factId) {
             const fact = data.facts.find((item) => item.id === option.factId);
             if (fact) {
-              await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }, { event: `${fact.title} became the source of truth` });
+              if (!(await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }, { event: `${fact.title} became the source of truth` }))) return;
             }
           }
           context.toast("Conflict resolved", "The chosen assertion is authoritative; the other stays on the record as rejected evidence.");
@@ -1802,7 +1802,7 @@ function Escalation({ context, close }: { context: ScreenContext; close: () => v
         variant="primary"
         disabled={!note.trim()}
         onClick={async () => {
-          await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, escalatedBy: context.actor, escalationNote: note } }, { expectRevision: conflict.revision, event: `${conflict.title} escalated for external confirmation` });
+          if (!(await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, escalatedBy: context.actor, escalationNote: note } }, { expectRevision: conflict.revision, event: `${conflict.title} escalated for external confirmation` }))) return;
           context.toast("Escalated", "It is in review with your note. No request has left this browser.");
           close();
         }}
@@ -1902,7 +1902,7 @@ function ImpactReview({ context, close }: { context: ScreenContext; close: () =>
           fields: { approvers: context.actor, domain: String(decision.fields.domain ?? "general"), approvedAt: context.now.toISOString().slice(0, 10), supersedes: decision.id },
           body: { rationale, alternatives: [], outcome: "" },
         }, `Decision recorded, superseding ${decision.title}`);
-        await context.mutate.patch(decision.id, { status: "superseded", fields: { ...decision.fields, supersededBy: replacement.id } }, { expectRevision: decision.revision, event: `${decision.title} superseded` });
+        if (!(await context.mutate.patch(decision.id, { status: "superseded", fields: { ...decision.fields, supersededBy: replacement.id } }, { expectRevision: decision.revision, event: `${decision.title} superseded` }))) return;
         context.toast("Superseded", "The old decision stays visible for audit with its approvers and date.");
         close();
       }}
@@ -1938,7 +1938,7 @@ function BrandRuleEditor({ context, close }: { context: ScreenContext; close: ()
         const next = existing
           ? rules.map((item) => (item.id === existing.id ? { ...item, rule, source, status } : item))
           : [...rules, { id: `rule-${wallMs()}`, rule, source, status }];
-        await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: next } }, { expectRevision: proposal.revision, event: `Brand rule ${existing ? "updated" : "added"}: ${rule.slice(0, 40)}` });
+        if (!(await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: next } }, { expectRevision: proposal.revision, event: `Brand rule ${existing ? "updated" : "added"}: ${rule.slice(0, 40)}` }))) return;
         context.toast("Rule saved", status === "approved" ? "It is an approved rule with its evidence." : "It stays proposed until a person approves it.");
         close();
       }}
@@ -1998,11 +1998,11 @@ function BrandImpactPreview({ context, close }: { context: ScreenContext; close:
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(proposal.id, {
+          if (!(await context.mutate.patch(proposal.id, {
             status: "approved",
             fields: { ...proposal.fields, approved: true, approvedBy: context.actor },
             body: { ...(proposal.body as object), colours: (body?.colours ?? []).map((colour) => ({ ...colour, approved: true })) },
-          }, { expectRevision: proposal.revision, event: `${proposal.title} approved by ${context.actor}` });
+          }, { expectRevision: proposal.revision, event: `${proposal.title} approved by ${context.actor}` }))) return;
           context.toast("Variant approved", "The proposal is now part of the recorded brand, with who approved it.");
           close();
         }}
@@ -2050,7 +2050,7 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
           const next = grants.some((grant) => grant.agentId === agentId)
             ? grants.map((grant) => (grant.agentId === agentId ? { ...grant, groups } : grant))
             : [...grants, { agentId, groups, note: `Set by ${context.actor}.` }];
-          await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Source grant changed for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` });
+          if (!(await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Source grant changed for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` }))) return;
           context.toast("Grant saved", `${groups.join(", ") || "no group"} is what this contract may retrieve.`);
           close();
         }}
@@ -2121,7 +2121,7 @@ function RevokeConfirmation({ context, close }: { context: ScreenContext; close:
         disabled={!agentId}
         onClick={async () => {
           const next = grants.map((grant) => (grant.agentId === agentId ? { ...grant, groups: [], note: `Revoked by ${context.actor}.` } : grant));
-          await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Grant revoked for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` });
+          if (!(await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Grant revoked for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` }))) return;
           context.toast("Grant revoked", "That contract can retrieve nothing until a grant is given again.");
           close();
         }}
@@ -2178,11 +2178,11 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
           disabled={failed}
           title={failed ? "A file that could not be parsed cannot be approved" : undefined}
           onClick={async () => {
-            await context.mutate.patch(source.id, {
+            if (!(await context.mutate.patch(source.id, {
               status: "indexed",
               ownerName: owner || source.ownerName,
               fields: { ...source.fields, scanned: true, indexing: "indexed", classification, reviewedBy: context.actor },
-            }, { expectRevision: source.revision, event: `${source.title} approved into the knowledge base by ${context.actor}` });
+            }, { expectRevision: source.revision, event: `${source.title} approved into the knowledge base by ${context.actor}` }))) return;
             let proposed = 0;
             for (const line of mapped) if (await proposeFactFromLine(context, { ...source, ownerName: owner || source.ownerName }, line, facts)) proposed += 1;
             context.toast("Approved", `The source is indexed and available to answers in this workspace.${proposed ? ` ${proposed} assertion${proposed === 1 ? " is" : "s are"} proposed in the fact registry, pending review.` : ""}`);
@@ -2194,7 +2194,7 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
         <Button
           variant="secondary"
           onClick={async () => {
-            await context.mutate.patch(source.id, { ownerName: owner || source.ownerName, fields: { ...source.fields, classification, routedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} routed to ${owner || source.ownerName}` });
+            if (!(await context.mutate.patch(source.id, { ownerName: owner || source.ownerName, fields: { ...source.fields, classification, routedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} routed to ${owner || source.ownerName}` }))) return;
             context.toast("Routed", `${owner || source.ownerName} owns it. It stays out of retrieval until approved.`);
             close();
           }}
@@ -2254,9 +2254,9 @@ async function reprocessSource(context: ScreenContext): Promise<void> {
   if (!source || source.collection !== "sources") { context.toast("Select a source first", "Choose the source to re-read.", "info"); return; }
   const body = (source.body ?? {}) as { extracted?: string[] };
   const lines = body.extracted?.length ?? 0;
-  await context.mutate.patch(source.id, {
+  if (!(await context.mutate.patch(source.id, {
     fields: { ...source.fields, reprocessedBy: context.actor, reprocessedAt: context.now.toISOString() },
-  }, { expectRevision: source.revision, event: `${source.title} re-read locally by ${context.actor}` });
+  }, { expectRevision: source.revision, event: `${source.title} re-read locally by ${context.actor}` }))) return;
   context.toast(
     "Re-read what is stored",
     lines > 0
@@ -2275,7 +2275,7 @@ async function reindexSource(context: ScreenContext): Promise<void> {
     context.toast("Cannot index an unreviewed file", "No scanner is connected, so a person has to review it before it can be indexed.", "blocked");
     return;
   }
-  await context.mutate.patch(source.id, { status: "indexed", fields: { ...source.fields, indexing: "indexed", indexedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} indexed by ${context.actor}` });
+  if (!(await context.mutate.patch(source.id, { status: "indexed", fields: { ...source.fields, indexing: "indexed", indexedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} indexed by ${context.actor}` }))) return;
   context.toast("Indexed", "The source is available to answers composed from now on.");
 }
 
@@ -2320,7 +2320,7 @@ async function importBrandGuide(context: ScreenContext): Promise<void> {
     .filter((line) => !existing.some((rule) => rule.rule === line))
     .map((line, index) => ({ id: `rule-import-${wallMs()}-${index}`, rule: line, source: guide.id, status: "proposed" }));
   if (added.length === 0) { context.toast("Nothing new", `Every line in ${guide.title} is already a rule.`, "info"); return; }
-  await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: [...existing, ...added] } }, { expectRevision: proposal.revision, event: `${added.length} brand rules proposed from ${guide.title}` });
+  if (!(await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: [...existing, ...added] } }, { expectRevision: proposal.revision, event: `${added.length} brand rules proposed from ${guide.title}` }))) return;
   context.toast("Rules proposed", `${added.length} line${added.length === 1 ? "" : "s"} from ${guide.title} are proposed. None was applied to the approved set.`);
 }
 
@@ -2329,7 +2329,7 @@ async function deferConflict(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const conflict = id ? await db.records.get(id) : undefined;
   if (!conflict || conflict.collection !== "conflicts") { context.toast("Select a conflict first", "Choose the conflict to defer.", "info"); return; }
-  await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, deferredBy: context.actor, deferredAt: context.now.toISOString() } }, { expectRevision: conflict.revision, event: `${conflict.title} deferred by ${context.actor}` });
+  if (!(await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, deferredBy: context.actor, deferredAt: context.now.toISOString() } }, { expectRevision: conflict.revision, event: `${conflict.title} deferred by ${context.actor}` }))) return;
   context.toast("Deferred", "It moves to In review with who deferred it. Both sides stay unresolved, so neither is authoritative.");
 }
 
@@ -2338,9 +2338,9 @@ async function retrySafeStep(context: ScreenContext): Promise<void> {
   const failed = sources.filter((source) => source.status === "failed");
   if (failed.length === 0) { context.toast("Nothing failed", "No file is in the failed queue.", "info"); return; }
   const target = failed[0];
-  await context.mutate.patch(target.id, {
+  if (!(await context.mutate.patch(target.id, {
     fields: { ...target.fields, retries: Number(target.fields.retries ?? 0) + 1, lastRetryBy: context.actor },
-  }, { expectRevision: target.revision, event: `${target.title} retry attempted and reported` });
+  }, { expectRevision: target.revision, event: `${target.title} retry attempted and reported` }))) return;
   context.toast(
     "Retried the safe step",
     `Re-reading ${target.title} needs the original file, which is not in this browser. The attempt is recorded and the file stays isolated.`,
@@ -2593,7 +2593,7 @@ async function rejectFact(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const fact = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!fact || fact.collection !== "facts") return;
-  await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` });
+  if (!(await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` }))) return;
   context.toast("Rejected", "It stays in the registry marked rejected, with who rejected it and when.");
 }
 
@@ -2608,10 +2608,10 @@ async function linkApproval(context: ScreenContext): Promise<void> {
   }
   const approvers = String(decision.fields.approvers || "").split(",").map((name) => name.trim()).filter(Boolean);
   if (approvers.includes(context.actor)) { context.toast("Already recorded", "Your approval is already on this decision.", "info"); return; }
-  await context.mutate.patch(decision.id, {
+  if (!(await context.mutate.patch(decision.id, {
     status: "approved",
     fields: { ...decision.fields, approvers: [...approvers, context.actor].join(","), approvedAt: context.now.toISOString().slice(0, 10) },
-  }, { expectRevision: decision.revision, event: `${decision.title} approved by ${context.actor}` });
+  }, { expectRevision: decision.revision, event: `${decision.title} approved by ${context.actor}` }))) return;
   context.toast("Approval linked", `${decision.title} now carries your approval and today's date.`);
 }
 

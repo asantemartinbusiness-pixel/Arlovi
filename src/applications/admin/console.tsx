@@ -272,8 +272,9 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
   const payload = context.overlayPayload as { id?: string } | undefined;
   const initialId = payload?.id ?? context.selectedId ?? "";
   const active = data.sessions.filter(row => row.status === "active" && row.fields.current !== true);
-  const [scope, setScope] = useState<"single" | "all" | "none">(initialId ? "single" : "none");
-  const [selectedId, setSelectedId] = useState(initialId);
+  const firstId = (active.find(row => row.fields.anomaly) ?? active[0])?.id ?? "";
+  const [scope, setScope] = useState<"single" | "all" | "none">(initialId || firstId ? "single" : "none");
+  const [selectedId, setSelectedId] = useState(initialId || firstId);
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -307,10 +308,9 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
         </Field>
       )}
       <OverlaySection title="Who loses a session" hint="Your current session is never included." tone={scope === "all" ? "danger" : "neutral"}><Stack gap={3}>
-        <FactGrid columns={3} dense items={[
+        <FactGrid columns={2} dense items={[
           { label: "Session records", value: String(target.length), mono: true },
           { label: "People", value: String(new Set(target.map(row => String(row.fields.member))).size), mono: true },
-          { label: "Provider sign-out", value: "Not connected", tone: "warning" },
         ]} />
         {target.length === 0
           ? <p className="ds-subtle">Choose a scope above to see exactly which sessions are marked revoked.</p>

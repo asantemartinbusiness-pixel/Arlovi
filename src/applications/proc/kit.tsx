@@ -10,9 +10,9 @@ import { statusTone, findSupplier, useProcData } from "./data";
 import "./proc-lifecycle.css";
 
 /** Footer for a form overlay: submit first on the left, Cancel at the end. */
-export const procFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
+export const procFooter = (formId: string, label: string, options?: { tone?: "danger" }) => ({ close }: { close: () => void }) => (
   <OverlayActions
-    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    primary={<Button variant={options?.tone === "danger" ? "danger" : "primary"} type="submit" form={formId}>{label}</Button>}
     end={<Button variant="ghost" onClick={close}>Cancel</Button>}
   />
 );

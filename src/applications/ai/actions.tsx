@@ -348,7 +348,7 @@ export function ResolveDisagreement({ context, close }: { context: ScreenContext
         <Button variant="primary" busy={busy} disabled={!dispute || !decision.trim()} onClick={async () => {
           if (!dispute) return;
           setBusy(true);
-          await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: clockIso(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` });
+          if (!(await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: clockIso(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` }))) return;
           await context.mutate.create({
             collection: "messages", title: `Decision: ${decision.trim().slice(0, 60)}`, status: "posted", summary: decision.trim(), parentId: context.params.id,
             at: clockIso(), fields: { author: context.actor, kind: "human", decision: true, resolves: dispute.id },

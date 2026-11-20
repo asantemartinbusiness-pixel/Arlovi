@@ -126,7 +126,7 @@ export function QuoteRequest({ context, close }: { context: ScreenContext; close
       </Row>
       <Field label="Note for the supplier"><TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
       <Notice tone="info">A quote request asks for a price. It is not a requisition or an order and commits no money.</Notice>
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary id="email.send" kept="The quote request, as a draft on this supplier. Nothing is sent." />
     </form>
   );
 }

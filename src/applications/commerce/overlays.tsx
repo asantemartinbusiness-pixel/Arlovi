@@ -1317,7 +1317,7 @@ export function ReportSchedule({ context, close }: { context: ScreenContext; clo
     >
       <Field label="Send on"><Select value={frequency} onChange={(event) => setFrequency(event.target.value)}>{["Monday", "First of the month", "End of quarter"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       <Field label="Recipients" hint="Comma separated"><TextInput value={recipients} onChange={(event) => setRecipients(event.target.value)} /></Field>
-      <ProviderBoundary id="email.send" title="A scheduled report cannot be delivered" />
+      <ProviderBoundary id="email.send" title="A scheduled report cannot be delivered" kept="The schedule itself; no report is delivered." />
     </form>
   );
 }

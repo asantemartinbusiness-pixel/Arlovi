@@ -941,7 +941,7 @@ function VoiceLive({ context }: { context: ScreenContext }) {
               if (!text.trim()) return;
               const entry: TranscriptEntry = { id: `tr-${wallMs()}`, at: context.now.toISOString(), speaker, text: text.trim(), source: "typed" };
               const body = (session.body ?? {}) as Record<string, unknown>;
-              await context.mutate.patch(session.id, { body: { ...body, transcript: [...entries, entry] } }, { expectRevision: session.revision, event: "Transcript turn added" });
+              if (!(await context.mutate.patch(session.id, { body: { ...body, transcript: [...entries, entry] } }, { expectRevision: session.revision, event: "Transcript turn added" }))) return;
               setText("");
               context.toast("Turn recorded", "It is in the transcript as typed text, marked as typed rather than heard.");
             }}
@@ -1010,7 +1010,7 @@ function VoiceTranscript({ context }: { context: ScreenContext }) {
                   const next = entries.map((item) => item.id === entry.id
                     ? { ...item, text: value, corrected: { from: item.text, at: context.now.toISOString(), by: context.actor } }
                     : item);
-                  await context.mutate.patch(session.id, { body: { ...body, transcript: next } }, { expectRevision: session.revision, event: `Transcript line corrected by ${context.actor}` });
+                  if (!(await context.mutate.patch(session.id, { body: { ...body, transcript: next } }, { expectRevision: session.revision, event: `Transcript line corrected by ${context.actor}` }))) return;
                   setEditing(null);
                   context.toast("Line corrected", "The previous text is kept on the line as its correction history.");
                 }}>Save correction</Button>
@@ -1140,7 +1140,7 @@ function MeetingRoom({ context, view }: { context: ScreenContext; view: "Meeting
               if (consentBlocked || !line.trim()) return;
               const body = (meeting.body ?? {}) as Record<string, unknown>;
               const entry: TranscriptEntry = { id: `tr-${wallMs()}`, at: context.now.toISOString(), speaker: speaker || context.actor, text: line.trim(), source: "typed" };
-              await context.mutate.patch(meeting.id, { body: { ...body, transcript: [...transcript, entry] } }, { expectRevision: meeting.revision, event: "Meeting transcript line added" });
+              if (!(await context.mutate.patch(meeting.id, { body: { ...body, transcript: [...transcript, entry] } }, { expectRevision: meeting.revision, event: "Meeting transcript line added" }))) return;
               setLine("");
               context.toast("Line added", "It is stored against the meeting as typed text.");
             }}
@@ -1604,9 +1604,9 @@ function ArtifactScreen({ context, view }: { context: ScreenContext; view: "Prev
               event.preventDefault();
               if (!comment.trim()) return;
               const body = (artifact.body ?? {}) as Record<string, unknown>;
-              await context.mutate.patch(artifact.id, {
+              if (!(await context.mutate.patch(artifact.id, {
                 body: { ...body, comments: [...comments, { id: `c-${wallMs()}`, at: context.now.toISOString(), author: context.actor, text: comment.trim() }] },
-              }, { expectRevision: artifact.revision, event: `Comment added to ${artifact.title}` });
+              }, { expectRevision: artifact.revision, event: `Comment added to ${artifact.title}` }))) return;
               setComment("");
               context.toast("Comment saved", "It is stored on the artifact record.");
             }}
@@ -1919,7 +1919,7 @@ function ThreadPreview({ context }: { context: ScreenContext }) {
             variant="secondary"
             disabled={!name.trim() || name.trim() === conversation.title}
             onClick={async () => {
-              await context.mutate.patch(conversation.id, { title: name.trim() }, { expectRevision: conversation.revision, event: `Conversation renamed to ${name.trim()}` });
+              if (!(await context.mutate.patch(conversation.id, { title: name.trim() }, { expectRevision: conversation.revision, event: `Conversation renamed to ${name.trim()}` }))) return;
               context.toast("Renamed", "The thread record carries the new name.");
             }}
           >
@@ -1984,7 +1984,7 @@ function SharingDialog({ context, close }: { context: ScreenContext; close: () =
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(conversation.id, { fields: { ...conversation.fields, shared } }, { expectRevision: conversation.revision, event: `${conversation.title} sharing changed` });
+          if (!(await context.mutate.patch(conversation.id, { fields: { ...conversation.fields, shared } }, { expectRevision: conversation.revision, event: `${conversation.title} sharing changed` }))) return;
           context.toast("Sharing updated", shared ? "The thread is readable by the workspace." : "The thread is private to you again.");
           close();
         }}
@@ -2110,7 +2110,7 @@ function ParticipantSelector({ context, close }: { context: ScreenContext; close
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(room.id, { fields: { ...room.fields, participants: selected.join(",") } }, { expectRevision: room.revision, event: `Participants changed in ${room.title}` });
+          if (!(await context.mutate.patch(room.id, { fields: { ...room.fields, participants: selected.join(",") } }, { expectRevision: room.revision, event: `Participants changed in ${room.title}` }))) return;
           context.toast("Participants updated", `${selected.length} participants are in ${room.title}.`);
           close();
         }}
@@ -2231,7 +2231,7 @@ function TaskHandoffDrawer({ context, close }: { context: ScreenContext; close: 
         disabled={!task || !target}
         onClick={async () => {
           if (!task || !target) return;
-          await context.mutate.patch(task.id, { fields: { ...task.fields, assignee: target.title, kind: "ai" }, ownerName: target.title }, { expectRevision: task.revision, event: `${task.title} handed to ${target.title}` });
+          if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, assignee: target.title, kind: "ai" }, ownerName: target.title }, { expectRevision: task.revision, event: `${task.title} handed to ${target.title}` }))) return;
           await context.mutate.create({
             collection: "messages",
             title: `Handoff: ${task.title}`,
@@ -2310,7 +2310,7 @@ function ReviewDialog({ context, close }: { context: ScreenContext; close: () =>
         disabled={!note.trim()}
         onClick={async () => {
           if (allowed) {
-            await context.mutate.patch(task.id, { fields: { ...task.fields, stage: verdict, reviewedBy: context.actor, reviewNote: note } }, { expectRevision: task.revision, event: `${task.title} reviewed as ${verdict} by ${context.actor}` });
+            if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, stage: verdict, reviewedBy: context.actor, reviewNote: note } }, { expectRevision: task.revision, event: `${task.title} reviewed as ${verdict} by ${context.actor}` }))) return;
           } else {
             await context.mutate.log(`${context.actor} noted a review of ${task.title}: ${verdict} — ${note}`, { entityId: task.id, type: "review.note" });
           }
@@ -2420,10 +2420,10 @@ function RecordingConsent({ context, close }: { context: ScreenContext; close: (
         onClick={async () => {
           const body = (meeting.body ?? {}) as Record<string, unknown>;
           const stamped = rows.map((participant) => ({ ...participant, at: participant.consent === "given" ? context.now.toISOString() : undefined }));
-          await context.mutate.patch(meeting.id, {
+          if (!(await context.mutate.patch(meeting.id, {
             body: { ...body, participants: stamped },
             fields: { ...meeting.fields, consentComplete: stamped.filter((participant) => participant.kind === "human").every((participant) => participant.consent === "given") },
-          }, { expectRevision: meeting.revision, event: "Meeting consent updated" });
+          }, { expectRevision: meeting.revision, event: "Meeting consent updated" }))) return;
           context.toast("Consent recorded", "Each participant's state is stored with the time it was given.");
           close();
         }}
@@ -2446,7 +2446,7 @@ function MeetingNotes({ context, close }: { context: ScreenContext; close: () =>
       onSubmit={async (event) => {
         event.preventDefault();
         const body = (meeting.body ?? {}) as Record<string, unknown>;
-        await context.mutate.patch(meeting.id, { body: { ...body, notes: { text: notes, by: context.actor, at: context.now.toISOString() } } }, { expectRevision: meeting.revision, event: "Meeting notes written" });
+        if (!(await context.mutate.patch(meeting.id, { body: { ...body, notes: { text: notes, by: context.actor, at: context.now.toISOString() } } }, { expectRevision: meeting.revision, event: "Meeting notes written" }))) return;
         context.toast("Notes saved", "They are stored on the meeting record with your name and the time.");
         close();
       }}
@@ -2538,10 +2538,10 @@ function ConfidenceNote({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         const body = (research.body ?? {}) as Record<string, unknown>;
-        await context.mutate.patch(research.id, {
+        if (!(await context.mutate.patch(research.id, {
           fields: { ...research.fields, confidence },
           body: { ...body, confidenceNote: { text: note, by: context.actor, at: context.now.toISOString() } },
-        }, { expectRevision: research.revision, event: `Confidence on ${research.title} set to ${confidence}` });
+        }, { expectRevision: research.revision, event: `Confidence on ${research.title} set to ${confidence}` }))) return;
         context.toast("Confidence recorded", "It is stored with your name and the reason.");
         close();
       }}
@@ -2782,7 +2782,7 @@ async function toggleVoiceMute(context: ScreenContext): Promise<void> {
   const rows = await listPreferences(context);
   const pref = rows.find((row) => row.fields.kind === "voiceSettings");
   const muted = !(pref?.fields.muted === true);
-  if (pref) await context.mutate.patch(pref.id, { fields: { ...pref.fields, muted } }, { skipHistory: true, event: muted ? "Microphone muted" : "Microphone unmuted" });
+  if (pref) if (!(await context.mutate.patch(pref.id, { fields: { ...pref.fields, muted } }, { skipHistory: true, event: muted ? "Microphone muted" : "Microphone unmuted" }))) return;
   else await context.mutate.create({ collection: "preferences", title: "Voice settings", status: "active", fields: { kind: "voiceSettings", muted } }, muted ? "Microphone muted" : "Microphone unmuted");
   context.toast(muted ? "Muted" : "Unmuted", `Sessions will start with the microphone ${muted ? "off" : "on"}. No audio service is connected, so nothing is being captured now.`, "info");
 }
@@ -3066,10 +3066,10 @@ async function startOrEndVoice(context: ScreenContext): Promise<void> {
     return;
   }
   if (session.status === "open") {
-    await context.mutate.patch(session.id, { status: "closed", endAt: context.now.toISOString() }, { expectRevision: session.revision, event: "Voice session ended" });
+    if (!(await context.mutate.patch(session.id, { status: "closed", endAt: context.now.toISOString() }, { expectRevision: session.revision, event: "Voice session ended" }))) return;
     context.toast("Session ended", "The transcript stays on the record.");
   } else {
-    await context.mutate.patch(session.id, { status: "open" }, { expectRevision: session.revision, event: "Voice session reopened" });
+    if (!(await context.mutate.patch(session.id, { status: "open" }, { expectRevision: session.revision, event: "Voice session reopened" }))) return;
     context.toast("Session reopened", "Typed turns can be added again.");
   }
 }
@@ -3089,9 +3089,9 @@ async function inviteAgentToMeeting(context: ScreenContext): Promise<void> {
   const existing = body.participants ?? [];
   const candidate = agents.find((agent) => !existing.some((participant) => participant.id === agent.id));
   if (!candidate) { context.toast("Every active contract is already here", "No other AI employee is available to add.", "info"); return; }
-  await context.mutate.patch(meeting.id, {
+  if (!(await context.mutate.patch(meeting.id, {
     body: { ...(meeting.body as object), participants: [...existing, { id: candidate.id, name: candidate.title, kind: "ai", consent: "not_applicable" }] },
-  }, { expectRevision: meeting.revision, event: `${candidate.title} added to ${meeting.title}` });
+  }, { expectRevision: meeting.revision, event: `${candidate.title} added to ${meeting.title}` }))) return;
   context.toast("AI employee added", `${candidate.title} can read what its grants allow. It cannot listen: no audio service is connected.`);
 }
 
@@ -3116,7 +3116,7 @@ async function endMeeting(context: ScreenContext): Promise<void> {
   const meeting = await db.records.get(context.params.id ?? "");
   if (!meeting) return;
   if (meeting.status === "held") { context.toast("Already ended", `${meeting.title} is recorded as held.`, "info"); return; }
-  await context.mutate.patch(meeting.id, { status: "held", endAt: context.now.toISOString() }, { expectRevision: meeting.revision, event: `${meeting.title} ended` });
+  if (!(await context.mutate.patch(meeting.id, { status: "held", endAt: context.now.toISOString() }, { expectRevision: meeting.revision, event: `${meeting.title} ended` }))) return;
   context.toast("Meeting ended", "The record carries the end time. Actions and decisions stay as records.");
 }
 
@@ -3128,9 +3128,9 @@ async function refineQuestion(context: ScreenContext): Promise<void> {
   const body = (research.body ?? {}) as { question?: string; assumptions?: string[] };
   const gaps = (research.body as { gaps?: string[] } | undefined)?.gaps ?? [];
   const refined = `${body.question ?? research.title} (refined ${context.date(context.now)}: ${gaps.length ? `narrowed to exclude ${gaps.length} gap${gaps.length === 1 ? "" : "s"} that cannot be closed from these records` : "scope unchanged; no gap was recorded"})`;
-  await context.mutate.patch(research.id, {
+  if (!(await context.mutate.patch(research.id, {
     body: { ...(research.body as object), question: refined },
-  }, { expectRevision: research.revision, event: `Research question refined by ${context.actor}` });
+  }, { expectRevision: research.revision, event: `Research question refined by ${context.actor}` }))) return;
   context.toast("Question refined", "The new wording is on the record; the previous wording is in its history.");
 }
 
@@ -3139,10 +3139,10 @@ async function requestReview(context: ScreenContext): Promise<void> {
   const rows = await db.records.where("[organizationId+collection]").equals([context.org.id, "research"]).toArray();
   const research = rows.find((row) => row.id === context.params.id) ?? rows[0];
   if (!research) return;
-  await context.mutate.patch(research.id, {
+  if (!(await context.mutate.patch(research.id, {
     status: "review",
     fields: { ...research.fields, reviewRequested: true, reviewRequestedBy: context.actor },
-  }, { expectRevision: research.revision, event: `Independent review requested on ${research.title}` });
+  }, { expectRevision: research.revision, event: `Independent review requested on ${research.title}` }))) return;
   context.toast("Review requested", "The question is marked for review with who asked. No reviewer is assigned automatically.");
 }
 
@@ -3158,14 +3158,14 @@ async function reviseArtifact(context: ScreenContext): Promise<void> {
     `Sources read for this revision (${sources.length}): ${sources.join(", ") || "none recorded"}.`,
     "No sentence was generated: this revision only adds the source list and marks any line that has no record behind it.",
   ].join("\n");
-  await context.mutate.patch(artifact.id, {
+  if (!(await context.mutate.patch(artifact.id, {
     fields: { ...artifact.fields, version },
     body: {
       ...body,
       text: `${body.text ?? ""}${appendix}`,
       versions: [...(body.versions ?? []), { version, at: context.now.toISOString(), author: context.actor, summary: "Revision composed locally: source list appended, unsupported lines flagged. No model was called." }],
     },
-  }, { expectRevision: artifact.revision, event: `${artifact.title} revised locally to v${version}` });
+  }, { expectRevision: artifact.revision, event: `${artifact.title} revised locally to v${version}` }))) return;
   context.toast("Revision composed locally", `v${version} adds the source list. No model is connected, so nothing was written for you.`);
 }
 
@@ -3182,10 +3182,10 @@ async function archiveConversation(context: ScreenContext): Promise<void> {
   const conversation = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!conversation || conversation.collection !== "conversations") return;
   const archived = conversation.fields.archived === true;
-  await context.mutate.patch(conversation.id, {
+  if (!(await context.mutate.patch(conversation.id, {
     status: archived ? "active" : "archived",
     fields: { ...conversation.fields, archived: !archived },
-  }, { expectRevision: conversation.revision, event: `${conversation.title} ${archived ? "restored" : "archived"} by ${context.actor}` });
+  }, { expectRevision: conversation.revision, event: `${conversation.title} ${archived ? "restored" : "archived"} by ${context.actor}` }))) return;
   context.toast(archived ? "Restored" : "Archived", archived ? "It is back in Recent." : "It is out of the chat surface and still held for the retention schedule.");
 }
 

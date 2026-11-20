@@ -193,7 +193,7 @@ export const adminApp = registerApp({
       ],
       overlays: [
         { id: "Provider setup", kind: "modal", title: "Single sign-on", width: 560, render: ({ close, ...context }) => <ProviderSetup context={context} close={close} /> },
-        { id: "emergency revoke", kind: "modal", title: "Revoke sessions", tone: "danger", width: 620, capability: "manage_policy", presentation: { noRecordContext: true, guidance: "Choose one session or deliberately select all other active sessions. This records local revocation only; no identity-provider logout occurs." }, render: ({ close, ...context }) => <EmergencyRevoke context={context} close={close} /> },
+        { id: "emergency revoke", kind: "modal", title: "Revoke sessions", tone: "danger", width: OVERLAY_WIDTH.form, capability: "manage_policy", presentation: { noRecordContext: true, guidance: "Choose which other active sessions to mark revoked." }, render: ({ close, ...context }) => <EmergencyRevoke context={context} close={close} /> },
         { id: "security review", kind: "modal", title: "Confirm a security change", width: 560, render: ({ close, ...context }) => <SecurityReview context={context} close={close} /> },
         { id: "export sessions", kind: "modal", title: "Export sessions", width: 500, render: ({ close, ...context }) => <SessionsExport context={context} close={close} /> },
       ],

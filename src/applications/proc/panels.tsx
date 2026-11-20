@@ -170,7 +170,7 @@ export function ProcurementOverview({ context, lens }: { context: ScreenContext;
           </Stack>
         </Card>
       </Grid>
-      <ProviderBoundary id="email.send" title="Orders are not transmitted to suppliers" />
+      <ProviderBoundary id="email.send" title="Orders are not transmitted to suppliers" kept="Each order marked as issued, with its version history." />
     </Stack>
   );
 }
@@ -300,7 +300,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
   if (lens === "Communications") {
     return (
       <Stack gap={4}>
-        <ProviderBoundary id="email.send" title="Nothing has been sent to this supplier" />
+        <ProviderBoundary id="email.send" title="Nothing has been sent to this supplier" kept="Quote requests and notes, as drafts on this supplier." />
         <Card eyebrow="ON FILE" prov="human" title="What is recorded" subtitle="Contact details held in this workspace">
           <KeyValueList items={[
             { label: "Contact", value: String(supplier.fields.contactName ?? "—") },

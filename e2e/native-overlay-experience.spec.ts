@@ -109,7 +109,7 @@ test("emergency revocation requires scope and typed confirmation", async ({ page
   await page.goto("/o/northline/admin/security?overlay=emergency%20revoke");
   const dialog = page.getByRole("dialog", { name: "Revoke sessions" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("combobox", { name: "Revocation scope" })).toHaveValue("none");
+  await expect(dialog.getByRole("combobox", { name: "Revocation scope" })).toHaveValue("single");
   await expect(dialog.getByRole("button", { name: /Record revocation/ })).toBeDisabled();
   await expect(dialog).toContainText("No identity provider is connected");
   await dialog.getByRole("button", { name: "Cancel" }).click();

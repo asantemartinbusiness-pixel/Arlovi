@@ -184,7 +184,7 @@ function CommerceOverviewBody({ context, lens }: { context: ScreenContext; lens:
         <Stat label="Storefront conversion" value="Unavailable" unavailable meta="No analytics records a session" onClick={() => context.openOverlay("KPI explanation", { metric: "conversion" })} />
         <Stat label="Stock warnings" value={String(lowStock.length)} meta="At or below the reorder point" />
       </StatRow>
-      <ProviderBoundary id="payment.capture" />
+      <ProviderBoundary id="payment.capture" kept="The order, held as awaiting payment until someone records payment." />
       <Grid>
         <Card span={7} title="Latest orders" subtitle={`${live.length} excluding cancellations`} flush>
           <DataGrid
@@ -908,7 +908,7 @@ export function CheckoutAdmin({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Payments") {
     return (
       <Stack gap={4}>
-        <ProviderBoundary id="payment.capture" title="No payment processor is connected" />
+        <ProviderBoundary id="payment.capture" title="No payment processor is connected" kept="Payment state on each order, recorded by hand." />
         <Grid>
           {["Card", "Apple Pay and Google Pay", "Bank transfer", "Pay by invoice"].map((method) => (
             <Card key={method} span={6} title={method}

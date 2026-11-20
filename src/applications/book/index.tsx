@@ -111,7 +111,7 @@ export const bookApp = registerApp({
         { id: "conflict review", kind: "drawer", title: "Conflicts", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ConflictReview context={context} /> },
         { id: "reschedule notice", kind: "modal", title: "Reschedule notice", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleNotice context={context} close={close} />, footer: submitFooter("reschedule-notice", "Keep as a draft") },
         { id: "Reschedule", kind: "modal", title: "Move booking", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleBooking context={context} close={close} />, footer: submitFooter("reschedule", "Move booking") },
-        { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking") },
+        { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking", { tone: "danger" }) },
         confirmOverlay,
       ],
     },
@@ -136,7 +136,7 @@ export const bookApp = registerApp({
       ],
       overlays: [
         { id: "Reschedule", kind: "modal", title: "Reschedule", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleBooking context={context} close={close} />, footer: submitFooter("reschedule", "Move booking") },
-        { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking") },
+        { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking", { tone: "danger" }) },
         { id: "refund rule", kind: "drawer", title: "Cancellation and fees", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RefundRule context={context} /> },
         { id: "customer message", kind: "modal", title: "Message the customer", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CustomerMessage context={context} close={close} />, footer: submitFooter("customer-message", "Record message") },
         { id: "take deposit", kind: "modal", title: "Deposit", description: "Review the deposit and record its status without charging a card.", width: OVERLAY_WIDTH.modal, presentation: { selectedRecord: true, collection: "bookings" }, render: ({ close, ...context }) => <TakeDeposit context={context} close={close} /> },

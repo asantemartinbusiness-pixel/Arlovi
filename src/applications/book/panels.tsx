@@ -446,7 +446,7 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
           <Stat label="Processor reference" value="Unavailable" unavailable meta="No payment processor is connected" />
         </StatRow>
         <TotalsBlock totals={totals} money={context.money} label="Service" />
-        <ProviderBoundary id="payment.capture" title="A deposit cannot be taken here" >
+        <ProviderBoundary kept={"the deposit is recorded on the booking as requested or received; no card was charged."} id="payment.capture" title="A deposit cannot be taken here" >
           The deposit amount, the service and the person it belongs to are recorded against this booking. Collecting it needs a processor, so the booking says awaiting payment rather than implying money arrived.
         </ProviderBoundary>
       </Stack>
@@ -470,7 +470,7 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
             ))}
           </ol>
         )}
-        <ProviderBoundary id="email.send" />
+        <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" />
       </Stack>
     );
   }
@@ -886,7 +886,7 @@ export function PublicBookingPage({ context, lens }: { context: ScreenContext; l
             <Button variant="primary" disabled>Request this time — needs hosting</Button>
           </div>
         </div>
-        <ProviderBoundary id="site.publish" title="The booking page is not published" />
+        <ProviderBoundary kept={"the booking page and its fields are saved and export as HTML; nothing is published."} id="site.publish" title="The booking page is not published" />
       </Stack>
     );
   }
@@ -957,7 +957,7 @@ export function RemindersAndNoShows({ context, lens }: { context: ScreenContext;
     const queued = data.bookings.filter((booking) => String(booking.fields.reminderState) === "queued_local");
     return (
       <Stack gap={4}>
-        <ProviderBoundary id="email.send" title="No reminder has ever been delivered" />
+        <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" title="No reminder has ever been delivered" />
         <DataGrid rows={data.bookings.filter((booking) => booking.startAt)} rowId={(row) => row.id} label="Reminder history"
           columns={[
             { key: "title", header: "Booking", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },

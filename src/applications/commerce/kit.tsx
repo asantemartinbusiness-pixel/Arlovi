@@ -5,9 +5,9 @@ import { useRecord } from "@/platform/workspace";
 import { statusTone, paymentTone, paymentLabel, bodyOf, marginOf, onHandFor, useCommerceData, type OrderBody } from "./data";
 
 /** Footer for a form overlay: submit first on the left, Cancel at the end. */
-export const commerceFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
+export const commerceFooter = (formId: string, label: string, options?: { tone?: "danger" }) => ({ close }: { close: () => void }) => (
   <OverlayActions
-    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    primary={<Button variant={options?.tone === "danger" ? "danger" : "primary"} type="submit" form={formId}>{label}</Button>}
     end={<Button variant="ghost" onClick={close}>Cancel</Button>}
   />
 );

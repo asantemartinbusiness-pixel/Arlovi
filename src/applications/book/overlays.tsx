@@ -416,7 +416,7 @@ function RescheduleForm({ context, close, booking }: { context: ScreenContext; c
       <Field label="Note for the record" required={reasonCode === "other"} error={touched && reasonCode === "other" && reasonProblem ? reasonProblem : undefined}>
         <TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} />
       </Field>
-      <ProviderBoundary id="email.send" title="The customer is not notified automatically" />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" title="The customer is not notified automatically" />
     </form>
   );
 }
@@ -450,7 +450,7 @@ export function RefundRule({ context }: { context: ScreenContext }) {
           : "No fee applies under the recorded policy."}
       </Notice>
       {deposit > 0 && String(booking.fields.depositState) === "paid_local" && (
-        <ProviderBoundary id="payment.capture" title="Returning the deposit cannot be done here" />
+        <ProviderBoundary kept={"the deposit is recorded on the booking as requested or received; no card was charged."} id="payment.capture" title="Returning the deposit cannot be done here" />
       )}
     </Stack>
   );
@@ -486,7 +486,7 @@ export function CustomerMessage({ context, close }: { context: ScreenContext; cl
       ]} />
       {!contact && <Notice tone="warning" title="This booking has no customer record">A message cannot be addressed to anyone. Link a contact first.</Notice>}
       <Field label="Message" required><TextArea value={text} rows={5} onChange={(event) => setText(event.target.value)} required /></Field>
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" />
     </form>
   );
 }
@@ -600,7 +600,7 @@ function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenC
       </section>
 
       <div className="book-deposit-provider">
-        <ProviderBoundary id="payment.capture" title="Payment collection is not connected">
+        <ProviderBoundary kept={"the deposit is recorded on the booking as requested or received; no card was charged."} id="payment.capture" title="Payment collection is not connected">
           No card details are entered and no charge is attempted. A request is recorded as awaiting payment;
           an external receipt is recorded only after you confirm the money arrived.
         </ProviderBoundary>
@@ -967,7 +967,7 @@ export function PublishBookingPage({ context, close }: { context: ScreenContext;
         </ul>
       </OverlaySection>
       {problems.length > 0 && <Notice tone="warning" title="Before publishing">{problems.join(" ")}</Notice>}
-      <ProviderBoundary id="site.publish" title="There is nowhere to publish to">
+      <ProviderBoundary kept={"the booking page and its fields are saved and export as HTML; nothing is published."} id="site.publish" title="There is nowhere to publish to">
         The page model, its services and its fields are saved here and export as HTML. Until hosting is connected, no visitor can reach it, so the booking page cannot take a booking on its own.
       </ProviderBoundary>
       <Button
@@ -1041,7 +1041,7 @@ export function ReminderTemplateEditor({ context, close }: { context: ScreenCont
         <TextArea value={text} rows={5} onChange={(event) => setText(event.target.value)} required />
       </Field>
       {!hasOptOut && <Notice tone="danger" title="An SMS needs an opt-out">Include how to stop receiving messages, for example "Reply STOP to opt out".</Notice>}
-      <ProviderBoundary id="telephony" title={channel === "sms" ? "No telephony provider is connected" : "No mail provider is connected"} />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="telephony" title={channel === "sms" ? "No telephony provider is connected" : "No mail provider is connected"} />
     </form>
   );
 }
@@ -1074,7 +1074,7 @@ export function SendPreview({ context }: { context: ScreenContext }) {
         <div className="t4-device-head">{String(template.fields.channel) === "email" ? (body.subject ?? "").replace(/\{\{service\}\}/g, service?.title ?? "your appointment").replace(/\{\{time\}\}/g, booking?.startAt ? new Date(booking.startAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "the booked time") || "No subject" : "SMS"}</div>
         <div className="t4-device-body"><p style={{ whiteSpace: "pre-wrap" }}>{filled}</p></div>
       </div>
-      <ProviderBoundary id={String(template.fields.channel) === "sms" ? "telephony" : "email.send"} />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id={String(template.fields.channel) === "sms" ? "telephony" : "email.send"} />
       {template.fields.lastTestAt ? <span className="ds-subtle">Last test held locally {context.relative(String(template.fields.lastTestAt))} by {String(template.fields.lastTestBy)}.</span> : null}
       <Button variant="primary" onClick={() => recordTestSend(context, template, context.actor)}>Record a test send to {context.actor}</Button>
     </Stack>

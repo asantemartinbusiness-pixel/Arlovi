@@ -15,7 +15,7 @@ import {
   useProjectData,
 } from "./panels";
 import "./project.css";
-import { taskRecord, StagePill } from "./taskInspector";
+import { taskRecord, StagePill, TaskSummary, TaskDrawerFooter } from "./taskInspector";
 import { criticalPath, dependenciesOf } from "./timeline";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
 import { approveHours } from "@/applications/hr/actions";
@@ -360,6 +360,25 @@ function BatchReview({ context, close }: { context: ScreenContext; close: () => 
   );
 }
 
+function WorkloadSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { person?: string } | undefined;
+  const data = useProjectData();
+  const selected = useRecord(context.selectedId);
+  const person = payload?.person ?? String(selected?.fields.assignee ?? "");
+  if (!person) return null;
+  const assigned = data.tasks.filter((task) => String(task.fields.assignee ?? task.ownerName) === person && stageOf(task) !== "done" && task.fields.kind !== "onboarding");
+  const hours = assigned.reduce((sum, task) => sum + Number(task.fields.estimateHours ?? 0), 0);
+  return (
+    <OverlaySummary
+      avatar={<Avatar name={person} size="lg" />}
+      eyebrow="Holds"
+      title={person}
+      status={hours > 35 ? <Pill tone="danger" dot>Over capacity</Pill> : undefined}
+      meta={[`${assigned.length} open ${assigned.length === 1 ? "task" : "tasks"}`]}
+    />
+  );
+}
+
 function WorkloadDetail({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { person?: string } | undefined;
   const data = useProjectData();
@@ -371,13 +390,6 @@ function WorkloadDetail({ context }: { context: ScreenContext }) {
   const blocked = assigned.filter((task) => stageOf(task) === "blocked").length;
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        avatar={<Avatar name={person} size="lg" />}
-        eyebrow="Holds"
-        title={person}
-        status={hours > 35 ? <Pill tone="danger" dot>Over capacity</Pill> : undefined}
-        meta={[`${assigned.length} open ${assigned.length === 1 ? "task" : "tasks"}`]}
-      />
       <FactGrid columns={3} items={[
         { label: "Estimated", value: `${hours}h of 35h`, mono: true, tone: hours > 35 ? "danger" : undefined },
         { label: "Projects", value: String(new Set(assigned.map((task) => task.parentId)).size), mono: true },
@@ -776,22 +788,30 @@ function ArchiveImpact({ context, close }: { context: ScreenContext; close: () =
   );
 }
 
+function QuickSummary({ context }: { context: ScreenContext }) {
+  const data = useProjectData();
+  const project = useRecord(context.selectedId) ?? data.projects[0];
+  if (!project) return null;
+  const health = String(project.fields.health ?? "");
+  return (
+    <OverlaySummary
+      eyebrow="Project"
+      title={project.title}
+      status={health ? <Pill tone={health === "off_track" ? "danger" : health === "at_risk" ? "warning" : "success"} dot>{health.replace("_", " ")}</Pill> : undefined}
+      meta={[project.ownerName, `${context.date(project.startAt)} – ${context.date(project.endAt)}`]}
+      actions={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`)}>Open the project</Button>}
+    />
+  );
+}
+
 function QuickDetail({ context }: { context: ScreenContext }) {
   const data = useProjectData();
   const project = useRecord(context.selectedId) ?? data.projects[0];
   if (!project) return <Empty title="Select a project" icon={<FolderKanban size={20} />} />;
   const tasks = data.tasks.filter((task) => task.parentId === project.id && task.fields.kind !== "onboarding");
   const done = tasks.filter((task) => stageOf(task) === "done").length;
-  const health = String(project.fields.health ?? "");
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow="Project"
-        title={project.title}
-        status={health ? <Pill tone={health === "off_track" ? "danger" : health === "at_risk" ? "warning" : "success"} dot>{health.replace("_", " ")}</Pill> : undefined}
-        meta={[project.ownerName, `${context.date(project.startAt)} – ${context.date(project.endAt)}`]}
-        actions={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`)}>Open the project</Button>}
-      />
       {project.summary && <p className="ds-subtle">{project.summary}</p>}
       <FactGrid columns={3} items={[
         { label: "Tasks done", value: `${done} of ${tasks.length}`, mono: true },
@@ -872,6 +892,15 @@ function ConflictReview({ context }: { context: ScreenContext }) {
 }
 
 /** What waits for what: tasks in the order they can start, each step released by the one before it. */
+function GraphSummary({ context }: { context: ScreenContext }) {
+  const data = useProjectData();
+  const project = useRecord(context.params.id) ?? data.projects[0];
+  const tasks = data.tasks.filter((task) => task.parentId === project?.id);
+  if (tasks.length === 0) return null;
+  const critical = new Set(criticalPath(tasks));
+  return <OverlaySummary eyebrow="What waits for what" title={project?.title ?? "Project"} meta={[`${tasks.length} tasks`, `${critical.size} on the critical path`]} />;
+}
+
 function DependencyGraph({ context }: { context: ScreenContext }) {
   const data = useProjectData();
   const project = useRecord(context.params.id) ?? data.projects[0];
@@ -895,7 +924,6 @@ function DependencyGraph({ context }: { context: ScreenContext }) {
   const steps = [...new Set(tasks.map((task) => level.get(task.id) ?? 0))].sort((a, b) => a - b);
   return (
     <Stack gap={3}>
-      <OverlaySummary eyebrow="What waits for what" title={project?.title ?? "Project"} meta={[`${tasks.length} tasks`, `${critical.size} on the critical path`]} />
       {steps.map((step) => (
         <OverlaySection key={step} title={step === 0 ? "Can start now" : `Step ${step + 1} · released by step ${step}`}>
           <ul className="pj-depworks">
@@ -981,7 +1009,7 @@ export const projectApp = registerApp({
         ...kitOverlays,
         { id: "Project template", kind: "modal", title: "Create a project", width: 600, render: ({ close, ...context }) => <ProjectFromTemplate context={context} close={close} />, footer: submitFooter("pj-create", "Create project") },
         { id: "archive impact", kind: "modal", title: "Archive this project", tone: "danger", width: 540, render: ({ close, ...context }) => <ArchiveImpact context={context} close={close} /> },
-        { id: "quick detail", kind: "drawer", title: "Project", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <QuickDetail context={context} /> },
+        { id: "quick detail", kind: "drawer", title: "Project", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <QuickSummary context={context} />, render: ({ ...context }) => <QuickDetail context={context} /> },
       ],
     },
 
@@ -1031,7 +1059,7 @@ export const projectApp = registerApp({
         { id: "new task", kind: "modal", title: "New task", width: 560, render: ({ close, ...context }) => <NewTask context={context} close={close} />, footer: submitFooter("pj-new-task", "Create the task") },
         { id: "move task", kind: "modal", title: "Move a task", width: 480, render: ({ close, ...context }) => <MoveTask context={context} close={close} /> },
         { id: "board filter", kind: "modal", title: "Filter the board", width: 440, render: ({ close, ...context }) => <BoardFilter context={context} close={close} /> },
-        { id: "Task drawer", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <TaskDrawer context={context} close={context.close} /> },
+        { id: "Task drawer", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.record, summary: ({ ...context }) => <TaskSummary context={context} />, render: ({ ...context }) => <TaskDrawer context={context} close={context.close} />, footer: (context) => <TaskDrawerFooter context={context} close={context.close} /> },
         { id: "dependency selector", kind: "modal", title: "Link work", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DependencySelector context={context} close={close} />, footer: submitFooter("pj-dependency", "Save link") },
         { id: "stage rule", kind: "modal", title: "This move skips a review", tone: "danger", width: 540, render: ({ close, ...context }) => <StageRule context={context} close={close} /> },
         { id: "batch action review", kind: "modal", title: "Review this batch first", width: 620, render: ({ close, ...context }) => <BatchReview context={context} close={close} /> },
@@ -1060,7 +1088,7 @@ export const projectApp = registerApp({
         { id: "delegate AI", kind: "modal", title: "Delegate to an AI employee", width: 520, render: ({ close, ...context }) => <DelegateAI context={context} close={close} />, footer: submitFooter("pj-delegate", "Delegate") },
         { id: "Assignee picker", kind: "modal", title: "Assign this task", width: 520, render: ({ close, ...context }) => <AssigneePicker context={context} close={close} />, footer: submitFooter("pj-assignee", "Assign") },
         { id: "dependency selector", kind: "modal", title: "Link work", width: 560, render: ({ close, ...context }) => <DependencySelector context={context} close={close} />, footer: submitFooter("pj-dependency", "Save link") },
-        { id: "completion check", kind: "modal", title: "Before this is called done", width: 560, render: ({ close, ...context }) => <CompletionCheck context={context} close={close} /> },
+        { id: "completion check", kind: "modal", title: "Before this is called done", width: 560, summary: ({ ...context }) => <CompletionSummary context={context} />, render: ({ close: _close, ...context }) => <CompletionCheck context={context} />, footer: (context) => <CompletionFooter context={context} close={context.close} /> },
       ],
     },
 
@@ -1083,7 +1111,7 @@ export const projectApp = registerApp({
         { id: "duration edit", kind: "modal", title: "Change a duration", width: 480, render: ({ close, ...context }) => <DurationEdit context={context} close={close} /> },
         { id: "Date edit", kind: "modal", title: "Reschedule", width: 520, render: ({ close, ...context }) => <DateEdit context={context} close={close} />, footer: submitFooter("pj-dates", "Save dates") },
         { id: "conflict review", kind: "drawer", title: "Scheduling conflicts", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ConflictReview context={context} /> },
-        { id: "dependency graph", kind: "drawer", title: "What waits for what", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <DependencyGraph context={context} /> },
+        { id: "dependency graph", kind: "drawer", title: "What waits for what", width: OVERLAY_WIDTH.record, summary: ({ ...context }) => <GraphSummary context={context} />, render: ({ ...context }) => <DependencyGraph context={context} /> },
       ],
     },
 
@@ -1098,7 +1126,7 @@ export const projectApp = registerApp({
         { id: "adjust estimates", label: "Adjust an estimate", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a task first"), run: (context) => context.openOverlay("allocation editor") },
       ],
       overlays: [
-        { id: "Workload detail", kind: "drawer", title: "What this person holds", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <WorkloadDetail context={context} /> },
+        { id: "Workload detail", kind: "drawer", title: "What this person holds", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <WorkloadSummary context={context} />, render: ({ ...context }) => <WorkloadDetail context={context} /> },
         { id: "allocation editor", kind: "modal", title: "Owner and estimate", width: 520, render: ({ close, ...context }) => <AllocationEditor context={context} close={close} />, footer: submitFooter("pj-allocation", "Save") },
         { id: "over-capacity alert", kind: "drawer", title: "Over capacity", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <OverCapacity context={context} /> },
       ],
@@ -1167,19 +1195,51 @@ export const projectApp = registerApp({
   },
 });
 
-function CompletionCheck({ context, close }: { context: ScreenContext; close: () => void }) {
+function useCompletion(context: ScreenContext) {
   const task = useRecord(context.params.id ?? context.selectedId);
   const data = useProjectData();
-  if (!task) return <Empty title="No task" />;
-  const checklist = (task.body as { checklist?: { label: string; done: boolean }[] } | undefined)?.checklist ?? [];
+  const checklist = (task?.body as { checklist?: { label: string; done: boolean }[] } | undefined)?.checklist ?? [];
   const unticked = checklist.filter((item) => !item.done);
-  const blockers = String(task.fields.dependsOn ?? "").split(",").filter(Boolean)
+  const blockers = String(task?.fields.dependsOn ?? "").split(",").filter(Boolean)
     .map((id) => data.tasks.find((row) => row.id === id))
     .filter((row): row is Rec => Boolean(row) && stageOf(row!) !== "done");
-  const hours = data.shifts.filter((entry) => entry.fields.taskId === task.id).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0);
+  const hours = data.shifts.filter((entry) => entry.fields.taskId === task?.id).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0);
+  return { task, checklist, unticked, blockers, hours };
+}
+
+function CompletionSummary({ context }: { context: ScreenContext }) {
+  const { task } = useCompletion(context);
+  return task ? <OverlaySummary eyebrow="Completing" title={task.title} /> : null;
+}
+
+function CompletionFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { task, blockers } = useCompletion(context);
+  if (!task) return null;
+  return (
+    <OverlayActions
+      primary={
+        <Button
+          variant="primary"
+          disabled={blockers.length > 0}
+          onClick={async () => {
+            await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", completedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} completed by ${context.actor}` });
+            context.toast("Task complete", "The stage changed on the record, with your name against it.");
+            close();
+          }}
+        >
+          Mark complete
+        </Button>
+      }
+      secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    />
+  );
+}
+
+function CompletionCheck({ context }: { context: ScreenContext }) {
+  const { task, checklist, unticked, blockers, hours } = useCompletion(context);
+  if (!task) return <Empty title="No task" />;
   return (
     <Stack gap={3}>
-      <OverlaySummary eyebrow="Completing" title={task.title} />
       <FactGrid columns={3} items={[
         { label: "Checklist", value: `${checklist.length - unticked.length} of ${checklist.length} ticked`, mono: true, tone: unticked.length ? "warning" : "success" },
         { label: "Waiting on", value: blockers.length ? blockers.map((row) => row.title).join(", ") : "Nothing", tone: blockers.length ? "danger" : undefined },
@@ -1187,23 +1247,6 @@ function CompletionCheck({ context, close }: { context: ScreenContext; close: ()
       ]} />
       {blockers.length > 0 && <Notice tone="danger" title="This task depends on unfinished work">Completing it now would say something finished that has not.</Notice>}
       {unticked.length > 0 && blockers.length === 0 && <Notice tone="warning" title={`${unticked.length} checklist items are not ticked`}>{unticked.map((item) => item.label).join("; ")}.</Notice>}
-      <OverlayActions
-        variant="form"
-        primary={
-          <Button
-            variant="primary"
-            disabled={blockers.length > 0}
-            onClick={async () => {
-              await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", completedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} completed by ${context.actor}` });
-              context.toast("Task complete", "The stage changed on the record, with your name against it.");
-              close();
-            }}
-          >
-            Mark complete
-          </Button>
-        }
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
-      />
     </Stack>
   );
 }

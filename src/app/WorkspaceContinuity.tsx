@@ -54,6 +54,9 @@ export function WorkspaceContinuity({ compact = false }: { compact?: boolean }) 
   const toggle = (path: string) => toggleSavedNavigation(org.id,org.slug,path);
   const continued = resume.filter(item =>
     !query.trim() || `${item.title} ${item.page}`.toLowerCase().includes(query.trim().toLowerCase()));
+  if (compact && continued.length === 0 && visiblePinned.length === 0 && visibleRecent.length === 0) {
+    return <p className="ws-continuity-none" role="status">Nothing to return to yet.</p>;
+  }
   return <section className="ws-section ws-continuity" aria-label="Recent and saved work">
     <div className="ws-continuity-heading"><h2><Clock3 size={18}/> {compact ? "Pick up where you left off" : "Recent and saved work"}</h2>
       {!compact && available.length > 0 && <button className="ws-continuity-clear" type="button" onClick={() => clearRecentNavigation(org.id,org.slug)}>Clear recent</button>}

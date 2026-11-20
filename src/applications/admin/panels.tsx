@@ -860,7 +860,7 @@ export function PolicyEditor({ context, close }: { context: ScreenContext; close
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = ofKind(data.policies, "role").find((row) => row.id === (payload?.id ?? context.selectedId));
   const [title, setTitle] = useSeeded(existing?.title ?? "");
-  const [basedOnValue, setBasedOn] = useSeeded(String(existing?.fields.basedOn ?? "member"));
+  const [basedOnValue, setBasedOn] = useSeeded(String(existing?.fields.basedOn ?? "owner"));
   const basedOn = basedOnValue as Role;
   const [caps, setCaps] = useSeededList(typeof existing?.fields.capabilities === "string" ? existing.fields.capabilities : "");
   const [deny, setDeny] = useSeededList(typeof existing?.fields.deny === "string" ? existing.fields.deny : "");
@@ -902,9 +902,9 @@ export function PolicyEditor({ context, close }: { context: ScreenContext; close
           {ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
         </Select>
       </Field>
-      <Field label="Capabilities" error={widened.length ? error || `Not held by ${ROLE_LABELS[basedOn]}: ${widened.map(capabilityLabel).join(", ")}` : undefined}>
+      <Field label="Capabilities" hint={CAPABILITIES.every((capability) => !roleCan(basedOn, capability)) ? `${ROLE_LABELS[basedOn]} holds no capabilities to keep; choose another base.` : "Tick what this role keeps."} error={widened.length ? error || `Not held by ${ROLE_LABELS[basedOn]}: ${widened.map(capabilityLabel).join(", ")}` : undefined}>
         <Stack gap={2}>
-          {CAPABILITIES.map((capability) => (
+          {CAPABILITIES.filter((capability) => roleCan(basedOn, capability) || caps.includes(capability)).map((capability) => (
             <Checkbox
               key={capability}
               label={`${capabilityLabel(capability)}${roleCan(basedOn, capability) ? "" : " — not in the base view"}`}

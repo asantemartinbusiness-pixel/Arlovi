@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ArrowUpRight, CalendarDays, CheckCircle2, CircleDot, Clock3, Inbox, Layers3, Rocket, Bell, ShieldCheck } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, CircleDot, Rocket, Bell, ShieldCheck } from "lucide-react";
 import { ContextualCreate } from "@/app/ContextualCreate";
 import { appEntry } from "@/app/catalog";
 import { buildAttention, filterForRole, headerAttentionCounts, routeForRecord } from "@/platform/attention";
@@ -22,11 +22,11 @@ function WorkItem({ record, slug }: { record: Rec; slug: string }) {
     <ArrowUpRight size={17} aria-hidden="true"/>
   </Link>;
 }
-function Waiting({ label, value, detail, to, icon: Icon, tone }: { label: string; value: number; detail: string; to: string; icon: typeof CheckCircle2; tone: "decision" | "update" | "task" | "mission" }) {
-  return <Link to={to} className="wh-wait" data-tone={tone} data-zero={value === 0 || undefined}>
+function Waiting({ label, value, ready, detail, to, icon: Icon, tone }: { label: string; value: number; ready: boolean; detail: string; to: string; icon: typeof CheckCircle2; tone: "decision" | "update" | "task" | "mission" }) {
+  return <Link to={to} className="wh-wait" data-tone={tone} data-zero={(ready && value === 0) || undefined}>
     <span className="wh-wait-icon" aria-hidden="true"><Icon size={16}/></span>
     <span className="wh-wait-copy"><span className="wh-wait-label">{label}</span><small>{detail}</small></span>
-    <strong>{value}</strong>
+    <strong>{ready ? value : "–"}</strong>
   </Link>;
 }
 /** Same feed the header badges read, so the numbers on Home can never disagree with the bell. */
@@ -40,6 +40,15 @@ function useWaitingOnYou() {
     workflowApprovals: data.workflowApprovals, orgSlug: org.slug, now,
   }), role), receipts, org.id, role, actor, now)), [data, org.slug, org.id, now, role, actor, receipts]);
 }
+/** Counts keep arriving while collections hydrate; hold them back until they have stopped changing. */
+function useSettled(key: string, ms = 1400): boolean {
+  const [settled, setSettled] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(key), ms);
+    return () => window.clearTimeout(timer);
+  }, [key, ms]);
+  return settled === key;
+}
 export function WorkspaceHome({ orgName, slug, actor, tasks, projects, missions, docs, continuity }: Props) {
   const mine = tasks.filter(t => t.ownerName === actor || t.fields.assignee === actor);
   const pending = mine.filter(t => !closed.has(t.status));
@@ -49,20 +58,22 @@ export function WorkspaceHome({ orgName, slug, actor, tasks, projects, missions,
   const focused = [...pending].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
   const { decisions, unreadUpdates } = useWaitingOnYou();
   const inbox = appEntry("INBOX", slug);
+  const running = openMissions.filter(m => m.status === "running").length;
+  const ready = useSettled(`${decisions}|${unreadUpdates}|${pending.length}|${openMissions.length}`);
   const waiting = decisions + pending.length;
   return <div className="wh-home">
     <header className="wh-head">
       <div className="wh-head-copy">
         <span className="ws-eyebrow">{orgName.toUpperCase()} / MY WORKSPACE</span>
-        <h1>{waiting === 0 ? <>Nothing is <em>waiting on you.</em></> : <><em>{waiting} {waiting === 1 ? "thing needs" : "things need"} you</em> today.</>}</h1>
+        <h1>{!ready ? <span className="wh-pending">Checking what is waiting on you…</span> : waiting === 0 ? <>Nothing is <em>waiting on you.</em></> : <><em>{waiting} {waiting === 1 ? "thing needs" : "things need"} you</em> today.</>}</h1>
       </div>
       <div className="wh-hero-actions"><ContextualCreate label="Create new"/><Link className="wh-secondary-action" to={inbox}>Open inbox <ArrowUpRight size={16}/></Link></div>
     </header>
     <section className="wh-waiting" aria-label="Waiting on you">
-      <Waiting tone="decision" label="Decisions waiting" value={decisions} detail={decisions ? "Approvals need your answer" : "Nothing needs your approval"} to={inbox} icon={ShieldCheck}/>
-      <Waiting tone="update" label="Unread updates" value={unreadUpdates} detail={unreadUpdates ? "New activity since you looked" : "You are up to date"} to={inbox} icon={Bell}/>
-      <Waiting tone="task" label="Assigned to me" value={pending.length} detail={pending.length ? "Open tasks on your list" : "No open tasks"} to={`/o/${slug}/workspace/work`} icon={CheckCircle2}/>
-      <Waiting tone="mission" label="Open missions" value={openMissions.length} detail={`${activeProjects.length} active project${activeProjects.length === 1 ? "" : "s"}`} to={appEntry("MISSION",slug)} icon={Rocket}/>
+      <Waiting tone="decision" label="Decisions waiting" ready={ready} value={decisions} detail={decisions ? "Approvals need your answer" : "Nothing needs your approval"} to={inbox} icon={ShieldCheck}/>
+      <Waiting tone="update" label="Unread updates" ready={ready} value={unreadUpdates} detail={unreadUpdates ? "New activity since you looked" : "You are up to date"} to={inbox} icon={Bell}/>
+      <Waiting tone="task" label="Assigned to me" ready={ready} value={pending.length} detail={pending.length ? "Open tasks on your list" : "No open tasks"} to={`/o/${slug}/workspace/work`} icon={CheckCircle2}/>
+      <Waiting tone="mission" label="Open missions" ready={ready} value={openMissions.length} detail={openMissions.length ? `${running} running, ${openMissions.length - running} waiting` : "None open"} to={appEntry("MISSION",slug)} icon={Rocket}/>
     </section>
     <div className="wh-main-grid">
       <section className="wh-panel wh-priority" aria-label="Assigned work">
@@ -71,14 +82,6 @@ export function WorkspaceHome({ orgName, slug, actor, tasks, projects, missions,
       </section>
       <aside className="wh-side-column">
         <section className="wh-panel wh-resume" aria-label="Continue where you left off">{continuity}</section>
-        <section className="wh-panel wh-quick" aria-label="Quick access"><div className="wh-panel-heading"><div><h2>Go to</h2></div></div>
-          <div className="wh-quick-grid">
-            <Link to={inbox}><Inbox size={18}/><span>Inbox</span><ArrowUpRight size={15}/></Link>
-            <Link to={appEntry("BOOK",slug)}><CalendarDays size={18}/><span>Calendar</span><ArrowUpRight size={15}/></Link>
-            <Link to={`/o/${slug}/workspace/spaces`}><Layers3 size={18}/><span>Spaces</span><ArrowUpRight size={15}/></Link>
-            <Link to={`/o/${slug}/workspace/recent`}><Clock3 size={18}/><span>Recent work</span><ArrowUpRight size={15}/></Link>
-          </div>
-        </section>
       </aside>
     </div>
     {recentDocs.length > 0 && <section className="wh-panel wh-documents" aria-label="Recently updated documents">

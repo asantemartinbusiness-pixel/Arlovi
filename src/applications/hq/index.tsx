@@ -13,7 +13,7 @@ import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import * as repo from "@/platform/repo";
 import { addDays, clockIso, freshness, resolveRange, sameDay } from "@/platform/clock";
-import { Building } from "@/applications/hq/pieces";
+import { Building, BuildingSummary } from "@/applications/hq/pieces";
 import { outstandingMinor, receivablePosition } from "@/applications/fin/data";
 import { approvalRows } from "@/applications/inbox/engine";
 import {
@@ -1021,6 +1021,37 @@ function WorkplaceDirectory({ context, lens }: { context: ScreenContext; lens: s
  * Shared overlay bodies
  * ====================================================================== */
 
+function MetricSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { metric?: string } | undefined;
+  const data = useCollections(["invoices", "journals"]);
+  const { now } = useWorkspace();
+  const metric = payload?.metric ?? "receivable";
+  if (metric === "ledger") {
+    const latest = data.journals.filter((journal) => journal.status === "posted").map((journal) => journal.at ?? journal.updatedAt).sort().at(-1);
+    const age = freshness(latest, now);
+    return (
+      <OverlaySummary
+        eyebrow="Ledger posted"
+        title={age.known ? context.date(latest) : "Unavailable"}
+        status={age.stale ? <Pill tone="warning" dot>Stale</Pill> : age.known ? <Pill tone="success" dot>Current</Pill> : <Pill tone="neutral">No source</Pill>}
+        meta={[age.known ? `${age.days} ${age.days === 1 ? "day" : "days"} old` : "No posting recorded"]}
+      />
+    );
+  }
+  const position = receivablePosition(data.invoices, now);
+  const overdue = metric === "overdue";
+  const rows = overdue ? position.overdue : position.open;
+  const total = overdue ? position.overdueMinor : position.receivableMinor;
+  return (
+    <OverlaySummary
+      eyebrow={overdue ? "Overdue" : "Receivable"}
+      title={<span className="ds-num">{context.money(total)}</span>}
+      status={overdue && rows.length > 0 ? <Pill tone="danger" dot>{rows.length} past due</Pill> : <Pill tone="success" dot>Posted</Pill>}
+      meta={[`${rows.length} invoice ${rows.length === 1 ? "record" : "records"}`, "Finance computation"]}
+    />
+  );
+}
+
 function MetricInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { metric?: string } | undefined;
   const data = useCollections(["invoices", "journals"]);
@@ -1031,12 +1062,6 @@ function MetricInspector({ context }: { context: ScreenContext }) {
     const age = freshness(latest, now);
     return (
       <Stack gap={3}>
-        <OverlaySummary
-          eyebrow="Ledger posted"
-          title={age.known ? context.date(latest) : "Unavailable"}
-          status={age.stale ? <Pill tone="warning" dot>Stale</Pill> : age.known ? <Pill tone="success" dot>Current</Pill> : <Pill tone="neutral">No source</Pill>}
-          meta={[age.known ? `${age.days} ${age.days === 1 ? "day" : "days"} old` : "No posting recorded"]}
-        />
         <FactGrid columns={2} items={[
           { label: "Source", value: "Posted journals in this browser" },
           { label: "Last posting", value: age.known ? context.date(latest) : "Not recorded", mono: true },
@@ -1052,15 +1077,8 @@ function MetricInspector({ context }: { context: ScreenContext }) {
   const position = receivablePosition(data.invoices, now);
   const overdue = metric === "overdue";
   const rows = overdue ? position.overdue : position.open;
-  const total = overdue ? position.overdueMinor : position.receivableMinor;
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow={overdue ? "Overdue" : "Receivable"}
-        title={<span className="ds-num">{context.money(total)}</span>}
-        status={overdue && rows.length > 0 ? <Pill tone="danger" dot>{rows.length} past due</Pill> : <Pill tone="success" dot>Posted</Pill>}
-        meta={[`${rows.length} invoice ${rows.length === 1 ? "record" : "records"}`, "Finance computation"]}
-      />
       <OverlaySection title="Sources" hint="The same computation Finance uses. Each row adds to the figure.">
         <DataGrid rows={rows} rowId={(row) => row.id} label="Metric sources" filterable={false} columns={[
           { key: "title", header: "Invoice", primary: true, cell: (row) => row.title },
@@ -1141,6 +1159,25 @@ function GoalEditor({ context, close }: { context: ScreenContext; close: () => v
   );
 }
 
+function MemberSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const member = useRecord(payload?.id ?? context.selectedId);
+  const departments = useCollection("departments");
+  if (!member) return null;
+  const ai = member.fields.kind === "ai";
+  const department = departments.find((dept) => dept.id === member.fields.departmentId);
+  return (
+    <OverlaySummary
+      avatar={<Avatar name={member.title} kind={ai ? "ai" : "human"} size="lg" />}
+      eyebrow={ai ? "AI employee" : "Person"}
+      title={member.title}
+      status={<Pill tone={ai ? "info" : "neutral"}>{String(member.fields.role ?? "member")}</Pill>}
+      meta={[String(member.fields.title ?? ""), department?.title]}
+      actions={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/hq/directory`)}>Directory</Button>}
+    />
+  );
+}
+
 function MemberInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const member = useRecord(payload?.id ?? context.selectedId);
@@ -1150,14 +1187,6 @@ function MemberInspector({ context }: { context: ScreenContext }) {
   const department = departments.find((dept) => dept.id === member.fields.departmentId);
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        avatar={<Avatar name={member.title} kind={ai ? "ai" : "human"} size="lg" />}
-        eyebrow={ai ? "AI employee" : "Person"}
-        title={member.title}
-        status={<Pill tone={ai ? "info" : "neutral"}>{String(member.fields.role ?? "member")}</Pill>}
-        meta={[String(member.fields.title ?? ""), department?.title]}
-        actions={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/hq/directory`)}>Directory</Button>}
-      />
       <FactGrid columns={2} items={[
         { label: "Department", value: department?.title ?? "Unassigned" },
         { label: "Role view", value: String(member.fields.role ?? "member") },
@@ -1323,7 +1352,7 @@ export const hqApp = registerApp({
       overlays: [
         { id: "Widget picker", kind: "drawer", title: "Arrange cards", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <ArrangeCards context={context} close={close} />, footer: submitFooter("hq-arrange", "Save arrangement") },
         { id: "recommendations", kind: "drawer", title: "Recommendations", width: 480, render: ({ ...context }) => <RecommendationsDrawer context={context} /> },
-        { id: "metric inspector", kind: "drawer", title: "Where this figure comes from", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <MetricInspector context={context} /> },
+        { id: "metric inspector", kind: "drawer", title: "Where this figure comes from", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <MetricSummary context={context} />, render: ({ ...context }) => <MetricInspector context={context} /> },
         { id: "save view dialog", kind: "modal", title: "Save this view", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SaveViewDialog context={context} close={close} />, footer: submitFooter("save-view", "Save view") },
         { id: "key results", kind: "modal", title: "Objective check-in", width: 640, render: ({ close, ...context }) => <KeyResultsEditor context={context} close={close} /> },
         { id: "log decision", kind: "modal", title: "Log a decision", width: 580, render: ({ close, ...context }) => <DecisionEditor context={context} close={close} /> },
@@ -1360,7 +1389,7 @@ export const hqApp = registerApp({
             </form>
           ),
           footer: submitFooter("quick-task", "Add task") },
-        { id: "work item inspector", kind: "drawer", title: "Work item", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <WorkItemInspector context={context} /> },
+        { id: "work item inspector", kind: "drawer", title: "Work item", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <WorkItemSummary context={context} />, render: ({ ...context }) => <WorkItemInspector context={context} /> },
         { id: "request help", kind: "modal", title: "Request help", width: 520, render: ({ close, ...context }) => <RequestHelp context={context} close={close} />, footer: submitFooter("hq-help", "Ask for help") },
         { id: "personal preferences", kind: "modal", title: "Personal preferences", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <WorkspacePreferences context={context} close={close} />, footer: submitFooter("hq-prefs", "Save preferences") },
       ],
@@ -1392,7 +1421,7 @@ export const hqApp = registerApp({
             <Field label="Note" required hint="Written to the company activity log under your name."><TextArea name="note" rows={5} required /></Field>
           </form>
         ), footer: submitFooter("hq-note", "Record the note") },
-        { id: "data freshness inspector", kind: "drawer", title: "Data freshness", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ ...context }) => <MetricInspector context={{ ...context, overlayPayload: { metric: "ledger" } }} /> },
+        { id: "data freshness inspector", kind: "drawer", title: "Data freshness", width: OVERLAY_WIDTH.compact, summary: ({ ...context }) => <MetricSummary context={{ ...context, overlayPayload: { metric: "ledger" } }} />, render: ({ ...context }) => <MetricInspector context={{ ...context, overlayPayload: { metric: "ledger" } }} /> },
       ],
     },
 
@@ -1414,7 +1443,7 @@ export const hqApp = registerApp({
         { id: "assign leader", kind: "modal", title: "Assign a leader", width: 480, render: ({ close, ...context }) => <AssignLeader context={context} close={close} />, footer: submitFooter("hq-leader", "Assign") },
         { id: "open department", kind: "modal", title: "Open a department", width: 460, render: ({ close, ...context }) => <OpenDepartment context={context} close={close} /> },
         { id: "reorder directory", kind: "modal", title: "Reorder the directory", width: 480, render: ({ close, ...context }) => <ReorderDepartments context={context} close={close} />, footer: submitFooter("hq-reorder", "Save order") },
-        { id: "organizational impact preview", kind: "drawer", title: "Organisational impact", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => {
+        { id: "organizational impact preview", kind: "drawer", title: "Organisational impact", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <BuildingSummary departmentId={(context.overlayPayload as { departmentId?: string } | undefined)?.departmentId} />, render: ({ ...context }) => {
           const payload = context.overlayPayload as { departmentId?: string } | undefined;
           return <Building departmentId={payload?.departmentId} context={context} />;
         } },
@@ -1440,7 +1469,7 @@ export const hqApp = registerApp({
         { id: "assign work", kind: "modal", title: "Assign work", width: 540, render: ({ close, ...context }) => <AssignWork context={context} close={close} />, footer: submitFooter("hq-assign-work", "Assign") },
         { id: "message team", kind: "modal", title: "Message the team", width: 540, render: ({ close, ...context }) => <MessageTeam context={context} close={close} />, footer: submitFooter("hq-message-team", "Post message") },
         { id: "add resource", kind: "modal", title: "Add a resource", width: 520, render: ({ close, ...context }) => <AddResource context={context} close={close} />, footer: submitFooter("hq-resource", "Add resource") },
-        { id: "Department settings", kind: "modal", title: "Department settings", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <DepartmentSettings context={context} /> },
+        { id: "Department settings", kind: "modal", title: "Department details", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <DepartmentSummary context={context} />, render: ({ ...context }) => <DepartmentSettings context={context} /> },
         { id: "invite member", kind: "modal", title: "Invite a member", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => (
           <form id="hq-invite" className="ds-stack ds-gap-3" onSubmit={async (event) => {
             event.preventDefault();
@@ -1482,7 +1511,7 @@ export const hqApp = registerApp({
         { id: "zoom out", label: "Zoom out", placement: "overflow", run: (context) => stepZoom(context, Number(new URLSearchParams(window.location.search).get("zoom") ?? 1) || 1, -1) },
       ],
       overlays: [
-        { id: "Member inspector", kind: "drawer", title: "Member", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <MemberInspector context={context} /> },
+        { id: "Member inspector", kind: "drawer", title: "Member", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <MemberSummary context={context} />, render: ({ ...context }) => <MemberInspector context={context} /> },
         { id: "change manager", kind: "modal", title: "Change reporting line", width: 480, render: ({ close, ...context }) => <ChangeManager context={context} close={close} />, footer: submitFooter("change-manager", "Apply change") },
         { id: "impact confirmation", kind: "modal", title: "Confirm the change", tone: "danger", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ close }) => (
           <Stack gap={3}>
@@ -1562,7 +1591,7 @@ export const hqApp = registerApp({
       ],
       overlays: [
         { id: "log decision", kind: "modal", title: "Log a decision", width: 580, render: ({ close, ...context }) => <DecisionEditor context={context} close={close} /> },
-        { id: "Event inspector", kind: "drawer", title: "Event", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => {
+        { id: "Event inspector", kind: "drawer", title: "Event", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <EventSummary id={(context.overlayPayload as { id?: string } | undefined)?.id} context={context} />, render: ({ ...context }) => {
           const payload = context.overlayPayload as { id?: string } | undefined;
           return <EventInspector id={payload?.id} context={context} />;
         } },
@@ -1608,7 +1637,7 @@ export const hqApp = registerApp({
         { id: "presence", label: "Presence settings", placement: "overflow", run: (context) => context.openOverlay("presence settings") },
       ],
       overlays: [
-        { id: "Profile quick view", kind: "drawer", title: "Profile", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <MemberInspector context={context} /> },
+        { id: "Profile quick view", kind: "drawer", title: "Profile", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <MemberSummary context={context} />, render: ({ ...context }) => <MemberInspector context={context} /> },
         { id: "start conversation", kind: "modal", title: "Start a conversation", width: 520, render: ({ close, ...context }) => <StartConversation context={context} close={close} />, footer: submitFooter("hq-conversation", "Send") },
         { id: "assign task", kind: "modal", title: "Assign a task", width: 520, render: ({ close, ...context }) => <AssignTaskTo context={context} close={close} />, footer: submitFooter("hq-assign-task", "Assign") },
         { id: "find colleague", kind: "modal", title: "Find a colleague", width: 520, render: ({ close, ...context }) => <FindColleague context={context} close={close} /> },
@@ -1658,21 +1687,26 @@ function PresenceSettings({ context, close }: { context: ScreenContext; close: (
   );
 }
 
-function DepartmentSettings({ context }: { context: ScreenContext }) {
+function DepartmentSummary({ context }: { context: ScreenContext }) {
   const dept = useRecord(context.params.id);
   const members = useCollection("members");
-  if (!dept) return <Empty title="No department open" />;
+  if (!dept) return null;
   const count = members.filter((member) => member.fields.departmentId === dept.id).length;
+  return <OverlaySummary eyebrow="Department" title={dept.title} status={<Pill tone="neutral">{dept.status}</Pill>} meta={[`${count} ${count === 1 ? "member" : "members"}`]} />;
+}
+
+function DepartmentSettings({ context }: { context: ScreenContext }) {
+  const dept = useRecord(context.params.id);
+  if (!dept) return <Empty title="No department open" />;
   return (
     <Stack gap={3}>
-      <OverlaySummary eyebrow="Department" title={dept.title} status={<Pill tone="neutral">{dept.status}</Pill>} meta={[`${count} ${count === 1 ? "member" : "members"}`]} />
       <FactGrid columns={2} items={[
         { label: "Lead", value: String(dept.fields.lead ?? "Unassigned") },
         { label: "Private records", value: "Visible to members only" },
         { label: "Updated", value: context.date(dept.updatedAt), mono: true },
         { label: "Revision", value: String(dept.revision), mono: true },
       ]} />
-      <p className="ds-subtle">Change the lead from the Departments directory. Settings are read from the record, not edited here.</p>
+      <p className="ds-subtle">Change the lead from the Departments directory. These details are read from the record.</p>
     </Stack>
   );
 }
@@ -1699,6 +1733,20 @@ function RecommendationsDrawer({ context }: { context: ScreenContext }) {
   return <RecommendationsManager context={context} insights={insights} />;
 }
 
+function WorkItemSummary({ context }: { context: ScreenContext }) {
+  const task = useRecord(context.selectedId);
+  if (!task) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Task"
+      title={task.title}
+      status={<Pill>{String(task.fields.stage ?? task.status)}</Pill>}
+      meta={[task.tags.includes("pinned") ? "Pinned" : null]}
+      actions={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/project/tasks/${task.id}`)}>Open the task</Button>}
+    />
+  );
+}
+
 function WorkItemInspector({ context }: { context: ScreenContext }) {
   const task = useRecord(context.selectedId);
   const events = useEvents(task?.id, 8);
@@ -1706,13 +1754,6 @@ function WorkItemInspector({ context }: { context: ScreenContext }) {
   const high = task.fields.priority === "high";
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow="Task"
-        title={task.title}
-        status={<Pill>{String(task.fields.stage ?? task.status)}</Pill>}
-        meta={[task.tags.includes("pinned") ? "Pinned" : null]}
-        actions={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/project/tasks/${task.id}`)}>Open the task</Button>}
-      />
       <FactGrid columns={3} items={[
         { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
         { label: "Priority", value: String(task.fields.priority ?? "normal"), tone: high ? "danger" : undefined },
@@ -1756,16 +1797,17 @@ function RelatedWork({ context }: { context: ScreenContext }) {
   );
 }
 
+function EventSummary({ id, context }: { id?: string; context: ScreenContext }) {
+  const event = useRecord(id);
+  if (!event) return null;
+  return <OverlaySummary eyebrow={String(event.fields.kind ?? "event")} title={event.title} meta={[context.dateTime(event.at ?? event.updatedAt)]} />;
+}
+
 function EventInspector({ id, context }: { id?: string; context: ScreenContext }) {
   const event = useRecord(id);
   if (!event) return <Empty title="Select an event">Choose an event on the timeline to see its source.</Empty>;
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow={String(event.fields.kind ?? "event")}
-        title={event.title}
-        meta={[context.dateTime(event.at ?? event.updatedAt)]}
-      />
       <FactGrid columns={2} items={[
         { label: "When", value: context.dateTime(event.at ?? event.updatedAt), mono: true },
         { label: "Recorded by", value: event.createdBy },
