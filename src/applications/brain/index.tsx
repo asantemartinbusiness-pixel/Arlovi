@@ -6,7 +6,7 @@ import {
   Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollection, useCollections, useOrgRecords, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness, wallMs } from "@/platform/clock";
 import { CapabilityLine, DiagramToggle } from "@/applications/t2_shared/pieces";
 import { usePanelFlags } from "@/applications/t2_shared/store";
@@ -1895,6 +1895,7 @@ function ConflictSummary({ context, eyebrow }: { context: ScreenContext; eyebrow
 
 function ComparisonDrawer({ context }: { context: ScreenContext }) {
   const data = useKnowledge();
+  const everything = useOrgRecords();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const conflict = data.conflicts.find((item) => item.id === (payload?.id ?? context.selectedId));
   if (!conflict) return <Empty title="Choose a conflict" />;
@@ -1913,9 +1914,10 @@ function ComparisonDrawer({ context }: { context: ScreenContext }) {
           {conflict.summary} Nothing is recorded on this conflict to set side by side, so there is nothing to choose between yet.
         </Notice>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, Math.min(options.length, 2))}, minmax(0, 1fr))`, gap: "var(--space-3)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, Math.min(options.length, 2))}, minmax(0, 1fr))`, gap: "var(--space-3)", alignItems: "start" }}>
         {options.map((option, index) => {
           const source = sourceOf(data, option.sourceId);
+          const origin = source ?? everything.find((item) => item.id === option.sourceId);
           const chosen = closed && String(conflict.fields.chosen ?? "") === option.factId;
           return (
             <OverlaySection key={option.id} title={`Version ${String.fromCharCode(65 + index)}${chosen ? " · chosen" : ""}`} tone={chosen ? "success" : "neutral"}>
@@ -1923,10 +1925,10 @@ function ComparisonDrawer({ context }: { context: ScreenContext }) {
                 <h4>{option.value}</h4>
                 <FactGrid columns={2} dense items={[
                   { label: "Recorded", value: context.date(option.recordedAt), mono: true },
-                  { label: "Source state", value: <Pill tone={source?.status === "indexed" ? "success" : "warning"}>{source?.status ?? "no source record"}</Pill> },
-                  { label: "Source", value: source?.title ?? option.sourceId },
-                  { label: "Freshness", value: source ? context.date(String(source.fields.freshness ?? source.updatedAt)) : "Unknown", mono: true },
-                  { label: "Visibility", value: <Pill tone={visibilityOf(source).tone}>{visibilityOf(source).label}</Pill> },
+                  { label: "Source state", value: source ? <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> : "No source recorded" },
+                  { label: "Source", value: origin ? `${origin.title} (${origin.collection === "sources" ? "source" : origin.collection})` : "No source recorded" },
+                  { label: "Freshness", value: source ? context.date(String(source.fields.freshness ?? source.updatedAt)) : "Not recorded", mono: Boolean(source) },
+                  { label: "Visibility", value: source ? <Pill tone={visibilityOf(source).tone}>{visibilityOf(source).label}</Pill> : "Not recorded" },
                 ]} />
                 <p className="ds-prose">{option.note}</p>
               </Stack>

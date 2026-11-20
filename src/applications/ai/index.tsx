@@ -2770,7 +2770,7 @@ function ShareDialog({ context }: { context: ScreenContext }) {
   const artifact = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.params.id);
   return (
     <Stack gap={4}>
-      <CapabilityLine id="site.publish" title="Sharing outside this browser is not connected" />
+      <CapabilityLine id="document.publish" title="Sharing outside this browser is not connected" />
       <Properties rows={[
         { label: "Inside this workspace", value: "Anyone with a role view that opens this application" },
         { label: "Outside this workspace", value: <Pill tone="warning">Not possible</Pill> },
