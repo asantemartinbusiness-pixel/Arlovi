@@ -5,6 +5,7 @@ import { routeForRecord } from "@/platform/attention";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import "./flagship-showcase.css";
+import "./flagship-identity.css";
 
 const GROUPS = ["designs","publications","photos","videos","decks","sites","forms","projects","deals","employees","agents","orders","campaigns"];
 const STUDIO: { title:string; kind:string; code:string; id:string; description:string; style:string; icon:typeof Palette }[] = [
@@ -52,7 +53,16 @@ export default function FlagshipShowcase() {
   return <div className="fs">
     <div className="fs-utility"><Link to={`/o/${org.slug}/workspace/home`}><ArrowLeft size={15}/> Back to workspace</Link><span>FICTIONAL COMPANY · BROWSER-LOCAL DEMONSTRATION</span></div>
     <header className="fs-hero">
-      <div className="fs-hero-orbit" aria-hidden="true"><span/><span/><span/></div>
+      <div className="fs-hero-collage" aria-hidden="true">
+        <span className="fs-paper fs-paper--back"/><span className="fs-paper fs-paper--violet"/>
+        <span className="fs-paper fs-paper--graphite"/><span className="fs-paper fs-paper--vellum"/>
+        <svg className="fs-collage-doodle" viewBox="0 0 500 500" fill="none">
+          <path d="M41 243C131 111 312 124 373 220S361 405 251 373 172 245 266 224 388 292 320 322" stroke="#dfff3f" strokeWidth="7" strokeLinecap="round"/>
+          <path d="M302 301L320 322 337 299" stroke="#dfff3f" strokeWidth="7" strokeLinecap="round"/>
+        </svg>
+        <span className="fs-slip fs-slip--top"><small>BRIEF / 001</small>Make room for the unexpected.</span>
+        <span className="fs-slip fs-slip--bottom"><small>COLLECTIVE NOTE</small>Material is where the idea begins.</span>
+      </div>
       <div className="fs-hero-content">
         <p className="fs-eyebrow">ARLOVI / THE FLAGSHIP BUSINESS</p>
         <h1>Northline<br/><em>Collective.</em></h1>
@@ -60,6 +70,7 @@ export default function FlagshipShowcase() {
         <div className="fs-hero-actions">
           <a className="fs-primary" href="/northline-collective/" target="_blank" rel="noopener noreferrer">Experience the website <ArrowUpRight size={17}/></a>
           <a className="fs-secondary" href="#creative-work">Explore native Studio <ArrowRight size={17}/></a>
+          <a className="fs-secondary fs-film-link" href="/northline-collective/film.html" target="_blank" rel="noopener noreferrer">Watch original motion study <ArrowUpRight size={17}/></a>
         </div>
       </div>
       <div className="fs-hero-footer"><span>STRATEGY / DESIGN / COMMERCE / INTELLIGENCE</span><span>01 — 35 NATIVE APPLICATIONS</span></div>
