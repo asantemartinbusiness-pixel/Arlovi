@@ -139,7 +139,8 @@ export async function recoverLocalOrganizations(): Promise<string | null> {
   let selected: string | null = null;
   try { selected = localStorage.getItem("arlovi-last-workspace"); } catch { /* optional index */ }
   if (!selected || !orgBySlug(selected)) {
-    selected = recovered[0]?.slug ?? null;
+    const personal = recovered.find(profile => ![ORG_NORTHLINE, ORG_COLLECTIVE, ORG_HARBOR].includes(profile.id));
+    selected = personal?.slug ?? "northline";
   }
   try {
     const existing = loadLocalOrganizations();
