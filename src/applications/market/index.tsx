@@ -1,3 +1,4 @@
+import { AnalyticsReady } from "@/applications/analytics/ready";
 import { Link } from "react-router-dom";
 import { CalendarDays, Images, LayoutTemplate, Mail, Megaphone, MousePointerClick, Search, Target, TrendingUp, Users } from "lucide-react";
 import { Empty, Notice, OVERLAY_WIDTH, Pill, Properties, Stack } from "@/design-system";
@@ -330,7 +331,8 @@ export const marketApp = registerApp({
       subtitle: () => "Which channel gets the credit is a choice of model. The unattributed share is published, not hidden.",
       tabs: ["Channels", "Funnels", "Revenue", "Cohorts", "Models"].map((lens) => ({
         id: lens,
-        render: (context: ScreenContext) => <Attribution context={context} lens={lens} />,
+        // Attribution counts orders from Commerce; never count from a partial read.
+        render: (context: ScreenContext) => <AnalyticsReady><Attribution context={context} lens={lens} /></AnalyticsReady>,
       })),
       actions: [
         { id: "compare", label: "Compare models", placement: "primary", run: (context) => context.setTab("Models") },
@@ -343,7 +345,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Attribution model", kind: "modal", title: "About this model", width: 560, render: ({ ...context }) => <AttributionModelExplainer context={context} /> },
         { id: "source inspector", kind: "drawer", title: "Source", width: 620, render: ({ ...context }) => <SourceInspector context={context} /> },
-        { id: "metric notes", kind: "drawer", title: "Metric notes", width: 560, render: ({ ...context }) => <MetricNotes context={context} /> },
+        { id: "metric notes", kind: "drawer", title: "Metric notes", width: 560, render: ({ ...context }) => <AnalyticsReady><MetricNotes context={context} /></AnalyticsReady> },
         { id: "channel filter", kind: "modal", title: "Filter channels", width: 520, render: ({ close }) => <AttributionFilter close={close} />, footer: submitFooter("attribution-filter", "Apply filter") },
       ],
     },

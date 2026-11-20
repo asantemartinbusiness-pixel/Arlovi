@@ -266,3 +266,16 @@ Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint c
   automation last-run summary (stated when not updated), inbox approval rollback (says when the target could not be reset).
 - WF-16 expectation aligned with the B7 record header (h1 is the portal name).
 - Re-runs: typecheck 0, lint 0, vitest 829/829, analytics/automation/asset/workflow specs 34/34 with journeys 24/24.
+
+## Seed enrichment and attribution readiness
+
+- Two seeded trade orders (ORD-401, ORD-404) now carry a recorded campaign link to "Winter trade list 2026".
+  Fresh workspaces only: seeding inserts missing records and never rewrites existing ones, so no seed-version bump.
+- Found while verifying: Marketing attribution counted orders before Commerce's records had loaded
+  (first visit read "2 of 2" unattributed). Its tabs and the metric-notes drawer now use the Analytics
+  fixtures-ready gate; first visit reads "7 of 9". New spec `e2e/marketing-attribution-ready.spec.ts`.
+- Deposit-bearing bookings were already seeded (one paid locally, six awaiting payment); the report's
+  item was wrong and is corrected. The sample photo still opens the blend picker on an adjustment layer,
+  which the picker explains and a B3 spec asserts; left as is.
+- Re-runs: growth suites and the new spec 43/43, journeys 24/24, deep MARKET/COMMERCE pass. The background
+  deep sweep run alongside other suites failed CONNECT and IT once; both pass when re-run alone (2/2).

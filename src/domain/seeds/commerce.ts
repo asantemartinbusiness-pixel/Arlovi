@@ -185,8 +185,10 @@ registerSeed("commerce", (ctx) => {
   const orders: {
     n: number; number: string; contact: number; status: string; fulfilment: string; payment: string;
     days: number; lines: Line[]; carrier?: string; tracking?: string; channel: string;
+    /** A campaign recorded on the order by the showroom (a recorded touch, not a click). */
+    campaign?: number;
   }[] = [
-    { n: 20, number: "ORD-401", contact: 20, status: "delivered", fulfilment: "delivered", payment: "paid_local", days: -12, channel: "trade",
+    { n: 20, number: "ORD-401", contact: 20, status: "delivered", fulfilment: "delivered", payment: "paid_local", days: -12, channel: "trade", campaign: 20,
       carrier: "Pallet North", tracking: "PN-884120",
       lines: [
         { id: "l1", description: "Beacon Floor Lamp · Natural brass", productId: P(20), quantity: 2, unitPriceMinor: 185_00, taxCategory: "standard" },
@@ -202,7 +204,7 @@ registerSeed("commerce", (ctx) => {
         { id: "l1", description: "Drift Pendant · 900mm drop", productId: P(22), quantity: 1, unitPriceMinor: 151_00, taxCategory: "standard" },
         { id: "l2", description: "Care & restoration guide", productId: P(23), quantity: 1, unitPriceMinor: 12_00, taxCategory: "zero_rated" },
       ] },
-    { n: 23, number: "ORD-404", contact: 24, status: "unfulfilled", fulfilment: "picking", payment: "paid_local", days: -5, channel: "trade",
+    { n: 23, number: "ORD-404", contact: 24, status: "unfulfilled", fulfilment: "picking", payment: "paid_local", days: -5, channel: "trade", campaign: 20,
       lines: [
         { id: "l1", description: "Drift Pendant · 1400mm drop", productId: P(22), quantity: 3, unitPriceMinor: 164_00, taxCategory: "standard" },
       ] },
@@ -243,6 +245,7 @@ registerSeed("commerce", (ctx) => {
         carrier: order.carrier ?? "",
         tracking: order.tracking ?? "",
         warehouseId: "nl-warehouses-001",
+        ...(order.campaign ? { campaignId: id("nl", "campaigns", order.campaign) } : {}),
         netMinor: net,
         taxMinor: tax,
         shippingMinor: order.channel === "trade" ? 4_500 : 695,

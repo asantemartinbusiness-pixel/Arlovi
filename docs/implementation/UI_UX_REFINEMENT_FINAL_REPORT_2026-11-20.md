@@ -104,8 +104,8 @@ plus repository-wide integrity passes.
 - Large-scale-tier passes were done by setting the tier attribute; the live slider path was verified
   by the display-scale specs only.
 - Several overlays can only be exercised with a selected record; deep links show the shared guard.
-- Seed data is sparse in places (for example no seeded order carries a campaign touch, so Marketing
-  attribution honestly reports every order as unattributed).
+- Seed data is sparse in places; existing browser workspaces keep their stored records, so the new
+  campaign links appear only in fresh or reset workspaces.
 - A few HR-noted S4 items are logged in the disposition files and not fixed (for example overlay
   breadcrumb spelling now follows the page title, but a handful of lists still show dense dark cards).
 
@@ -113,7 +113,8 @@ plus repository-wide integrity passes.
 
 1. Merge after review and run the production smoke on `/o/northline/hq/home`, Finance invoices,
    CRM deals, People employee profile and the Docs editor.
-2. Enrich seeds (campaign touches on orders, a deposit-bearing booking, a pixel-layer default in the
-   sample photo) so the enhanced panels show their full behaviour out of the box.
+2. Done after the report: two seeded orders carry recorded campaign links, and Marketing attribution
+   waits for every application's records before counting (see `GATES.md`). Deposit-bearing bookings
+   were already seeded.
 3. Done after the report: `commitTogether` now lives in `src/platform/commit.ts`, and lint rejects an
    ignored `mutate.patch` result (6 remaining cases fixed; see `GATES.md`, "Hardening").
