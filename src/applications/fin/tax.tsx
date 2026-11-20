@@ -427,10 +427,11 @@ export function TaxConfiguration({ context }: { context: ScreenContext; close?: 
   const engineCodes = taxCodesFor(org.jurisdiction);
   const [busy, setBusy] = useState(false);
 
+  // Same predicate as the Codes tab: a record with no engine rule disagrees too.
   const stale = data.taxCodes.filter((record) => {
-    if (String(record.fields.jurisdiction ?? "") !== org.jurisdiction) return false;
+    if (String(record.fields.jurisdiction ?? "") !== org.jurisdiction || record.status !== "active") return false;
     const engine = engineCodes.find((item) => item.code === String(record.fields.code ?? ""));
-    return record.status === "active" && engine && engine.rateBp !== Number(record.fields.rateBp ?? 0);
+    return engine ? engine.rateBp !== Number(record.fields.rateBp ?? 0) : true;
   });
 
   return (
@@ -452,7 +453,7 @@ export function TaxConfiguration({ context }: { context: ScreenContext; close?: 
               <Row key={record.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
                 <div className="ds-grow">
                   <strong>{record.title}</strong>
-                  <p className="ds-subtle">Records {(Number(record.fields.rateBp ?? 0) / 100).toFixed(2)}%, the engine applies {((engine?.rateBp ?? 0) / 100).toFixed(2)}%.</p>
+                  <p className="ds-subtle">Records {(Number(record.fields.rateBp ?? 0) / 100).toFixed(2)}%, {engine ? `the engine applies ${(engine.rateBp / 100).toFixed(2)}%.` : "no rule in the engine resolves to this code."}</p>
                 </div>
                 <Button
                   size="sm"

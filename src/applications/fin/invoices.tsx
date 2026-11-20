@@ -15,7 +15,7 @@ import {
   CUSTOMER_TAX_STATUSES, TAX_CATEGORIES, blankLine, documentDate, documentTotals, readLines, statusFor, taxCategoryLabel, writeLines,
 } from "@/domain/fin-invoice";
 import type { CustomerTaxStatus, DocumentTotals, InvoiceLine, TaxCategory } from "@/domain/fin-invoice";
-import { accountCode, accountType, ageBuckets, checkPosting, daysOverdue } from "@/domain/fin-ledger";
+import { accountCode, accountType, ageBuckets, checkPosting, daysOverdue, journalDate } from "@/domain/fin-ledger";
 import type { JLine } from "@/domain/fin-ledger";
 import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
@@ -368,7 +368,7 @@ type InvoicePart = "numberMono" | "number" | "status" | "summary" | "customer" |
 
 /** One piece of the invoice record header. Each reads the invoice itself so the header props can stay plain nodes. */
 function InvoiceHeaderPart({ context, part }: { context: ScreenContext; part: InvoicePart }) {
-  const { invoice, totals, customer } = useInvoice(context);
+  const { invoice, totals, customer, data } = useInvoice(context);
   const { org } = useWorkspace();
   if (!invoice) return part === "number" ? <>Invoice</> : null;
   const late = daysOverdue(invoice, context.now);
@@ -390,7 +390,7 @@ function InvoiceHeaderPart({ context, part }: { context: ScreenContext; part: In
     case "customer": return customer
       ? <Link to={`/o/${org.slug}/crm/contacts/${customer.id}`}>{customer.title}</Link>
       : <>No customer linked</>;
-    case "issued": return <span className="ds-num">Issued {context.date(invoice.at)}</span>;
+    case "issued": return <span className="ds-num">Issued {context.date(issueDate(data, invoice))}</span>;
     case "due": return <span className="ds-num">Due {context.date(invoice.dueAt)}</span>;
     case "gross": return <span className="ds-num"><strong>{context.money(totals.grossMinor)}</strong> gross</span>;
     case "split": return <span className="ds-num">{context.money(totals.netMinor)} net + {context.money(totals.taxMinor)} tax</span>;
@@ -1210,7 +1210,7 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
           </div>
           <div style={{ textAlign: "end" }}>
             <strong style={{ fontSize: "var(--text-lg)" }}>{invoice.status === "void" ? "VOID · " : ""}Invoice {invoice.title}</strong>
-            <p className="ds-subtle">Issued {context.date(invoice.at)} · due {context.date(invoice.dueAt)}</p>
+            <p className="ds-subtle">Issued {context.date(issueDate(data, invoice))} · due {context.date(invoice.dueAt)}</p>
           </div>
         </Row>
         <hr className="ds-divider" />
@@ -1850,4 +1850,10 @@ export function ApproveInvoice({ context, close, blockedReason, inline }: { cont
 
 function customerName(data: FinData, invoice: Rec): string {
   return contactOf(data, invoice)?.title ?? "No customer linked";
+}
+
+/** The date an invoice was issued: the issue journal's ledger date when it is posted, else the record date. */
+function issueDate(data: FinData, invoice: Rec): string | undefined {
+  const journal = data.journals.find((item) => item.id === String(invoice.fields.journalId ?? ""));
+  return journal ? journalDate(journal) : invoice.at;
 }

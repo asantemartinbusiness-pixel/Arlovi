@@ -642,7 +642,7 @@ export function BalancingValidator({ context }: { context: ScreenContext }) {
                 <FactGrid columns={3} dense items={[
                   { label: "Debits", value: <Amount minor={check.debitMinor} context={context} zero="0" />, mono: true },
                   { label: "Credits", value: <Amount minor={check.creditMinor} context={context} zero="0" />, mono: true },
-                  { label: "Difference", value: check.differenceMinor === null ? "Not computable" : <Amount minor={check.differenceMinor} context={context} zero="0" />, mono: true, tone: check.differenceMinor ? "danger" : "success" },
+                  { label: "Difference", value: check.differenceMinor === null ? "Not computable" : <Amount minor={check.differenceMinor} context={context} zero="0" />, mono: true, tone: check.differenceMinor === null ? "warning" : check.differenceMinor ? "danger" : "success" },
                 ]} />
                 <span className={check.reason ? "" : "ds-subtle"}>{check.reason ?? "Debits equal credits and the period is open."}</span>
               </Stack>
