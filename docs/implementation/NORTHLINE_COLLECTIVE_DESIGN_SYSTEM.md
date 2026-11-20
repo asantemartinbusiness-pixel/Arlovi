@@ -1,6 +1,6 @@
 # Northline Collective — Brand Identity & Experience System
 **Version:** 1.0 / flagship simulation / November 2026  
-**Scope:** `northline` demo only. Arlovi OS and unrelated demo organisations retain their own design systems.
+**Scope:** `collective` browser-local demo organisation only. Arlovi OS and unrelated demo organisations retain their own design systems.
 
 ## Creative basis and ownership
 This system is adapted to Northline from the **user-supplied** reference titled “Strut — paper meets acid”. The reference is a visual-language and component specification, not permission to adopt that product's name, marks, copyrighted artwork, prose, pricing, customer claims or proprietary designs.
@@ -56,7 +56,7 @@ Hosted web typography may load from Google Fonts; resilient stacks remain for mi
 
 ### Native Arlovi simulation
 - Scope branded presentation surfaces to the Northline flagship; **not** global Arlovi UI.
-- The showcase's source-file cards use square panels, ruled boundaries and coherent link affordances.
+- The Collective tenant's showcase source-file cards use square panels, ruled boundaries and coherent link affordances.
 - Mark editable Design, Layout, Forms and Film records as local / fictional / unreviewed until genuinely approved.
 - The source brand palette is seeded in the native brand record; vector files, editorial book, native website and forms follow the same palette.
 - Preserve native application interaction semantics: keyboard navigation, readable data grids, inline permission messaging and reversible user actions matter more than visual novelty.
