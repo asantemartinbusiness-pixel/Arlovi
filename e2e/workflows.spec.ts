@@ -693,8 +693,8 @@ test("WF-11 Replenishment-to-payment: requisition, approval, purchase order, rec
   await pick(page, new RegExp(reqNumber), reqNumber);
   await action(page, "Approve selected");
   await expect(dialog(page).getByText("Drift Pendant is below its reorder point of 8.")).toBeVisible();
-  await expect(dialog(page).getByRole("button", { name: "Reject — a reason is required" })).toBeDisabled();
-  await dialog(page).getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(dialog(page).getByRole("button", { name: "Reject with reason" })).toBeDisabled(); // B6: button renamed; still disabled until a reason is written
+  await dialog(page).getByRole("button", { name: "Approve requisition" }).click(); // B6: primary renamed from "Approve"
   await page.getByRole("tab", { name: "Mine" }).click();
   await expect(main(page).getByRole("row", { name: new RegExp(reqNumber) })).toContainText("APPROVED", { ignoreCase: true });
 
