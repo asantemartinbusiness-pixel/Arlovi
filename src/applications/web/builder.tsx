@@ -445,7 +445,7 @@ export function ThemeEditor({ site, onChange }: { site: SiteModel; onChange: (th
       </div>
       <Field label="Typeface">
         <Select value={theme.font} onChange={(event) => onChange({ ...theme, font: event.target.value as SiteModel["theme"]["font"] })}>
-          {["Inter", "Source Serif", "IBM Plex Mono"].map((font) => <option key={font} value={font}>{font}</option>)}
+          {["Inter", "Source Serif", "IBM Plex Mono", "Manrope", "Newsreader", "DM Mono"].map((font) => <option key={font} value={font}>{font}</option>)}
         </Select>
       </Field>
       <Row gap={2} wrap>
