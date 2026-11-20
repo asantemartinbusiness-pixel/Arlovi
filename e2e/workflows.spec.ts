@@ -919,7 +919,7 @@ test("WF-08 Build-to-deploy: local checks, secrets masked, production promotion 
   await action(page, "Promote");
   await expect(dialog(page).getByText("Model checks · clear")).toBeVisible();
   await expect(dialog(page).getByText("Promotion to production stops at the hosting boundary")).toBeVisible();
-  await dialog(page).getByRole("button", { name: "Record the attempt honestly" }).click();
+  await dialog(page).getByRole("button", { name: "Record a blocked attempt" }).click();
   await expect(dialog(page)).toHaveCount(0);
   await page.getByRole("tab", { name: "Releases" }).click();
   await expect(main(page).getByText(/production/i).first()).toBeVisible();
