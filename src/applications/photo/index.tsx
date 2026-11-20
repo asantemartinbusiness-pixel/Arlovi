@@ -919,18 +919,21 @@ function BatchQueue({ context }: { context: ScreenContext }) {
           rows={photos}
           rowId={(row) => row.id}
           label="Images"
+          onOpen={(id) => setChosen((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))}
           columns={[
             { key: "title", header: "Image", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => row.title },
             { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "unreadable" ? "danger" : "neutral"}>{row.status}</Pill> },
             { key: "album", header: "Album", cell: (row) => String(row.fields.album ?? "Unfiled") },
             {
               key: "pick", header: "In the batch", align: "end", cell: (row) => (
-                <Checkbox
-                  label=""
-                  aria-label={`Include ${row.title}`}
-                  checked={chosen.includes(row.id)}
-                  onChange={(event) => setChosen((current) => (event.target.checked ? [...current, row.id] : current.filter((id) => id !== row.id)))}
-                />
+                <span onClick={(event) => event.stopPropagation()}>
+                  <Checkbox
+                    label={chosen.includes(row.id) ? "Included" : "Include"}
+                    aria-label={`Include ${row.title}`}
+                    checked={chosen.includes(row.id)}
+                    onChange={(event) => setChosen((current) => (event.target.checked ? [...current, row.id] : current.filter((id) => id !== row.id)))}
+                  />
+                </span>
               ),
             },
           ]}

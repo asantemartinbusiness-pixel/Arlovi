@@ -87,7 +87,7 @@ export function EasingScreen({ context, actions }: { context: ScreenContext; act
               className="mo-layer"
               data-selected={picked?.keyframe.id === segment.from.id}
               style={{ width: "100%", textAlign: "start", border: 0, background: picked?.keyframe.id === segment.from.id ? undefined : "transparent", display: "grid", gap: 0 }}
-              onClick={() => motionUi.set((current) => ({ ...current, selectedLayerId: segment.layerId, selectedProperty: segment.property, selectedKeyframeId: segment.from.id, time: segment.from.t }))}
+              onClick={() => { motionUi.set((current) => ({ ...current, selectedLayerId: segment.layerId, selectedProperty: segment.property, selectedKeyframeId: segment.from.id, time: segment.from.t })); /* the command bar re-reads its guards when the page state changes */ context.select(segment.from.id); }}
             >
               <span>{segment.layer} · {PROPERTY_LABEL[segment.property]}</span>
               <span className="vx-mini"><span className="ds-num">{segment.from.t.toFixed(2)}→{segment.to.t.toFixed(2)}s</span> · {easingName(segment.from.easing)}</span>

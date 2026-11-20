@@ -159,7 +159,7 @@ const EASING_ACTIONS: ActionDef[] = [
     run: (context) => context.openOverlay("Curve editor"),
   },
   {
-    id: "stagger", label: "Stagger", placement: "secondary",
+    id: "stagger", label: "Stagger", placement: "overflow",
     guard: () => (motionUi.get().staggerIds.length >= 2 ? undefined : "Choose two or more layers on the Timing tab"),
     run: (context) => {
       const open = current();
@@ -170,7 +170,7 @@ const EASING_ACTIONS: ActionDef[] = [
     },
   },
   {
-    id: "loop", label: "Loop on or off", placement: "secondary",
+    id: "loop", label: "Loop on or off", placement: "overflow",
     guard: noDoc,
     run: (context) => {
       const open = current();
