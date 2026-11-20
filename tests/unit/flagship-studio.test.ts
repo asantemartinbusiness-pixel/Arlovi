@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import "@/domain/seeds/flagshipStudio";
 import { collectSeedsByContributor } from "@/domain/seedRegistry";
-import { ORG_NORTHLINE, SEED_NOW } from "@/domain/types";
+import { ORG_COLLECTIVE, SEED_NOW } from "@/domain/types";
 
 const studio = collectSeedsByContributor(SEED_NOW).find(item => item.key === "flagship-studio");
 const item = (id: string) => studio!.records.find(record => record.id === id)!;
@@ -11,7 +11,7 @@ describe("Northline Collective — native creative studio", () => {
     expect(studio).toBeDefined();
     expect(studio!.records).toHaveLength(6);
     expect(new Set(studio!.records.map(record => record.id)).size).toBe(6);
-    expect(studio!.records.every(record => record.organizationId === ORG_NORTHLINE)).toBe(true);
+    expect(studio!.records.every(record => record.organizationId === ORG_COLLECTIVE)).toBe(true);
     expect(studio!.records.every(record => record.status === "draft")).toBe(true);
     expect(studio!.records.every(record => record.fields.fictional === true)).toBe(true);
     expect(studio!.records.every(record => record.fields.delivery === "local_only")).toBe(true);
