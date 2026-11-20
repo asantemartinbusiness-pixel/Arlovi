@@ -227,12 +227,20 @@ export function AppShell() {
   const activePinned = activePreference?.fields.pinned === true;
 
   function chooseRoleView(nextRole: Role) {
+    // A role preview is not authentication. The route must remain inside the
+    // new perspective even if its native application has not yet registered.
+    // Client views have no HQ workspace surface: preserve only PORTAL / CARE
+    // / BOOK and route anything else to the external portal entry.
+    const clientRoutes = ["portal", "care", "book"];
+    const routeApp = location.pathname.split("/")[3] ?? "";
+    const clientCanStay = clientRoutes.includes(routeApp)
+      && (!activeScreen || canOpenLegacyScreen("client", activeScreen));
+    const destination = nextRole === "client"
+      ? (!clientCanStay ? appEntry("PORTAL", org.slug) : null)
+      : (activeScreen && !canOpenLegacyScreen(nextRole, activeScreen)
+        ? workAreaPath(org.slug, "home") : null);
     ui.setRole(nextRole);
-    // A role view is not authentication. Avoid stranding the user on a
-    // native application hidden by the new local navigation perspective.
-    if (activeScreen && !canOpenLegacyScreen(nextRole, activeScreen)) {
-      navigate(nextRole === "client" ? appEntry("PORTAL", org.slug) : workAreaPath(org.slug, "home"));
-    }
+    if (destination && destination !== location.pathname) navigate(destination, { replace: true });
   }
 
   async function toggleFavourite() {
