@@ -1,4 +1,5 @@
 import { registerSeed } from "@/domain/seedRegistry";
+import { ORG_COLLECTIVE } from "@/domain/types";
 import type { Rec } from "@/domain/types";
 import { NORTHLINE_COLORS } from "@/domain/flagship/identity";
 
@@ -161,4 +162,4 @@ registerSeed("flagship-lighthouse-review",ctx=>{
   });
 
   return {records};
-});
+}, {organizationId: ORG_COLLECTIVE});
