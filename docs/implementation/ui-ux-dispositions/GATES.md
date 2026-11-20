@@ -303,3 +303,7 @@ Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint c
   host now shows the loading state until the application is ready. WF-06: Marta Nowak is on both the Offers and
   Candidates panels; the spec looked her up before the panel switched and clicked the Offers card. It now waits for
   the Candidates tab and clicks her candidate button. Under load: 16/16 (Brain and WF-06, 4 repeats); vitest 829/829.
+- CI on 4209671: all checks pass. A local full run of the CI suite (627 pass, 1 fail, 38 skipped) failed MARKET plan
+  approval once: its action helper gave the page 1.5 s before looking in the overflow menu, which an application still
+  opening can exceed. Both copies of the helper now wait for the loading state to clear; growth and journey specs
+  31/31, growth under load 21/21.
