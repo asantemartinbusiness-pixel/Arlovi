@@ -160,6 +160,7 @@ test("PROJECT subtasks and dependency links persist; health check is shown", asy
   await open(page, "/project/tasks/nl-tasks-024", "Repaint and make good");
   await expect(card(page, "Dependencies").getByText(/Waiting on 2 unfinished tasks/)).toBeVisible();
   await card(page, "Dependencies").getByRole("button", { name: "Remove the link to Trade counter joinery" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Remove the link" }).click();
   await expect(card(page, "Dependencies").getByText(/Waiting on 1 unfinished task/)).toBeVisible();
   await page.getByRole("tab", { name: "Subtasks" }).click();
   await main(page).getByLabel("New subtask").fill("Mask the trade counter");

@@ -96,12 +96,7 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
       {phases.length > 0 && (
         <Properties rows={phases.map((phase) => ({ label: phase.name, value: phase.tasks.join(", ") }))} />
       )}
-      <Notice tone="info" title="Project and tasks save together">
-        Arlovi checks this template again before committing. If any task or template validation fails, no partial project is created.
-      </Notice>
-      <Notice tone="info" title="A clone starts clean">
-        Confidential attachments, comments and approvals from the source project are not copied. Only the phase and task structure is.
-      </Notice>
+      <p className="ds-subtle">Project and tasks save together or not at all. A clone starts clean: confidential attachments, comments and approvals are not copied, only the phase and task structure.</p>
       <Row gap={2}>
         <WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => {

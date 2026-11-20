@@ -4,7 +4,8 @@ import {
   AtSign, Bot, FileText, Layers, MessagesSquare, Mic, Microscope, Pin, Rocket, Sparkles, Users, Video,
 } from "lucide-react";
 import {
-  Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
+  Avatar, Button, Card, Checkbox, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, ModalActions, ModalUnsavedChanges, Notice,
+  OVERLAY_WIDTH, OverlayActions, OverlaySection, OverlaySummary, Pill, Properties,
   Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -195,20 +196,17 @@ function ChiefChat({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={3} eyebrow="THREADS" title="Threads" subtitle={`${conversations.length} in ${org.shortName}`}>
+      <Card span={3} title="Threads" subtitle={`${conversations.length} in ${org.shortName}`}>
         <ThreadList context={context} conversations={conversations} activeId={conversation.id} />
       </Card>
 
       <Card
         span={6}
-        eyebrow="CHIEF OF STAFF"
         prov="agent"
         title={conversation.title}
         subtitle={`${turns.length} turns · ${conversation.fields.shared === true ? "shared with the workspace" : "private to you"}`}
-        actions={<Pill tone="accent" dot>Chief of Staff</Pill>}
       >
         <Stack gap={4}>
-          <CapabilityLine id="model.inference" title="No language model is connected" />
           {turns.length === 0 && (
             <Stack gap={2}>
               <span className="ds-subtle">Questions this workspace can answer:</span>
@@ -254,7 +252,7 @@ function ChiefChat({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={3} eyebrow="ARTIFACT" prov="agent" title="Artifact" subtitle="Produced in this workspace">
+      <Card span={3} prov="agent" title="Artifact">
         <ArtifactPreview context={context} conversation={conversation} />
       </Card>
     </Grid>
@@ -2764,11 +2762,10 @@ function ExportDialog({ context, close }: { context: ScreenContext; close: () =>
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 const chiefThread = (context: ScreenContext) => threadKey(context.screen.id, context.selectedId ?? new URLSearchParams(window.location.search).get("thread") ?? "active");
@@ -2822,12 +2819,10 @@ export const aiApp = registerApp({
     "ARL-AI-001": {
       id: "ARL-AI-001",
       title: () => "Chief of Staff",
-      subtitle: (context) => `Answers are composed from ${context.org.name} records and name what they read. No model provider is connected.`,
       statusStrip: (context) => (
         <Row gap={2} wrap>
-          <Pill tone="warning" dot>Model: not connected</Pill>
-          <Pill tone="neutral">Reading {context.org.name} only</Pill>
-          <span className="ds-subtle">Every figure comes from a record, or is shown as unavailable.</span>
+          <Pill tone="warning" dot>No model connected</Pill>
+          <span className="ds-subtle">Answers are composed from {context.org.name} records and name every record they read. Nothing leaves this browser.</span>
         </Row>
       ),
       tabs: [

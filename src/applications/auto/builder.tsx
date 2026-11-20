@@ -504,7 +504,7 @@ export function ConnectorGrants({ context }: { context: ScreenContext }) {
   );
 }
 
-export function NodeConfiguration({ context }: { context: ScreenContext }) {
+export function NodeConfiguration({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, draft } = useBuilderWorkflow(context);
   const pool = useGraphRecords(draft?.graph ?? { nodes: [], edges: [] });
   if (!record || !draft) return <Empty title="Open an automation first" />;
@@ -525,6 +525,9 @@ export function NodeConfiguration({ context }: { context: ScreenContext }) {
         collections={AUTOMATION_COLLECTIONS}
         records={pool}
       />
+      <ModalActions>
+        <OverlayActions primary={<Button variant="primary" onClick={close}>Done</Button>} />
+      </ModalActions>
     </Stack>
   );
 }

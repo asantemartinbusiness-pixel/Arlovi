@@ -3,8 +3,7 @@ import {
   ChevronDown, ChevronUp, GripVertical, LayoutDashboard, Maximize2, Minimize2, Pin, Plus, Share2,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, ModalActions, Notice, OverlayActions, Pill, Properties,
-  Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";

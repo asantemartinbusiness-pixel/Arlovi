@@ -144,6 +144,6 @@ test("a range edit that overwrites values is previewed first, and only Apply wri
   await page.keyboard.press("Delete");
   await preview.getByRole("button", { name: /^Apply to 6 cells/ }).click();
   await expect(cell(page, "B3")).not.toContainText("250");
-  await page.keyboard.press("Control+z");
+  await page.getByRole("button", { name: "Undo", exact: true }).first().click();
   await expect(cell(page, "B3")).toContainText("250");
 });

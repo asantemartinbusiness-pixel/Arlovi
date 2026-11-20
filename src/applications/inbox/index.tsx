@@ -559,6 +559,76 @@ function InboxStats({ context }: { context: ScreenContext }) {
 
 /* ---------------------------- overlays: 001 ---------------------------- */
 
+function useItemOf(context: ScreenContext) {
+  const { items, rules } = useInboxData();
+  const payload = context.overlayPayload as { itemId?: string } | undefined;
+  return { item: items.find((row) => row.id === (payload?.itemId ?? context.selectedId)), rules };
+}
+
+function NotificationSummary({ context }: { context: ScreenContext }) {
+  const { item } = useItemOf(context);
+  if (!item) return null;
+  return (
+    <OverlaySummary
+      eyebrow={`${item.sourceLabel} · ${item.kind}`}
+      title={item.title}
+      status={<PriorityTag priority={item.priority} />}
+      meta={[`${context.relative(item.at)}`, item.assignee ? `With ${item.assignee}` : "Unassigned"]}
+    />
+  );
+}
+
+function NotificationFooter({ context }: { context: ScreenContext }) {
+  const { item } = useItemOf(context);
+  if (!item) return null;
+  return (
+    <OverlayActions
+      primary={item.kind === "approval" ? (
+        <Button variant="primary" onClick={() => context.navigate(approvalReviewPath(context.org.slug, item))}>Decide on the record</Button>
+      ) : item.resolved ? (
+        <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { resolved: false, snoozedUntil: null }, `Reopened: ${item.title}`).then(() => context.toast("Reopened", "The item is back in the queue."))}>Reopen</Button>
+      ) : (
+        <Button
+          variant="primary"
+          onClick={() => void writeTriage(context.mutate, item, { read: true, resolved: true }, `Resolved from the inbox: ${item.title}`).then(() => context.toast("Resolved", "The item left the queue and the change is on the record."))}
+        >
+          Resolve
+        </Button>
+      )}
+      secondary={<>
+      {item.read ? (
+        <Button
+          variant="ghost"
+          onClick={() => void writeTriage(context.mutate, item, { read: false, acknowledged: false }, `Marked unread: ${item.title}`).then(() => context.toast("Marked unread", "It is back in Unread."))}
+        >
+          Mark unread
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          onClick={() => void writeTriage(context.mutate, item, { read: true }, `Marked read: ${item.title}`).then(() => context.toast("Marked read", "The item is still open. Reading does not approve or resolve it."))}
+        >
+          Mark read
+        </Button>
+      )}
+      <Button
+        variant="secondary"
+        disabled={item.acknowledged}
+        onClick={() => void writeTriage(context.mutate, item, { read: true, acknowledged: true }, `Acknowledged: ${item.title}`).then(() => context.toast("Acknowledged", "Recorded that you have seen it."))}
+      >
+        Acknowledge
+      </Button>
+      {item.snoozed ? (
+        <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { snoozedUntil: null }, `Woken early: ${item.title}`).then(() => context.toast("Back in the queue", "The snooze was cleared."))}>Wake now</Button>
+      ) : (
+        <Button variant="secondary" disabled={item.resolved} onClick={() => context.openOverlay("snooze picker", { itemIds: [item.id] })}>Snooze</Button>
+      )}
+      </>}
+    />
+
+  );
+}
+
 function NotificationDetail({ context }: { context: ScreenContext }) {
   const { items, rules } = useInboxData();
   const { role } = useWorkspace();
@@ -568,12 +638,6 @@ function NotificationDetail({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow={`${item.sourceLabel} · ${item.kind}`}
-        title={item.title}
-        status={<PriorityTag priority={item.priority} />}
-        meta={[`${context.relative(item.at)}`, item.assignee ? `With ${item.assignee}` : "Unassigned"]}
-      />
       <StateTags item={item} />
       {item.body && <p>{item.body}</p>}
       <OverlaySection title="Why this reached you"><p>{routeReason(item, rules, role)}</p></OverlaySection>
@@ -591,49 +655,6 @@ function NotificationDetail({ context }: { context: ScreenContext }) {
           Resolve: nothing more is needed. {item.kind === "approval" ? "Approving or declining happens on the request itself." : ""}
         </p>
       </OverlaySection>
-      <OverlayActions
-        primary={item.kind === "approval" ? (
-          <Button variant="primary" onClick={() => context.navigate(approvalReviewPath(context.org.slug, item))}>Decide on the record</Button>
-        ) : item.resolved ? (
-          <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { resolved: false, snoozedUntil: null }, `Reopened: ${item.title}`).then(() => context.toast("Reopened", "The item is back in the queue."))}>Reopen</Button>
-        ) : (
-          <Button
-            variant="primary"
-            onClick={() => void writeTriage(context.mutate, item, { read: true, resolved: true }, `Resolved from the inbox: ${item.title}`).then(() => context.toast("Resolved", "The item left the queue and the change is on the record."))}
-          >
-            Resolve
-          </Button>
-        )}
-        secondary={<>
-        {item.read ? (
-          <Button
-            variant="ghost"
-            onClick={() => void writeTriage(context.mutate, item, { read: false, acknowledged: false }, `Marked unread: ${item.title}`).then(() => context.toast("Marked unread", "It is back in Unread."))}
-          >
-            Mark unread
-          </Button>
-        ) : (
-          <Button
-            variant="secondary"
-            onClick={() => void writeTriage(context.mutate, item, { read: true }, `Marked read: ${item.title}`).then(() => context.toast("Marked read", "The item is still open. Reading does not approve or resolve it."))}
-          >
-            Mark read
-          </Button>
-        )}
-        <Button
-          variant="secondary"
-          disabled={item.acknowledged}
-          onClick={() => void writeTriage(context.mutate, item, { read: true, acknowledged: true }, `Acknowledged: ${item.title}`).then(() => context.toast("Acknowledged", "Recorded that you have seen it."))}
-        >
-          Acknowledge
-        </Button>
-        {item.snoozed ? (
-          <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { snoozedUntil: null }, `Woken early: ${item.title}`).then(() => context.toast("Back in the queue", "The snooze was cleared."))}>Wake now</Button>
-        ) : (
-          <Button variant="secondary" disabled={item.resolved} onClick={() => context.openOverlay("snooze picker", { itemIds: [item.id] })}>Snooze</Button>
-        )}
-        </>}
-      />
     </Stack>
   );
 }
@@ -929,6 +950,43 @@ function ApprovalEvidence({ record, context }: { record: Rec; context: ScreenCon
   );
 }
 
+function useApprovalOf(context: ScreenContext) {
+  const approvals = useCollection("approvals");
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  return approvals.find((row) => row.id === (payload?.id ?? context.selectedId));
+}
+
+function ApprovalSummary({ context }: { context: ScreenContext }) {
+  const record = useApprovalOf(context);
+  if (!record) return null;
+  const decided = DECIDED.has(record.status);
+  return (
+    <OverlaySummary
+      eyebrow="Approval request"
+      title={record.title}
+      status={<Pill tone={RISK_TONE(record.fields.risk)} dot>{String(record.fields.risk ?? "low")} risk</Pill>}
+      meta={[
+        record.amountMinor !== undefined ? <span key="a" className="ds-num">{context.money(record.amountMinor)}</span> : null,
+        `Plan version ${String(record.fields.planVersion ?? "1")}`,
+        decided ? record.status.replace("_", " ") : record.dueAt ? `Expires ${context.date(record.dueAt)}` : null,
+      ]}
+    />
+  );
+}
+
+function StepUpSummary({ context }: { context: ScreenContext }) {
+  const record = useApprovalOf(context);
+  if (!record) return null;
+  return <OverlaySummary eyebrow="You are approving" title={record.title} status={<Pill tone={RISK_TONE(record.fields.risk)} dot>{String(record.fields.risk ?? "low")} risk</Pill>} />;
+}
+
+function ScopeSummary({ context }: { context: ScreenContext }) {
+  const record = useApprovalOf(context);
+  if (!record) return null;
+  const isAgent = record.fields.requesterKind === "ai";
+  return <OverlaySummary eyebrow="Requested against held" title={record.title} meta={[`${String(record.fields.requester ?? record.ownerName)}${isAgent ? " (agent)" : ""}`]} />;
+}
+
 function ApprovalReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const approvals = useCollection("approvals");
   const payload = context.overlayPayload as { id?: string; intent?: string } | undefined;
@@ -961,16 +1019,6 @@ function ApprovalReview({ context, close }: { context: ScreenContext; close: () 
 
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow="Approval request"
-        title={record.title}
-        status={<Pill tone={RISK_TONE(record.fields.risk)} dot>{String(record.fields.risk ?? "low")} risk</Pill>}
-        meta={[
-          record.amountMinor !== undefined ? <span key="a" className="ds-num">{context.money(record.amountMinor)}</span> : null,
-          `Plan version ${String(record.fields.planVersion ?? "1")}`,
-          decided ? record.status.replace("_", " ") : record.dueAt ? `Expires ${context.date(record.dueAt)}` : null,
-        ]}
-      />
       {record.summary && <p className="ib-summary">{record.summary}</p>}
       <ApprovalEvidence record={record} context={context} />
       <OverlaySection title={decided ? "Decision" : "Your decision"}>
@@ -986,13 +1034,18 @@ function ApprovalReview({ context, close }: { context: ScreenContext; close: () 
             <Field label="Note" hint="Required to deny or to ask for changes. Stored on the request.">
               <TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
             </Field>
+            {(drifted || !allowed || !note.trim()) && (
+              <p className="ib-helper" role="status">
+                {drifted ? "Approve is unavailable: the target changed since the request was raised." : !allowed ? "Approve is unavailable in this role view." : "Add a note to enable Deny and Ask for changes."}
+              </p>
+            )}
             <OverlayActions
-              primary={<Button variant="primary" disabled={!allowed || drifted} title={drifted ? "The target changed since the request" : undefined} onClick={() => context.openOverlay("step-up auth", { id: record.id })}>Approve…</Button>}
+              primary={<Button variant="primary" disabled={!allowed || drifted} onClick={() => context.openOverlay("step-up auth", { id: record.id })}>Approve…</Button>}
               secondary={<>
-                <Button variant="secondary" busy={busy} disabled={!note.trim()} title={!note.trim() ? "Add a note first" : undefined} onClick={() => void decide("changes_requested")}>Ask for changes</Button>
+                <Button variant="secondary" busy={busy} disabled={!note.trim()} onClick={() => void decide("changes_requested")}>Ask for changes</Button>
                 <Button variant="ghost" onClick={() => context.openOverlay("scope diff", { id: record.id })}>Compare scope</Button>
               </>}
-              end={<Button variant="outline-danger" busy={busy} disabled={!note.trim()} title={!note.trim() ? "Add a note first" : undefined} onClick={() => void decide("denied")}>Deny</Button>}
+              end={<Button variant="outline-danger" busy={busy} disabled={!note.trim()} onClick={() => void decide("denied")}>Deny</Button>}
               busy={busy}
             />
           </Stack>
@@ -1008,6 +1061,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
   const record = approvals.find((row) => row.id === (payload?.id ?? context.selectedId));
   const target = useRecord(record ? String(record.fields.targetId ?? "") : undefined);
   const [phrase, setPhrase] = useState("");
+  const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const { actor } = useWorkspace();
 
@@ -1019,14 +1073,24 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
   async function approve() {
     setBusy(true);
     try {
-      await context.mutate.patch(record!.id, {
+      // The target carries the approval first, bound to the revision the request describes. A conflict here records nothing.
+      if (target) {
+        const marked = await context.mutate.patch(target.id, {
+          fields: { ...target.fields, approvedBy: actor, approvedAt: clockIso(), approvalId: record!.id },
+        }, { event: `Approval recorded against ${target.title}`, expectRevision: target.revision });
+        if (!marked) {
+          context.toast("Not approved", `${target.title} changed while you were confirming. No approval was recorded; reopen the request and review it again.`, "blocked");
+          return;
+        }
+      }
+      const saved = await context.mutate.patch(record!.id, {
         status: "approved",
         fields: { ...record!.fields, decision: "approved", decidedBy: actor, decidedPlanVersion: planVersion },
       }, { event: `Approved ${record!.title} at plan version ${planVersion}`, expectRevision: record!.revision });
-      if (target) {
-        await context.mutate.patch(target.id, {
-          fields: { ...target.fields, approvedBy: actor, approvedAt: clockIso(), approvalId: record!.id },
-        }, { event: `Approval recorded against ${target.title}` });
+      if (!saved) {
+        if (target) await context.mutate.patch(target.id, { fields: { ...target.fields } }, { event: `Approval withdrawn from ${target.title}: the request changed` });
+        context.toast("Not approved", "The request changed while you were confirming. Reopen it and review it again.", "blocked");
+        return;
       }
       await context.mutate.log(`Step-up confirmation entered for ${record!.title}. Local confirmation only.`, { entityId: record!.id, type: "approval.step_up", capability: "ready_local" });
       context.toast("Approved", target ? `${record!.title} is approved and ${target.title} carries the approval.` : `${record!.title} is approved.`);
@@ -1037,12 +1101,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
   }
 
   return (
-    <form className="ds-stack ds-gap-3" onSubmit={(event) => { event.preventDefault(); if (!drifted && phrase === expected) void approve(); }}>
-      <OverlaySummary
-        eyebrow="You are approving"
-        title={record.title}
-        status={<Pill tone={RISK_TONE(record.fields.risk)} dot>{String(record.fields.risk ?? "low")} risk</Pill>}
-      />
+    <form id="ib-stepup" className="ds-stack ds-gap-3" onSubmit={(event) => { event.preventDefault(); setTried(true); if (!drifted && phrase === expected && !busy) void approve(); }}>
       <FactGrid columns={2} items={[
         { label: "Action", value: String(record.fields.action ?? "Not stated"), mono: true },
         { label: "Amount", value: record.amountMinor === undefined ? "No money moves" : context.money(record.amountMinor), mono: record.amountMinor !== undefined },
@@ -1056,17 +1115,25 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
         </Notice>
       ) : (
         <>
-          <Field label={`Type ${expected} to confirm`} required hint="A local confirmation recorded in the audit log, not a second factor. No device or provider is checked.">
-            <TextInput value={phrase} onChange={(event) => setPhrase(event.target.value.toUpperCase())} autoComplete="off" />
+          <Field label={`Type ${expected} to confirm`} required hint={tried && phrase !== expected ? `Type ${expected} exactly to approve.` : "A local confirmation recorded in the audit log, not a second factor. No device or provider is checked."}>
+            <TextInput value={phrase} invalid={tried && phrase !== expected} onChange={(event) => setPhrase(event.target.value.toUpperCase())} autoComplete="off" />
           </Field>
         </>
       )}
-      <OverlayActions
-        primary={<Button variant="primary" type="submit" busy={busy} disabled={drifted || phrase !== expected}>Approve this action</Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
-        busy={busy}
-      />
     </form>
+  );
+}
+
+function StepUpFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const record = useApprovalOf(context);
+  const target = useRecord(record ? String(record.fields.targetId ?? "") : undefined);
+  if (!record) return null;
+  const { drifted } = targetDrift(record, target);
+  return (
+    <OverlayActions
+      primary={<Button variant="primary" type="submit" form="ib-stepup" disabled={drifted}>Approve this action</Button>}
+      secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    />
   );
 }
 
@@ -1076,7 +1143,6 @@ function ScopeDiff({ context }: { context: ScreenContext }) {
   const record = approvals.find((row) => row.id === (payload?.id ?? context.selectedId));
   if (!record) return <Empty title="Select a request" />;
   const capability = String(record.fields.capability ?? "");
-  const requester = String(record.fields.requester ?? record.ownerName);
   const isAgent = record.fields.requesterKind === "ai";
   const rows: { aspect: string; requested: string; held: string; differs: boolean }[] = [
     { aspect: "Action", requested: String(record.fields.action ?? "Not stated"), held: isAgent ? "Drafts and requests only" : "Depends on their role view", differs: true },
@@ -1087,7 +1153,6 @@ function ScopeDiff({ context }: { context: ScreenContext }) {
   ];
   return (
     <Stack gap={3}>
-      <OverlaySummary eyebrow="Requested against held" title={record.title} meta={[`${requester}${isAgent ? " (agent)" : ""}`]} />
       <table className="ib-diff" aria-label="Requested against held">
         <thead><tr><th scope="col">Aspect</th><th scope="col">Requested</th><th scope="col">Held today</th></tr></thead>
         <tbody>
@@ -1225,6 +1290,40 @@ async function convertToTask(context: ScreenContext, message: Rec | undefined) {
   context.toast("Task created", `"${task.title}" is in Projects and the thread now links to it.`);
 }
 
+function useThreadOf(context: ScreenContext) {
+  const messages = useCollection("messages");
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  return messages.find((row) => row.id === (payload?.id ?? context.selectedId));
+}
+
+function ThreadSummary({ context }: { context: ScreenContext }) {
+  const message = useThreadOf(context);
+  if (!message) return null;
+  return (
+    <OverlaySummary
+      avatar={<Avatar name={String(message.fields.author ?? message.ownerName)} kind={message.fields.authorKind === "ai" ? "ai" : "human"} size="lg" />}
+      eyebrow={`${String(message.fields.author ?? message.ownerName)} · ${String(message.fields.channel ?? "Direct")}`}
+      title={message.title}
+      meta={[context.relative(message.at), message.fields.assignee ? `Waiting on ${String(message.fields.assignee)}` : "Nobody owns this yet"]}
+    />
+  );
+}
+
+function ThreadFooter({ context }: { context: ScreenContext }) {
+  const message = useThreadOf(context);
+  if (!message) return null;
+  return (
+    <OverlayActions
+      primary={<Button variant="primary" type="submit" form="ib-reply">Save reply to the thread</Button>}
+      secondary={<>
+        <Button variant="secondary" onClick={() => context.openOverlay("reassignment", { id: message.id })}>Reassign</Button>
+        <Button variant="secondary" onClick={() => void convertToTask(context, message)}>Convert to task</Button>
+      </>}
+      end={<Button variant="ghost" onClick={() => context.openOverlay("mute", { id: message.id })}>Mute</Button>}
+    />
+  );
+}
+
 function MessageInspector({ context, close }: { context: ScreenContext; close: () => void }) {
   const messages = useCollection("messages");
   const payload = context.overlayPayload as { id?: string } | undefined;
@@ -1258,13 +1357,7 @@ function MessageInspector({ context, close }: { context: ScreenContext; close: (
   }
 
   return (
-    <Stack gap={3}>
-      <OverlaySummary
-        avatar={<Avatar name={String(message.fields.author ?? message.ownerName)} kind={message.fields.authorKind === "ai" ? "ai" : "human"} size="lg" />}
-        eyebrow={`${String(message.fields.author ?? message.ownerName)} · ${String(message.fields.channel ?? "Direct")}`}
-        title={message.title}
-        meta={[context.relative(message.at), message.fields.assignee ? `Waiting on ${String(message.fields.assignee)}` : "Nobody owns this yet"]}
-      />
+    <form id="ib-reply" className="ds-stack ds-gap-3" onSubmit={(event) => { event.preventDefault(); if (reply.trim() && !busy) void send(); }}>
       <p className="ds-prose">{message.summary}</p>
       <FactGrid columns={3} items={[
         { label: "Owner", value: String(message.fields.assignee ?? "Unassigned"), tone: message.fields.assignee ? undefined : "warning" },
@@ -1273,7 +1366,7 @@ function MessageInspector({ context, close }: { context: ScreenContext; close: (
         { label: "Visibility", value: restricted.length ? `Restricted to ${restricted.map((entry) => ROLE_LABELS[entry as keyof typeof ROLE_LABELS] ?? entry).join(", ")}` : "Everyone in the workspace" },
         { label: "Thread", value: String(message.fields.threadId ?? message.id), mono: true },
       ]} />
-      <Field label="Reply" hint="Saved as a message record in this thread.">
+      <Field label="Reply" hint={reply.trim() ? "Saved as a message record in this thread." : "Write a reply to enable Save reply to the thread."}>
         <TextArea rows={4} value={reply} onChange={(event) => setReply(event.target.value)} />
       </Field>
       {mail && (
@@ -1281,17 +1374,14 @@ function MessageInspector({ context, close }: { context: ScreenContext; close: (
           {mail.localEquivalent} {mail.note}
         </Notice>
       )}
-      <OverlayActions
-        primary={<Button variant="primary" busy={busy} disabled={!reply.trim()} onClick={() => void send()}>Save reply to the thread</Button>}
-        secondary={<>
-          <Button variant="secondary" onClick={() => context.openOverlay("reassignment", { id: message.id })}>Reassign</Button>
-          <Button variant="secondary" onClick={() => void convertToTask(context, message)}>Convert to task</Button>
-        </>}
-        end={<Button variant="ghost" onClick={() => context.openOverlay("mute", { id: message.id })}>Mute</Button>}
-        busy={busy}
-      />
-    </Stack>
+    </form>
   );
+}
+
+function ThreadOwnerSummary({ context }: { context: ScreenContext }) {
+  const message = useThreadOf(context);
+  if (!message) return null;
+  return <OverlaySummary eyebrow="Thread" title={message.title} meta={[`Owned by ${String(message.fields.assignee ?? "nobody")}`]} />;
 }
 
 function Reassignment({ context, close }: { context: ScreenContext; close: () => void }) {
@@ -1302,12 +1392,26 @@ function Reassignment({ context, close }: { context: ScreenContext; close: () =>
   const [to, setTo] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tried, setTried] = useState(false);
   if (!message) return <Empty title="Select a thread" />;
 
   return (
-    <Stack gap={4}>
-      <OverlaySummary eyebrow="Thread" title={message.title} meta={[`Owned by ${String(message.fields.assignee ?? "nobody")}`]} />
-      <Field label="New owner" required>
+    <form id="ib-reassign" className="ds-stack ds-gap-3" onSubmit={async (event) => {
+      event.preventDefault();
+      setTried(true);
+      if (!to || busy) return;
+      setBusy(true);
+      try {
+        await context.mutate.patch(message.id, {
+          fields: { ...message.fields, assignee: to, handoverNote: note, handoverBy: context.actor },
+        }, { event: `Thread reassigned to ${to}${note ? `: ${note}` : ""}`, expectRevision: message.revision });
+        context.toast("Reassigned", `${to} now owns the thread, and the note is on the record.`);
+        close();
+      } finally {
+        setBusy(false);
+      }
+    }}>
+      <Field label="New owner" required hint={tried && !to ? "Choose who owns the thread." : undefined}>
         <Select value={to} onChange={(event) => setTo(event.target.value)}>
           <option value="">Choose a person or an agent</option>
           {members.filter((member) => member.status === "active").map((member) => (
@@ -1323,29 +1427,7 @@ function Reassignment({ context, close }: { context: ScreenContext; close: () =>
           An agent may draft a reply and summarise the thread. Anything consequential still comes back for a human decision.
         </Notice>
       )}
-      <OverlayActions
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
-        primary={<Button
-          variant="primary"
-          busy={busy}
-          disabled={!to}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await context.mutate.patch(message.id, {
-                fields: { ...message.fields, assignee: to, handoverNote: note, handoverBy: context.actor },
-              }, { event: `Thread reassigned to ${to}${note ? `: ${note}` : ""}`, expectRevision: message.revision });
-              context.toast("Reassigned", `${to} now owns the thread, and the note is on the record.`);
-              close();
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Reassign thread
-        </Button>}
-      />
-    </Stack>
+    </form>
   );
 }
 
@@ -1466,6 +1548,12 @@ function NotificationsFeed({ context, tab }: { context: ScreenContext; tab: Feed
   );
 }
 
+function EventItemSummary({ context }: { context: ScreenContext }) {
+  const { item } = useItemOf(context);
+  if (!item) return null;
+  return <OverlaySummary eyebrow={`${item.sourceLabel} · ${item.category}`} title={item.title} status={<PriorityTag priority={item.priority} />} meta={[context.relative(item.at)]} />;
+}
+
 function EventDetail({ context }: { context: ScreenContext }) {
   const { items, rules } = useInboxData();
   const { role } = useWorkspace();
@@ -1474,7 +1562,6 @@ function EventDetail({ context }: { context: ScreenContext }) {
   if (!item) return <Empty title="Select an event" icon={<Bell size={20} />}>Choose a row to see its source and its deep link.</Empty>;
   return (
     <Stack gap={3}>
-      <OverlaySummary eyebrow={`${item.sourceLabel} · ${item.category}`} title={item.title} status={<PriorityTag priority={item.priority} />} meta={[context.relative(item.at)]} />
       <StateTags item={item} />
       {item.body && <p>{item.body}</p>}
       <FactGrid columns={2} items={[
@@ -1607,6 +1694,54 @@ function IncidentBoard({ context, tab }: { context: ScreenContext; tab: Incident
   );
 }
 
+function useIncidentOf(context: ScreenContext) {
+  const incidents = useCollection("incidents");
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  return incidents.find((row) => row.id === (payload?.id ?? context.selectedId));
+}
+
+function IncidentHead({ context }: { context: ScreenContext }) {
+  const record = useIncidentOf(context);
+  if (!record) return null;
+  return (
+    <OverlaySummary
+      eyebrow={`${String(record.fields.service ?? "Incident")}`}
+      title={record.title}
+      status={<Pill tone={record.fields.severity === "sev1" ? "danger" : "warning"} dot>{String(record.fields.severity).toUpperCase()}</Pill>}
+      meta={[<Pill key="s" tone={record.status === "resolved" ? "success" : "neutral"}>{record.status}</Pill>, `Waiting on ${String(record.fields.owner ?? "no owner")}`]}
+    />
+  );
+}
+
+function IncidentFooter({ context }: { context: ScreenContext }) {
+  const record = useIncidentOf(context);
+  if (!record) return null;
+  return (
+    <OverlayActions
+      primary={
+      <Button
+        variant="primary"
+        disabled={record.status === "resolved"}
+        onClick={async () => {
+          await context.mutate.patch(record.id, { status: "resolved", fields: { ...record.fields, resolvedBy: context.actor, resolvedAt: clockIso() } }, { event: `Incident resolved: ${record.title}`, expectRevision: record.revision });
+          context.toast("Resolved", "The incident moved to Resolved with your name and the time.");
+        }}
+      >
+        Mark resolved
+      </Button>}
+      secondary={<Button variant="secondary" onClick={() => context.openOverlay("owner handoff", { id: record.id })}>Hand over</Button>}
+      end={record.fields.severity === "sev1" ? <Button variant="outline-danger" onClick={() => context.openOverlay("emergency pause", { id: record.id })}>Emergency pause…</Button> : undefined}
+    />
+
+  );
+}
+
+function IncidentOwnerSummary({ context }: { context: ScreenContext }) {
+  const record = useIncidentOf(context);
+  if (!record) return null;
+  return <OverlaySummary eyebrow="Incident" title={record.title} meta={[`Owned by ${String(record.fields.owner ?? "nobody")}`]} />;
+}
+
 function IncidentSummary({ context }: { context: ScreenContext }) {
   const incidents = useCollection("incidents");
   const payload = context.overlayPayload as { id?: string } | undefined;
@@ -1614,12 +1749,6 @@ function IncidentSummary({ context }: { context: ScreenContext }) {
   if (!record) return <Empty title="Select an incident" icon={<ShieldAlert size={20} />}>Choose an incident from the board.</Empty>;
   return (
     <Stack gap={3}>
-      <OverlaySummary
-        eyebrow={`${String(record.fields.service ?? "Incident")}`}
-        title={record.title}
-        status={<Pill tone={record.fields.severity === "sev1" ? "danger" : "warning"} dot>{String(record.fields.severity).toUpperCase()}</Pill>}
-        meta={[<Pill key="s" tone={record.status === "resolved" ? "success" : "neutral"}>{record.status}</Pill>, `Waiting on ${String(record.fields.owner ?? "no owner")}`]}
-      />
       {record.summary && <p>{record.summary}</p>}
       <FactGrid columns={2} items={[
         { label: "Owner", value: String(record.fields.owner ?? "Unassigned"), tone: record.fields.owner ? undefined : "warning" },
@@ -1629,21 +1758,6 @@ function IncidentSummary({ context }: { context: ScreenContext }) {
       ]} />
       <OverlaySection title="What the records show" hint="Stored on the incident. Where a cause is unknown the field says so."><p>{String(record.fields.diagnosis ?? "No diagnosis recorded")}</p></OverlaySection>
       <OverlaySection title="Safe recovery"><p>{String(record.fields.recovery ?? "No recovery step recorded")}</p></OverlaySection>
-      <OverlayActions
-        primary={
-        <Button
-          variant="primary"
-          disabled={record.status === "resolved"}
-          onClick={async () => {
-            await context.mutate.patch(record.id, { status: "resolved", fields: { ...record.fields, resolvedBy: context.actor, resolvedAt: clockIso() } }, { event: `Incident resolved: ${record.title}`, expectRevision: record.revision });
-            context.toast("Resolved", "The incident moved to Resolved with your name and the time.");
-          }}
-        >
-          Mark resolved
-        </Button>}
-        secondary={<Button variant="secondary" onClick={() => context.openOverlay("owner handoff", { id: record.id })}>Hand over</Button>}
-        end={record.fields.severity === "sev1" ? <Button variant="outline-danger" onClick={() => context.openOverlay("emergency pause", { id: record.id })}>Emergency pause…</Button> : undefined}
-      />
     </Stack>
   );
 }
@@ -1655,11 +1769,20 @@ function OwnerHandoff({ context, close }: { context: ScreenContext; close: () =>
   const record = incidents.find((row) => row.id === (payload?.id ?? context.selectedId));
   const [to, setTo] = useState("");
   const [brief, setBrief] = useState("");
+  const [tried, setTried] = useState(false);
   if (!record) return <Empty title="Select an incident" />;
   return (
-    <Stack gap={3}>
-      <OverlaySummary eyebrow="Incident" title={record.title} meta={[`Owned by ${String(record.fields.owner ?? "nobody")}`]} />
-      <Field label="Hand over to" required>
+    <form id="ib-handoff" className="ds-stack ds-gap-3" onSubmit={async (event) => {
+      event.preventDefault();
+      setTried(true);
+      if (!to || !brief.trim()) return;
+      await context.mutate.patch(record.id, {
+        fields: { ...record.fields, owner: to, handoverBrief: brief, handoverBy: context.actor, handoverAt: clockIso() },
+      }, { event: `Incident handed to ${to}: ${brief}`, expectRevision: record.revision });
+      context.toast("Handed over", `${to} owns the incident and the brief is on the record.`);
+      close();
+    }}>
+      <Field label="Hand over to" required hint={tried && !to ? "Choose who takes the incident." : undefined}>
         <Select value={to} onChange={(event) => setTo(event.target.value)}>
           <option value="">Choose a person</option>
           {members.filter((member) => member.fields.kind === "human" && member.status === "active").map((member) => (
@@ -1667,26 +1790,10 @@ function OwnerHandoff({ context, close }: { context: ScreenContext; close: () =>
           ))}
         </Select>
       </Field>
-      <Field label="What they need to know" required hint="Written onto the incident so the next owner starts from the facts.">
+      <Field label="What they need to know" required hint={tried && !brief.trim() ? "Write what the next owner needs to know." : "Written onto the incident so the next owner starts from the facts."}>
         <TextArea rows={4} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="Rig is isolated; second circuit is free; client viewing at 14:00." />
       </Field>
-      <OverlayActions
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
-        primary={<Button
-          variant="primary"
-          disabled={!to || !brief.trim()}
-          onClick={async () => {
-            await context.mutate.patch(record.id, {
-              fields: { ...record.fields, owner: to, handoverBrief: brief, handoverBy: context.actor, handoverAt: clockIso() },
-            }, { event: `Incident handed to ${to}: ${brief}`, expectRevision: record.revision });
-            context.toast("Handed over", `${to} owns the incident and the brief is on the record.`);
-            close();
-          }}
-        >
-          Hand over
-        </Button>}
-      />
-    </Stack>
+    </form>
   );
 }
 
@@ -2540,14 +2647,14 @@ function DelegationGrant({ context, close }: { context: ScreenContext; close: ()
           <option value="category:security">category:security</option>
         </Select>
       </Field>
-      <Row gap={3} wrap>
+      <div className="ib-pair">
         <Field label="Escalate after (minutes)" required>
           <TextInput type="number" min={5} step={5} value={timer} onChange={(event) => setTimer(event.target.value)} required />
         </Field>
         <Field label="Authority cap" hint="Minor units; 0 means no money may move under this cover.">
           <TextInput type="number" min={0} step={1000} value={String(capMinor)} onChange={(event) => setCapMinor(Number(event.target.value))} />
         </Field>
-      </Row>
+      </div>
       {backup && !backupCan && (
         <Notice tone="warning" title={`${backup} cannot hold this`}>
           The {backupRole} view does not hold {capability?.replace(/_/g, " ")}. The rule will be saved disabled: a delegated person
@@ -2761,7 +2868,7 @@ export const inboxApp = registerApp({
         { id: "bulk triage", label: "Bulk triage", placement: "overflow", run: (context) => context.openOverlay("action preview", { intent: "read" }) },
       ],
       overlays: [
-        { id: "Notification detail", kind: "drawer", title: "Where this came from", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <NotificationDetail context={context} /> },
+        { id: "Notification detail", kind: "drawer", title: "Where this came from", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <NotificationSummary context={context} />, render: ({ close: _close, ...context }) => <NotificationDetail context={context} />, footer: (context) => <NotificationFooter context={context} /> },
         { id: "snooze picker", kind: "modal", title: "Snooze", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SnoozePicker context={context} close={close} /> },
         { id: "action preview", kind: "modal", title: "Preview this triage", width: 720, render: ({ close, ...context }) => <ActionPreview context={context} close={close} /> },
       ],
@@ -2782,9 +2889,9 @@ export const inboxApp = registerApp({
         { id: "escalation rules", label: "Escalation rules", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/inbox/escalations`) },
       ],
       overlays: [
-        { id: "Approval review", kind: "drawer", title: "Review the request", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ApprovalReview context={context} close={close} /> },
-        { id: "step-up auth", kind: "modal", title: "Confirm this approval", width: OVERLAY_WIDTH.form, blocking: true, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <StepUpAuth context={context} close={close} /> },
-        { id: "scope diff", kind: "modal", title: "Requested against held", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <ScopeDiff context={context} /> },
+        { id: "Approval review", kind: "drawer", title: "Review the request", width: OVERLAY_WIDTH.record, summary: ({ ...context }) => <ApprovalSummary context={context} />, render: ({ close, ...context }) => <ApprovalReview context={context} close={close} /> },
+        { id: "step-up auth", kind: "modal", title: "Confirm this approval", width: OVERLAY_WIDTH.form, blocking: true, summary: ({ ...context }) => <StepUpSummary context={context} />, render: ({ close, ...context }) => <StepUpAuth context={context} close={close} />, footer: (context) => <StepUpFooter context={context} close={context.close} /> },
+        { id: "scope diff", kind: "modal", title: "Requested against held", width: OVERLAY_WIDTH.wide, summary: ({ ...context }) => <ScopeSummary context={context} />, render: ({ close: _close, ...context }) => <ScopeDiff context={context} /> },
         { id: "delegate approval", kind: "modal", title: "Delegate this request", width: 580, render: ({ close, ...context }) => <DelegateApproval context={context} close={close} /> },
       ],
     },
@@ -2810,8 +2917,8 @@ export const inboxApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Message inspector", kind: "drawer", title: "Thread", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <MessageInspector context={context} close={close} /> },
-        { id: "reassignment", kind: "modal", title: "Reassign the thread", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <Reassignment context={context} close={close} /> },
+        { id: "Message inspector", kind: "drawer", title: "Thread", width: OVERLAY_WIDTH.record, summary: ({ ...context }) => <ThreadSummary context={context} />, render: ({ close, ...context }) => <MessageInspector context={context} close={close} />, footer: (context) => <ThreadFooter context={context} /> },
+        { id: "reassignment", kind: "modal", title: "Reassign the thread", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <ThreadOwnerSummary context={context} />, render: ({ close, ...context }) => <Reassignment context={context} close={close} />, footer: submitFooter("ib-reassign", "Reassign thread") },
         { id: "mute", kind: "modal", title: "Mute", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <MuteThread context={context} close={close} /> },
       ],
     },
@@ -2834,7 +2941,7 @@ export const inboxApp = registerApp({
         { id: "open deep-link", label: "Open deep link", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select an event"), run: (context) => openItem(context, busItem(context.selectedId)) },
       ],
       overlays: [
-        { id: "Event detail", kind: "drawer", title: "Event", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <EventDetail context={context} /> },
+        { id: "Event detail", kind: "drawer", title: "Event", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <EventItemSummary context={context} />, render: ({ close: _close, ...context }) => <EventDetail context={context} /> },
         { id: "grouped items", kind: "modal", title: "Grouped items", width: 640, render: ({ close: _close, ...context }) => <GroupedItems context={context} /> },
         { id: "preference quick view", kind: "drawer", title: "Delivery at a glance", width: OVERLAY_WIDTH.compact, render: ({ close: _close, ...context }) => <PreferenceQuickView context={context} /> },
         { id: "action preview", kind: "modal", title: "Preview this triage", width: 720, render: ({ close, ...context }) => <ActionPreview context={context} close={close} /> },
@@ -2860,8 +2967,8 @@ export const inboxApp = registerApp({
         { id: "emergency pause", label: "Emergency pause", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("emergency pause") },
       ],
       overlays: [
-        { id: "Incident summary", kind: "drawer", title: "Incident", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <IncidentSummary context={context} /> },
-        { id: "owner handoff", kind: "modal", title: "Hand over the incident", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <OwnerHandoff context={context} close={close} /> },
+        { id: "Incident summary", kind: "drawer", title: "Incident", width: OVERLAY_WIDTH.record, summary: ({ ...context }) => <IncidentHead context={context} />, render: ({ close: _close, ...context }) => <IncidentSummary context={context} />, footer: (context) => <IncidentFooter context={context} /> },
+        { id: "owner handoff", kind: "modal", title: "Hand over the incident", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <IncidentOwnerSummary context={context} />, render: ({ close, ...context }) => <OwnerHandoff context={context} close={close} />, footer: submitFooter("ib-handoff", "Hand over") },
         { id: "emergency pause", kind: "modal", title: "Emergency pause", tone: "danger", width: 520, blocking: true, render: ({ close, ...context }) => <EmergencyPause context={context} close={close} /> },
         { id: "acknowledge incident", kind: "modal", title: "Acknowledge an incident", width: 540, render: ({ close, ...context }) => <AcknowledgeIncident context={context} close={close} /> },
         { id: "escalate incident", kind: "modal", title: "Escalate an incident", width: 580, tone: "danger", render: ({ close, ...context }) => <EscalateIncident context={context} close={close} /> },

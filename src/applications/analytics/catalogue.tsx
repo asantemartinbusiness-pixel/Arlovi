@@ -3,8 +3,7 @@ import {
   AlertTriangle, CheckCircle2, Database, GitMerge, Ruler, Table2,
 } from "lucide-react";
 import {
-  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, KeyValueList, Meter, ModalActions, Notice, OverlayActions,
-  OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, Empty, Field, Grid, KeyValueList, Meter, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";

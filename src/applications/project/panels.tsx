@@ -3,7 +3,7 @@ import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Activity, CalendarRange, FolderKanban, LayoutDashboard, ListChecks, Timer, Users } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
-  Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, PageSection, KeyValueList,
+  Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, PageSection, KeyValueList, ConfirmModal,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -567,6 +567,7 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
     ? (record?.collection === "tasks" && record.organizationId === org.id ? record : undefined)
     : data.tasks[0];
   const facts = useTaskFacts(task);
+  const [unlink, setUnlink] = useState<Rec | null>(null);
   const commentScope = `project:task-comment:${org.id}:${context.actor}:${task?.id ?? "none"}`;
   const [comment, setComment] = useWorkingField(commentScope, "comment", "");
   if (!task) return <Empty title="No task" icon={<ListChecks size={20} />} />;
@@ -658,6 +659,20 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
   const items = taskFactItems(context, task, facts);
   return (
     <div className="pj-detail">
+      <ConfirmModal
+        open={unlink !== null}
+        onOpenChange={(open) => { if (!open) setUnlink(null); }}
+        title="Remove this dependency?"
+        consequence={unlink ? <>{task.title} will start before {unlink.title} is done. Nothing else changes, and the link can be added back with Link work.</> : null}
+        confirmLabel="Remove the link"
+        onConfirm={async () => {
+          const dependency = unlink;
+          if (!dependency) return;
+          const saved = await context.mutate.patch(task.id, { fields: { ...task.fields, dependsOn: withoutDependency(task, dependency.id) } }, { expectRevision: task.revision, event: `${task.title} no longer waits on ${dependency.title} (${context.actor})` });
+          setUnlink(null);
+          if (saved) context.toast("Link removed", `${task.title} no longer waits on ${dependency.title}.`);
+        }}
+      />
       <div className="pj-detail-main">
         <PageSection title="Description">
           {task.summary ? <p>{task.summary}</p> : <span className="ds-subtle">No description. Add one from Edit the task.</span>}
@@ -670,10 +685,7 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
             context={context}
             task={task}
             facts={facts}
-            onRemove={async (dependency) => {
-              await context.mutate.patch(task.id, { fields: { ...task.fields, dependsOn: withoutDependency(task, dependency.id) } }, { expectRevision: task.revision, event: `${task.title} no longer waits on ${dependency.title} (${context.actor})` });
-              context.toast("Link removed", `${task.title} no longer waits on ${dependency.title}.`);
-            }}
+            onRemove={(dependency) => setUnlink(dependency)}
           />
         </PageSection>
         <PageSection title="Recent activity" actions={<Button size="sm" variant="ghost" onClick={() => context.setTab("Discussion")}>All discussion</Button>}>
@@ -694,7 +706,7 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
               { label: "Logged", value: `${facts.loggedHours} hours`, mono: true },
               { label: "Entries", value: String(facts.time.length), mono: true },
             ]} />
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/project/time`)}>Log time</Button>
+            <div><Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/project/time`)}>Log time</Button></div>
           </Stack>
         </PageSection>
         <PageSection title="Record">

@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertOctagon, CalendarClock, Gauge, PlugZap, ShieldQuestion } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, Meter, ModalActions, ModalInFlight, Notice,
-  OverlayActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayActions, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";

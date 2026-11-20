@@ -169,3 +169,6 @@
 .pj-comment-entry { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
 .pj-comment-entry textarea { width: 100%; }
 .pj-depwork .pj-link { flex: 1 1 auto; }
+.pj-kbd { font-size: var(--text-sm); color: var(--fg-muted); }
+.pj-kbd summary { cursor: pointer; width: fit-content; }
+.pj-kbd[open] summary { margin-block-end: var(--space-2); }

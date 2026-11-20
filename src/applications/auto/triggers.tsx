@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarClock, Globe, Inbox, Radio } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, Notice, OverlayActions, OverlaySection, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextInput,
+  Button, Card, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
@@ -307,7 +307,7 @@ export function WebhookSetup({ context, close }: { context: ScreenContext; close
       <Notice tone="warning" title="This endpoint does not exist">
         Nothing is hosted from this browser, so no provider can post to it. A test delivery exercises the de-duplication and ordering rules on real rows instead.
       </Notice>
-      <FactGrid columns={1} items={[
+      <FactGrid columns={2} items={[
         { label: "Endpoint that would be registered", value: path, mono: true },
         { label: "Signature header", value: "X-Arlovi-Signature", mono: true },
         { label: "De-duplication", value: "By the Idempotency-Key header, for 24 hours" },
