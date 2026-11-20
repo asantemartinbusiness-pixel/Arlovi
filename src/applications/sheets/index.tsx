@@ -33,7 +33,8 @@ import {
 } from "./model";
 import { SheetGrid, singleSelection } from "./grid";
 import { boxAddresses, protectedSet, SAVE_LABEL, SAVE_TONE, useWorkbookEditor, type WorkbookEditor } from "./state";
-import { ChangePreview, proposeChange } from "./preview";
+import { ChangePreview, pendingChange, proposeChange } from "./preview";
+import { useStore } from "@/applications/visual/kit";
 import { LibraryStrip, RecordCardGrid, ViewToggle, useLibraryView } from "../docs/libraryKit";
 import "./sheets.css";
 
@@ -313,6 +314,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
           { label: "Owned by you", value: active.filter((record) => record.ownerName === actor).length },
           { label: "Sharing recorded", value: sharedCount },
           { label: "Templates", value: templateCount },
+          { label: tab === "Recent" ? "shown (latest 12, filtered)" : "shown in this view", value: rows.length },
         ]}
       >
         <ViewToggle label="Library view" value={view} onChange={setView} />
@@ -573,6 +575,8 @@ function ReviewRibbon({ editor, context }: { editor: WorkbookEditor; context: Sc
 function GridEditorScreen({ context }: { context: ScreenContext }) {
   const record = useWorkbook(context);
   const editor = useWorkbookEditor(context, record);
+  const pending = useStore(pendingChange);
+  const previewed = useMemo(() => (pending && pending.editorKey === record?.id ? new Set(pending.diff.changes.map((line) => line.address)) : undefined), [pending, record?.id]);
   const [mobilePanel, setMobilePanel] = useState<"grid" | "aside">("grid");
 
   if (!record) {
@@ -606,7 +610,7 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
       <div className="sx-bar">
         <section className="sx-bar-main" aria-label="Workbook working status">
           <div className="sx-bar-title">
-            <strong>{record.title}</strong>
+            <h1 className="sx-bar-h1">{record.title}</h1>
             <span className="sx-bar-sub">
               <Pill tone={record.status === "archived" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
               <span>{editor.sheet.name} · {editor.workbook.sheets.length} sheet{editor.workbook.sheets.length === 1 ? "" : "s"}</span>
@@ -676,6 +680,7 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
             }}
             onCopy={(box) => copyRange(editor.sheet, box)}
             hiddenRows={hidden}
+            previewed={previewed}
             comments={sheetComments.map((comment) => ({ address: comment.address, resolved: comment.resolved }))}
             protectedAddresses={guarded}
             height={560}
@@ -2791,6 +2796,7 @@ registerApp({
     "ARL-SHEETS-002": {
       id: "ARL-SHEETS-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <GridEditorScreen context={context} />,
       tabs: ["Sheet tabs", "Data", "Formulas", "Review", "View"].map((id) => ({ id, render: () => null })),
       actions: GRID_ACTIONS,
@@ -2800,7 +2806,7 @@ registerApp({
         { id: "named range", kind: "modal", summary: workbookSummary, title: "Named range", width: OVERLAY_WIDTH.form, footer: formFooter("named-range", "Save", false), render: (context) => <NamedRangeOverlay context={context} close={context.close} /> },
         { id: "edit cell", kind: "modal", title: "Edit cell", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-edit-cell", "Save"), render: (context) => <EditCell context={context} close={context.close} /> },
         { id: "paste cells", kind: "modal", title: "Paste", width: OVERLAY_WIDTH.modal, footer: formFooter("sheets-paste", "Paste"), render: (context) => <PasteCells context={context} close={context.close} /> },
-        { id: "sort range", kind: "modal", title: "Sort", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-sort", "Sort"), render: (context) => <SortForm context={context} close={context.close} /> },
+        { id: "sort range", kind: "modal", title: "Sort", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-sort", "Preview the sort"), render: (context) => <SortForm context={context} close={context.close} /> },
         { id: "chart picker", kind: "drawer", summary: workbookSummary, title: "Chart", width: OVERLAY_WIDTH.form, footer: formFooter("chart-picker", "Save chart", false), render: (context) => <ChartPicker context={context} close={context.close} /> },
       ],
     },

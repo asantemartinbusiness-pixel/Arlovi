@@ -161,6 +161,7 @@ export function ExportScreen({ context, actions }: { context: ScreenContext; act
     <EditorFrame
       context={context}
       lean
+      titleLevel={1}
       actions={actions}
       tabs={[{ id: "Formats" }, { id: "Presets" }, { id: "Queue" }, { id: "History" }]}
       title={`${record.title} — export`}

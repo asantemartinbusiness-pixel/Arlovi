@@ -1,5 +1,5 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PenTool, Square, Circle, Type as TypeIcon, Frame as FrameIcon, Minus, Hexagon,
   MousePointer2, Hand, Grid3x3, Magnet, Link2, Play, FileCode2, Download, Plus, Component,
@@ -13,7 +13,7 @@ import { registerApp, type ActionDef, type ScreenContext } from "@/platform/regi
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob, downloadText,
-  slug, useStore, type DocHandle,
+  slug, useStore, createStore, NumberBox, type DocHandle,
 } from "@/applications/visual/kit";
 import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useGuardRefresh, useSharedDoc } from "./sharedDoc";
 import { CAPABILITY_LABELS } from "@/platform/capability";
@@ -366,7 +366,6 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
           <Toolbar label="History">
             <Button size="sm" variant="ghost" disabled={!handle.canUndo} onClick={handle.undo}>Undo</Button>
             <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
-            <Button size="sm" variant="ghost" onClick={requestFit}>Fit</Button>
             <Popover align="end" trigger={<Button size="sm" variant="ghost" aria-label="Keyboard shortcuts">Keys</Button>}>
               <div className="vx-keys"><ShortcutTable rows={SHORTCUT_ROWS} /></div>
             </Popover>
@@ -726,6 +725,9 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
           <Toolbar label="History">
             <Button size="sm" variant="ghost" disabled={!handle.canUndo} onClick={handle.undo}>Undo</Button>
             <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
+            <Popover align="end" trigger={<Button size="sm" variant="ghost" aria-label="What the path operations do">Operations</Button>}>
+              <div className="vx-keys"><PathOperationsHelp /></div>
+            </Popover>
           </Toolbar>
         </>
       }
@@ -755,7 +757,7 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
         </Stack>
       }
       leftLabel="Paths"
-      right={<PathInspector handle={handle} context={context} tab={context.tab} />}
+      right={<PathRight handle={handle} context={context} tab={context.tab} />}
       rightLabel={context.tab === "Boolean" ? "Combine" : context.tab === "Offset" ? "Offset" : "Point"}
       status={
         <>
@@ -767,6 +769,21 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
     >
       <PathCanvas handle={handle} nodeId={active?.id} onConvert={convert} />
     </EditorFrame>
+  );
+}
+
+function PathRight({ handle, context, tab }: { handle: DocHandle<DesignDoc>; context: ScreenContext; tab: string }) {
+  const focus = useStore(pathFocus);
+  return (
+    <Stack gap={3}>
+      {focus.help && (
+        <Notice tone="info" title="Path operations" actions={<Button size="sm" variant="ghost" onClick={() => pathFocus.set((c) => ({ ...c, help: false }))}>Dismiss</Button>}>
+          <PathOperationsHelp />
+        </Notice>
+      )}
+      <PathInspector handle={handle} context={context} tab={tab} />
+      <StrokeControls handle={handle} />
+    </Stack>
   );
 }
 
@@ -2409,7 +2426,7 @@ function ApplyStyle({ context, close }: { context: ScreenContext; close: () => v
   const doc = handle.doc;
   const page = activePage(doc);
   const nodes = ui.selected.map((id) => page.nodes[id]).filter(Boolean);
-  if (nodes.length === 0) return <Notice tone="info" title="Select a layer">Pick the layers first, then the style.</Notice>;
+  if (nodes.length === 0) return <HandOff context={context} toast={["Select a layer first", "Pick the layers, then apply a style."]} />;
   const texts = nodes.filter((node) => node.kind === "text");
   const shapes = nodes.filter((node) => node.kind !== "text");
   const apply = (change: (node: SceneNode) => Partial<SceneNode>, label: string, ids: string[]) => {
@@ -2709,6 +2726,7 @@ registerApp({
     "ARL-DESIGN-002": {
       id: "ARL-DESIGN-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <CanvasScreen context={context} actions={CANVAS_ACTIONS} />,
       tabs: (["Design", "Prototype", "Inspect", "Comments"] as const).map((lens) => ({
         id: lens,
@@ -2784,6 +2802,7 @@ registerApp({
     "ARL-DESIGN-004": {
       id: "ARL-DESIGN-004",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <PathScreen context={context} actions={PATH_ACTIONS} />,
       tabs: (["Pen", "Curves", "Boolean", "Offset"] as const).map((lens) => ({
         id: lens,
@@ -2792,19 +2811,7 @@ registerApp({
       actions: PATH_ACTIONS,
       overlays: [
         { id: "Point inspector", kind: "drawer", title: "Point", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <PointInspectorOverlay context={context} /> },
-        { id: "path operations", kind: "modal", title: "Path operations", width: OVERLAY_WIDTH.form, render: () => (
-          <Stack gap={3}>
-            <Notice tone="info" title="What each operation does">
-              <ul>
-                <li><strong>Join</strong> closes the contour, merging the two ends when they are within six pixels.</li>
-                <li><strong>Simplify</strong> runs Ramer–Douglas–Peucker over the anchors at a four pixel tolerance and refits smooth tangents.</li>
-                <li><strong>Offset</strong> moves each anchor along the local normal.</li>
-                <li><strong>Combine</strong> adds a second contour and sets the fill rule; it does not compute intersection geometry.</li>
-              </ul>
-            </Notice>
-            <Notice tone="warning" title="Reversible">Every operation goes through the undo stack, so nothing is destructive.</Notice>
-          </Stack>
-        ) },
+        { id: "path operations", kind: "modal", title: "Path operations", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <HandOff context={context} then={() => pathFocus.set((c) => ({ ...c, help: true }))} /> },
         { id: "stroke editing", kind: "drawer", title: "Stroke", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <StrokeOverlay context={context} /> },
       ],
     },
@@ -3436,27 +3443,67 @@ function PointInspectorOverlay({ context }: { context: ScreenContext }) {
   return <PathInspector handle={handle} context={context} tab="Pen" />;
 }
 
-function StrokeOverlay({ context }: { context: ScreenContext }) {
-  const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
-  if (!record || !handle.doc) return <Empty title="Open a file first" />;
-  const page = activePage(handle.doc);
-  const node = page.nodes[ui.pathNodeId ?? ui.selected[0]] ?? Object.values(page.nodes).find((item) => item.kind === "path");
-  if (!node) return <Empty title="Select a layer" />;
+/** Overlays that are really inspector sections: they hand off to the inspector and close, so the canvas is never scrimmed. */
+const pathFocus = createStore<{ stroke: number; help: boolean }>({ stroke: 0, help: false });
+
+function HandOff({ context, then, toast }: { context: ScreenContext; then?: () => void; toast?: [string, string] }) {
+  useEffect(() => {
+    then?.();
+    if (toast) context.toast(toast[0], toast[1], "info");
+    context.closeOverlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
+function PathOperationsHelp() {
   return (
-    <Stack gap={3}>
-      <Field label="Stroke colour">
-        <input type="color" aria-label="Stroke colour" value={node.stroke?.color ?? "#17223A"} onChange={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: event.target.value, width: node.stroke?.width ?? 1, align: node.stroke?.align ?? "center" } })), "Stroke colour")} />
-      </Field>
-      <Field label="Width"><TextInput type="number" value={node.stroke?.width ?? 0} onChange={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: node.stroke?.color ?? "#17223A", width: Number(event.target.value), align: node.stroke?.align ?? "center" } })), "Stroke width")} /></Field>
-      <Field label="Alignment">
-        <Select value={node.stroke?.align ?? "center"} onChange={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: node.stroke?.color ?? "#17223A", width: node.stroke?.width ?? 1, align: event.target.value as "center" } })), "Stroke alignment")}>
+    <Stack gap={2}>
+      <ul className="vx-help">
+        <li><strong>Join</strong> closes the contour, merging the two ends when they are within six pixels.</li>
+        <li><strong>Simplify</strong> runs Ramer–Douglas–Peucker over the anchors at a four pixel tolerance and refits smooth tangents.</li>
+        <li><strong>Offset</strong> moves each anchor along the local normal.</li>
+        <li><strong>Combine</strong> adds a second contour and sets the fill rule; it does not compute intersection geometry.</li>
+      </ul>
+      <p className="vx-mini">Every operation goes through the undo stack, so nothing is destructive.</p>
+    </Stack>
+  );
+}
+
+/** Stroke controls for a path, live on the canvas. */
+function StrokeControls({ handle }: { handle: DocHandle<DesignDoc> }) {
+  const ui = useStore(designUi);
+  const focus = useStore(pathFocus);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus.stroke) ref.current?.querySelector<HTMLElement>("input")?.focus();
+  }, [focus.stroke]);
+  const doc = handle.doc;
+  if (!doc) return null;
+  const page = activePage(doc);
+  const node = page.nodes[ui.pathNodeId ?? ui.selected[0]] ?? Object.values(page.nodes).find((item) => item.kind === "path");
+  if (!node) return null;
+  const stroke = (patch: Partial<NonNullable<SceneNode["stroke"]>>, label: string) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: node.stroke?.color ?? "#17223A", width: node.stroke?.width ?? 1, align: node.stroke?.align ?? "center", ...patch } })), label);
+  return (
+    <PanelGroup title="Stroke">
+      <div ref={ref} className="vx-fieldrow">
+        <div>
+          <label className="vx-label" htmlFor="path-stroke-colour">Stroke colour</label>
+          <input id="path-stroke-colour" type="color" aria-label="Stroke colour" value={node.stroke?.color ?? "#17223A"} onChange={(event) => stroke({ color: event.target.value }, "Stroke colour")} />
+        </div>
+        <NumberBox label="Width" value={node.stroke?.width ?? 0} min={0} step={0.5} onChange={(value) => stroke({ width: Math.max(0, value) }, "Stroke width")} />
+      </div>
+      <Field label="Alignment" hint="The export renders a centred stroke; inside and outside are recorded on the layer.">
+        <Select value={node.stroke?.align ?? "center"} onChange={(event) => stroke({ align: event.target.value as "center" }, "Stroke alignment")}>
           {["center", "inside", "outside"].map((option) => <option key={option} value={option}>{option}</option>)}
         </Select>
       </Field>
-      <Notice tone="warning" title="Stroke alignment in the export">SVG strokes are centred. Inside and outside alignment is recorded on the layer but the exported file renders a centred stroke; the difference is stated here rather than hidden.</Notice>
-    </Stack>
+    </PanelGroup>
   );
+}
+
+function StrokeOverlay({ context }: { context: ScreenContext }) {
+  return <HandOff context={context} then={() => pathFocus.set((c) => ({ ...c, stroke: c.stroke + 1 }))} toast={["Stroke is in the path inspector", "Edit it on the right; the canvas updates as you change it."]} />;
 }
 
 function FrameSizeOverlay({ context }: { context: ScreenContext }) {
@@ -3464,8 +3511,8 @@ function FrameSizeOverlay({ context }: { context: ScreenContext }) {
   const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const page = activePage(handle.doc);
-  const frame = (ui.selected.map((id) => page.nodes[id]).find((node) => node?.kind === "frame")) ?? Object.values(page.nodes).find((node) => node.kind === "frame");
-  if (!frame) return <Empty title="No frame on this page" />;
+  const frame = ui.selected.map((id) => page.nodes[id]).find((node) => node?.kind === "frame");
+  if (!frame) return <HandOff context={context} toast={["Select a frame first", "Frame size applies to the selected frame."]} />;
   return (
     <Stack gap={3}>
       <Field label="Width"><TextInput type="number" value={Math.round(frame.w)} onChange={(event) => handle.edit((current) => updatePage(current, (p) => resizeFrame(p, frame.id, Math.max(40, Number(event.target.value)), frame.h)), "Set frame width")} /></Field>
@@ -3626,12 +3673,12 @@ function PublishComponent({ context, close }: { context: ScreenContext; close: (
   const { first, changes } = componentChanges(doc, component);
   const breaking = changes.filter((change) => change.breaking);
   const nothingNew = !first && changes.length === 0;
-  const next = component.version + 1;
+  const next = component.published ? component.version + 1 : component.version;
   return (
     <Stack gap={3}>
       <FactGrid
         items={[
-          { label: "Version", value: component.published ? `${component.version} → ${next}` : `unpublished → ${next}`, mono: true },
+          { label: "Version", value: component.published ? `v${component.version} → v${next}` : `not published → v${next}`, mono: true },
           { label: "Instances reached", value: uses.length, mono: true, tone: breaking.length > 0 && uses.length > 0 ? "warning" : undefined, hint: uses.length ? `on ${[...new Set(uses.map((use) => use.pageName))].join(", ")}` : undefined },
         ]}
       />

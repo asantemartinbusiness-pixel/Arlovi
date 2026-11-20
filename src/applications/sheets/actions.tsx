@@ -202,8 +202,8 @@ export function SortForm({ context, close }: { context: ScreenContext; close: ()
         event.preventDefault();
         const blocked = blockedByProtection(editor, selectionAddresses({ ...editor, selection: { ...editor.selection, box } }));
         if (blocked) { context.toast("Protected", blocked, "blocked"); return; }
-        if (!proposeChange(editor, sortRange(editor.sheet, box, column, direction, header, editor.values), `Sort ${boxLabel(box)}`, context.params.id ?? "")) {
-          context.toast("Review the sort", "Rows move, so the cells that change are shown above the grid.", "info");
+        if (!proposeChange(editor, sortRange(editor.sheet, box, column, direction, header, editor.values), `Sort ${boxLabel(box)}`, context.params.id ?? "", true)) {
+          context.toast("Review the sort", "The cells that change are highlighted in the grid and listed above it. Apply writes them.", "info");
         }
         close();
       }}

@@ -488,3 +488,4 @@ ol.dx-list { list-style: decimal outside; margin: 0 0 var(--space-4); padding-in
   .dx-release-step { border-inline-start: 0; border-block-start: 1px solid var(--border-default); }
   .dx-release-step:first-child { border-block-start: 0; }
 }
+.dx-bar-h1 { margin: 0; font: inherit; display: contents; }

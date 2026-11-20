@@ -201,3 +201,4 @@
 .px-keys { font-size: var(--text-xs); color: var(--fg-muted); }
 .px-keys summary { cursor: pointer; font-weight: 600; }
 .px-keys p { margin: var(--space-1) 0 0; }
+.px-bar-h1 { margin: 0; font-size: var(--text-md); font-weight: 600; color: var(--fg-strong); letter-spacing: 0; }

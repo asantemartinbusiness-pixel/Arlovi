@@ -36,7 +36,7 @@ import {
 } from "./actions";
 import { useStore } from "@/applications/visual/kit";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
-import { LibraryStrip } from "../docs/libraryKit";
+import { LibraryStrip, ViewToggle, useLibraryView } from "../docs/libraryKit";
 import "./present.css";
 
 /* ====================================================================== *
@@ -232,6 +232,7 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
   const decks = useCollection("decks");
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
+  const [view, setView] = useLibraryView("present", "cards");
   const rows = useMemo(() => {
     const list = tab === "Recent"
       ? [...decks].filter((record) => record.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -252,8 +253,10 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
           { label: "Current decks", value: decks.filter((record) => record.status !== "archived").length },
           { label: "Templates", value: decks.filter((record) => record.fields.isTemplate === true).length },
           { label: "Archived", value: decks.filter((record) => record.status === "archived").length },
+          { label: "shown in this view", value: rows.length },
         ]}
       >
+        <ViewToggle label="Library view" value={view} onChange={setView} />
       </LibraryStrip>
       {tab === "Shared" && <p className="ds-subtle">These records do not grant public or workspace access.</p>}
       <div className="lk-toolbar">
@@ -268,7 +271,23 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
           : tab === "Templates" ? "Create a presentation and mark it as a template to reuse its layouts and theme."
           : tab === "Archived" ? "Archived presentations will appear here when there are any."
           : "Create a presentation or import an outline to start."}
-      </Empty> : (
+      </Empty> : view === "table" ? (
+        <DataGrid
+          rows={rows}
+          rowId={(row) => row.id}
+          label={`${tab} presentations`}
+          selectedId={context.selectedId}
+          onSelect={(id) => context.select(id)}
+          onOpen={(id) => context.navigate(`/o/${org.slug}/present/decks/${id}`)}
+          columns={[
+            { key: "title", header: "Deck", primary: true, sortValue: (row) => row.title, cell: (row) => <span className="ds-truncate">{row.title}</span> },
+            { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "published" ? "success" : row.status === "in_review" ? "warning" : "neutral"}>{row.status.replace("_", " ")}</Pill> },
+            { key: "slides", header: "Slides", align: "end", cell: (row) => String(readDeck(row.body).slides.length), hideBelow: 900 },
+            { key: "owner", header: "Owner", cell: (row) => row.ownerName, hideBelow: 1100 },
+            { key: "updated", header: "Changed", align: "end", sortValue: (row) => row.updatedAt, cell: (row) => context.relative(row.updatedAt) },
+          ]}
+        />
+      ) : (
     <Grid>
       {rows.map((record) => {
         const deck = readDeck(record.body);
@@ -775,7 +794,7 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
       <div className="px-bar">
         <section className="px-bar-main" aria-label="Active slide context">
           <div className="px-bar-title">
-            <strong>{record.title}</strong>
+            <h1 className="px-bar-h1">{record.title}</h1>
             <span className="px-bar-sub">
               <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill>
               <span>Slide {editor.deck.index + 1} of {editor.deck.slides.length} · {layoutById(editor.deck, editor.slide.layoutId).name}</span>
@@ -3131,6 +3150,7 @@ registerApp({
     "ARL-PRESENT-002": {
       id: "ARL-PRESENT-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <SlideEditorScreen context={context} />,
       tabs: ["Design", "Insert", "Animate", "Review", "View"].map((id) => ({ id, render: () => null })),
       actions: SLIDE_ACTIONS,

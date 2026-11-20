@@ -210,6 +210,7 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
     <EditorFrame
       context={context}
       lean
+      titleLevel={1}
       actions={actions}
       tabs={[{ id: "Edit" }, { id: "Colour" }, { id: "Audio" }, { id: "Captions" }, { id: "Export" }]}
       title={record.title}
@@ -2762,6 +2763,7 @@ registerApp({
     "ARL-VIDEO-002": {
       id: "ARL-VIDEO-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <TimelineScreen context={context} actions={TIMELINE_ACTIONS} />,
       tabs: (["Edit", "Colour", "Audio", "Captions", "Export"] as const).map((lens) => ({
         id: lens,

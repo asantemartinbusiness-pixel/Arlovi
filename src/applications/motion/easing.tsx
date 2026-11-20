@@ -71,6 +71,7 @@ export function EasingScreen({ context, actions }: { context: ScreenContext; act
     <EditorFrame
       context={context}
       lean
+      titleLevel={1}
       actions={actions}
       tabs={[{ id: "Curves" }, { id: "Timing" }, { id: "Presets" }, { id: "Spring" }]}
       title={`${record.title} — easing and timing`}

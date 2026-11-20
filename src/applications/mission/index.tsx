@@ -17,6 +17,7 @@ import {
 } from "./interpreter";
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/applications/shared/commit";
 
 import { ExecutionStatusCard, MilestoneTimeline, MilestonesCard, MissionBriefCard, ParticipantsPanel } from "./BriefPanels";
 import { TaskSchedule } from "./TaskSchedule";
@@ -863,43 +864,53 @@ async function executeStep(context: ScreenContext, step: Rec, mission: Rec, pool
   }
   const result = runStep(step, { records: pool, mission, money, date, now });
   const attempts = Number(step.fields.attempts ?? 0) + 1;
-  if (!(await context.mutate.patch(step.id, {
-    status: result.state,
-    fields: { ...step.fields, attempts, lastRunBy: context.actor, lastRunAt: now.toISOString() },
-    body: { ...(step.body as object), output: result.output, reason: result.reason ?? "", inputs: result.read },
-  }, { expectRevision: step.revision, event: `${step.title} run locally: ${result.state}` }))) return { state: step.status as StepResult["state"], output: "", reason: "The step changed elsewhere", read: [] };
-
-  await context.mutate.create({
-    collection: "missionReceipts",
-    title: `Receipt · ${String(step.fields.operation ?? step.title)}`,
-    status: result.state === "done" ? "recorded" : result.state,
-    parentId: mission.id,
-    at: now.toISOString(),
-    summary: result.state === "done"
-      ? `Ran in this browser. ${result.read.length} records read.`
-      : result.reason ?? "The step did not complete.",
-    fields: {
-      stepId: step.id,
-      state: result.state === "done" ? "ready_local" : result.state === "blocked" ? "not_connected" : result.state,
-      attempt: attempts,
-      actor: context.actor,
-      capability: result.capability ?? "",
+  /* The step's new state, its receipt and any draft it produced are one change: a stale step revision rolls all of it back. */
+  const recorded = await commitTogether(context, [
+    {
+      record: step,
+      patch: {
+        status: result.state,
+        fields: { ...step.fields, attempts, lastRunBy: context.actor, lastRunAt: now.toISOString() },
+        body: { ...(step.body as object), output: result.output, reason: result.reason ?? "", inputs: result.read },
+      },
+      event: `${step.title} run locally: ${result.state}`,
     },
-    body: { request: String(step.fields.operation ?? ""), response: result.output, reason: result.reason ?? "", read: result.read },
-  }, `Receipt written for ${step.title}`);
-
-  if (result.create) {
-    await context.mutate.create({
-      collection: result.create.collection,
-      title: result.create.title,
-      status: "draft",
-      parentId: mission.id,
-      summary: result.create.summary,
-      at: now.toISOString(),
-      fields: { missionId: mission.id, deliverable: true, version: 1, approval: "draft", producedBy: "local interpreter" },
-      body: { text: result.create.text, versions: [{ version: 1, at: now.toISOString(), author: "Local interpreter", summary: "Composed from workspace records." }] },
-    }, `Draft produced by ${step.title}`);
-  }
+    {
+      create: {
+        collection: "missionReceipts",
+        title: `Receipt · ${String(step.fields.operation ?? step.title)}`,
+        status: result.state === "done" ? "recorded" : result.state,
+        parentId: mission.id,
+        at: now.toISOString(),
+        summary: result.state === "done"
+          ? `Ran in this browser. ${result.read.length} records read.`
+          : result.reason ?? "The step did not complete.",
+        fields: {
+          stepId: step.id,
+          state: result.state === "done" ? "ready_local" : result.state === "blocked" ? "not_connected" : result.state,
+          attempt: attempts,
+          actor: context.actor,
+          capability: result.capability ?? "",
+        },
+        body: { request: String(step.fields.operation ?? ""), response: result.output, reason: result.reason ?? "", read: result.read },
+      },
+      event: `Receipt written for ${step.title}`,
+    },
+    ...(result.create ? [{
+      create: {
+        collection: result.create.collection,
+        title: result.create.title,
+        status: "draft",
+        parentId: mission.id,
+        summary: result.create.summary,
+        at: now.toISOString(),
+        fields: { missionId: mission.id, deliverable: true, version: 1, approval: "draft", producedBy: "local interpreter" },
+        body: { text: result.create.text, versions: [{ version: 1, at: now.toISOString(), author: "Local interpreter", summary: "Composed from workspace records." }] },
+      },
+      event: `Draft produced by ${step.title}`,
+    }] : []),
+  ]);
+  if (!recorded) return { state: step.status as StepResult["state"], output: "", reason: "The step changed elsewhere", read: [] };
 
   if (result.state === "done") {
     context.toast("Step ran", `${step.title} read ${result.read.length} records. The output and a receipt are on the record.`);

@@ -112,7 +112,7 @@ test("Document approval requires an explicit human confirmation", async ({ page 
   await expect(approve).toBeVisible();
   await approve.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Approve and publish locally");
+  await expect(dialog).toContainText("Approve the document");
   await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).not.toBeChecked();
   await expect(dialog).toContainText("The dialog’s Approve action is only valid after acknowledgement");
   await dialog.getByRole("checkbox", { name: /reviewed this version/ }).check();
@@ -169,7 +169,7 @@ test("Document publishing cannot bypass an approval confirmation", async ({ page
   await expect(button).toBeVisible();
   await button.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Approve and publish locally");
+  await expect(dialog).toContainText("Approve the document");
   await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).not.toBeChecked();
   await expect(page.locator("#main")).toContainText("Publishing requires a named reviewer");
 });
@@ -221,7 +221,7 @@ test("Export preview identifies its paper source and does not claim native PDF g
   await page.goto(`/o/northline/docs/documents/${id}/publish?tab=Export`);
   await page.getByRole("button", { name: "Preview the export" }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Inspect the rendered document");
+  await expect(dialog).toContainText("not an approved, signed or externally published document");
   await expect(dialog).toContainText("Pagination remains an estimate");
   await expect(dialog.getByTitle("Export preview of QA Export Preview")).toBeVisible();
 });

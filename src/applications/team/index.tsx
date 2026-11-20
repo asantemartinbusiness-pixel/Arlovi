@@ -15,6 +15,7 @@ import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
 import { AssignmentHistory, ContractEditor, ExecutionAvailabilityCard } from "./ContractPanels";
 import { AgentOverviewCard } from "./AgentOverviewCard";
+import { commitTogether } from "@/applications/shared/commit";
 import { AgentTeamForm, AgentTeamsOrgCard, AgentTeamsSection } from "./AgentTeamsPanels";
 
 /* ====================================================================== *
@@ -1516,10 +1517,10 @@ function PermissionInspector({ context, close }: { context: ScreenContext; close
       <DrawerActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          if (!(await context.mutate.patch(agent.id, { body: { ...(agent.body as object), tools } }, { expectRevision: agent.revision, event: `Tool grants changed on ${agent.title}` }))) return;
-          for (const task of queued) {
-            await context.mutate.patch(task.id, { fields: { ...task.fields, reauthorisationRequired: true } }, { event: `${task.title} needs re-authorisation after a permission change` });
-          }
+          if (!(await commitTogether(context, [
+            { record: agent, patch: { body: { ...(agent.body as object), tools } }, event: `Tool grants changed on ${agent.title}` },
+            ...queued.map((task) => ({ record: task, patch: { fields: { reauthorisationRequired: true } }, event: `${task.title} needs re-authorisation after a permission change` })),
+          ]))) return;
           context.toast("Permissions saved", `${queued.length} queued item${queued.length === 1 ? "" : "s"} now need re-authorisation.`);
           close();
         }}
@@ -2657,11 +2658,13 @@ function ReassignWork({ context, close }: { context: ScreenContext; close: () =>
           onClick={async () => {
             if (!target) return;
             setBusy(true);
-            for (const task of open) {
-              await context.mutate.patch(task.id, {
-                fields: { ...task.fields, assignee: target.title, previousAssignee: agent.title, grantCheck: "required", reassignedBy: context.actor },
-              }, { expectRevision: task.revision, event: `${task.title} reassigned from ${agent.title} to ${target.title}; grants must be checked again` });
-            }
+            /* Every task moves or none does: a stale revision rolls the whole reassignment back. */
+            const moved = await commitTogether(context, open.map((task) => ({
+              record: task,
+              patch: { fields: { ...task.fields, assignee: target.title, previousAssignee: agent.title, grantCheck: "required", reassignedBy: context.actor } },
+              event: `${task.title} reassigned from ${agent.title} to ${target.title}; grants must be checked again`,
+            })));
+            if (!moved) { setBusy(false); return; }
             context.toast("Work reassigned", `${open.length} task${open.length === 1 ? "" : "s"} moved to ${target.title}, each marked for a grant check.`);
             setBusy(false);
             close();

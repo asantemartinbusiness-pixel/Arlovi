@@ -360,12 +360,14 @@ export function GeometryInspector({ handle, context }: { handle: DocHandle<Desig
                     <button
                       key={token.id}
                       type="button"
-                      className="vx-swatch"
+                      className="vx-token"
                       title={`${token.name} ${token.value}`}
                       aria-label={`Fill with ${token.name}`}
-                      style={{ background: token.value }}
                       onClick={() => set({ fill: { type: "solid", color: token.value } }, `Fill with ${token.name}`)}
-                    />
+                    >
+                      <span className="vx-token-chip" style={{ background: token.value }} />
+                      <span className="vx-mini">{token.name}</span>
+                    </button>
                   ))}
                 </div>
               </Popover>

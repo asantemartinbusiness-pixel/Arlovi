@@ -53,11 +53,21 @@ const needsSelection = (context: ScreenContext) => {
 
 /* ----------------------------- slide editor ----------------------------- */
 
+/** Move, resize and align live beside the object (inspector fields, Design toolbar); the action puts focus there instead of opening a modal over the selection. */
+function focusControl(context: ScreenContext, selector: string, hint: string, tab?: string): void {
+  if (tab && context.tab !== tab) context.setTab(tab);
+  window.setTimeout(() => {
+    const node = document.querySelector<HTMLElement>(selector);
+    if (node) { node.focus(); context.toast("Edit it here", hint, "info"); }
+    else context.toast("Select an object first", "Choose an object on the slide to edit its position, size or alignment.", "blocked");
+  }, tab ? 150 : 0);
+}
+
 export const SLIDE_ACTIONS: ActionDef[] = [
   { id: "Insert slide", label: "Insert slide", placement: "toolbar", run: (context) => context.openOverlay("Layout picker") },
-  { id: "drag object", label: "Move object…", placement: "toolbar", guard: needsSelection, run: (context) => context.openOverlay("move object") },
-  { id: "align", label: "Align…", placement: "toolbar", guard: needsSelection, run: (context) => context.openOverlay("align objects") },
-  { id: "resize", label: "Resize…", placement: "toolbar", guard: needsSelection, run: (context) => context.openOverlay("resize object") },
+  { id: "drag object", label: "Move object…", placement: "toolbar", guard: needsSelection, run: (context) => focusControl(context, '[aria-label="X"]', "Position is edited in the inspector: X and Y, or drag on the slide.") },
+  { id: "align", label: "Align…", placement: "toolbar", guard: needsSelection, run: (context) => focusControl(context, 'button[aria-label="Align left"]', "Align tools are on the Design toolbar.", "Design") },
+  { id: "resize", label: "Resize…", placement: "toolbar", guard: needsSelection, run: (context) => focusControl(context, '[aria-label="Width"]', "Size is edited in the inspector: Width and Height, or drag the handles.") },
   { id: "comment", label: "Comment", placement: "toolbar", run: (context) => context.openOverlay("properties", { mode: "comment" }) },
   {
     id: "undo", label: "Undo", placement: "toolbar", shortcut: "⌘Z",

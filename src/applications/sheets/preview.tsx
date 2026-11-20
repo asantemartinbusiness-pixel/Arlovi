@@ -48,10 +48,10 @@ export function needsPreview(diff: ChangeDiff): boolean {
 }
 
 /** Commit straight away when the change is small; otherwise hold it for review. Returns true if it was committed. */
-export function proposeChange(editor: WorkbookEditor, next: Sheet, label: string, editorKey: string): boolean {
+export function proposeChange(editor: WorkbookEditor, next: Sheet, label: string, editorKey: string, force = false): boolean {
   const diff = diffSheets(editor, next);
   if (diff.changes.length === 0) return true;
-  if (!needsPreview(diff)) { editor.commitSheet(next, label); return true; }
+  if (!force && !needsPreview(diff)) { editor.commitSheet(next, label); return true; }
   counter += 1;
   pendingChange.set({ id: counter, label, next, diff, editorKey });
   return false;

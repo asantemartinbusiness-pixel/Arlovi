@@ -306,6 +306,7 @@ registerApp({
     "ARL-MOTION-002": {
       id: "ARL-MOTION-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <EditorScreen context={context} actions={EDITOR_ACTIONS} />,
       tabs: (["Animate", "Design", "Effects", "Preview"] as const).map((lens) => ({
         id: lens,
@@ -323,6 +324,7 @@ registerApp({
     "ARL-MOTION-003": {
       id: "ARL-MOTION-003",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <EasingScreen context={context} actions={EASING_ACTIONS} />,
       tabs: (["Curves", "Timing", "Presets", "Spring"] as const).map((lens) => ({
         id: lens,
@@ -339,6 +341,7 @@ registerApp({
     "ARL-MOTION-004": {
       id: "ARL-MOTION-004",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <InteractiveScreen context={context} actions={INTERACTIVE_ACTIONS} />,
       tabs: (["States", "Triggers", "Preview", "Export"] as const).map((lens) => ({
         id: lens,
@@ -357,6 +360,7 @@ registerApp({
     "ARL-MOTION-005": {
       id: "ARL-MOTION-005",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <ExportScreen context={context} actions={EXPORT_ACTIONS} />,
       tabs: (["Formats", "Presets", "Queue", "History"] as const).map((lens) => ({
         id: lens,

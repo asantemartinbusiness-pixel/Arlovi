@@ -202,6 +202,7 @@ function RasterEditor({ context, actions }: { context: ScreenContext; actions: A
     <EditorFrame
       context={context}
       lean
+      titleLevel={1}
       actions={actions}
       tabs={[{ id: "Edit" }, { id: "Layers" }, { id: "Adjust" }, { id: "Review" }]}
       title={record.title}
@@ -403,6 +404,7 @@ function MasksScreen({ context, actions }: { context: ScreenContext; actions: Ac
     <EditorFrame
       context={context}
       lean
+      titleLevel={1}
       actions={actions}
       tabs={[{ id: "Select" }, { id: "Refine" }, { id: "Mask" }, { id: "Compare" }]}
       title={`${record.title} — selections and masks`}
@@ -1996,6 +1998,7 @@ registerApp({
     "ARL-PHOTO-002": {
       id: "ARL-PHOTO-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <RasterEditor context={context} actions={EDITOR_ACTIONS} />,
       tabs: (["Edit", "Layers", "Adjust", "Review"] as const).map((lens) => ({
         id: lens,
@@ -2014,6 +2017,7 @@ registerApp({
     "ARL-PHOTO-003": {
       id: "ARL-PHOTO-003",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <MasksScreen context={context} actions={MASK_ACTIONS} />,
       tabs: (["Select", "Refine", "Mask", "Compare"] as const).map((lens) => ({
         id: lens,

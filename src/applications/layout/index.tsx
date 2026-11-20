@@ -1467,10 +1467,15 @@ function RecordSummary({ context }: { context: ScreenContext }) {
   );
 }
 
+/** The editor's right panel is the frame inspector; this id hands off to it instead of scrimming the page. */
+/** The editor's right panel is the frame inspector; this id hands off to it instead of scrimming the page. */
 function FrameEditorOverlay({ context }: { context: ScreenContext }) {
-  const { record, handle, compositions } = usePublication(context);
-  if (!record || !handle.doc) return <Empty title="Open a publication first" />;
-  return <FramePanel handle={handle} context={context} compositions={compositions} />;
+  useEffect(() => {
+    context.toast("Frame properties are in the panel", "Select a frame and edit it in the Frame panel on the right.", "info");
+    context.closeOverlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
 }
 
 function PageSettings({ context }: { context: ScreenContext }) {
@@ -2268,6 +2273,7 @@ registerApp({
     "ARL-LAYOUT-002": {
       id: "ARL-LAYOUT-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <PublicationEditor context={context} actions={EDITOR_ACTIONS} />,
       tabs: (["Pages", "Layout", "Type", "Review"] as const).map((lens) => ({
         id: lens,

@@ -283,6 +283,7 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
           { label: "Drafts", value: drafts.length },
           { label: "In review", value: pendingReview.length, tone: pendingReview.length ? "warning" : undefined },
           { label: "Confidential", value: confidentialCount },
+          { label: tab === "Recent" ? "shown (latest 12, filtered)" : "shown in this view", value: rows.length },
         ]}
       >
         <ViewToggle label="Library view" value={view} onChange={setView} />
@@ -447,11 +448,63 @@ function LibraryInspector({ context }: { context: ScreenContext }) {
  * ARL-DOCS-002 — Document Editor
  * ====================================================================== */
 
+function useNarrow(): boolean {
+  const query = "(max-width: 599px)";
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const on = () => setNarrow(list.matches);
+    list.addEventListener("change", on);
+    return () => list.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
 function WriteRibbon({ editor, context, onFind }: { editor: DocEditor; context: ScreenContext; onFind: () => void }) {
   const block = currentBlock(editor);
   const selection = editor.selection;
+  const narrow = useNarrow();
   const expanded = Boolean(selection && !(selection.anchor.blockId === selection.head.blockId && selection.anchor.offset === selection.head.offset));
   const mark = (type: MarkType) => () => selection && editor.handleEdit({ kind: "toggleMark", mark: type, range: selection });
+  if (narrow) {
+    const setType = (type: BlockType, label: string) => () => selection && editor.commit(setBlockType(editor.model, selection, type).model, label, selection);
+    return (
+      <Toolbar label="Writing tools">
+        <Tool label="Undo (Cmd+Z)" icon={<Undo2 size={16} />} disabled={!editor.canUndo} onClick={editor.undo} />
+        <Tool label="Redo (Cmd+Shift+Z)" icon={<Redo2 size={16} />} disabled={!editor.canRedo} onClick={editor.redo} />
+        <Tool label="Bold (Cmd+B)" icon={<Bold size={16} />} pressed={editor.marks.includes("bold")} disabled={!expanded} onClick={mark("bold")} />
+        <Tool label="Italic (Cmd+I)" icon={<Italic size={16} />} pressed={editor.marks.includes("italic")} disabled={!expanded} onClick={mark("italic")} />
+        <PopoverTool kind="link" label="Link (Cmd+Shift+L)" icon={<Link2 size={16} />} title="Link the selection" editor={editor} disabled={!expanded} width={280}>
+          {(done, range) => <LinkPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <PopoverTool kind="table" label="Insert table" icon={<TableIcon size={16} />} title="Insert a table" editor={editor} width={260}>
+          {(done) => <TablePopoverBody editor={editor} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <PopoverTool kind="image" label="Insert image reference" icon={<ImageIcon size={16} />} title="Image reference" editor={editor} width={300}>
+          {(done, _range, blockId) => <ImagePopoverBody editor={editor} blockId={blockId} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <PopoverTool kind="comment" label="Comment on the selection" icon={<MessageSquare size={16} />} title="Comment on the selection" editor={editor} width={280} disabled={!expanded}>
+          {(done, range) => <CommentPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <Menu
+          label="More writing tools"
+          trigger={<Tool label="More writing tools" icon={<MoreHorizontal size={16} />} />}
+          items={[
+            { label: "Body text", onSelect: setType("paragraph", "Body text") },
+            { label: "Heading 1", onSelect: setType("heading1", "Heading 1") },
+            { label: "Heading 2", onSelect: setType("heading2", "Heading 2") },
+            { label: "Bulleted list", onSelect: setType("bulletItem", "Bulleted list"), separatorBefore: true },
+            { label: "Numbered list", onSelect: setType("numberItem", "Numbered list") },
+            { label: "Quote", onSelect: setType("quote", "Quote") },
+            { label: "Underline", onSelect: mark("underline"), disabled: !expanded, separatorBefore: true },
+            { label: "Strikethrough", onSelect: mark("strike"), disabled: !expanded },
+            { label: "Inline code", onSelect: mark("code"), disabled: !expanded },
+            { label: "Find and replace", onSelect: onFind, separatorBefore: true },
+          ]}
+        />
+      </Toolbar>
+    );
+  }
   return (
     <Toolbar label="Writing tools">
       <Tool label="Undo (Cmd+Z)" icon={<Undo2 size={16} />} disabled={!editor.canUndo} onClick={editor.undo} />
@@ -693,7 +746,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
       <div className="dx-bar">
         <section className="dx-bar-main" aria-label="Document working status">
           <div className="dx-bar-title">
-            <input
+            <h1 className="dx-bar-h1"><input
               aria-label="Document title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -702,7 +755,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
                   void context.mutate.patch(record.id, { title: title.trim() }, { event: `Document renamed to ${title.trim()}` });
                 } else setTitle(record.title);
               }}
-            />
+            /></h1>
             <span className="dx-bar-sub">
               <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
               {editor.model.suggestMode && <Pill tone="info">Suggesting</Pill>}
@@ -3320,7 +3373,6 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
         }
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / HUMAN DECISION</span><h3>Approve and publish locally</h3><p>Inspect outstanding changes and mandatory review comments before accepting responsibility for publication.</p></div>
       {mandatoryOpen.length > 0 ? (
         <Notice tone="danger" title={`${mandatoryOpen.length} mandatory review${mandatoryOpen.length === 1 ? " is" : "s are"} still open`}>
           Approval is blocked until each “must resolve” comment is resolved, so a reviewer's objection is never erased by an approval. {mandatoryOpen.map((comment) => `${comment.author}: “${comment.body.slice(0, 60)}”`).join(" · ")}
@@ -3336,7 +3388,6 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
       {!context.can("edit_knowledge") && <Notice tone="warning" title="Insufficient role permissions">Your current role cannot record document approvals.</Notice>}
       {error && <Notice tone="danger" title="Approval not saved">{error}</Notice>}
       {saving && <p className="ds-subtle">Recording the approval…</p>}
-      <p className="ds-subtle">The dialog’s Approve action is only valid after acknowledgement and resolution of all mandatory comments and tracked changes.</p>
     </form>
   );
 }
@@ -3410,10 +3461,7 @@ function PreviewDocument({ context }: { context: ScreenContext }) {
   const pages = paginate(editor.model).pages.length;
   return (
     <Stack gap={4}>
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / EXPORT PREVIEW</span>
-        <h3>Inspect the rendered document</h3>
-        <p>Review the actual HTML rendering before creating a copy. This is not an approved, signed or externally published document.</p>
-      </div>
+      <Notice tone="info">The rendered HTML before a copy is made. This is not an approved, signed or externally published document.</Notice>
       <Properties rows={[
         { label: "Document", value: record.title },
         { label: "Company status", value: record.status.replace("_", " ") },
@@ -3537,6 +3585,7 @@ registerApp({
     "ARL-DOCS-002": {
       id: "ARL-DOCS-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <DocumentEditorScreen context={context} />,
       tabs: ["Write", "Review", "Layout", "References"].map((id) => ({ id, render: () => null })),
       actions: [

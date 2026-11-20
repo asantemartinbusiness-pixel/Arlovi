@@ -11,6 +11,7 @@ import {
   contractProblems, executionAvailability, normaliseScopeId, requiresReauthorisation,
   type ApprovalLevel, type ContractDraft, type ScopeAccess, type ToolScope,
 } from "./contract";
+import { commitTogether } from "@/applications/shared/commit";
 import "./team-contract.css";
 
 /* ====================================================================== *
@@ -93,20 +94,24 @@ export function ContractEditor({ context, agent, queued }: { context: ScreenCont
     try {
       const tools = draft.tools.map((tool) => ({ ...tool, id: normaliseScopeId(tool.id), label: tool.label.trim() }));
       const authority = draft.authority.map((line) => line.trim());
-      const result = await context.mutate.patch(agent.id, {
-        fields: { ...agent.fields, autonomy: draft.approval },
-        body: { ...(agent.body as object), tools, authority },
-      }, { expectRevision: agent.revision, event: `${agent.title} contract changed by ${context.actor}: ${changes.join("; ")}` });
-      if (!result) return;
-      if (reauth) {
-        for (const task of queued) {
-          // patch merges fields, so naming only the flag cannot revert a newer save of the task.
-          await context.mutate.patch(task.id, { fields: { reauthorisationRequired: true } }, { event: `${task.title} needs re-authorisation after ${agent.title}'s contract changed` });
-        }
-      }
+      /* The contract and every queued item it invalidates are one change: a stale revision rolls all of it back. */
+      const saved = await commitTogether(context, [
+        {
+          record: agent,
+          patch: { fields: { ...agent.fields, autonomy: draft.approval }, body: { ...(agent.body as object), tools, authority } },
+          event: `${agent.title} contract changed by ${context.actor}: ${changes.join("; ")}`,
+        },
+        ...(reauth ? queued.map((task) => ({
+          record: task,
+          // fields merge, so naming only the flag cannot revert a newer save of the task.
+          patch: { fields: { reauthorisationRequired: true } },
+          event: `${task.title} needs re-authorisation after ${agent.title}'s contract changed`,
+        })) : []),
+      ]);
+      if (!saved) return;
       context.toast("Contract saved", reauth && queued.length > 0
         ? `${changes.length} change${changes.length === 1 ? "" : "s"} recorded. ${queued.length} queued item${queued.length === 1 ? "" : "s"} now need re-authorisation before they run.`
-        : `${changes.length} change${changes.length === 1 ? "" : "s"} recorded on revision ${result.revision}.`);
+        : `${changes.length} change${changes.length === 1 ? "" : "s"} recorded on revision ${agent.revision + 1}.`);
       setShowProblems(false);
     } catch {
       context.toast("Not saved", "The contract could not be written to this browser's storage.", "failed");
