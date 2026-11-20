@@ -273,8 +273,11 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
   const initialId = payload?.id ?? context.selectedId ?? "";
   const active = data.sessions.filter(row => row.status === "active" && row.fields.current !== true);
   const firstId = (active.find(row => row.fields.anomaly) ?? active[0])?.id ?? "";
-  const [scope, setScope] = useState<"single" | "all" | "none">(initialId || firstId ? "single" : "none");
-  const [selectedId, setSelectedId] = useState(initialId || firstId);
+  // Defaults are derived, not stored, because the session records may still be loading on first render.
+  const [chosenScope, setScope] = useState<"single" | "all" | "none" | null>(null);
+  const [chosenId, setSelectedId] = useState<string | null>(null);
+  const scope = chosenScope ?? (initialId || firstId ? "single" : "none");
+  const selectedId = chosenId ?? (initialId || firstId);
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);

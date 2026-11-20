@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { BookOpen, Brain, Database, FileSearch, GitBranch, Inbox, Lock, Palette, Scale } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
+  BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, Meter, ModalActions, ModalUnsavedChanges, Notice,
+  OVERLAY_WIDTH, OverlayActions, OverlaySection, OverlaySummary, Pill, Properties,
   Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -33,6 +34,37 @@ function useKnowledge() {
 
 function sourceOf(data: Record<string, Rec[]>, id: unknown): Rec | undefined {
   return (data.sources ?? []).find((source) => source.id === String(id ?? ""));
+}
+
+/** Visibility is the source's sensitivity group: who and what may retrieve it. */
+function visibilityOf(source: Rec | undefined): { label: string; tone: "success" | "info" | "warning" | "neutral" } {
+  if (!source) return { label: "Unknown", tone: "neutral" };
+  const group = String(source.fields.classification ?? "internal");
+  return { label: group === "confidential" ? "Confidential" : group === "public" ? "Public" : "Internal", tone: group === "confidential" ? "warning" : group === "public" ? "success" : "info" };
+}
+
+/** Source, how old it is, and who may see it: the trail behind any assertion. */
+function SourceTrail({ context, source, line }: { context: ScreenContext; source: Rec | undefined; line?: string }) {
+  const { now } = useWorkspace();
+  if (!source) return <Notice tone="danger" title="No source record">Nothing backs this assertion, so it cannot be verified.</Notice>;
+  const age = freshness(String(source.fields.freshness ?? source.updatedAt), now, 45);
+  const visibility = visibilityOf(source);
+  const body = source.body as { corrections?: Correction[] } | undefined;
+  const corrections = line ? correctionsOfLine(line, body?.corrections ?? []) : [];
+  return (
+    <Stack gap={3}>
+      <FactGrid items={[
+        { label: "Source", value: source.title },
+        { label: "State", value: <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> },
+        { label: "Freshness", value: age.known ? `${context.date(String(source.fields.freshness ?? source.updatedAt))} · ${age.days} days` : "Unknown", mono: true, tone: age.stale ? "warning" : undefined },
+        { label: "Visibility", value: <Pill tone={visibility.tone}>{visibility.label}</Pill> },
+      ]} />
+      {line && <p className="ds-prose" style={{ borderInlineStart: "2px solid var(--border-strong)", paddingInlineStart: "var(--space-3)" }}>{line}</p>}
+      {corrections.length > 0 && (
+        <p className="ds-subtle">{corrections.length} correction{corrections.length === 1 ? "" : "s"} tracked on this line, latest by {corrections[0].by} on {context.date(corrections[0].at)}. The original is kept.</p>
+      )}
+    </Stack>
+  );
 }
 
 /* ---------------------------- BRAIN-001 ---------------------------- */
@@ -624,6 +656,21 @@ function assertionFromLine(line: string): { subject: string; value: string } | u
   return { subject: match[1].trim(), value: match[2].trim().replace(/\.$/, "") };
 }
 
+/** Verify or reject assertions one by one, saying how many were really saved. */
+async function decideFacts(context: ScreenContext, facts: Rec[], verdict: "verified" | "rejected"): Promise<void> {
+  let saved = 0;
+  for (const fact of facts) {
+    const patch = verdict === "verified"
+      ? { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10) } }
+      : { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } };
+    const result = await context.mutate.patch(fact.id, patch, { expectRevision: fact.revision, event: `${fact.title} ${verdict === "verified" ? "verified" : "rejected"} by ${context.actor}` });
+    if (result) saved += 1;
+  }
+  if (saved === 0) return;
+  const word = verdict === "verified" ? "verified" : "rejected";
+  context.toast(saved === facts.length ? `${saved} assertion${saved === 1 ? "" : "s"} ${word}` : `${saved} of ${facts.length} ${word}`, saved === facts.length ? "Each carries your name and the date." : "The rest changed elsewhere and were left as they were.");
+}
+
 async function proposeFactFromLine(context: ScreenContext, source: Rec, line: string, existing: Rec[]): Promise<Rec | undefined> {
   const parsed = assertionFromLine(line) ?? { subject: line.trim().slice(0, 80), value: line.trim() };
   if (existing.some((fact) => fact.fields.sourceId === source.id && fact.fields.sourceLine === line && fact.status !== "rejected")) return undefined;
@@ -668,7 +715,13 @@ function FactRegistry({ context, view }: { context: ScreenContext; view: "Verifi
         columns={[
           { key: "title", header: "Assertion", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "value", header: "Value", cell: (row) => String(row.fields.value ?? row.summary) },
-          { key: "owner", header: "Canonical owner", cell: (row) => row.ownerName },
+          { key: "source", header: "Source", cell: (row) => {
+            const source = sourceOf(data, row.fields.sourceId);
+            if (!source) return <Pill tone="warning">No source</Pill>;
+            const age = freshness(String(source.fields.freshness ?? source.updatedAt), now, 45);
+            return <span>{source.title}{age.known && <span className="ds-subtle ds-num"> · {age.days}d{age.stale ? " old" : ""}</span>}</span>;
+          } },
+          { key: "visibility", header: "Visibility", cell: (row) => { const visibility = visibilityOf(sourceOf(data, row.fields.sourceId)); return <Pill tone={visibility.tone}>{visibility.label}</Pill>; } },
           { key: "confidence", header: "Confidence", cell: (row) => {
             const open = conflictsOfFact(row, data.conflicts).length;
             return <Row gap={2}><Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill><span className="ds-num">{String(row.fields.confidenceScore ?? 0)}%</span>{open > 0 && <span className="ds-subtle ds-num" title="Open conflicts naming this assertion">{open} open conflict{open === 1 ? "" : "s"}</span>}</Row>;
@@ -678,28 +731,23 @@ function FactRegistry({ context, view }: { context: ScreenContext; view: "Verifi
             const expired = to && new Date(to) < now;
             return <span>{context.date(String(row.fields.validFrom ?? row.at))}{to ? ` – ${context.date(to)}` : " – open"}{expired ? " · past" : ""}</span>;
           } },
-          { key: "source", header: "Source", cell: (row) => sourceOf(data, row.fields.sourceId)?.title ?? <Pill tone="warning">No source</Pill> },
         ]}
         bulkActions={[
           {
             label: "Approve",
             disabled: (selected) => selected.some((fact) => !sourceOf(data, fact.fields.sourceId)),
-            onRun: (selected) => selected.forEach((fact) => {
-              void context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }, { event: `${fact.title} verified by ${context.actor}` });
-            }),
+            onRun: (selected) => void decideFacts(context, selected, "verified"),
           },
           {
             label: "Reject",
             tone: "danger",
-            onRun: (selected) => selected.forEach((fact) => {
-              void context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { event: `${fact.title} rejected by ${context.actor}` });
-            }),
+            onRun: (selected) => void decideFacts(context, selected, "rejected"),
           },
         ]}
       />
-      <Notice tone="info" title="Approving needs a source">
-        An assertion with no source record cannot be approved in bulk or singly. The registry would have nothing to show a reader who asks why it is true.
-      </Notice>
+      {rows.some((fact) => !sourceOf(data, fact.fields.sourceId)) && (
+        <p className="ds-subtle">An assertion with no source cannot be approved, singly or in bulk: the registry would have nothing to show a reader who asks why it is true.</p>
+      )}
     </Stack>
   );
 }

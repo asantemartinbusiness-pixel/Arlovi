@@ -1002,8 +1002,14 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
             ]} />
             {widened.length > 0 ? (
               <Notice tone="danger" title="Cannot be published">A custom role may only narrow its base view. Remove the widened capabilities first.</Notice>
-            ) : (
-              <Button
+            ) : null}
+          </Stack>
+        </Card>
+      )}
+      {role && widened.length === 0 && (
+        <ModalActions>
+          <OverlayActions
+            primary={<Button
                 variant="primary"
                 busy={busy}
                 disabled={role.status === "published"}
@@ -1019,10 +1025,10 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
                 }}
               >
                 Publish this role
-              </Button>
-            )}
-          </Stack>
-        </Card>
+              </Button>}
+            end={<OverlayCancel>Close</OverlayCancel>}
+          />
+        </ModalActions>
       )}
     </Stack>
   );

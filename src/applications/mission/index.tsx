@@ -858,7 +858,7 @@ async function executeStep(context: ScreenContext, step: Rec, mission: Rec, pool
     status: result.state,
     fields: { ...step.fields, attempts, lastRunBy: context.actor, lastRunAt: now.toISOString() },
     body: { ...(step.body as object), output: result.output, reason: result.reason ?? "", inputs: result.read },
-  }, { expectRevision: step.revision, event: `${step.title} run locally: ${result.state}` }))) return;
+  }, { expectRevision: step.revision, event: `${step.title} run locally: ${result.state}` }))) return { state: step.status as StepResult["state"], output: "", reason: "The step changed elsewhere", read: [] };
 
   await context.mutate.create({
     collection: "missionReceipts",

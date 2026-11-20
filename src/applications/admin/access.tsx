@@ -319,16 +319,16 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
       </Stack>}
       {error && decided && <Notice tone="danger" title="Change not saved">{error}</Notice>}
       <DrawerActions>
-        <Button variant="ghost" disabled={busy} onClick={close}>{decided ? "Close" : "Cancel"}</Button>
-        <span className="ds-grow" />
-        {request.status === "approved" && <Button variant="danger" busy={busy} disabled={!canRestore}
-          onClick={() => void restorePreviousRole()}>Restore previous local role</Button>}
-        {!decided && (
-          <>
-            <Button variant="danger" busy={busy} disabled={!canDecide || selfReview || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>
-            <Button variant="primary" busy={busy} disabled={!canApprove} onClick={() => void decide("approved")}>Approve and change role</Button>
-          </>
-        )}
+        <OverlayActions
+          busy={busy}
+          primary={request.status === "approved"
+            ? <Button variant="danger" busy={busy} disabled={!canRestore} onClick={() => void restorePreviousRole()}>Restore previous local role</Button>
+            : !decided ? <Button variant="primary" busy={busy} disabled={!canApprove} onClick={() => void decide("approved")}>Approve and change role</Button> : undefined}
+          end={<>
+            <OverlayCancel disabled={busy}>{decided ? "Close" : "Cancel"}</OverlayCancel>
+            {!decided && <Button variant="outline-danger" busy={busy} disabled={!canDecide || selfReview || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>}
+          </>}
+        />
       </DrawerActions>
     </Stack>
   );
