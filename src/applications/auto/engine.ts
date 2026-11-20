@@ -131,6 +131,15 @@ export function readGraph(record: Rec | undefined): WorkflowGraph {
   const body = record?.body as Partial<WorkflowGraph> | undefined;
   const nodes = Array.isArray(body?.nodes) ? (body?.nodes as WfNode[]) : [];
   const edges = Array.isArray(body?.edges) ? (body?.edges as WfEdge[]) : [];
+  /* A legacy edge with no port leaves by the node's first port: "when true" for a condition, "approved" for a gate. */
+  const typeOf = new Map(nodes.map((node) => [node.id, node.type]));
+  const taken = new Set(edges.filter((edge) => edge.port).map((edge) => `${edge.from}:${edge.port}`));
+  const defaultPort = (edge: WfEdge): PortId => {
+    const type = typeOf.get(edge.from);
+    if (type === "condition") { const port: PortId = taken.has(`${edge.from}:then`) ? "else" : "then"; taken.add(`${edge.from}:${port}`); return port; }
+    if (type === "approval") { const port: PortId = taken.has(`${edge.from}:approved`) ? "rejected" : "approved"; taken.add(`${edge.from}:${port}`); return port; }
+    return "out";
+  };
   return {
     nodes: nodes.map((node, index) => ({
       id: node.id ?? `n${index}`,
@@ -140,7 +149,7 @@ export function readGraph(record: Rec | undefined): WorkflowGraph {
       y: Number.isFinite(node.y) ? node.y : 80,
       config: node.config ?? defaultConfigFor((node.type ?? "action") as NodeKind, node.label ?? ""),
     })),
-    edges: edges.map((edge, index) => ({ id: edge.id ?? `e${index}`, from: edge.from, to: edge.to, port: edge.port ?? "out" })),
+    edges: edges.map((edge, index) => ({ id: edge.id ?? `e${index}`, from: edge.from, to: edge.to, port: edge.port ?? defaultPort(edge) })),
     limits: { ...DEFAULT_LIMITS, ...(body?.limits ?? {}) },
     fixture: body?.fixture ?? {},
     assertions: Array.isArray(body?.assertions) ? body!.assertions : [],

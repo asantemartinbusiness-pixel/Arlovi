@@ -823,7 +823,7 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
                       <strong className="ds-grow">{conflict.title}</strong>
                       <Pill tone={String(conflict.fields.urgency) === "critical" ? "danger" : String(conflict.fields.urgency) === "high" ? "warning" : "neutral"}>{String(conflict.fields.urgency ?? "normal")}</Pill>
                     </Row>
-                    <p className="ds-subtle">{conflict.summary}</p>
+                    <p className="ds-subtle">{conflict.summary}{options.length === 0 ? " No competing versions are recorded on it, so there is nothing to choose between yet." : ""}</p>
                     <Stack gap={1} style={{ marginBlock: "var(--space-2)" }}>
                       {options.map((option) => (
                         <Row key={option.id} gap={2}>
@@ -1863,9 +1863,10 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
               disabled={ledger || options.length === 0 || !chosen || !reason.trim()}
               onClick={async () => {
                 const option = options.find((item) => item.id === chosen);
+                const winnerHasFact = Boolean(option && data.facts.some((item) => item.id === option.factId));
                 const changes: TogetherChange[] = [{
                   record: conflict,
-                  patch: { status: "resolved", fields: { ...conflict.fields, chosen: option?.factId ?? chosen, resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason } },
+                  patch: { status: "resolved", fields: { ...conflict.fields, chosen: chosen, chosenFactId: option?.factId ?? "", resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason } },
                   event: `${conflict.title} resolved by ${context.actor}`,
                 }];
                 for (const candidate of options) {
@@ -1880,8 +1881,28 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
                     event: verdict ? `${fact.title} became the source of truth` : `${fact.title} rejected in favour of another source`,
                   });
                 }
+                if (option && !winnerHasFact) {
+                  changes.push({
+                    create: {
+                      collection: "facts",
+                      title: conflict.title,
+                      status: "verified",
+                      summary: `Verified from the conflict “${conflict.title}”: ${option.value}. ${option.note}`,
+                      at: context.now.toISOString(),
+                      ownerName: context.actor,
+                      fields: {
+                        confidence: "verified", subject: conflict.title, predicate: "is", value: option.value, sourceId: option.sourceId,
+                        domain: String(conflict.fields.domain ?? "general"), validFrom: context.now.toISOString().slice(0, 10), validTo: "",
+                        verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10), fromConflictId: conflict.id,
+                      },
+                    },
+                    event: `Assertion recorded from the resolution of ${conflict.title}: ${option.value}`,
+                  });
+                }
                 if (!(await commitTogether(context, changes))) return;
-                context.toast("Conflict resolved", "The chosen assertion is current; the other stays on the record as rejected evidence.");
+                context.toast("Conflict resolved", winnerHasFact
+                  ? "The chosen assertion is current; the other stays on the record as rejected evidence."
+                  : `The winning record had no assertion, so one was recorded: ${conflict.title} is ${option?.value}. The other stays on the record as rejected evidence.`);
                 close();
               }}
             >
@@ -1936,7 +1957,7 @@ function ComparisonDrawer({ context }: { context: ScreenContext }) {
         {options.map((option, index) => {
           const source = sourceOf(data, option.sourceId);
           const origin = source ?? everything.find((item) => item.id === option.sourceId);
-          const chosen = closed && String(conflict.fields.chosen ?? "") === option.factId;
+          const chosen = closed && [option.id, option.factId].includes(String(conflict.fields.chosen ?? "")) && Boolean(conflict.fields.chosen);
           return (
             <OverlaySection key={option.id} title={`Version ${String.fromCharCode(65 + index)}${chosen ? " · chosen" : ""}`} tone={chosen ? "success" : "neutral"}>
               <Stack gap={3}>
@@ -2654,11 +2675,11 @@ export const brainApp = registerApp({
         render: (context: ScreenContext) => <BusinessGraph context={context} view={view} />,
       })),
       actions: [
-        { id: "Explore node", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Choose an entity in the graph or the list"), run: (context) => context.openOverlay("Entity inspector") },
-        { id: "merge candidates", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("merge preview", { id: "" }) },
+        { id: "Explore node", label: "Explore a node", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Choose an entity in the graph or the list"), run: (context) => context.openOverlay("Entity inspector") },
+        { id: "merge candidates", label: "Review merge candidates", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("merge preview", { id: "" }) },
         { id: "exceptions", label: "All exceptions", placement: "overflow", run: (context) => context.setTab("Exceptions") },
-        { id: "filter graph", placement: "secondary", run: (context) => { context.setTab("Entities"); usePanelFlags.getState().toggle("brain.graph.filter"); context.toast("Filter", "Choose an entity kind beside the display toggle to narrow the graph and the list together.", "info"); } },
-        { id: "split record", placement: "overflow", capability: "edit_knowledge", run: (context) => context.openOverlay("split record") },
+        { id: "filter graph", label: "Filter the graph", placement: "secondary", run: (context) => { context.setTab("Entities"); usePanelFlags.getState().toggle("brain.graph.filter"); context.toast("Filter", "Choose an entity kind beside the display toggle to narrow the graph and the list together.", "info"); } },
+        { id: "split record", label: "Split a record", placement: "overflow", capability: "edit_knowledge", run: (context) => context.openOverlay("split record") },
       ],
       overlays: [
         { id: "Entity inspector", kind: "drawer", title: "Entity", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <EntityInspector context={context} /> },
@@ -2705,7 +2726,7 @@ export const brainApp = registerApp({
       })),
       actions: [
         { id: "Select source of truth", placement: "primary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => context.openOverlay("resolution dialog") },
-        { id: "defer", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => void deferConflict(context) },
+        { id: "defer", label: "Defer", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => void deferConflict(context) },
         { id: "request external confirmation", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => context.openOverlay("escalation") },
       ],
       overlays: [

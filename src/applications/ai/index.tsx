@@ -3070,7 +3070,7 @@ export const aiApp = registerApp({
         { id: "publish report", label: "Publish the report", placement: "overflow", run: (context) => context.openOverlay("save report", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Source inspector", kind: "drawer", title: "Source", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourceInspector context={context} /> },
+        { id: "Source inspector", kind: "drawer", title: "Source", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "sources" }, render: ({ ...context }) => <SourceInspector context={context} /> },
         { id: "confidence note", kind: "modal", title: "Confidence", width: 560, render: ({ close, ...context }) => <ConfidenceNote context={context} close={close} />, footer: submitFooter("confidence-note", "Record confidence") },
         { id: "save report", kind: "modal", title: "Save as a report", width: 560, render: ({ close, ...context }) => <SaveReport context={context} close={close} /> },
       ],

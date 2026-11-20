@@ -810,6 +810,9 @@ export function SharingPanel({ context, close }: { context: ScreenContext; close
   const [shared, setShared] = useState<boolean | null>(null);
   if (!record) return <Empty title="Choose a dashboard first" />;
   const value = shared ?? record.fields.shared === true;
+  /* Active internal members only: suspended people and external contacts never see a workspace dashboard. */
+  const active = members.filter((member) => member.status === "active" && member.fields.external !== true);
+  const audience = value ? active : active.filter((member) => member.ownerName === record.ownerName || member.title === record.ownerName);
 
   return (
     <Stack gap={4}>
@@ -820,8 +823,8 @@ export function SharingPanel({ context, close }: { context: ScreenContext; close
       ]} />
       <Checkbox label="Everyone in this workspace can open it" checked={value} onChange={(event) => setShared(event.target.checked)} />
       <Stack gap={2}>
-        <strong>Who that is, today</strong>
-        {members.length === 0 ? <span className="ds-subtle">No members are recorded.</span> : members.map((member) => (
+        <strong>{value ? "Who that is, today" : "Who can open it"}</strong>
+        {audience.length === 0 ? <span className="ds-subtle">No active member is recorded.</span> : audience.map((member) => (
           <Row key={member.id} gap={2}>
             <span className="ds-grow ds-truncate">{member.title}</span>
             <Pill tone={member.fields.kind === "ai" ? "accent" : "neutral"}>{member.fields.kind === "ai" ? "AI employee" : "person"}</Pill>
