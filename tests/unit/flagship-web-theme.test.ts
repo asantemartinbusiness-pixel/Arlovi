@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import "@/domain/seeds/flagshipCollective";
 import { collectSeedsByContributor } from "@/domain/seedRegistry";
 import { SEED_NOW } from "@/domain/types";
-import { readSite, themeCss } from "@/applications/web/model";
+import { readSite, themeCss, pageHtml } from "@/applications/web/model";
 
 const flagship=collectSeedsByContributor(SEED_NOW).find(group=>group.key==="flagship-collective");
 const siteRecord=flagship?.records.find(record=>record.id==="nl-sites-900");
@@ -25,6 +25,10 @@ describe("Northline native Web site identity contract",()=>{
     expect(css).toContain("font-family:Manrope, Arial, sans-serif");
     expect(css).toContain("--accent:#dfff3f");
     expect(css).not.toContain("undefined");
+    const exported=pageHtml(site,site.pages[0]);
+    expect(exported).toContain("fonts.googleapis.com");
+    expect(exported).toContain("Manrope");
+    expect(exported).toContain("noindex");
     for(const font of ["Newsreader","DM Mono"] as const){
       const value=themeCss({...site.theme,font});
       expect(value).toContain("font-family:");
