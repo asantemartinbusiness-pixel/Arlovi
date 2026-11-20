@@ -128,8 +128,20 @@ const slide = (layout:string, title:string, values:Record<string,string>,notes:s
   objects: slideFromLayout(deckLayout(layout),title).objects.map(o => o.type === "text" && o.text?.role && values[o.text.role] !== undefined ? { ...o, text:{...o.text,text:values[o.text.role]} } : o),
   notes,
 });
+const collectiveDeckTheme: typeof THEMES[number] = {
+  id:"northline-collective-paper-acid",
+  name:"Northline Collective / Working Paper",
+  colours:{
+    ink:NORTHLINE_COLORS.ink,muted:NORTHLINE_COLORS.muted,
+    background:NORTHLINE_COLORS.canvas,surface:NORTHLINE_COLORS.white,
+    accent:NORTHLINE_COLORS.acid,accentInk:NORTHLINE_COLORS.ink,
+    support:NORTHLINE_COLORS.violet,line:NORTHLINE_COLORS.rule,
+  },
+  headingFont:"Manrope",bodyFont:"Manrope",headingScale:1,
+  fontSubstitutions:[],
+};
 const flagshipDeck:Deck = {
-  theme: THEMES[0], themes: THEMES, layouts: LAYOUTS,
+  theme: collectiveDeckTheme, themes: [collectiveDeckTheme, ...THEMES], layouts: LAYOUTS,
   slides: [
     slide("title","Material. Space. Experience.",{eyebrow:"NORTHLINE COLLECTIVE / 2027",title:"Material. Space. Experience.",subtitle:"An independent house of design, objects and experiences"},"Open with the philosophy, not an inventory of capabilities. Leave silence after the headline."),
     slide("twoColumn","The collective",{title:"Three disciplines. One perspective.",body:"ATELIER  /  considered spaces and illumination\nSUPPLY  /  objects built to outlast trends\nEXPERIENCES  /  meaningful human encounters",caption:"Editorial narrative, not a claim of external market performance."},"Introduce the shared principles and each business separately."),
