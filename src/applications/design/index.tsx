@@ -3453,7 +3453,6 @@ function HandOff({ context, then, toast }: { context: ScreenContext; then?: () =
     then?.();
     if (toast) context.toast(toast[0], toast[1], "info");
     context.closeOverlay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
 }

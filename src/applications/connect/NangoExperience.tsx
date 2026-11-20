@@ -290,7 +290,6 @@ export function NangoLiveConnections({ context }: { context: ScreenContext }) {
   useEffect(() => {
     if (status?.available) void load(1);
     // Only when readiness/org changes; no polling.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.available, context.org.id]);
 
   const reconnect = async (account: ConnectedAccount) => {

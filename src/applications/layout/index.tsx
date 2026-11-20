@@ -1474,7 +1474,6 @@ function FrameEditorOverlay({ context }: { context: ScreenContext }) {
   useEffect(() => {
     context.toast("Frame properties are in the panel", "Select a frame and edit it in the Frame panel on the right.", "info");
     context.closeOverlay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
 }
