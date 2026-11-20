@@ -1256,7 +1256,8 @@ test("WF-17 Multi-entity organization: switching organization rescopes records, 
   await page.getByRole("menuitem", { name: "Harbor Supply" }).filter({visible:true}).first().click();
   await expect(page).toHaveURL(/\/o\/harbor\//);
   await open(page, "/o/harbor/fin/invoices?tab=Awaiting%20payment", "Invoice List");
-  await expect(main(page).getByText("Every invoice in Harbor Supply, with the tax code each line resolved to.")).toBeVisible();
+  // A1: the invoice list lede no longer names the organisation; the org scope is asserted by the rows below.
+  await expect(main(page).getByText("Tax is resolved per line from jurisdiction, category, customer status and date.")).toBeVisible();
   const harborRow = main(page).getByRole("row", { name: /HB-208/ });
   await expect(harborRow).toContainText("$640.00");
   await expect(harborRow).toContainText("Nov 10, 2026");

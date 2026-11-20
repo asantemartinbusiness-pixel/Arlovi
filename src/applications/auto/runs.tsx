@@ -4,7 +4,7 @@ import {
   Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, Notice,
   OverlayActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea,
 } from "@/design-system";
-import type { RecordHeaderProps } from "@/design-system";
+import type { Column, RecordHeaderProps } from "@/design-system";
 import { knownRecord } from "@/platform/repo";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useRecord } from "@/platform/workspace";
@@ -13,6 +13,7 @@ import { assessRetry, RUN_STATUS_LABELS, type RunStatus, type StoredRun } from "
 import { JsonBlock, ReplayPlan, RunBindings, RunHeadline, RunTimeline, StepTrace, readRun } from "./panels";
 import { executeRun, useGraphRecords, LiveRunRefused, useLiveRunBlocker } from "./runner";
 
+type RunRow = { run: Rec; stored: StoredRun | undefined };
 export type RunTab = "All" | "Running" | "Failed" | "Completed" | "Waiting";
 
 /** Older seeded runs say "succeeded"; it means the same as the interpreter's "completed". */
@@ -99,9 +100,9 @@ export function RunHistory({ context, tab }: { context: ScreenContext; tab: RunT
               filterValue: (row) => `${row.run.id} ${row.run.title} ${row.stored?.workflowTitle ?? ""}`,
               sortValue: (row) => row.run.title,
             },
-            ...(hasTrigger ? [{ key: "trigger", header: "Trigger", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{row.stored?.trigger ?? String(row.run.fields.trigger ?? "—")}</span>, hideBelow: 1100 }] : []),
+            ...(hasTrigger ? [{ key: "trigger", header: "Trigger", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{row.stored?.trigger ?? String(row.run.fields.trigger ?? "—")}</span>, hideBelow: 1100 } satisfies Column<RunRow>] : []),
             { key: "status", header: "Status", cell: (row) => <Pill tone={isCompleted(row.run.status) ? "success" : row.run.status === "failed" ? "danger" : "warning"} dot>{statusLabel(row.run.status)}</Pill>, sortValue: (row) => row.run.status },
-            ...(hasAttempts ? [{ key: "attempts", header: "Attempts", align: "end", cell: (row) => String(row.run.fields.attempts ?? row.stored?.result.steps.reduce((total, step) => total + step.attempts.length, 0) ?? "—"), hideBelow: 900 }] : []),
+            ...(hasAttempts ? [{ key: "attempts", header: "Attempts", align: "end" as const, cell: (row) => String(row.run.fields.attempts ?? row.stored?.result.steps.reduce((total, step) => total + step.attempts.length, 0) ?? "—"), hideBelow: 900 } satisfies Column<RunRow>] : []),
             { key: "timing", header: "Started", align: "end", cell: (row) => <span>{context.dateTime(row.run.at)}<br /><span className="ds-subtle ds-num" style={{ fontSize: "var(--text-xs)" }}>{row.run.fields.durationMs ?? 0} ms</span></span>, sortValue: (row) => row.run.at ?? "" },
             { key: "worker", header: "Worker", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{String(row.run.fields.worker ?? "local-interpreter")}</span>, hideBelow: 1300 },
             { key: "outcome", header: "Outcomes", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{outcomeSummary(row.run, row.stored)}</span> },
