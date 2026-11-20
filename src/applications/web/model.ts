@@ -453,7 +453,15 @@ export function blockHtml(block: Block): string {
   }
 }
 
+const FONT_STYLESHEETS: Partial<Record<Theme["font"], string>> = {
+  Manrope: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap",
+  Newsreader: "https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&display=swap",
+  "DM Mono": "https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap",
+};
+
 export function pageHtml(site: SiteModel, page: Page): string {
+  const fontUrl = FONT_STYLESHEETS[site.theme.font];
+
   const nav = site.nav.header.length
     ? `<nav class="site">${site.nav.header.map((link) => {
       const anchor = (item: NavLink) => `<a href="${escapeHtml(item.target)}"${item.kind === "external" ? ' rel="noreferrer"' : ""}>${escapeHtml(item.label)}</a>`;
@@ -468,6 +476,7 @@ export function pageHtml(site: SiteModel, page: Page): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(page.seo.title || page.name)}</title>
+${fontUrl ? `<link rel="stylesheet" href="${escapeHtml(fontUrl)}">\n` : ""}
 ${page.seo.description ? `<meta name="description" content="${escapeHtml(page.seo.description)}">\n` : ""}${page.seo.noindex || site.seo.robots === "noindex" ? '<meta name="robots" content="noindex">\n' : ""}<style>${themeCss(site.theme)}</style>
 </head>
 <body>
