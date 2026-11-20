@@ -445,16 +445,14 @@ function DashboardEditorBody({ context }: { context: ScreenContext }) {
   const measureIds = [...new Set(ordered.map((tile) => tile.measureId))];
   const scope = runQuery({ measureIds, filters: body.filters }, queryContext);
   const age = freshness(scope.asOf, context.now, 7);
-  const picked = ordered.find((tile) => tile.id === context.selectedId);
+  const picked = ordered.find((tile) => tile.id === context.selectedId) ?? ordered[0];
   const hasMonthly = ordered.some((tile) => tile.viz === "line");
 
   return (
     <Stack gap={4}>
       <Row gap={2} wrap>
         <Button variant="primary" icon={<Plus size={15} />} onClick={() => context.openOverlay("Widget chooser")}>Add a tile</Button>
-        <Button variant="secondary" disabled={!picked} title={picked ? undefined : "Select a tile first"} onClick={() => context.setTab("Data")}>Edit the query</Button>
-        <span className="ds-grow" />
-        <Pill tone={record.status === "published" ? "success" : "neutral"} dot>{record.status}</Pill>
+        <Button variant="secondary" disabled={!picked} onClick={() => { if (picked) context.select(picked.id); context.setTab("Data"); }}>Edit the query</Button>
       </Row>
 
       <section className="an-scope" aria-label="What these figures cover">

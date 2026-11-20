@@ -1839,6 +1839,7 @@ function MediaInspector({ context }: { context: ScreenContext }) {
         { label: "State", value: source.missing ? "offline" : "present", tone: source.missing ? "danger" : undefined },
       ]} />
       <OverlaySection title="Rights" hint="Saved as you change them" tone={source.license === "Unknown" ? "danger" : "neutral"}>
+        <Stack gap={3}>
         <Field label="Licence">
           <Select value={source.license} onChange={(event) => patchSource({ license: event.target.value }, "Change the licence")}>
             {SOURCE_LICENCES.map((option) => <option key={option}>{option}</option>)}
@@ -1848,6 +1849,7 @@ function MediaInspector({ context }: { context: ScreenContext }) {
           <TextInput value={source.credit} onChange={(event) => patchSource({ credit: event.target.value }, "Change the credit")} />
         </Field>
         {source.license === "Unknown" && <p className="vx-mini">Unknown rights block delivery: record where this source came from.</p>}
+        </Stack>
       </OverlaySection>
     </Stack>
   );

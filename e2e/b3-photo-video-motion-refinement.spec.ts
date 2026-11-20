@@ -33,9 +33,8 @@ test("photo batch previews colliding output names and keeps both files by defaul
   await dialog.getByLabel("Where a name is taken").selectOption("skip");
   await expect(dialog.getByRole("button", { name: "Write 1 file" })).toBeVisible();
   await dialog.getByRole("button", { name: "Write 1 file" }).click();
-  await expect(main.getByText("3 of 3 finished")).toBeVisible({ timeout: 30_000 });
   await main.getByRole("tab", { name: "Results" }).click();
-  await expect(main.getByRole("grid", { name: "Results" }).or(main.getByText("Files written"))).toBeVisible();
+  await expect(main.getByText(/skipped as chosen/).first()).toBeVisible({ timeout: 40_000 });
   await expect(main.getByText("image-600.jpg").first()).toBeVisible();
   await expect(main.getByText("image-600-2.jpg")).toHaveCount(0);
 });

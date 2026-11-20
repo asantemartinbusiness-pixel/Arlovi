@@ -713,10 +713,10 @@ function TaskBoard({ context, view }: { context: ScreenContext; view: string }) 
       context.toast("Move blocked", `${unmet.map((id) => tasks.find((item) => item.id === id)?.title).join(", ")} must finish first.`, "blocked");
       return;
     }
-    await context.mutate.patch(task.id, {
+    if (!(await context.mutate.patch(task.id, {
       status: lane === "verified" ? "done" : lane,
       fields: { ...task.fields, stage: lane, movedBy: context.actor },
-    }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` });
+    }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` }))) return;
     setAnnouncement(`${task.title} moved to ${lane}.`);
     context.toast("Moved", `${task.title} is in ${lane}. The record changed; nothing executed.`);
   }
@@ -854,11 +854,11 @@ async function executeStep(context: ScreenContext, step: Rec, mission: Rec, pool
   }
   const result = runStep(step, { records: pool, mission, money, date, now });
   const attempts = Number(step.fields.attempts ?? 0) + 1;
-  await context.mutate.patch(step.id, {
+  if (!(await context.mutate.patch(step.id, {
     status: result.state,
     fields: { ...step.fields, attempts, lastRunBy: context.actor, lastRunAt: now.toISOString() },
     body: { ...(step.body as object), output: result.output, reason: result.reason ?? "", inputs: result.read },
-  }, { expectRevision: step.revision, event: `${step.title} run locally: ${result.state}` });
+  }, { expectRevision: step.revision, event: `${step.title} run locally: ${result.state}` }))) return;
 
   await context.mutate.create({
     collection: "missionReceipts",
@@ -955,7 +955,7 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
                 disabled={gate.status === "done" || !context.can("approve_mission")}
                 title={context.can("approve_mission") ? undefined : "This role view does not approve missions"}
                 onClick={async () => {
-                  await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` });
+                  if (!(await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` }))) return;
                   context.toast("Gate passed", `${context.actor} approved it. The next step can be run.`);
                 }}
               >
@@ -999,7 +999,7 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
                 </Button>
                 {step.status === "unknown_side_effect" && (
                   <Button size="sm" variant="outline-danger" onClick={async () => {
-                    await context.mutate.patch(step.id, { status: "failed", fields: { ...step.fields, reconciledBy: context.actor } }, { expectRevision: step.revision, event: `${step.title} reconciled by ${context.actor}: no effect found` });
+                    if (!(await context.mutate.patch(step.id, { status: "failed", fields: { ...step.fields, reconciledBy: context.actor } }, { expectRevision: step.revision, event: `${step.title} reconciled by ${context.actor}: no effect found` }))) return;
                     context.toast("Reconciled", "You recorded that no external effect happened. The step can now be retried.");
                   }}>Reconcile</Button>
                 )}
@@ -1635,7 +1635,7 @@ function MissionArchive({ context, close }: { context: ScreenContext; close: () 
       <Button
         variant="danger"
         onClick={async () => {
-          await context.mutate.patch(mission.id, { status: "archived", fields: { ...mission.fields, archivedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} archived by ${context.actor}` });
+          if (!(await context.mutate.patch(mission.id, { status: "archived", fields: { ...mission.fields, archivedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} archived by ${context.actor}` }))) return;
           context.toast("Archived", "It stays auditable and cannot be executed.");
           close();
         }}
@@ -1841,10 +1841,10 @@ function PauseDialog({ context, close }: { context: ScreenContext; close: () => 
         variant="primary"
         disabled={!reason.trim()}
         onClick={async () => {
-          await context.mutate.patch(mission.id, {
+          if (!(await context.mutate.patch(mission.id, {
             status: mission.status === "paused" ? "running" : "paused",
             fields: { ...mission.fields, executionPaused: mission.status !== "paused", pauseReason: reason },
-          }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "paused"} by ${context.actor}` });
+          }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "paused"} by ${context.actor}` }))) return;
           context.toast(mission.status === "paused" ? "Resumed" : "Paused", `${mission.title} is ${mission.status === "paused" ? "running" : "paused"}, with your reason on the record.`);
           close();
         }}
@@ -1914,7 +1914,7 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
             <Row key={id} gap={2}>
               <span className="ds-grow">{tasks.find((item) => item.id === id)?.title ?? id}</span>
               <Button size="sm" variant="ghost" onClick={async () => {
-                await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: deps.filter((item) => item !== id) } }, { expectRevision: task.revision, event: `Dependency removed from ${task.title}` });
+                if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: deps.filter((item) => item !== id) } }, { expectRevision: task.revision, event: `Dependency removed from ${task.title}` }))) return;
                 context.toast("Dependency removed", "The plan graph and the list both reflect it.");
               }}>Remove</Button>
             </Row>
@@ -1932,7 +1932,7 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
         variant="primary"
         disabled={!dependency || Boolean(cycle)}
         onClick={async () => {
-          await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: [...deps, dependency] } }, { expectRevision: task.revision, event: `Dependency added to ${task.title}` });
+          if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: [...deps, dependency] } }, { expectRevision: task.revision, event: `Dependency added to ${task.title}` }))) return;
           context.toast("Dependency added", "The task now waits for it. A cycle would have been refused.");
           close();
         }}
@@ -1960,7 +1960,7 @@ function PlanRevision({ context, close }: { context: ScreenContext; close: () =>
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(mission.id, { fields: { ...mission.fields, planVersion: version + 1, revisedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} plan revised to version ${version + 1}` });
+          if (!(await context.mutate.patch(mission.id, { fields: { ...mission.fields, planVersion: version + 1, revisedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} plan revised to version ${version + 1}` }))) return;
           context.toast("Plan revised", `Version ${version + 1} is current. Version ${version} stays on the record with its receipts.`);
           close();
         }}
@@ -2014,7 +2014,7 @@ function TaskDetail({ context, close }: { context: ScreenContext; close: () => v
           variant="primary"
           disabled={!evidence.trim()}
           onClick={async () => {
-            await context.mutate.patch(task.id, { body: { ...(task.body as object), evidence: [...(body?.evidence ?? []), evidence.trim()] } }, { expectRevision: task.revision, event: `Evidence attached to ${task.title}` });
+            if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), evidence: [...(body?.evidence ?? []), evidence.trim()] } }, { expectRevision: task.revision, event: `Evidence attached to ${task.title}` }))) return;
             context.toast("Evidence attached", "It is on the task and shows on the mission results.");
             setEvidence("");
           }}
@@ -2050,7 +2050,7 @@ function ReassignTask({ context, close }: { context: ScreenContext; close: () =>
         variant="primary"
         onClick={async () => {
           const isAgent = data.agents.some((agent) => agent.title === to);
-          await context.mutate.patch(task.id, { ownerName: to, fields: { ...task.fields, assignee: to, kind: isAgent ? "ai" : "human" } }, { expectRevision: task.revision, event: `${task.title} reassigned to ${to}` });
+          if (!(await context.mutate.patch(task.id, { ownerName: to, fields: { ...task.fields, assignee: to, kind: isAgent ? "ai" : "human" } }, { expectRevision: task.revision, event: `${task.title} reassigned to ${to}` }))) return;
           context.toast("Reassigned", `${to} owns ${task.title}.`);
           close();
         }}
@@ -2235,7 +2235,7 @@ function HandoffView({ context, close }: { context: ScreenContext; close: () => 
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(task.id, { fields: { ...task.fields, reviewer, approvalRequired: true } }, { expectRevision: task.revision, event: `Review requested on ${task.title} from ${reviewer}` });
+          if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, reviewer, approvalRequired: true } }, { expectRevision: task.revision, event: `Review requested on ${task.title} from ${reviewer}` }))) return;
           context.toast("Review requested", `${reviewer} is recorded as the reviewer, and the task now has a gate.`);
           close();
         }}
@@ -2311,7 +2311,7 @@ function DeliverableApproval({ context, close }: { context: ScreenContext; close
         disabled={!note.trim()}
         onClick={async () => {
           if (allowed) {
-            await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approval: "approved", approvedBy: context.actor, approvalNote: note } }, { expectRevision: item.revision, event: `${item.title} approved by ${context.actor}` });
+            if (!(await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approval: "approved", approvedBy: context.actor, approvalNote: note } }, { expectRevision: item.revision, event: `${item.title} approved by ${context.actor}` }))) return;
           } else {
             await context.mutate.log(`${context.actor} reviewed ${item.title}: ${note}`, { entityId: item.id, type: "deliverable.note" });
           }
@@ -2413,7 +2413,7 @@ function LimitIncrease({ context, close }: { context: ScreenContext; close: () =
         disabled={amount <= 0 || !reason.trim()}
         onClick={async () => {
           if (allowed) {
-            await context.mutate.patch(mission.id, { fields: { ...mission.fields, budgetMinor: ceiling + amount }, amountMinor: ceiling + amount }, { expectRevision: mission.revision, event: `Ceiling raised to ${context.money(ceiling + amount)} by ${context.actor}: ${reason}` });
+            if (!(await context.mutate.patch(mission.id, { fields: { ...mission.fields, budgetMinor: ceiling + amount }, amountMinor: ceiling + amount }, { expectRevision: mission.revision, event: `Ceiling raised to ${context.money(ceiling + amount)} by ${context.actor}: ${reason}` }))) return;
             context.toast("Ceiling raised", `${context.money(ceiling + amount)} is the new ceiling, recorded with your reason.`);
           } else {
             await context.mutate.create({
@@ -2478,7 +2478,7 @@ function ResultsApproval({ context, close }: { context: ScreenContext; close: ()
         disabled={unverified.length > 0 || !allowed}
         title={allowed ? undefined : "This role view does not approve missions"}
         onClick={async () => {
-          await context.mutate.patch(mission.id, { status: "completed", fields: { ...mission.fields, closedBy: context.actor, closedAt: context.now.toISOString() } }, { expectRevision: mission.revision, event: `${mission.title} closed as complete by ${context.actor}` });
+          if (!(await context.mutate.patch(mission.id, { status: "completed", fields: { ...mission.fields, closedBy: context.actor, closedAt: context.now.toISOString() } }, { expectRevision: mission.revision, event: `${mission.title} closed as complete by ${context.actor}` }))) return;
           context.toast("Mission closed", "Completion is recorded against verified criteria, not agent text.");
           close();
         }}
@@ -2515,7 +2515,7 @@ function ReopenTask({ context, close }: { context: ScreenContext; close: () => v
             body: { dependsOn: [], evidence: [] },
           }, `Follow-up created on ${mission.title}`);
           if (mission.status === "completed") {
-            await context.mutate.patch(mission.id, { status: "running", fields: { ...mission.fields, reopenedBy: context.actor } }, { event: `${mission.title} reopened by ${context.actor}` });
+            if (!(await context.mutate.patch(mission.id, { status: "running", fields: { ...mission.fields, reopenedBy: context.actor } }, { event: `${mission.title} reopened by ${context.actor}` }))) return;
           }
           context.toast("Follow-up created", "It is on the board with your reason.");
           close();
@@ -2540,7 +2540,7 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         if (template) {
-          await context.mutate.patch(template.id, { title, summary }, { expectRevision: template.revision, event: `Template updated: ${title}` });
+          if (!(await context.mutate.patch(template.id, { title, summary }, { expectRevision: template.revision, event: `Template updated: ${title}` }))) return;
         } else {
           await context.mutate.create({
             collection: "templates",
@@ -2688,7 +2688,7 @@ async function approveNextStep(context: ScreenContext): Promise<void> {
     .sort((a, b) => Number(a.fields.order ?? 0) - Number(b.fields.order ?? 0));
   const gate = steps[0];
   if (!gate) { context.toast("No gate is waiting", "Nothing on this mission is held for approval.", "info"); return; }
-  await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: context.now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` });
+  if (!(await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: context.now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` }))) return;
   context.toast("Gate passed", `${gate.title} was approved by ${context.actor}. The next step can be run from the console.`);
 }
 
@@ -2715,10 +2715,10 @@ async function runNextStep(context: ScreenContext): Promise<void> {
 async function stopMission(context: ScreenContext): Promise<void> {
   const mission = await missionRecord(context, context.params.id);
   if (!mission) return;
-  await context.mutate.patch(mission.id, {
+  if (!(await context.mutate.patch(mission.id, {
     status: mission.status === "paused" ? "running" : "paused",
     fields: { ...mission.fields, executionPaused: mission.status !== "paused", pausedBy: context.actor },
-  }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "stopped"} by ${context.actor}` });
+  }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "stopped"} by ${context.actor}` }))) return;
   context.toast(mission.status === "paused" ? "Resumed" : "Stopped", mission.status === "paused" ? "The next step can be run again." : "No further step will be started until it is resumed.");
 }
 
@@ -2730,10 +2730,10 @@ async function resumeMission(context: ScreenContext): Promise<void> {
     context.toast("Nothing to resume", `${mission.title} is ${mission.status.replace(/_/g, " ")}, not paused.`, "blocked");
     return;
   }
-  await context.mutate.patch(mission.id, {
+  if (!(await context.mutate.patch(mission.id, {
     status: "running",
     fields: { ...mission.fields, executionPaused: false, resumedBy: context.actor },
-  }, { expectRevision: mission.revision, event: `${mission.title} resumed by ${context.actor}` });
+  }, { expectRevision: mission.revision, event: `${mission.title} resumed by ${context.actor}` }))) return;
   context.toast("Resumed", "The next step can be run again.");
 }
 
@@ -2745,10 +2745,10 @@ async function cancelMission(context: ScreenContext): Promise<boolean> {
     context.toast("Cannot cancel", `${mission.title} is already ${mission.status}.`, "blocked");
     return false;
   }
-  await context.mutate.patch(mission.id, {
+  if (!(await context.mutate.patch(mission.id, {
     status: "cancelled",
     fields: { ...mission.fields, executionPaused: true, cancelledBy: context.actor },
-  }, { expectRevision: mission.revision, event: `${mission.title} cancelled by ${context.actor}` });
+  }, { expectRevision: mission.revision, event: `${mission.title} cancelled by ${context.actor}` }))) return false;
   context.toast("Mission cancelled", "No further step will start. Completed steps and their receipts are kept.");
   return true;
 }
@@ -3048,7 +3048,7 @@ async function reopenTask(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const task = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!task || task.collection !== "missionTasks") { context.toast("Choose a card", "Select the task to reopen.", "info"); return; }
-  await context.mutate.patch(task.id, { status: "ready", fields: { ...task.fields, stage: "ready", reopenedBy: context.actor, reviewedBy: "" } }, { expectRevision: task.revision, event: `${task.title} reopened by ${context.actor}` });
+  if (!(await context.mutate.patch(task.id, { status: "ready", fields: { ...task.fields, stage: "ready", reopenedBy: context.actor, reviewedBy: "" } }, { expectRevision: task.revision, event: `${task.title} reopened by ${context.actor}` }))) return;
   context.toast("Reopened", `${task.title} is back in Ready, and its review is cleared so it must be verified again.`);
 }
 
@@ -3056,7 +3056,7 @@ async function acceptHandoff(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const task = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!task || task.collection !== "missionTasks") { context.toast("Choose a task", "Select the handoff to accept.", "info"); return; }
-  await context.mutate.patch(task.id, { ownerName: context.actor, fields: { ...task.fields, assignee: context.actor, kind: "human", acceptedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} accepted by ${context.actor}` });
+  if (!(await context.mutate.patch(task.id, { ownerName: context.actor, fields: { ...task.fields, assignee: context.actor, kind: "human", acceptedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} accepted by ${context.actor}` }))) return;
   context.toast("Handoff accepted", `${task.title} is yours. The deliverable and its bound are unchanged.`);
 }
 
@@ -3113,7 +3113,7 @@ async function publishTemplate(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const template = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!template || template.collection !== "templates") return;
-  await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, publishedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} published by ${context.actor}` });
+  if (!(await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, publishedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} published by ${context.actor}` }))) return;
   context.toast("Published", "It is offered to anyone creating a mission here. No credential or approval travels with it.");
 }
 

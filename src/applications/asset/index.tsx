@@ -1,13 +1,13 @@
 import { AlertTriangle, Images, Palette, ScrollText, Wand2 } from "lucide-react";
 import {
-  Button, Empty, ModalActions, Notice, OVERLAY_WIDTH, OverlayActions, Row, Stack,
+  Button, Empty, ModalActions, Notice, OVERLAY_WIDTH, OverlayActions, Pill, Row, Stack,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { getRecord } from "@/platform/repo";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { AssetPreview, FileStateTag } from "./thumbs";
 import {
-  ArchiveAsset, AssetDetail, AssetInspector, GroupAssets, LibraryStripLine, ReplacementImpact,
+  ArchiveAsset, AssetDetail, AssetInspector, AssetSummary, GroupAssets, LibraryStripLine, ReplacementImpact,
   RightsCheck, RightsForm, VariantEditor, downloadAsset, licence, licenceTone, useAssets,
 } from "./panels";
 import {

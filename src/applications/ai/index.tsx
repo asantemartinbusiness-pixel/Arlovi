@@ -1956,6 +1956,20 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
   );
 }
 
+function ThreadPreviewSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const conversation = useRecord(payload?.id ?? context.selectedId);
+  if (!conversation) return <OverlaySummary eyebrow="Thread" title="No thread chosen" />;
+  return (
+    <OverlaySummary
+      eyebrow={String(conversation.fields.kind ?? "chief") === "chief" ? "Chief of Staff thread" : "Specialist thread"}
+      title={conversation.title}
+      status={conversation.fields.legalHold === true ? <Pill tone="warning">Legal hold</Pill> : conversation.fields.archived === true ? <Pill tone="neutral">Archived</Pill> : undefined}
+      meta={[`${readTurns(conversation).length} turns`, conversation.fields.shared === true ? "Shared with the workspace" : "Only you", context.relative(conversation.at ?? conversation.updatedAt)]}
+    />
+  );
+}
+
 function ThreadPreview({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string; rename?: boolean } | undefined;
   const conversation = useRecord(payload?.id ?? context.selectedId);
@@ -1979,14 +1993,13 @@ function ThreadPreview({ context }: { context: ScreenContext }) {
           </Button>
         </Row>
       </Field>
-      <Properties rows={[
-        { label: "Turns", value: String(turns.length) },
-        { label: "Sharing", value: conversation.fields.shared === true ? "Shared with the workspace" : "Only you" },
-        { label: "Retention", value: conversation.fields.legalHold === true ? "Legal hold — cannot be deleted" : "Standard schedule" },
-        { label: "Last turn", value: context.dateTime(conversation.at ?? conversation.updatedAt) },
+      <FactGrid columns={3} dense items={[
+        { label: "Retention", value: conversation.fields.legalHold === true ? "Legal hold" : "Standard schedule", tone: conversation.fields.legalHold === true ? "warning" : undefined },
+        { label: "Last turn", value: context.dateTime(conversation.at ?? conversation.updatedAt), mono: true },
+        { label: "Turns", value: String(turns.length), mono: true },
       ]} />
       <TurnList turns={turns.slice(-4)} context={context} emptyTitle="No turn in this thread" emptyBody="Nothing has been asked yet." />
-      <Button variant="primary" onClick={() => { context.select(conversation.id); context.closeOverlay(); context.navigate(`/o/${context.org.slug}/ai/chat`); }}>Open in chat</Button>
+      <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => { context.select(conversation.id); context.closeOverlay(); context.navigate(`/o/${context.org.slug}/ai/chat?thread=${conversation.id}`); }}>Open in chat</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2047,6 +2060,21 @@ function SharingDialog({ context, close }: { context: ScreenContext; close: () =
   );
 }
 
+function AgentSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const agent = useRecord(payload?.id ?? context.params.id);
+  if (!agent) return <OverlaySummary eyebrow={eyebrow} title="No specialist selected" />;
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      avatar={<Avatar name={agent.title} kind="ai" size="lg" />}
+      title={agent.title}
+      status={<Pill tone={agent.status === "active" ? "success" : "warning"} dot>{agent.status}</Pill>}
+      meta={[String(agent.fields.role ?? ""), "No model connected"]}
+    />
+  );
+}
+
 function AgentProfileDrawer({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const agent = useRecord(payload?.id ?? context.params.id);
@@ -2054,26 +2082,18 @@ function AgentProfileDrawer({ context }: { context: ScreenContext }) {
   const body = agent.body as { skills?: string[]; tools?: { id: string; label: string; granted: boolean; capability?: string }[]; authority?: string[] } | undefined;
   return (
     <Stack gap={4}>
-      <Row gap={3}>
-        <Avatar name={agent.title} kind="ai" size="lg" />
-        <div>
-          <h3>{agent.title}</h3>
-          <p className="ds-subtle">{String(agent.fields.role ?? "")} · {agent.status}</p>
-        </div>
-      </Row>
-      <Properties rows={[
+      <FactGrid items={[
         { label: "Autonomy", value: String(agent.fields.autonomy ?? "draft") },
-        { label: "Manager", value: String(agent.fields.manager ?? "Unassigned") },
-        { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)) },
-        { label: "Recorded provider cost", value: context.money(Number(agent.fields.recordedCostMinor ?? 0)) },
-        { label: "Model", value: <Pill tone="warning">Not connected</Pill> },
+        { label: "Reports to", value: String(agent.fields.manager ?? "Unassigned") },
+        { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)), mono: true },
+        { label: "Provider cost recorded", value: context.money(Number(agent.fields.recordedCostMinor ?? 0)), mono: true },
       ]} />
-      <Card title="Authority" pad="tight">
+      <OverlaySection title="Authority">
         <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>
           {(body?.authority ?? ["Nothing recorded"]).map((line) => <li key={line}>{line}</li>)}
         </ul>
-      </Card>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/${agent.id}`)}>Open the full profile</Button>
+      </OverlaySection>
+      <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/${agent.id}`)}>Open the full profile</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2315,9 +2335,9 @@ function EvidenceInspector({ context }: { context: ScreenContext }) {
     <Stack gap={4}>
       {!message ? <Empty title="Choose a message" /> : (
         <>
-          <Card title={String(message.fields.author ?? "")} subtitle={context.dateTime(message.at ?? message.createdAt)}>
+          <OverlaySection title="The claim" hint={`${String(message.fields.author ?? "")} · ${context.dateTime(message.at ?? message.createdAt)}`}>
             <p className="ds-prose">{message.summary}</p>
-          </Card>
+          </OverlaySection>
           {cited.length === 0 ? (
             <Notice tone="warning" title="No evidence is attached to this message">
               A claim with no record behind it stays a claim. Ask for the records before acting on it.
@@ -2392,7 +2412,7 @@ function MicPermission({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="Why the prompt is not shown">
         Asking for your microphone would imply something could be heard and transcribed. Nothing here can do that, so the permission is not requested at all.
       </Notice>
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.setTab("Transcript"); }}>Open the transcript</Button>
+      <ModalActions><OverlayActions primary={<Button variant="secondary" onClick={() => { context.closeOverlay(); context.setTab("Transcript"); }}>Open the transcript</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2407,7 +2427,7 @@ function VoiceSettingsOverlay({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="These settings cannot take effect">
         They are kept against this workspace so the choice survives, but no speech is produced until a provider is connected.
       </Notice>
-      <Button variant="ghost" onClick={() => context.toast("Nothing to save", "Both controls are unavailable while no speech service is connected.", "info")}>Save preference</Button>
+      <ModalActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.closeOverlay()}>Close</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2899,9 +2919,9 @@ export const aiApp = registerApp({
         { id: "open artifact", label: "Open artifact", placement: "overflow", run: (context) => void openLatestArtifact(context) },
       ],
       overlays: [
-        { id: "Source selector", kind: "drawer", title: "Pin records into scope", width: 520, render: ({ ...context }) => <SourceSelector context={context} /> },
-        { id: "upload review", kind: "modal", title: "Attach a file by reference", width: 560, render: ({ ...context }) => <UploadReview context={context} /> },
-        { id: "message action menu", kind: "drawer", title: "Message actions", width: 480, render: ({ close, ...context }) => <MessageActionMenu context={context} close={close} /> },
+        { id: "Source selector", kind: "drawer", title: "Pin records into scope", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourceSelector context={context} /> },
+        { id: "upload review", kind: "modal", title: "Attach a file by reference", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <UploadReview context={context} /> },
+        { id: "message action menu", kind: "drawer", title: "Message actions", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MessageActionMenu context={context} close={close} /> },
         { id: "task authorization", kind: "modal", title: "Authorise a mission", width: OVERLAY_WIDTH.modal, summary: ({ close: _close, ...context }) => <TaskAuthorizationSummary context={context} />, render: ({ close, ...context }) => <TaskAuthorization context={context} close={close} />, footer: submitFooter("task-authorization", "Authorise the mission") },
       ],
     },
@@ -2921,9 +2941,9 @@ export const aiApp = registerApp({
         { id: "delete", placement: "overflow", tone: "danger", capability: "delete_records", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => context.openOverlay("delete confirmation") },
       ],
       overlays: [
-        { id: "Thread preview", kind: "drawer", title: "Thread", width: 520, render: ({ ...context }) => <ThreadPreview context={context} /> },
-        { id: "delete confirmation", kind: "modal", title: "Delete this thread", tone: "danger", width: 520, render: ({ close, ...context }) => <DeleteConversation context={context} close={close} /> },
-        { id: "sharing dialog", kind: "modal", title: "Sharing", width: 480, render: ({ close, ...context }) => <SharingDialog context={context} close={close} /> },
+        { id: "Thread preview", kind: "drawer", title: "Thread", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <ThreadPreviewSummary context={context} />, render: ({ ...context }) => <ThreadPreview context={context} /> },
+        { id: "delete confirmation", kind: "modal", title: "Delete this thread", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <DeleteConversation context={context} close={close} /> },
+        { id: "sharing dialog", kind: "modal", title: "Sharing", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SharingDialog context={context} close={close} /> },
       ],
     },
 
@@ -2944,9 +2964,9 @@ export const aiApp = registerApp({
         { id: "review tool scope", placement: "overflow", run: (context) => context.openOverlay("permission explainer", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Agent profile drawer", kind: "drawer", title: "Specialist", width: 480, render: ({ ...context }) => <AgentProfileDrawer context={context} /> },
-        { id: "permission explainer", kind: "drawer", title: "Tool scope", width: 520, render: ({ ...context }) => <PermissionExplainer context={context} /> },
-        { id: "mission escalation", kind: "modal", title: "Hand this to the coordinator", width: 560, render: ({ close, ...context }) => <MissionEscalation context={context} close={close} />, footer: submitFooter("mission-escalation", "Record the handoff") },
+        { id: "Agent profile drawer", kind: "drawer", title: "Specialist", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="Specialist" />, render: ({ ...context }) => <AgentProfileDrawer context={context} /> },
+        { id: "permission explainer", kind: "drawer", title: "Tool scope", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="Tool scope" />, render: ({ ...context }) => <PermissionExplainer context={context} /> },
+        { id: "mission escalation", kind: "modal", title: "Hand this to the coordinator", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionEscalation context={context} close={close} />, footer: submitFooter("mission-escalation", "Record the handoff") },
         { id: "attach record", kind: "modal", title: "Attach a record", width: 560, render: ({ close, ...context }) => <AttachToSpecialist context={context} close={close} /> },
       ],
     },
@@ -2969,7 +2989,7 @@ export const aiApp = registerApp({
       overlays: [
         { id: "Participant selector", kind: "modal", title: "Participants", width: 560, render: ({ close, ...context }) => <ParticipantSelector context={context} close={close} /> },
         { id: "decision recorder", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <DecisionRecorder context={context} close={close} />, footer: submitFooter("decision-recorder", "Record decision") },
-        { id: "topic thread", kind: "drawer", title: "Topic", width: 520, render: ({ ...context }) => <TopicThread context={context} /> },
+        { id: "topic thread", kind: "drawer", title: "Topic", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <TopicThread context={context} /> },
         { id: "assign task", kind: "modal", title: "Assign a task", width: 560, render: ({ close, ...context }) => <AssignRoomTask context={context} close={close} /> },
         { id: "host review", kind: "modal", title: "Host a review", width: 560, render: ({ close, ...context }) => <HostReview context={context} close={close} /> },
       ],
@@ -2995,8 +3015,8 @@ export const aiApp = registerApp({
         { id: "hand over", label: "Hand a task over", placement: "overflow", run: (context) => context.openOverlay("Task handoff drawer") },
       ],
       overlays: [
-        { id: "Task handoff drawer", kind: "drawer", title: "Hand a task over", width: 520, render: ({ close, ...context }) => <TaskHandoffDrawer context={context} close={close} /> },
-        { id: "evidence inspector", kind: "drawer", title: "Evidence", width: 520, render: ({ ...context }) => <EvidenceInspector context={context} /> },
+        { id: "Task handoff drawer", kind: "drawer", title: "Hand a task over", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskHandoffDrawer context={context} close={close} /> },
+        { id: "evidence inspector", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <EvidenceInspector context={context} /> },
         { id: "review dialog", kind: "modal", title: "Record a review", width: 560, render: ({ close, ...context }) => <ReviewDialog context={context} close={close} /> },
         { id: "assign reviewer", kind: "modal", title: "Assign a reviewer", width: 560, render: ({ close, ...context }) => <AssignReviewer context={context} close={close} /> },
         { id: "resolve disagreement", kind: "modal", title: "Resolve a disagreement", width: 580, render: ({ close, ...context }) => <ResolveDisagreement context={context} close={close} /> },
@@ -3061,7 +3081,7 @@ export const aiApp = registerApp({
         { id: "publish report", label: "Publish the report", placement: "overflow", run: (context) => context.openOverlay("save report", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Source inspector", kind: "drawer", title: "Source", width: 520, render: ({ ...context }) => <SourceInspector context={context} /> },
+        { id: "Source inspector", kind: "drawer", title: "Source", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourceInspector context={context} /> },
         { id: "confidence note", kind: "modal", title: "Confidence", width: 560, render: ({ close, ...context }) => <ConfidenceNote context={context} close={close} />, footer: submitFooter("confidence-note", "Record confidence") },
         { id: "save report", kind: "modal", title: "Save as a report", width: 560, render: ({ close, ...context }) => <SaveReport context={context} close={close} /> },
       ],
@@ -3081,8 +3101,8 @@ export const aiApp = registerApp({
         { id: "redact selection", placement: "overflow", run: (context) => context.openOverlay("sensitive data warning") },
       ],
       overlays: [
-        { id: "Context picker", kind: "drawer", title: "Context", width: 560, render: ({ close, ...context }) => <ContextPicker context={context} close={close} /> },
-        { id: "permission explanation", kind: "drawer", title: "Why this is visible", width: 560, render: ({ ...context }) => <PermissionExplanation context={context} /> },
+        { id: "Context picker", kind: "drawer", title: "Context", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ContextPicker context={context} close={close} /> },
+        { id: "permission explanation", kind: "drawer", title: "Why this is visible", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <PermissionExplanation context={context} /> },
         { id: "sensitive data warning", kind: "modal", title: "Keep a selection out of retrieval", tone: "danger", width: 560, render: ({ close, ...context }) => <SensitiveDataWarning context={context} close={close} />, footer: submitFooter("redaction", "Record the request") },
       ],
     },
@@ -3102,9 +3122,9 @@ export const aiApp = registerApp({
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export dialog", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Version comparison", kind: "modal", title: "Compare versions", width: 680, render: ({ ...context }) => <VersionComparison context={context} /> },
-        { id: "share dialog", kind: "modal", title: "Share", width: 560, render: ({ ...context }) => <ShareDialog context={context} /> },
-        { id: "export dialog", kind: "modal", title: "Export", width: 520, render: ({ close, ...context }) => <ExportDialog context={context} close={close} /> },
+        { id: "Version comparison", kind: "modal", title: "Compare versions", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <VersionComparison context={context} /> },
+        { id: "share dialog", kind: "modal", title: "Share", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ShareDialog context={context} /> },
+        { id: "export dialog", kind: "modal", title: "Export", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <ExportDialog context={context} close={close} /> },
         { id: "comment", kind: "modal", title: "Comment on this artifact", width: 540, render: ({ close, ...context }) => <CommentOnArtifact context={context} close={close} /> },
       ],
     },

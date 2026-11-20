@@ -1342,7 +1342,7 @@ function AgentAssignment({ context, close }: { context: ScreenContext; close: ()
         disabled={blocked || !task}
         onClick={async () => {
           if (!task) return;
-          await context.mutate.patch(task.id, { ownerName: agent.title, fields: { ...task.fields, assignee: agent.title, kind: "ai" } }, { expectRevision: task.revision, event: `${task.title} assigned to ${agent.title}` });
+          if (!(await context.mutate.patch(task.id, { ownerName: agent.title, fields: { ...task.fields, assignee: agent.title, kind: "ai" } }, { expectRevision: task.revision, event: `${task.title} assigned to ${agent.title}` }))) return;
           context.toast("Assigned", `${task.title} belongs to ${agent.title}. Nothing starts running: no model is connected.`);
           close();
         }}
@@ -1373,7 +1373,7 @@ function ArchiveConfirmation({ context, close }: { context: ScreenContext; close
         variant="danger"
         disabled={open.length > 0}
         onClick={async () => {
-          await context.mutate.patch(agent.id, { status: "archived", fields: { ...agent.fields, archivedBy: context.actor } }, { expectRevision: agent.revision, event: `${agent.title} archived by ${context.actor}` });
+          if (!(await context.mutate.patch(agent.id, { status: "archived", fields: { ...agent.fields, archivedBy: context.actor } }, { expectRevision: agent.revision, event: `${agent.title} archived by ${context.actor}` }))) return;
           context.toast("Archived", "The contract is out of delegation and its history is kept.");
           close();
         }}
@@ -1399,10 +1399,10 @@ function RoleEdit({ context, close }: { context: ScreenContext; close: () => voi
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(agent.id, {
+        if (!(await context.mutate.patch(agent.id, {
           summary,
           fields: { ...agent.fields, role, manager, autonomy, spendCapMinor: cap },
-        }, { expectRevision: agent.revision, event: `${agent.title} contract edited by ${context.actor}` });
+        }, { expectRevision: agent.revision, event: `${agent.title} contract edited by ${context.actor}` }))) return;
         context.toast("Contract saved", "The change is on the record, and queued work is re-checked against the new contract before it runs.");
         close();
       }}
@@ -1462,7 +1462,7 @@ function PermissionInspector({ context, close }: { context: ScreenContext; close
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(agent.id, { body: { ...(agent.body as object), tools } }, { expectRevision: agent.revision, event: `Tool grants changed on ${agent.title}` });
+          if (!(await context.mutate.patch(agent.id, { body: { ...(agent.body as object), tools } }, { expectRevision: agent.revision, event: `Tool grants changed on ${agent.title}` }))) return;
           for (const task of queued) {
             await context.mutate.patch(task.id, { fields: { ...task.fields, reauthorisationRequired: true } }, { event: `${task.title} needs re-authorisation after a permission change` });
           }
@@ -1741,7 +1741,7 @@ function TransferApproval({ context, close }: { context: ScreenContext; close: (
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(record.id, { fields: { ...record.fields, departmentId } }, { expectRevision: record.revision, event: `${record.title} transferred` });
+          if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, departmentId } }, { expectRevision: record.revision, event: `${record.title} transferred` }))) return;
           context.toast("Transferred", `${record.title} now sits in ${data.departments.find((department) => department.id === departmentId)?.title}.`);
           close();
         }}
@@ -1836,7 +1836,7 @@ function InstallPermission({ context, close }: { context: ScreenContext; close: 
           if (!agent) return;
           const skills = agentBody(agent).skills ?? [];
           if (skills.includes(skill.id)) { context.toast("Already installed", `${agent.title} already holds ${skill.title}.`, "info"); close(); return; }
-          await context.mutate.patch(agent.id, { body: { ...(agent.body as object), skills: [...skills, skill.id] } }, { expectRevision: agent.revision, event: `${skill.title} installed on ${agent.title}` });
+          if (!(await context.mutate.patch(agent.id, { body: { ...(agent.body as object), skills: [...skills, skill.id] } }, { expectRevision: agent.revision, event: `${skill.title} installed on ${agent.title}` }))) return;
           context.toast("Installed", `${agent.title} holds ${skill.title} v${String(skill.fields.version ?? "1.0")}.`);
           close();
         }}
@@ -1932,16 +1932,16 @@ function AssessmentBuilder({ context, close }: { context: ScreenContext; close: 
         variant="primary"
         onClick={async () => {
           if (isAssessment) {
-            await context.mutate.patch(course.id, {
+            if (!(await context.mutate.patch(course.id, {
               body: { ...(course.body as object), questions: questions.split("\n").filter(Boolean) },
               fields: { ...course.fields, questions: questions.split("\n").filter(Boolean).length },
-            }, { expectRevision: course.revision, event: `Assessment updated: ${course.title}` });
+            }, { expectRevision: course.revision, event: `Assessment updated: ${course.title}` }))) return;
             context.toast("Assessment saved", "The questions are on the record.");
           } else {
             const agent = data.agents.find((item) => item.id === agentId);
-            await context.mutate.patch(course.id, {
+            if (!(await context.mutate.patch(course.id, {
               fields: { ...course.fields, assigned: Number(course.fields.assigned ?? 0) + 1, lastAssignedTo: agent?.title ?? "" },
-            }, { expectRevision: course.revision, event: `${course.title} assigned to ${agent?.title}` });
+            }, { expectRevision: course.revision, event: `${course.title} assigned to ${agent?.title}` }))) return;
             context.toast("Assigned", `${agent?.title} has ${course.title} on its record. Reading it changes nothing until a person verifies the result.`);
           }
           close();
@@ -1969,7 +1969,7 @@ function PublishingReview({ context, close }: { context: ScreenContext; close: (
         variant="primary"
         disabled={!scope.trim()}
         onClick={async () => {
-          await context.mutate.patch(course.id, { status: "published", fields: { ...course.fields, scope, publishedBy: context.actor } }, { expectRevision: course.revision, event: `${course.title} published for ${scope}` });
+          if (!(await context.mutate.patch(course.id, { status: "published", fields: { ...course.fields, scope, publishedBy: context.actor } }, { expectRevision: course.revision, event: `${course.title} published for ${scope}` }))) return;
           context.toast("Published", `${course.title} applies to ${scope}, recorded with your name.`);
           close();
         }}
@@ -1994,7 +1994,7 @@ function ScenarioEditor({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         if (scenario) {
-          await context.mutate.patch(scenario.id, { title, fields: { ...scenario.fields, domain, severity } }, { expectRevision: scenario.revision, event: `Scenario updated: ${title}` });
+          if (!(await context.mutate.patch(scenario.id, { title, fields: { ...scenario.fields, domain, severity } }, { expectRevision: scenario.revision, event: `Scenario updated: ${title}` }))) return;
         } else {
           await context.mutate.create({
             collection: "evaluations",
@@ -2099,7 +2099,7 @@ function PromotionApproval({ context, close }: { context: ScreenContext; close: 
         disabled={blocked || !agent}
         onClick={async () => {
           if (!agent) return;
-          await context.mutate.patch(agent.id, { status: "active", fields: { ...agent.fields, promotedBy: context.actor, promotedVersion: String(run.fields.contractVersion ?? "") } }, { expectRevision: agent.revision, event: `${agent.title} promoted after scoring ${score}` });
+          if (!(await context.mutate.patch(agent.id, { status: "active", fields: { ...agent.fields, promotedBy: context.actor, promotedVersion: String(run.fields.contractVersion ?? "") } }, { expectRevision: agent.revision, event: `${agent.title} promoted after scoring ${score}` }))) return;
           context.toast("Promoted", `${agent.title} is active on the version that scored ${score}.`);
           close();
         }}
@@ -2250,10 +2250,10 @@ async function pauseAgent(context: ScreenContext): Promise<void> {
       return;
     }
   }
-  await context.mutate.patch(agent.id, {
+  if (!(await context.mutate.patch(agent.id, {
     status: paused ? "active" : "paused",
     fields: { ...agent.fields, pausedReason: paused ? "" : `Paused by ${context.actor}.` },
-  }, { expectRevision: agent.revision, event: `${agent.title} ${paused ? "resumed" : "paused"} by ${context.actor}` });
+  }, { expectRevision: agent.revision, event: `${agent.title} ${paused ? "resumed" : "paused"} by ${context.actor}` }))) return;
   context.toast(paused ? "Resumed" : "Paused", paused ? `${agent.title} is active again.` : `${agent.title} is excluded from tool execution and automatic delegation.`);
 }
 
@@ -2572,7 +2572,7 @@ async function deprecateSkill(context: ScreenContext): Promise<void> {
     context.toast("In use", `${users.map((agent) => agent.title).join(", ")} hold ${skill.title}. Remove it from them before deprecating it.`, "blocked");
     return;
   }
-  await context.mutate.patch(skill.id, { status: "deprecated", fields: { ...skill.fields, deprecatedBy: context.actor } }, { expectRevision: skill.revision, event: `${skill.title} deprecated by ${context.actor}` });
+  if (!(await context.mutate.patch(skill.id, { status: "deprecated", fields: { ...skill.fields, deprecatedBy: context.actor } }, { expectRevision: skill.revision, event: `${skill.title} deprecated by ${context.actor}` }))) return;
   context.toast("Deprecated", "It stays in the library marked deprecated and is not offered to a contract.");
 }
 
