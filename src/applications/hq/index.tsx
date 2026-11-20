@@ -1305,7 +1305,7 @@ function LocationForm({ context, close }: { context: ScreenContext; close: () =>
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <OverlayActions
     primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
-    secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
   />
 );
 

@@ -39,7 +39,7 @@ async function withTask(context: ScreenContext, what: string, then: (task: Rec) 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <OverlayActions
     primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
-    secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
   />
 );
 
@@ -349,7 +349,7 @@ function BatchReview({ context, close }: { context: ScreenContext; close: () => 
         >
           Move {candidates.length} tasks
         </Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -545,7 +545,7 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
         >
           Create the project
         </Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -567,7 +567,7 @@ function RevisionConfirm({ context, close }: { context: ScreenContext; close: ()
           context.toast("Revision published", "Existing projects are untouched.");
           close();
         }}>Publish the revision</Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -1225,7 +1225,7 @@ function CompletionFooter({ context, close }: { context: ScreenContext; close: (
           Mark complete
         </Button>
       }
-      secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      end={<Button variant="ghost" onClick={close}>Cancel</Button>}
     />
   );
 }

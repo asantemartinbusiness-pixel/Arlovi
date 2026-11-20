@@ -719,7 +719,7 @@ function SnoozePicker({ context, close }: { context: ScreenContext; close: () =>
         >
           Snooze until the chosen time
         </Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -789,7 +789,7 @@ function ActionPreview({ context, close }: { context: ScreenContext; close: () =
       </Field>
       <OverlayActions
         primary={<Button variant="primary" busy={busy} disabled={willChange.length === 0} onClick={() => void apply()}>{label} {willChange.length}</Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -1132,7 +1132,7 @@ function StepUpFooter({ context, close }: { context: ScreenContext; close: () =>
   return (
     <OverlayActions
       primary={<Button variant="primary" type="submit" form="ib-stepup" disabled={drifted}>Approve this action</Button>}
-      secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      end={<Button variant="ghost" onClick={close}>Cancel</Button>}
     />
   );
 }
@@ -2364,7 +2364,7 @@ function DigestAudience({ context, close }: { context: ScreenContext; close: () 
         >
           Save audience
         </Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -2402,7 +2402,7 @@ function DigestSchedule({ context, close }: { context: ScreenContext; close: () 
         >
           Save schedule
         </Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -2763,7 +2763,7 @@ function EscalationConflictOverlay({ context }: { context: ScreenContext }) {
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <OverlayActions
     primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
-    secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
   />
 );
 

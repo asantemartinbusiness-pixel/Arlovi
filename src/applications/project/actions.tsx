@@ -399,7 +399,7 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
         >
           Move the task
         </Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -589,7 +589,7 @@ export function DurationEdit({ context, close }: { context: ScreenContext; close
         >
           Change the duration
         </Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );
@@ -635,7 +635,7 @@ export function LinkProject({ context, close }: { context: ScreenContext; close:
           context.toast("Projects linked", `${objective.title} lists ${ids.length} contributing project${ids.length === 1 ? "" : "s"}.`);
           close();
         }}>Save the links</Button>}
-        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
       />
     </Stack>
   );

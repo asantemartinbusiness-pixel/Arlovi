@@ -131,11 +131,7 @@ function MissionLibrary({ context, view }: { context: ScreenContext; view: strin
               label: "Tag as priority",
               onRun: (selected) => {
                 void (async () => {
-                  let tagged = 0;
-                  for (const mission of selected) {
-                    const saved = await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, "priority"])] }, { expectRevision: mission.revision, event: `${mission.title} tagged priority` });
-                    if (saved) tagged += 1;
-                  }
+                  const tagged = await tagMissions(context, selected, "priority");
                   if (tagged > 0) context.toast("Tagged", `${tagged} of ${selected.length} mission${selected.length === 1 ? "" : "s"} tagged priority.`);
                 })();
               },
@@ -3218,6 +3214,16 @@ async function publishTemplate(context: ScreenContext): Promise<void> {
  * ====================================================================== */
 
 /** MISSION-001: tags the chosen missions. */
+/** Tags each mission against the revision it was read at; returns how many were saved (a stale one returns null and is not counted). */
+export async function tagMissions(context: Pick<ScreenContext, "mutate">, missions: Rec[], tag: string): Promise<number> {
+  let tagged = 0;
+  for (const mission of missions) {
+    const saved = await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag}` });
+    if (saved) tagged += 1;
+  }
+  return tagged;
+}
+
 function BulkTagMissions({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useMissionData();
   const missions = data.missions.filter((mission) => mission.status !== "archived");
@@ -3236,11 +3242,7 @@ function BulkTagMissions({ context, close }: { context: ScreenContext; close: ()
       <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={chosen.length === 0 || !tag.trim()} onClick={async () => {
           setBusy(true);
           try {
-            let tagged = 0;
-            for (const mission of missions.filter((item) => chosen.includes(item.id))) {
-              const saved = await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag.trim()])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag.trim()}` });
-              if (saved) tagged += 1;
-            }
+            const tagged = await tagMissions(context, missions.filter((item) => chosen.includes(item.id)), tag.trim());
             if (tagged === 0) return;
             context.toast(tagged === chosen.length ? "Tagged" : "Partly tagged", `${tagged} of ${chosen.length} mission${chosen.length === 1 ? "" : "s"} tagged ${tag.trim()}.${tagged < chosen.length ? " The rest changed elsewhere; reopen and try again." : ""}`, tagged === chosen.length ? "ok" : "blocked");
             close();

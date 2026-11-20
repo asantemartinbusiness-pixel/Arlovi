@@ -418,6 +418,9 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   const payloadId = (ctx.overlayPayload as { id?: unknown } | undefined)?.id;
   const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.params.id, ctx.selectedId].filter((id): id is string => Boolean(id));
   const requiredId = found.presentation?.selectedRecord ? ids[0] : undefined;
+  /* A "choose a record first" guard must not carry an enabled footer action. */
+  const guarded = Boolean(found.presentation?.selectedRecord && !requiredId);
+  const footer = guarded ? undefined : found.footer?.(overlayContext);
   const requiredCollection = found.presentation?.collection;
   const body = found.presentation?.selectedRecord && !requiredId
     ? <Notice tone="warning" title="Choose a record first">
@@ -447,7 +450,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   }
   if (found.kind === "drawer") {
     return (
-      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={description} origin={origin} head={recordContext} application={appCode} width={found.width ?? OVERLAY_WIDTH.compact} footer={found.footer?.(overlayContext)}>
+      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={description} origin={origin} head={recordContext} application={appCode} width={found.width ?? OVERLAY_WIDTH.compact} footer={footer}>
         {body}
       </Drawer>
     );
@@ -464,7 +467,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
       width={found.width ?? OVERLAY_WIDTH.modal}
       tone={found.tone}
       blocking={found.blocking}
-      footer={found.footer?.(overlayContext)}
+      footer={footer}
     >
       {body}
     </Modal>
