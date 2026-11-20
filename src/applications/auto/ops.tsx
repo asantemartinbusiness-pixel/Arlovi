@@ -865,6 +865,7 @@ export function RetryFromException({ context, close }: { context: ScreenContext;
   const workflow = useRecord(String(exception?.fields.workflowId ?? ""));
   const stored = readRun(run);
   const pool = useGraphRecords(stored?.graph ?? { nodes: [], edges: [] });
+  const liveBlocker = useLiveRunBlocker(context, workflow ?? undefined);
   const [busy, setBusy] = useState(false);
   if (!exception) return <Empty title="Choose an exception first" />;
   if (!workflow || !stored) {
@@ -873,6 +874,7 @@ export function RetryFromException({ context, close }: { context: ScreenContext;
   const providerCause = exception.fields.cause === "provider";
   return (
     <Stack gap={4}>
+      {liveBlocker && <Notice tone="danger" title="A retry cannot start">{liveBlocker}</Notice>}
       {providerCause && (
         <Notice tone="warning" title="A retry will stop in the same place">
           The cause was a provider boundary, which has not changed. The retry is still recorded, and the new run will show the same block, which is the honest result.
@@ -884,7 +886,8 @@ export function RetryFromException({ context, close }: { context: ScreenContext;
           primary={<Button
         variant="primary"
         busy={busy}
-        disabled={!context.can("run_automation")}
+        disabled={!context.can("run_automation") || Boolean(liveBlocker)}
+        title={liveBlocker}
         onClick={async () => {
           if (busy) return;
           setBusy(true);

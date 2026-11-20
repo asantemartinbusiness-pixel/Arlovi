@@ -162,6 +162,7 @@ export function RetrySafetyCheck({ context, close }: { context: ScreenContext; c
   const workflow = useRecord(run?.parentId ?? String(run?.fields.workflowId ?? ""));
   const stored = readRun(run);
   const pool = useGraphRecords(stored?.graph ?? { nodes: [], edges: [] });
+  const liveBlocker = useLiveRunBlocker(context, workflow);
   const [reconciled, setReconciled] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -176,7 +177,7 @@ export function RetrySafetyCheck({ context, close }: { context: ScreenContext; c
 
   const assessment = assessRetry(stored.result);
   const unknown = assessment.filter((item) => item.safety === "unknown");
-  const canRetry = Boolean(workflow) && (unknown.length === 0 || reconciled) && context.can("run_automation");
+  const canRetry = Boolean(workflow) && !liveBlocker && (unknown.length === 0 || reconciled) && context.can("run_automation");
 
   return (
     <Stack gap={4}>
@@ -184,6 +185,7 @@ export function RetrySafetyCheck({ context, close }: { context: ScreenContext; c
       <Notice tone={unknown.length ? "warning" : "success"} title={unknown.length ? `${unknown.length} step${unknown.length === 1 ? "" : "s"} need reconciling first` : "Every step in this run is safe to replay"}>
         A retry is offered only where the first outcome is known. A step that already wrote a record would write it again.
       </Notice>
+      {liveBlocker && <Notice tone="danger" title="A retry cannot start">{liveBlocker}</Notice>}
       <ReplayPlan assessment={assessment} />
       {unknown.length > 0 && (
         <Checkbox
@@ -200,7 +202,7 @@ export function RetrySafetyCheck({ context, close }: { context: ScreenContext; c
               icon={<RotateCcw size={15} />}
               busy={busy}
               disabled={!canRetry}
-              title={!workflow ? "The automation this run belongs to is not in this company" : !context.can("run_automation") ? "This role view does not run automations" : undefined}
+              title={liveBlocker ?? (!workflow ? "The automation this run belongs to is not in this company" : !context.can("run_automation") ? "This role view does not run automations" : undefined)}
               onClick={async () => {
                 if (!workflow || busy) return;
                 setBusy(true);
@@ -366,6 +368,8 @@ export function RunDetail({ context }: { context: ScreenContext }) {
   const events = useEvents(context.params.id);
   const pool = useGraphRecords(stored?.graph ?? { nodes: [], edges: [] });
   const [busy, setBusy] = useState(false);
+  const liveBlocker = useLiveRunBlocker(context, workflow);
+  const resumeBlocked = String(run?.fields.mode) === "dry" ? undefined : liveBlocker;
   const redact = !context.can("manage_connectors");
 
   if (!run) {
@@ -487,8 +491,8 @@ export function RunDetail({ context }: { context: ScreenContext }) {
                 <Button
                   variant="primary"
                   busy={busy}
-                  disabled={!workflow || !context.can("run_automation")}
-                  title={!context.can("run_automation") ? "This role view does not run automations" : undefined}
+                  disabled={!workflow || Boolean(resumeBlocked) || !context.can("run_automation")}
+                  title={resumeBlocked ?? (!context.can("run_automation") ? "This role view does not run automations" : undefined)}
                   onClick={async () => {
                     if (!workflow) return;
                     setBusy(true);
@@ -513,7 +517,8 @@ export function RunDetail({ context }: { context: ScreenContext }) {
                 <Button
                   variant="secondary"
                   busy={busy}
-                  disabled={!workflow}
+                  disabled={!workflow || Boolean(resumeBlocked)}
+                  title={resumeBlocked}
                   onClick={async () => {
                     if (!workflow) return;
                     setBusy(true);
@@ -630,6 +635,7 @@ export function ReplaySummary({ context }: { context: ScreenContext }) {
 export function ReplayConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const { run, stored, workflow } = useRunDetail(context);
   const pool = useGraphRecords(stored?.graph ?? { nodes: [], edges: [] });
+  const liveBlocker = useLiveRunBlocker(context, workflow);
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState(false);
   if (!run || !stored) {
@@ -648,6 +654,7 @@ export function ReplayConfirmation({ context, close }: { context: ScreenContext;
       <Notice tone={unknown.length ? "warning" : "info"} title="A replay starts a new run and keeps this one">
         It evaluates the graph again from the trigger against today&apos;s records. Nothing from this run is reused.
       </Notice>
+      {liveBlocker && <Notice tone="danger" title="A replay cannot start">{liveBlocker}</Notice>}
       <ReplayPlan assessment={assessment} />
       {unknown.length > 0 && (
         <Checkbox label="I accept that the record changes above would be made again" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />
@@ -659,8 +666,8 @@ export function ReplayConfirmation({ context, close }: { context: ScreenContext;
               variant="primary"
               busy={busy}
               icon={<RotateCcw size={15} />}
-              disabled={!workflow || (unknown.length > 0 && !accepted) || !context.can("run_automation")}
-              title={!workflow ? "The automation this run belongs to is not in this company" : !context.can("run_automation") ? "This role view does not run automations" : undefined}
+              disabled={!workflow || Boolean(liveBlocker) || (unknown.length > 0 && !accepted) || !context.can("run_automation")}
+              title={liveBlocker ?? !workflow ? "The automation this run belongs to is not in this company" : !context.can("run_automation") ? "This role view does not run automations" : undefined}
               onClick={async () => {
                 if (!workflow || busy) return;
                 setBusy(true);

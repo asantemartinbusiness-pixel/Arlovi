@@ -745,7 +745,8 @@ test("WF-11 Replenishment-to-payment: requisition, approval, purchase order, rec
 
   // AP bill and payment authorisation: a payable can be captured but never paid from here.
   await open(page, "/fin/bills", "Bills & Payables");
-  await expect(main(page).getByText("No bank mandate exists in this workspace.")).toBeVisible();
+  // A1: the boundary is now stated in the page lede ("No bank mandate exists here.").
+  await expect(main(page).getByText("No bank mandate exists here.")).toBeVisible();
   await action(page, "Capture a bill");
   await expect(dialog(page).getByText("Capture is manual here")).toBeVisible();
   await dialog(page).getByLabel("Bill number").fill("TBF-7781");

@@ -56,6 +56,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
   const runs = useCollection("workflowRuns");
   const pool = useGraphRecords(draft?.graph ?? { nodes: [], edges: [] });
   const [busy, setBusy] = useState<"dry" | "live" | null>(null);
+  const liveBlocker = useLiveRunBlocker(context, record);
 
   const issues = useMemo(
     () => (draft ? validateWorkflow(draft.graph, pool) : []),
@@ -184,8 +185,8 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
                 variant="primary"
                 icon={<Play size={15} />}
                 busy={busy === "live"}
-                disabled={errors.length > 0 || draft.dirty || !context.can("run_automation")}
-                title={errors.length > 0 ? "Fix the validation errors first" : draft.dirty ? "Save the graph before a live run" : !context.can("run_automation") ? "This role view does not run automations" : undefined}
+                disabled={errors.length > 0 || draft.dirty || !context.can("run_automation") || Boolean(liveBlocker)}
+                title={liveBlocker ?? (errors.length > 0 ? "Fix the validation errors first" : draft.dirty ? "Save the graph before a live run" : !context.can("run_automation") ? "This role view does not run automations" : undefined)}
                 onClick={async () => {
                   setBusy("live");
                   try {
@@ -208,6 +209,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
             </Row>
           }
         >
+          {liveBlocker && <Notice tone="warning" title="Live runs are off">{liveBlocker} A dry run still works.</Notice>}
           {dryRun ? (
             <Stack gap={4}>
               <RunHeadline run={dryRun} context={context} />
