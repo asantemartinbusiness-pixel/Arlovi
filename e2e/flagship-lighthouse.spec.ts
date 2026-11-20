@@ -11,7 +11,7 @@ test("Lighthouse casefile follows actual project records across applications",as
   await expect(page.locator(".lh-measure")).toContainText("£185,000");
   await expect(page.locator(".lh-gate-banner")).toContainText("No external project delivery or approval has been verified");
   await page.getByRole("button",{name:"Design & research"}).click();
-  await expect(page.locator(".lh-record")).toHaveCount(4);
+  await expect(page.locator(".lh-record")).toHaveCount(5);
   await expect(page.getByRole("link",{name:/Spatial concept boards/})).toHaveAttribute("href","/o/northline/design/files/nl-designs-911");
   await page.getByRole("button",{name:"Commercial"}).click();
   await expect(page.locator(".lh-record-grid")).toContainText("Deposit invoice");
