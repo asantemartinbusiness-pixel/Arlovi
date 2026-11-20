@@ -93,9 +93,9 @@ export default function FlagshipLighthouse(){
   const ready=Boolean(portal && portal.status==="live" && gates?.scopeReviewed && gates.clientApproved && gates.invitationSent && verifiedGates===allGates.length && allGates.length===5);
   const visible=RECORDS.filter(r=>r.section===tab);
   const value=(minor:number)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP",maximumFractionDigits:0}).format(minor/100);
-  if(org.slug!=="northline"||role==="client")return <div className="lh-not-authorised">
+  if(org.slug!=="collective"||role==="client")return <div className="lh-not-authorised">
     <LockKeyhole size={27}/><h1>Internal casefile unavailable</h1>
-    <p>This fictional casefile is only available in Northline's internal browser-local workspace. A Client role preview cannot inspect draft approvals or sourcing records.</p>
+    <p>This fictional casefile is only available in the independent Collective browser-local workspace. A Client role preview cannot inspect draft approvals or sourcing records.</p>
     <Link to={`/o/${org.slug}/workspace/home`}>Return to your workspace <ArrowRight size={16}/></Link>
   </div>;
   return <main className="lh">
