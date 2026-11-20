@@ -248,7 +248,8 @@ table.ds-table { width: 100%; border-collapse: separate; border-spacing: 0; font
 .ds-record-card { border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: var(--space-3); background: var(--bg-surface); text-align: start; width: 100%; display: flex; flex-direction: column; gap: 4px; }
 .ds-record-card[aria-selected="true"] { border-color: var(--accent-border); background: var(--bg-selected); box-shadow: inset 2px 0 0 var(--accent); }
 .ds-record-card-check { padding-inline: var(--space-1); min-height: 28px; }
-[data-checked="true"] > .ds-record-card { border-color: var(--accent-border); background: var(--bg-selected); }
+[data-checked="true"] > .ds-record-card,
+.ds-record-card[aria-current="true"] { border-color: var(--accent-border); background: var(--bg-selected); }
 
 /* ========== Empty / loading ========== */
 .ds-empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-7) var(--space-5); text-align: center; color: var(--fg-muted); }

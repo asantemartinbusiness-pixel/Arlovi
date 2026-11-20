@@ -746,7 +746,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
       <div className="dx-bar">
         <section className="dx-bar-main" aria-label="Document working status">
           <div className="dx-bar-title">
-            <h1 className="dx-bar-h1"><input
+            <h1 className="dx-bar-h1"><span className="ds-sr-only">{title || record.title}</span><input
               aria-label="Document title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}

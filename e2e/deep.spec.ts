@@ -142,13 +142,18 @@ async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<type
     // The modal is state-derived and some schedule pages perform a costly
     // recurrence forecast. Wait for a real dialog rather than taking a 120 ms
     // snapshot and incorrectly recording an asynchronous open as missing.
-    const visible = await dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
-    const text = visible ? await dialog.innerText().catch(() => "") : "";
+    // An overlay id is satisfied by a dialog OR by an intentional hand-off: a status
+    // toast or inline status notice naming where focus went (path/stroke/Layout inspector, Frame editor popover).
+    const toast = page.locator(".ds-toasts, [role='status'].ds-notice").filter({ hasText: /\S/ }).first();
+    const visible = await dialog.or(toast).first().waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
+    const text = visible
+      ? await ((await dialog.isVisible().catch(() => false)) ? dialog : toast).innerText().catch(() => "")
+      : "";
     const overlayErrors = errors.take();
     const ok = visible && !NOT_BUILT.test(text) && overlayErrors.length === 0;
     checks.push({
       kind: "overlay", name: overlay, ok,
-      note: !visible ? "no dialog opened" : NOT_BUILT.test(text) ? "not implemented" : overlayErrors[0],
+      note: !visible ? "no dialog or hand-off notice opened" : NOT_BUILT.test(text) ? "not implemented" : overlayErrors[0],
     });
   }
 

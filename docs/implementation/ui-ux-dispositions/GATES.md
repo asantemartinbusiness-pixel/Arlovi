@@ -240,3 +240,19 @@ Summary of the 11: 2 `regression introduced by the programme` (header-context-sa
 | Spec | Passed | Failed | Skipped | Pass 2 (workers=1) |
 |---|---|---|---|---|
 | deep.spec.ts | 31 | 4 | 0 | 4 deterministic |
+
+## Closing fixes
+
+| # | Item | Fix | Kind | Result |
+|---|---|---|---|---|
+| 1 | header-context-safety role radio Enter | `ProfileMenu.tsx`: Radix refocused the menu root on pointer-leave of the Preview item (focus stolen from the radios, flaky); suppressed it, and Enter/Space on role radios now share the click path incl. redirect | product | pass (6 repeats) |
+| 2 | MISSION Deliverables nested button | `data-grid.tsx`: custom mobile card is a keyboard-operable `role=group` div (not a button); plain cards unchanged | product | no console warning at 1440 and 390; deep MISSION pass |
+| 3 | DOCS h1 empty textContent | `docs/index.tsx`: `ds-sr-only` span with the title beside the input | product | contract "every approved screen" and deep DOCS pass |
+| 4 | deep DESIGN / LAYOUT overlays | `deep.spec.ts`: overlay satisfied by dialog OR toast / status notice hand-off; console-error check kept | spec stale | pass |
+| 5 | Finance Time inputs heading | asserts "Billable time queue" toolbar heading | spec stale | pass |
+| 6 | record hit label | `/Invoice · /` | spec stale | pass |
+| 7 | Workspace people | heading is "People & collaboration" | spec stale | pass |
+| 8 | ADMIN privacy register | counts now in Collection scope row as "members: 1 · ..." | spec stale | pass |
+| 9 | switching company | asserts "No language model is connected. Answers come from records in Harbor Supply, not from an AI model" | spec stale | pass |
+
+Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint clean; tsc 0 errors; registry-contract 4/4.

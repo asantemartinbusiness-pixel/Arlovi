@@ -57,7 +57,8 @@ test("Project Time has distinct, functional My time, Team, Costs and Approvals s
 test("Finance Time inputs exposes distinct review filters and a non-invoice status", async ({ page }) => {
   await page.goto("/o/northline/fin/invoices?tab=Time%20inputs");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "From recorded time to accountable billing." })).toBeVisible();
+  // The A1 pass removed the marketing-style heading; the page now opens on the metrics and the queue toolbar.
+  await expect(main.getByText("Billable time queue", { exact: true })).toBeVisible();
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   await expect(main).toContainText("Source records, not an invoice or revenue");
   await main.getByRole("button", { name: /Needs work \(/ }).click();

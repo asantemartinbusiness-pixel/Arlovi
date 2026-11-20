@@ -207,7 +207,8 @@ test("ADMIN privacy register counts each request only once every app's records a
   await expect(rowan).toContainText(/ERASURE\s*11/i);
   await rowan.getByText("Rowan Pike — erasure of personal data").click();
   await main(page).getByRole("button", { name: "Review request" }).click();
-  await expect(dialog(page).getByText("members 1 · employees 1 · payrollRuns 2 · leaveRequests 7")).toBeVisible();
+  // A7 rewrote the drawer: counts now sit in the "Collection scope" row as "collection: n".
+  await expect(dialog(page).getByText("members: 1 · employees: 1 · payrollRuns: 2 · leaveRequests: 7")).toBeVisible();
 });
 
 test.describe("mobile", () => {

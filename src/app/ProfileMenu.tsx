@@ -205,6 +205,9 @@ export function ProfileMenu({
           <DropdownMenu.Label className="profile-menu__label">Role view (not a security boundary)</DropdownMenu.Label>
           <DropdownMenu.Item className="profile-menu__item"
             aria-expanded={roleExpanded} aria-controls="profile-role-views"
+            // Radix refocuses the menu root when a mouse leaves an item (layout shifts
+            // from expanding the inline roles fire it), stealing focus from the radios.
+            onPointerLeave={event => event.preventDefault()}
             onKeyDown={event => {
               if (event.key === "ArrowRight") { event.preventDefault(); setRoleExpanded(true); }
               if (event.key === "ArrowLeft" && roleExpanded) { event.preventDefault(); setRoleExpanded(false); }
@@ -219,10 +222,19 @@ export function ProfileMenu({
           {roleExpanded && (
             <div id="profile-role-views" className="profile-menu__inline-roles">
               <DropdownMenu.Label className="profile-menu__label">Preview navigation as</DropdownMenu.Label>
-              <DropdownMenu.RadioGroup value={role}
-                onValueChange={value => { setRoleExpanded(false); onRoleViewChange(value as Role); }}>
+              <DropdownMenu.RadioGroup value={role}>
                 {ROLE_VIEWS.map(item => (
-                  <DropdownMenu.RadioItem className="profile-menu__item" key={item} value={item}>
+                  <DropdownMenu.RadioItem className="profile-menu__item" key={item} value={item}
+                    onPointerLeave={event => event.preventDefault()}
+                    // Enter/Space and click share one path so keyboard selection
+                    // switches the role view (and redirects) exactly like a click.
+                    onKeyDown={event => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault(); event.stopPropagation();
+                        setRoleExpanded(false); onRoleViewChange(item);
+                      }
+                    }}
+                    onSelect={() => { setRoleExpanded(false); onRoleViewChange(item); }}>
                     <span className="profile-menu__item-title">{ROLE_LABELS[item]}</span>
                     {item === role && <Check size={15} aria-hidden="true" className="profile-menu__selection"/>}
                   </DropdownMenu.RadioItem>

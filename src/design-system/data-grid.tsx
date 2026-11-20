@@ -259,21 +259,44 @@ export function DataGrid<T>({
                     <span className="ds-subtle">Select</span>
                   </label>
                 )}
-                <button
-                  type="button"
-                  className="ds-record-card"
-                  aria-pressed={bothModes ? id === selectedId : undefined}
-                  onClick={() => (bothModes ? onSelect?.(id) : onOpen ? onOpen(id) : onSelect?.(id))}
-                >
-                  {card ? card(row) : (
+                {(() => {
+                  const activate = () => (bothModes ? onSelect?.(id) : onOpen ? onOpen(id) : onSelect?.(id));
+                  const content = card ? card(row) : (
                     <>
                       <strong>{columns.find((column) => column.primary)?.cell(row) ?? columns[0].cell(row)}</strong>
                       <span className="ds-subtle ds-row ds-gap-2 ds-wrap">
                         {columns.slice(1, 3).map((column) => <span key={column.key}>{column.cell(row)}</span>)}
                       </span>
                     </>
-                  )}
-                </button>
+                  );
+                  // A custom card may hold its own action buttons, so its container
+                  // must not itself be a <button> (invalid nesting); it stays
+                  // keyboard-operable and keeps the row as its accessible name.
+                  if (card) {
+                    const primary = columns.find((column) => column.primary)?.cell(row);
+                    return (
+                      <div
+                        className="ds-record-card"
+                        role="group"
+                        tabIndex={0}
+                        aria-label={typeof primary === "string" ? primary : undefined}
+                        aria-current={bothModes && id === selectedId ? "true" : undefined}
+                        onClick={activate}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(); }
+                        }}
+                      >
+                        {content}
+                      </div>
+                    );
+                  }
+                  return (
+                    <button type="button" className="ds-record-card" aria-pressed={bothModes ? id === selectedId : undefined} onClick={activate}>
+                      {content}
+                    </button>
+                  );
+                })()}
                 {bothModes && id === selectedId && (
                   <Button size="sm" variant="secondary" onClick={() => onOpen?.(id)}>Open</Button>
                 )}
