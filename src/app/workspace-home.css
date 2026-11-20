@@ -92,3 +92,31 @@
 :root[data-theme="dark"] .wh-focus-card > a { color:#d5c4ff; }
 :root[data-theme="dark"] .wh-quick-grid > a > svg:first-child { background:#33294d; color:#cbb6ff; }
 @media(max-width:700px){.wh-hero::after{width:90px;inset-inline-end:18px}.wh-hero h1 em{text-decoration-thickness:3px;text-underline-offset:5px}}
+
+
+/* Northline's flagship is an opt-in story, not a replacement for normal work. */
+.wh-flagship-spotlight{margin:28px 0 8px;padding:35px clamp(25px,4vw,60px);background:#233a32;color:#f6eee3;border-radius:12px;position:relative;overflow:hidden;display:flex;gap:35px;justify-content:space-between;align-items:center}
+.wh-flagship-spotlight:after{content:"";position:absolute;width:210px;height:210px;border-radius:50%;background:linear-gradient(135deg,#d5ac82,#a66849 60%,#344b3f);right:20%;top:-130px;opacity:.65;pointer-events:none}
+.wh-flagship-spotlight>div,.wh-flagship-spotlight>a{z-index:1;position:relative}
+.wh-flagship-eyebrow{font-size:10px;letter-spacing:.17em;color:#e7c9ae;font-weight:700}
+.wh-flagship-spotlight h2{font:400 clamp(24px,3vw,38px) Georgia,serif;letter-spacing:-.045em;line-height:1.15;margin:12px 0}
+.wh-flagship-spotlight h2 em{color:#e4ac85}
+.wh-flagship-spotlight p{max-width:630px;font-size:13px;line-height:1.65;color:#e3e1d7}
+.wh-flagship-spotlight>a{background:#f0e5d4;color:#21382f;border-radius:6px;min-height:47px;padding:12px 17px;display:inline-flex;align-items:center;gap:12px;white-space:nowrap;font-size:12px;font-weight:700;text-decoration:none}
+.wh-flagship-spotlight>a:hover{background:white}
+.wh-flagship-spotlight>a:focus-visible{outline:3px solid #d5ac82;outline-offset:4px}
+@media(max-width:760px){.wh-flagship-spotlight{align-items:flex-start;flex-direction:column}.wh-flagship-spotlight>a{width:100%;justify-content:space-between}}
+@media(prefers-reduced-motion:reduce){.wh-flagship-spotlight *{transition:none!important}}
+
+
+/* Northline-only flagship invitation: match its paper/acid identity without
+   changing Arlovi's global workspace design or unrelated tenants. */
+.wh-flagship-spotlight{background:#f3f0e8;color:#151515;border:1px solid #151515;border-radius:0}
+.wh-flagship-spotlight:after{border-radius:0;background:#7e57ff;transform:rotate(-19deg);opacity:1;width:170px;height:360px;right:16%;top:-120px}
+.wh-flagship-spotlight:before{content:"";position:absolute;width:145px;height:145px;border-radius:50%;background:#dfff3f;right:8%;bottom:-70px;z-index:0}
+.wh-flagship-eyebrow{font-family:"DM Mono","Courier New",monospace;font-weight:400;letter-spacing:.12em;color:#4f4d48}
+.wh-flagship-spotlight h2{font-family:Manrope,Arial,sans-serif;font-weight:700;letter-spacing:-.06em}
+.wh-flagship-spotlight h2 em{font-family:Newsreader,Georgia,serif;font-style:italic;font-weight:500;color:#151515}
+.wh-flagship-spotlight p{color:#4f4d48}
+.wh-flagship-spotlight>a{background:#dfff3f;color:#151515;border:1px solid #151515;border-radius:0;box-shadow:none}
+.wh-flagship-spotlight>a:hover{background:#151515;color:white}

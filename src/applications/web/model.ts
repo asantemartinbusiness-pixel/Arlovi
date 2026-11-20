@@ -46,7 +46,7 @@ export interface Page {
 }
 
 export interface Theme {
-  font: "Inter" | "Source Serif" | "IBM Plex Mono";
+  font: "Inter" | "Source Serif" | "IBM Plex Mono" | "Manrope" | "Newsreader" | "DM Mono";
   accent: string;
   ink: string;
   paper: string;
@@ -245,7 +245,7 @@ export function readSite(record: Rec | undefined): SiteModel {
   return {
     pages: live,
     theme: {
-      font: ["Inter", "Source Serif", "IBM Plex Mono"].includes(str(theme.font)) ? (str(theme.font) as Theme["font"]) : DEFAULT_THEME.font,
+      font: ["Inter", "Source Serif", "IBM Plex Mono", "Manrope", "Newsreader", "DM Mono"].includes(str(theme.font)) ? (str(theme.font) as Theme["font"]) : DEFAULT_THEME.font,
       accent: str(theme.accent, DEFAULT_THEME.accent),
       ink: str(theme.ink, DEFAULT_THEME.ink),
       paper: str(theme.paper, DEFAULT_THEME.paper),
@@ -377,6 +377,9 @@ const FONT_STACKS: Record<Theme["font"], string> = {
   Inter: "Inter, system-ui, sans-serif",
   "Source Serif": "'Source Serif 4', Georgia, serif",
   "IBM Plex Mono": "'IBM Plex Mono', ui-monospace, monospace",
+  Manrope: "Manrope, Arial, sans-serif",
+  Newsreader: "Newsreader, Georgia, serif",
+  "DM Mono": "'DM Mono', ui-monospace, monospace",
 };
 
 export function themeCss(theme: Theme): string {
@@ -450,7 +453,15 @@ export function blockHtml(block: Block): string {
   }
 }
 
+const FONT_STYLESHEETS: Partial<Record<Theme["font"], string>> = {
+  Manrope: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap",
+  Newsreader: "https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&display=swap",
+  "DM Mono": "https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap",
+};
+
 export function pageHtml(site: SiteModel, page: Page): string {
+  const fontUrl = FONT_STYLESHEETS[site.theme.font];
+
   const nav = site.nav.header.length
     ? `<nav class="site">${site.nav.header.map((link) => {
       const anchor = (item: NavLink) => `<a href="${escapeHtml(item.target)}"${item.kind === "external" ? ' rel="noreferrer"' : ""}>${escapeHtml(item.label)}</a>`;
@@ -465,6 +476,7 @@ export function pageHtml(site: SiteModel, page: Page): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(page.seo.title || page.name)}</title>
+${fontUrl ? `<link rel="stylesheet" href="${escapeHtml(fontUrl)}">\n` : ""}
 ${page.seo.description ? `<meta name="description" content="${escapeHtml(page.seo.description)}">\n` : ""}${page.seo.noindex || site.seo.robots === "noindex" ? '<meta name="robots" content="noindex">\n' : ""}<style>${themeCss(site.theme)}</style>
 </head>
 <body>

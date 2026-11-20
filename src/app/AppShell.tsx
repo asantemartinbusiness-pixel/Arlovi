@@ -226,13 +226,29 @@ export function AppShell() {
   const activePreference = data.preferences.find((item) => item.fields.app === APP_ENTRIES[activeCode]?.short);
   const activePinned = activePreference?.fields.pinned === true;
 
+  // Keep the Client app catalogue available as a filtered directory, but
+  // never strand a Client perspective on an inaccessible native application.
+  // This is local navigation simulation, not authenticated access control.
+  useEffect(() => {
+    if(role!=="client")return;
+    const code=location.pathname.split("/")[3]??"";
+    const inCatalogue=location.pathname===workAreaPath(org.slug,"apps");
+    if(inCatalogue||["portal","care","book"].includes(code))return;
+    const destination=appEntry("PORTAL",org.slug);
+    if(location.pathname!==destination)navigate(destination,{replace:true});
+  },[role,location.pathname,org.slug,navigate]);
+
   function chooseRoleView(nextRole: Role) {
+    const code=location.pathname.split("/")[3]??"";
+    const inCatalogue=location.pathname===workAreaPath(org.slug,"apps");
+    const clientCanStay=inCatalogue||(["portal","care","book"].includes(code)
+      &&(!activeScreen||canOpenLegacyScreen("client",activeScreen)));
+    const destination=nextRole==="client"
+      ?(!clientCanStay?appEntry("PORTAL",org.slug):null)
+      :(activeScreen&&!canOpenLegacyScreen(nextRole,activeScreen)
+        ?workAreaPath(org.slug,"home"):null);
     ui.setRole(nextRole);
-    // A role view is not authentication. Avoid stranding the user on a
-    // native application hidden by the new local navigation perspective.
-    if (activeScreen && !canOpenLegacyScreen(nextRole, activeScreen)) {
-      navigate(nextRole === "client" ? appEntry("PORTAL", org.slug) : workAreaPath(org.slug, "home"));
-    }
+    if(destination&&destination!==location.pathname)navigate(destination,{replace:true});
   }
 
   async function toggleFavourite() {

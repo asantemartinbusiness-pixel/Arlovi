@@ -180,7 +180,7 @@ export function PageView({
 }) {
   const page = site.pages.find((item) => item.id === pageId) ?? site.pages[0];
   return (
-    <div className="t6-render" style={{ background: site.theme.paper, color: site.theme.ink, fontFamily: site.theme.font === "Inter" ? "Inter, sans-serif" : site.theme.font === "Source Serif" ? "Georgia, serif" : "ui-monospace, monospace" }}>
+    <div className="t6-render" style={{ background: site.theme.paper, color: site.theme.ink, fontFamily: ({ Inter: "Inter, sans-serif", "Source Serif": "Georgia, serif", "IBM Plex Mono": "ui-monospace, monospace", Manrope: "Manrope, Arial, sans-serif", Newsreader: "Newsreader, Georgia, serif", "DM Mono": "'DM Mono', ui-monospace, monospace" })[site.theme.font] }}>
       <SiteNavView site={site} width={width} />
       {page.blocks.map((block) => (
         <BlockView

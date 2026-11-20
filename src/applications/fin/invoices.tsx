@@ -402,7 +402,7 @@ export function InvoiceHeader({ context }: { context: ScreenContext }) {
 
 export function InvoiceOverview({ context }: { context: ScreenContext }) {
   const { invoice, data, totals, customer } = useInvoice(context);
-  const { org } = useWorkspace();
+  const { org, role } = useWorkspace();
   if (!invoice) return <Empty title="No invoice selected" />;
   const status = statusFor(invoice, customer);
   const paid = invoice.status === "paid" ? totals.grossMinor : Math.max(0, Number(invoice.fields.paidMinor ?? 0));
@@ -410,6 +410,21 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
+      {invoice.fields.fictional === true && (
+        <Card prov="human" span={12} title="Fictional financial draft — not posted">
+          <Stack gap={2}>
+            <Notice tone="warning" title="No real invoice, cash receipt or recognised revenue">
+              This record belongs to a local business simulation. Its amount is an illustrative draft,
+              not evidence of invoice issue, payment, tax submission or ledger posting.
+            </Notice>
+            {invoice.id === "nl-invoices-900" && role !== "client" && (
+              <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/workspace/showcase/lighthouse`)}>
+                Follow Lighthouse's linked project casefile
+              </Button>
+            )}
+          </Stack>
+        </Card>
+      )}
       <Card prov="human" span={5} title="Customer and billing" subtitle={customer ? String(customer.fields.email ?? "") : "No contact record is linked"}>
         {customer ? (
           <Stack gap={3}>
@@ -431,11 +446,11 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card prov="posted" span={4} title="Tax" subtitle={`${org.jurisdiction} rules at ${context.date(documentDate(invoice, context.now))}`}>
+      <Card prov={invoice.fields.fictional === true ? "human" : "posted"} span={4} title="Tax" subtitle={`${org.jurisdiction} rules at ${context.date(documentDate(invoice, context.now))}`}>
         <TaxSummary totals={totals} context={context} />
       </Card>
 
-      <Card prov="posted" span={3} title="Totals">
+      <Card prov={invoice.fields.fictional === true ? "human" : "posted"} span={3} title="Totals">
         <StatementRow
           context={context}
           rows={[
@@ -450,7 +465,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
         />
       </Card>
 
-      <Card prov="posted" span={6} title="Ledger posting" subtitle={journal ? "This invoice is on the ledger" : "Nothing has been posted yet"}>
+      <Card prov={invoice.fields.fictional === true ? "human" : "posted"} span={6} title="Ledger posting" subtitle={journal ? "This invoice is on the ledger" : "Nothing has been posted yet"}>
         {journal ? (
           <Stack gap={3}>
             <Properties rows={[
@@ -468,7 +483,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card prov="posted" span={6} title="Versions" subtitle="An issued invoice is immutable; each change is a version">
+      <Card prov={invoice.fields.fictional === true ? "human" : "posted"} span={6} title="Versions" subtitle="An issued invoice is immutable; each change is a version">
         <InvoiceVersions invoice={invoice} context={context} />
       </Card>
     </Grid>

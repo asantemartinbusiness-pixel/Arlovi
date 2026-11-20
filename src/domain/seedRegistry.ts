@@ -37,11 +37,19 @@ export interface SeedRecordInput {
 
 type Contributor = (context: SeedContext) => { records: Rec[]; events?: Audit[] };
 
-const CONTRIBUTORS: { key: string; run: Contributor }[] = [];
+interface ContributorOptions { organizationId?: string; }
+const CONTRIBUTORS: { key: string; run: Contributor; options?: ContributorOptions }[] = [];
+function scoped(result: { records: Rec[]; events?: Audit[] }, options?: ContributorOptions) {
+  if (!options?.organizationId) return result;
+  return {
+    records: result.records.map(record => ({ ...record, organizationId: options.organizationId! })),
+    events: (result.events ?? []).map(event => ({ ...event, organizationId: options.organizationId! })),
+  };
+}
 
-export function registerSeed(key: string, run: Contributor): void {
+export function registerSeed(key: string, run: Contributor, options?: ContributorOptions): void {
   if (CONTRIBUTORS.some((item) => item.key === key)) return;
-  CONTRIBUTORS.push({ key, run });
+  CONTRIBUTORS.push({ key, run, options });
 }
 
 function makeContext(now: string): SeedContext {
@@ -86,7 +94,7 @@ function seedContext(now: string): SeedContext {
 export function collectSeedsByContributor(now: string): { key: string; records: Rec[]; events: Audit[] }[] {
   const context = seedContext(now);
   return CONTRIBUTORS.map((contributor) => {
-    const result = contributor.run(context);
+    const result = scoped(contributor.run(context), contributor.options);
     return { key: contributor.key, records: result.records, events: result.events ?? [] };
   });
 }
@@ -96,7 +104,7 @@ export function collectSeeds(now: string): { records: Rec[]; events: Audit[] } {
   const records: Rec[] = [];
   const events: Audit[] = [];
   for (const contributor of CONTRIBUTORS) {
-    const result = contributor.run(context);
+    const result = scoped(contributor.run(context), contributor.options);
     records.push(...result.records);
     if (result.events) events.push(...result.events);
   }

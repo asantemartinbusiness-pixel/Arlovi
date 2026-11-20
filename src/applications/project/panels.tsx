@@ -253,7 +253,7 @@ export function ProjectDirectory({ context, lens }: { context: ScreenContext; le
 export function ProjectOverview({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useProjectData();
   const record = useRecord(context.params.id);
-  const { org, now } = useWorkspace();
+  const { org, now, role } = useWorkspace();
   // A stale/wrong-company detail URL must never display the first project.
   const project = context.params.id
     ? (record?.collection === "projects" && record.organizationId === org.id ? record : undefined)
@@ -352,8 +352,11 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
         <Card span={6} eyebrow="WORK" prov="human" title="Work by stage">
           <DonutChart title="Tasks by stage" size={150} points={LANES.map((lane) => ({ label: lane.label, value: tasks.filter((task) => stageOf(task) === lane.id).length })).filter((point) => point.value > 0)} />
         </Card>
-        <Card span={12} eyebrow="BUDGET" prov="posted" title="Budget">
+        <Card span={12} eyebrow="BUDGET" prov={project.fields.fictional === true ? "human" : "posted"} title="Budget">
           <Stack gap={3}>
+            {project.fields.fictional === true && <Notice tone="warning" title="Illustrative project budget">
+              This amount is a proposed planning figure. It is not a posted expense, accepted contract or recognised revenue.
+            </Notice>}
             <Meter value={Number(project.fields.spentMinor ?? 0)} max={Math.max(1, Number(project.fields.budgetMinor ?? 0))} label="Budget used" tone={Number(project.fields.spentMinor ?? 0) > Number(project.fields.budgetMinor ?? 0) ? "danger" : undefined} />
             <Properties rows={[
               { label: "Budget", value: context.money(Number(project.fields.budgetMinor ?? 0)) },
@@ -378,6 +381,18 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
             { label: "Priority", value: String(project.fields.priority ?? "normal") },
             { label: "Status", value: project.status },
           ]} />
+          {project.id === "nl-projects-900" && role !== "client" && (
+            <Notice tone="info" title="Lighthouse / connected project casefile">
+              Follow the fictional 45-room lighting concept across CRM, editable design, three prepared client-review documents,
+              five pending approvals, draft sourcing and commercial records. No external customer approval, supplier order,
+              invoice payment or project handover is represented as complete.
+              <div style={{marginBlockStart:12}}>
+                <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/workspace/showcase/lighthouse`)}>
+                  Open cross-application casefile
+                </Button>
+              </div>
+            </Notice>
+          )}
           <Meter value={progressOf(tasks)} max={100} label="Project progress" tone={project.fields.health === "off_track" ? "danger" : undefined} />
           {project.fields.automationPaused === true && (
             <Notice tone="warning" title="Automation is paused for this project">

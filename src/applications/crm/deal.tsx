@@ -133,7 +133,7 @@ function BudgetConfirmation({ context, deal }: { context: ScreenContext; deal: R
 
 export function DealOverview({ context }: { context: ScreenContext }) {
   const { deal, data } = useDeal(context);
-  const { org, now } = useWorkspace();
+  const { org, now, role } = useWorkspace();
   if (!deal) return <Empty title="No deal selected" />;
 
   const contact = contactOfDeal(data, deal);
@@ -150,6 +150,18 @@ export function DealOverview({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
+      {deal.id === "nl-deals-910" && role !== "client" && (
+        <Card span={12} eyebrow="NORTHLINE COLLECTIVE / LIGHTHOUSE" prov="human" title="One client brief. One connected project.">
+          <Stack gap={2}>
+            <p>Explore the fictional hospitality engagement from proposal through editable concept boards, restricted
+              client review, material selection and draft commercial records. No external approval or sale is asserted.</p>
+            <Row gap={2}>
+              <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/workspace/showcase/lighthouse`)}>Open connected Lighthouse casefile</Button>
+              <Button variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/project/projects/nl-projects-900`)}>Open delivery project</Button>
+            </Row>
+          </Stack>
+        </Card>
+      )}
       <Card prov="human" span={4} title="Progress" subtitle={`${stage.label} at ${probabilityOf(deal)}%`}>
         <Stack gap={3}>
           <Meter value={stageIndex(stage.id) + 1} max={STAGES.length} label={`${deal.title} stage`} tone={stage.kind === "lost" ? "danger" : stage.kind === "won" ? "success" : undefined} />
