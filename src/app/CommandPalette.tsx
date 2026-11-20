@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight, ArrowUpRight, Bookmark, BookmarkCheck, CornerUpLeft,
@@ -273,10 +273,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   }, [candidates, query, scope, currentApp, org.slug, remoteConfigured, remoteSearch]);
 
   useEffect(() => { setIndex(0); }, [query, scope]);
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // Focus and the Escape listener are in place before the dialog paints, so a
+  // key pressed the moment it appears is never lost to the page behind it.
+  useLayoutEffect(() => { inputRef.current?.focus(); }, []);
   // Capture Escape before the browser's native search-field clear behaviour
   // can consume it; this also covers focused preview/scoping controls.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();

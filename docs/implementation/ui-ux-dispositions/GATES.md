@@ -292,3 +292,8 @@ Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint c
   client dashboard read 7, then 8, as other applications' records landed in the background. Portal screens and
   overlays now use the same fixtures-ready gate as Analytics (the gate now also wraps overlays). Re-runs: portal,
   analytics, growth and journey specs 65/65, deep PORTAL/ANALYTICS pass, native overlays 21/21, Browser QA 306/306.
+- `ci.yml` on 23641fc: 626 pass, 2 fail. (1) a11y "command palette": Escape sometimes arrived before the palette
+  had moved focus in and attached its Escape listener (both ran after paint); reproduced 1 in 8 locally. Both now
+  run before paint; 30/30 repeats and 56/56 across a11y, header and search suites. (2) WF-06 clicking a candidate
+  did not leave Recruitment; not reproduced locally (17/17, including 12 at four workers). The candidate card is a
+  plain navigating button and the screen host's URL writes were checked; left open pending a repeat in CI.
