@@ -243,7 +243,22 @@ export function DataGrid<T>({
             {visible.map((row) => {
               const id = rowId(row);
               return (
-                <div key={id} className="ds-stack ds-gap-1">
+                <div key={id} className="ds-stack ds-gap-1" data-checked={bulkActions && checked.has(id) ? "true" : undefined}>
+                {bulkActions && (
+                  <label className="ds-check ds-record-card-check">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select row ${id}`}
+                      checked={checked.has(id)}
+                      onChange={(event) => setChecked((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(id); else next.delete(id);
+                        return next;
+                      })}
+                    />
+                    <span className="ds-subtle">Select</span>
+                  </label>
+                )}
                 <button
                   type="button"
                   className="ds-record-card"
