@@ -38,7 +38,7 @@ const textStyles = [
   {id:"type-kicker",name:"Label / 14",family:"DM Mono",size:14,weight:400,lineHeight:1.3,letterSpacing:2},
   {id:"type-copy",name:"Body / 22",family:"Manrope",size:22,weight:400,lineHeight:1.4,letterSpacing:0},
 ];
-const page = (id:string,name:string,width:number,height:number,children:SceneNode[],background=C.paper):ScenePage => {
+const page = (id:string,name:string,width:number,height:number,children:SceneNode[],background:string=C.paper):ScenePage => {
   const frameId=id+"-frame";
   const artboard=N(frameId,"frame",name+" — artboard",0,0,width,height,{fill:{type:"solid",color:background},radius:0});
   return {
