@@ -282,7 +282,7 @@ export function QualityPanel({ context }: { context: ScreenContext }) {
   );
 }
 
-export function GrantReview({ context }: { context: ScreenContext }) {
+export function GrantReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const datasets = useDatasets();
   const dataset = datasets.find((row) => row.collection === context.selectedId) ?? datasets[0];
   return (
@@ -299,6 +299,9 @@ export function GrantReview({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="Privacy constraints that are respected">
         A contact without a recorded consent cannot be added to a report audience, and a dashboard marked sensitive does not show its figures in a preview to anyone but its owner.
       </Notice>
+      <ModalActions>
+        <OverlayActions primary={<Button variant="primary" onClick={close}>Close</Button>} />
+      </ModalActions>
     </Stack>
   );
 }
@@ -690,7 +693,7 @@ export function FormulaEditor({ context, close }: { context: ScreenContext; clos
   );
 }
 
-export function ImpactReview({ context }: { context: ScreenContext }) {
+export function ImpactReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const definitions = useCollection("metricDefinitions");
   const dashboards = useCollection("dashboards");
   const reports = useCollection("reports");
@@ -727,8 +730,8 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
           ? "Nothing reads this measure yet, so a change has no historical effect."
           : `${[...affectedDashboards, ...affectedReports].map((item) => item.title).join(", ")} would recompute under the new definition. The figures they showed before were computed under v${String(definition.fields.version ?? 1)}; the version record keeps what that meant.`}
       </Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           disabled={definition.status === "approved" || !context.can("manage_policy")}
           title={!context.can("manage_policy") ? "Approving a definition needs the Owner view" : undefined}
@@ -741,8 +744,7 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
           }}
         >
           Approve this version
-        </Button>
-        <Button
+        </Button>} secondary={<Button
           variant="secondary"
           onClick={async () => {
             const next = Number(definition.fields.version ?? 1) + 1;
@@ -755,8 +757,8 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
           }}
         >
           Record a new version
-        </Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Close</Button>} />
+</ModalActions>
     </Stack>
   );
 }

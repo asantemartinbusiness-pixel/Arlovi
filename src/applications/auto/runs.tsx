@@ -15,6 +15,10 @@ import { executeRun, useGraphRecords, LiveRunRefused, useLiveRunBlocker } from "
 
 export type RunTab = "All" | "Running" | "Failed" | "Completed" | "Waiting";
 
+/** Older seeded runs say "succeeded"; it means the same as the interpreter's "completed". */
+const isCompleted = (status: string) => status === "completed" || status === "succeeded";
+const statusLabel = (status: string) => (isCompleted(status) ? "Completed" : RUN_STATUS_LABELS[status as RunStatus] ?? status.replace(/_/g, " "));
+
 function outcomeSummary(run: Rec, stored?: StoredRun): string {
   if (!stored) return run.summary || "No step trace was stored for this run.";
   const ok = stored.result.steps.filter((step) => step.status === "ok").length;
@@ -37,10 +41,13 @@ export function RunHistory({ context, tab }: { context: ScreenContext; tab: RunT
   const filtered = useMemo(() => {
     if (tab === "Running") return rows.filter((row) => row.run.status === "running");
     if (tab === "Failed") return rows.filter((row) => row.run.status === "failed");
-    if (tab === "Completed") return rows.filter((row) => row.run.status === "completed");
+    if (tab === "Completed") return rows.filter((row) => isCompleted(row.run.status));
     if (tab === "Waiting") return rows.filter((row) => ["waiting_approval", "blocked"].includes(row.run.status));
     return rows;
   }, [rows, tab]);
+
+  const hasTrigger = rows.some((row) => Boolean(row.stored?.trigger ?? row.run.fields.trigger));
+  const hasAttempts = rows.some((row) => row.run.fields.attempts !== undefined || row.stored);
 
   if (rows.length === 0) {
     return (
@@ -64,7 +71,7 @@ export function RunHistory({ context, tab }: { context: ScreenContext; tab: RunT
       {tab === "All" && (
         <StatRow>
           <Stat prov="agent" label="Runs recorded" value={String(rows.length)} meta={`${workflows.length} automations`} />
-          <Stat prov="agent" label="Completed" value={String(rows.filter((row) => row.run.status === "completed").length)} meta="Every step on the path finished" />
+          <Stat prov="agent" label="Completed" value={String(rows.filter((row) => isCompleted(row.run.status)).length)} meta="Every step on the path finished" />
           <Stat prov="human" label="Waiting on a person" value={String(rows.filter((row) => row.run.status === "waiting_approval").length)} meta="Paused at an approval gate" />
           <Stat prov="unknown" label="Stopped at a provider" value={String(rows.filter((row) => row.run.status === "blocked" || Number(row.run.fields.blocked ?? 0) > 0).length)} meta="Recorded as not run" />
         </StatRow>
@@ -85,16 +92,16 @@ export function RunHistory({ context, tab }: { context: ScreenContext; tab: RunT
               key: "id", header: "Run", primary: true,
               cell: (row) => (
                 <div>
-                  <code className="ds-num" style={{ fontSize: "var(--text-xs)" }}>{row.run.id}</code>
+                  <strong>{row.run.title}</strong>
                   <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{row.stored?.workflowTitle ?? workflows.find((item) => item.id === row.run.parentId)?.title ?? "Unknown automation"}</p>
                 </div>
               ),
               filterValue: (row) => `${row.run.id} ${row.run.title} ${row.stored?.workflowTitle ?? ""}`,
-              sortValue: (row) => row.run.id,
+              sortValue: (row) => row.run.title,
             },
-            { key: "trigger", header: "Trigger", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{row.stored?.trigger ?? String(row.run.fields.trigger ?? "—")}</span>, hideBelow: 1100 },
-            { key: "status", header: "Status", cell: (row) => <Pill tone={row.run.status === "completed" ? "success" : row.run.status === "failed" ? "danger" : "warning"} dot>{RUN_STATUS_LABELS[row.run.status as RunStatus] ?? row.run.status}</Pill>, sortValue: (row) => row.run.status },
-            { key: "attempts", header: "Attempts", align: "end", cell: (row) => String(row.run.fields.attempts ?? row.stored?.result.steps.reduce((total, step) => total + step.attempts.length, 0) ?? "—"), hideBelow: 900 },
+            ...(hasTrigger ? [{ key: "trigger", header: "Trigger", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{row.stored?.trigger ?? String(row.run.fields.trigger ?? "—")}</span>, hideBelow: 1100 }] : []),
+            { key: "status", header: "Status", cell: (row) => <Pill tone={isCompleted(row.run.status) ? "success" : row.run.status === "failed" ? "danger" : "warning"} dot>{statusLabel(row.run.status)}</Pill>, sortValue: (row) => row.run.status },
+            ...(hasAttempts ? [{ key: "attempts", header: "Attempts", align: "end", cell: (row) => String(row.run.fields.attempts ?? row.stored?.result.steps.reduce((total, step) => total + step.attempts.length, 0) ?? "—"), hideBelow: 900 }] : []),
             { key: "timing", header: "Started", align: "end", cell: (row) => <span>{context.dateTime(row.run.at)}<br /><span className="ds-subtle ds-num" style={{ fontSize: "var(--text-xs)" }}>{row.run.fields.durationMs ?? 0} ms</span></span>, sortValue: (row) => row.run.at ?? "" },
             { key: "worker", header: "Worker", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{String(row.run.fields.worker ?? "local-interpreter")}</span>, hideBelow: 1300 },
             { key: "outcome", header: "Outcomes", cell: (row) => <span style={{ fontSize: "var(--text-xs)" }}>{outcomeSummary(row.run, row.stored)}</span> },
@@ -108,7 +115,7 @@ export function RunHistory({ context, tab }: { context: ScreenContext; tab: RunT
 /* ------------------------------ 006 overlays ------------------------------ */
 
 function runTone(status: string) {
-  return status === "completed" ? "success" as const : status === "failed" ? "danger" as const : "warning" as const;
+  return isCompleted(status) ? "success" as const : status === "failed" ? "danger" as const : "warning" as const;
 }
 
 /** Identity block for the run inspector drawer (OverlayDef.summary). */

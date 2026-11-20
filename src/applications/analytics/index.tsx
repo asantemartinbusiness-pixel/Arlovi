@@ -1,5 +1,5 @@
 import { Activity, Database, GitMerge, LayoutDashboard, LineChart, Ruler, Send, Sparkles } from "lucide-react";
-import { Button, Notice, OVERLAY_WIDTH, OverlayActions, Pill } from "@/design-system";
+import { Button, Notice, OVERLAY_WIDTH, OverlayActions, OverlaySummary, Pill } from "@/design-system";
 import type { RecordHeaderProps } from "@/design-system";
 import { knownRecord } from "@/platform/repo";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -75,6 +75,13 @@ function recordHead(context: ScreenContext, collection: string, eyebrow: string)
     meta: [record.ownerName ? `Owner ${record.ownerName}` : undefined, record.fields.shared === true ? "Shared with the workspace" : "Private to its owner"],
   };
 }
+
+/** Overlay identity for the dashboard or report in the address, so the head names the right kind of record. */
+const recordSummary = (collection: string, eyebrow: string) => (context: ScreenContext) => {
+  const record = knownRecord(context.params.id);
+  if (!record || record.collection !== collection) return null;
+  return <OverlaySummary eyebrow={eyebrow} title={record.title} status={<Pill tone={record.status === "published" ? "success" : "neutral"} dot>{record.status}</Pill>} />;
+};
 
 export const analyticsApp = registerApp({
   code: "ANALYTICS",
@@ -187,7 +194,7 @@ export const analyticsApp = registerApp({
       tabs: ["Layout", "Data", "Style", "Access"].map((tab) => ({ id: tab, render: () => null })),
       surface: (context) => <DashboardEditor context={context} />,
       actions: [
-        { id: "Drag widget", label: "Place a tile", placement: "primary", run: (context) => context.openOverlay("Widget chooser") },
+        { id: "Drag widget", label: "Add a tile", placement: "primary", run: (context) => context.openOverlay("Widget chooser") },
         { id: "resize", label: "Resize a tile", placement: "secondary", run: (context) => context.openOverlay("resize tile") },
         { id: "set filter", label: "Set a filter", placement: "secondary", run: (context) => context.openOverlay("set filter") },
         {
@@ -232,11 +239,11 @@ export const analyticsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Widget chooser", kind: "modal", title: "Add a tile", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <WidgetChooser context={context} close={close} /> },
-        { id: "query editor", kind: "drawer", title: "The query behind this tile", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <QueryEditor context={context} /> },
+        { id: "Widget chooser", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "Add a tile", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <WidgetChooser context={context} close={close} /> },
+        { id: "query editor", kind: "drawer", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "The query behind this tile", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <QueryEditor context={context} /> },
         { id: "share", kind: "modal", title: "Sharing", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
-        { id: "resize tile", kind: "modal", title: "Resize a tile", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ResizeTile context={context} close={close} /> },
-        { id: "set filter", kind: "modal", title: "Dashboard filters", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <SetFilter context={context} close={close} /> },
+        { id: "resize tile", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "Resize a tile", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ResizeTile context={context} close={close} /> },
+        { id: "set filter", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "Dashboard filters", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <SetFilter context={context} close={close} /> },
       ],
     },
 
@@ -305,11 +312,11 @@ export const analyticsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Report block", kind: "modal", title: "Add a block", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReportBlockOverlay context={context} close={close} /> },
+        { id: "Report block", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("reports", "Report")(context), title: "Add a block", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReportBlockOverlay context={context} close={close} /> },
         { id: "schedule", kind: "modal", title: "Schedule", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
         { id: "source inspection", kind: "drawer", title: "Citations", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <SourceInspection context={context} /> },
         { id: "create report", kind: "modal", title: "New report", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
-        { id: "cite figures", kind: "modal", title: "Cite the figures", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <CiteFigures context={context} close={close} /> },
+        { id: "cite figures", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("reports", "Report")(context), title: "Cite the figures", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <CiteFigures context={context} close={close} /> },
       ],
     },
 
@@ -354,7 +361,7 @@ export const analyticsApp = registerApp({
       ],
       overlays: [
         { id: "Dataset details", kind: "drawer", title: "Dataset", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <DatasetSummary context={context} />, render: ({ ...context }) => <DatasetDetails context={context} /> },
-        { id: "grant review", kind: "modal", title: "Access to this dataset", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <GrantReview context={context} /> },
+        { id: "grant review", kind: "modal", title: "Access to this dataset", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <GrantReview context={context} close={close} /> },
         { id: "quality", kind: "drawer", title: "Data quality", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <QualityPanel context={context} /> },
         { id: "document dataset", kind: "modal", title: "Document a dataset", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DocumentDataset context={context} close={close} /> },
         { id: "grant dataset", kind: "modal", title: "Grant access to a dataset", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <GrantDataset context={context} close={close} /> },
@@ -375,7 +382,7 @@ export const analyticsApp = registerApp({
       actions: [
         { id: "Define measure", label: "Define a measure", placement: "primary", run: (context) => context.openOverlay("Formula editor") },
         { id: "test", label: "Test a measure", placement: "secondary", run: (context) => context.openOverlay("test measure") },
-        { id: "approve", label: "Approve a version", placement: "secondary", capability: "manage_policy", run: (context) => context.openOverlay("impact review") },
+        { id: "approve", label: "Review and approve a version", placement: "secondary", capability: "manage_policy", run: (context) => context.openOverlay("impact review") },
         { id: "compare", label: "Compare two measures", placement: "overflow", run: (context) => context.openOverlay("compare measures") },
         { id: "lineage", label: "Lineage", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a measure first"), run: (context) => context.openOverlay("metric QA") },
         {
@@ -388,7 +395,7 @@ export const analyticsApp = registerApp({
       ],
       overlays: [
         { id: "Formula editor", kind: "modal", title: "Define a measure", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <FormulaEditor context={context} close={close} /> },
-        { id: "impact review", kind: "modal", title: "What changing this definition affects", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ImpactReview context={context} /> },
+        { id: "impact review", kind: "modal", title: "What changing this definition affects", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImpactReview context={context} close={close} /> },
         { id: "metric QA", kind: "drawer", title: "Metric lineage", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <MetricQA context={context} /> },
         { id: "test measure", kind: "modal", title: "Test a measure", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TestMeasure context={context} close={close} /> },
         { id: "compare measures", kind: "drawer", title: "Two measures side by side", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <CompareMeasures context={context} /> },

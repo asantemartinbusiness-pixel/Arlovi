@@ -355,7 +355,8 @@ export function MetricLineage({ measureId, context }: { measureId: string; conte
   const [limit, setLimit] = useState(8);
   if (!measure) return <Empty title="Unknown measure" />;
 
-  const asOf = records.map((record) => record.updatedAt ?? record.at ?? record.createdAt).sort().at(-1);
+  /* One freshness: the query layer's own newest-record date, the same figure the inspector shows. */
+  const asOf = runQuery({ measureIds: [measureId], filters: [] }, queryContext).asOf;
   const age = freshness(asOf, context.now, 7);
 
   return (

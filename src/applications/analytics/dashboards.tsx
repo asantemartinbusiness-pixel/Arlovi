@@ -92,15 +92,6 @@ const TEMPLATES: { id: string; name: string; description: string; tiles: Omit<Ti
  * ARL-ANALYTICS-002 — Dashboard directory
  * ====================================================================== */
 
-function Thumbnail({ tiles, masked }: { tiles: Tile[]; masked: boolean }) {
-  return (
-    <div className="an-thumb" data-masked={masked ? "true" : undefined} aria-hidden="true">
-      {tiles.slice(0, 6).map((tile) => <span key={tile.id} data-wide={tile.w >= 8 ? "true" : undefined} />)}
-      {tiles.length === 0 && <span />}
-    </div>
-  );
-}
-
 export function DashboardDirectory({ context, tab }: { context: ScreenContext; tab: string }) {
   const dashboards = useCollection("dashboards");
   const { actor, now } = useWorkspace();
@@ -130,7 +121,7 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
           {TEMPLATES.map((template) => (
             <Card key={template.id} span={4} eyebrow="TEMPLATE" title={template.name} subtitle={`${template.tiles.length} tiles`} prov="human">
               <Stack gap={3}>
-                <Thumbnail tiles={template.tiles.map((tile, index) => ({ ...tile, id: `${template.id}-${index}`, order: index }))} masked={false} />
+                <TileNames titles={template.tiles.map((tile) => tile.title)} />
                 <p className="ds-subtle">{template.description}</p>
                 <Button
                   variant="secondary"
@@ -187,13 +178,15 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
             actions={row.record.fields.pinned === true ? <Pill tone="accent" dot>pinned</Pill> : undefined}
           >
             <Stack gap={3}>
-              <Thumbnail tiles={row.body.tiles} masked={sensitive && !canSee} />
               {sensitive && !canSee ? (
                 <Notice tone="warning" title="Preview hidden">
                   This dashboard is marked sensitive and you are not its owner, so the preview shows its shape only — no measure name and no figure.
                 </Notice>
               ) : (
-                <p className="ds-subtle">{row.record.summary}</p>
+                <>
+                  <p className="ds-subtle">{row.record.summary}</p>
+                  <TileNames titles={row.body.tiles.map((tile) => tile.title)} />
+                </>
               )}
               <Properties rows={[
                 { label: "Status", value: <Pill tone={row.record.status === "published" ? "success" : "neutral"} dot>{row.record.status}</Pill> },
@@ -206,7 +199,7 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
                 {/* Selecting a dashboard enables the page actions (Open, Share, Pin, Archive). */}
                 <Button size="sm" variant={context.selectedId === row.record.id ? "primary" : "secondary"} aria-pressed={context.selectedId === row.record.id} onClick={() => context.select(context.selectedId === row.record.id ? undefined : row.record.id)}>{context.selectedId === row.record.id ? "Selected" : "Select"}</Button>
                 <Button size="sm" variant="ghost" icon={<Pin size={14} />} onClick={async () => {
-                  const saved = await context.mutate.patch(row.record.id, { fields: { ...row.record.fields, pinned: row.record.fields.pinned !== true } }, { event: row.record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
+                  const saved = await context.mutate.patch(row.record.id, { fields: { ...row.record.fields, pinned: row.record.fields.pinned !== true } }, { expectRevision: row.record.revision, event: row.record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
                   if (!saved) return;
                   context.toast(row.record.fields.pinned === true ? "Unpinned" : "Pinned", `${row.record.title} was updated on the record.`);
                 }}>{row.record.fields.pinned === true ? "Unpin" : "Pin"}</Button>
@@ -450,11 +443,6 @@ function DashboardEditorBody({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Row gap={2} wrap>
-        <Button variant="primary" icon={<Plus size={15} />} onClick={() => context.openOverlay("Widget chooser")}>Add a tile</Button>
-        <Button variant="secondary" disabled={!picked} onClick={() => { if (picked) context.select(picked.id); context.setTab("Data"); }}>Edit the query</Button>
-      </Row>
-
       <section className="an-scope" aria-label="What these figures cover">
         <FactGrid columns={4} dense items={[
           {
@@ -883,4 +871,12 @@ export function SourceDependencyOverlay({ context }: { context: ScreenContext })
       <SourceDependency body={readDashboard(record)} context={context} />
     </Stack>
   );
+}
+
+
+/** Which tiles a dashboard holds, by name. A real list, not a drawing of one. */
+function TileNames({ titles }: { titles: string[] }) {
+  if (titles.length === 0) return <p className="ds-subtle">No tile yet.</p>;
+  const shown = titles.slice(0, 3).join(", ");
+  return <p className="an-tile-names">{shown}{titles.length > 3 ? ` and ${titles.length - 3} more` : ""}</p>;
 }

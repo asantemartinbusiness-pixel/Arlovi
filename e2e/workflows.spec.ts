@@ -772,7 +772,8 @@ test("WF-11 Replenishment-to-payment: requisition, approval, purchase order, rec
 test("WF-14 Notification and approval: scoped request, typed confirmation, decision recorded everywhere", async ({ page }) => {
   // Bundled notice: the attention centre and the approvals inbox agree on what is waiting.
   await open(page, "/inbox/approvals", "Approvals");
-  await shows(page, /APPROVALS\s*4 waiting/);
+  // A5: the count is a "4 waiting" state line under the tab strip, no longer an APPROVALS stat label.
+  await shows(page, /\b4 waiting\b/);
   await open(page, "/hq/home", "Executive Home");
   await showsSoft(page, /Waiting on you\s*Today · 4 items/, "DEFECT: /hq/home 'Waiting on you' says 'Nothing to approve' while /inbox/approvals has 4 requests assigned to Maya Chen");
 
@@ -795,22 +796,27 @@ test("WF-14 Notification and approval: scoped request, typed confirmation, decis
   await expect(dialog(page).getByText("Post one journal in the current period")).toBeVisible();
   await expect(dialog(page).getByText("6300 Wages, 2200 Accrued wages")).toBeVisible();
   // The request and its target must describe the same journal and amount.
-  await expect(dialog(page).getByText(/Wage accrual draft \(revision 1\)/)).toBeVisible();
+  // A5: the "Bound to" block lists Target and Revision as separate facts.
+  await expect(dialog(page).getByText("Wage accrual draft", { exact: true })).toBeVisible();
+  await expect(dialog(page).getByText(/1 at request · now 1/)).toBeVisible();
   await expect.soft(dialog(page).getByText(targetValue).first(), `DEFECT: /inbox/approvals 'Post the October wage accrual' asks to post £18,420.00 (JRN-0008, October) but its target record is 'Wage accrual draft', a ${targetValue} journal dated 1 Nov 2026`).toBeVisible();
   // Deny needs a reason.
   await expect(dialog(page).getByRole("button", { name: "Deny" })).toBeDisabled();
 
   // Step-up: a typed confirmation, which says it is not a second factor.
   await dialog(page).getByRole("button", { name: "Approve…" }).click();
-  await expect(dialog(page).getByText("This is a local confirmation, not a second factor")).toBeVisible();
+  await expect(dialog(page).getByText(/A local confirmation recorded in the audit log, not a second factor/)).toBeVisible(); // A5 wording
   const approve = dialog(page).getByRole("button", { name: "Approve this action" });
-  await expect(approve).toBeDisabled();
+  // A5: the submit stays enabled and refuses an unmatched phrase with a hint instead of being disabled.
+  await approve.click();
+  await expect(dialog(page).getByText("Type APPROVE exactly to approve.")).toBeVisible();
+  await expect(dialog(page)).toBeVisible();
   await dialog(page).getByLabel("Type APPROVE to confirm").fill("APPROVE");
   await approve.click();
   await expect(dialog(page)).toHaveCount(0);
 
   // Decision recorded: history, waiting count, and a receipt in Integrations.
-  await shows(page, /APPROVALS\s*3 waiting/);
+  await shows(page, /\b3 waiting\b/);
   await page.getByRole("tab", { name: "History" }).click();
   await expect(main(page).getByRole("row", { name: /Post the October wage accrual/ })).toContainText("APPROVED", { ignoreCase: true });
   await reload(page);
@@ -823,7 +829,8 @@ test("WF-14 Notification and approval: scoped request, typed confirmation, decis
   await open(page, "/inbox/approvals", "Approvals");
   await pick(page, /Pay Hollis Metalwork bill BILL-220/, "Pay Hollis Metalwork bill BILL-220");
   await action(page, "Review");
-  await expect(dialog(page).getByText(/BILL-220 \(revision 1\)/)).toBeVisible();
+  await expect(dialog(page).getByText(/1 at request · now 1/)).toBeVisible();
+  await expect(dialog(page).getByText(/BILL-220/).first()).toBeVisible();
   await expect.soft(dialog(page).getByText("The target changed after this request was made"), "DEFECT: /inbox/approvals 'Pay Hollis Metalwork bill BILL-220' — the request is bound to plan version 2 but BILL-220 is at revision 1, a revision it cannot have gone back to; the review reports 'The target changed after this request was made' and blocks approval (the drift check compares a plan version with a record revision)").toHaveCount(0);
 });
 
