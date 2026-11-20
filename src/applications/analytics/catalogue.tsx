@@ -3,7 +3,7 @@ import {
   AlertTriangle, CheckCircle2, Database, GitMerge, Ruler, Table2,
 } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, KeyValueList, Meter, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions,
+  Button, Card, DataGrid, Empty, FactGrid, OverlaySummary, Field, Grid, KeyValueList, Meter, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -192,6 +192,20 @@ export function DatasetCatalogue({ context, tab }: { context: ScreenContext; tab
   );
 }
 
+export function DatasetSummary({ context }: { context: ScreenContext }) {
+  const datasets = useDatasets();
+  const dataset = datasets.find((row) => row.collection === context.selectedId) ?? datasets[0];
+  if (!dataset) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Dataset"
+      title={dataset.collection}
+      status={<Pill tone={dataset.retired ? "neutral" : dataset.stale ? "warning" : "success"} dot>{dataset.retired ? "retired" : dataset.stale ? "stale" : "current"}</Pill>}
+      meta={[`${dataset.records.length} records`, dataset.owner, dataset.known ? `newest ${dataset.ageDays} day${dataset.ageDays === 1 ? "" : "s"} old` : "age unknown"]}
+    />
+  );
+}
+
 export function DatasetDetails({ context }: { context: ScreenContext }) {
   const datasets = useDatasets();
   const dataset = datasets.find((row) => row.collection === context.selectedId) ?? datasets[0];
@@ -201,13 +215,10 @@ export function DatasetDetails({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Dataset", value: dataset.collection },
-        { label: "Records", value: <span className="ds-num">{dataset.records.length}</span> },
-        { label: "Owner", value: dataset.owner },
-        { label: "Newest record", value: dataset.known ? `${context.date(dataset.asOf)} (${dataset.ageDays} day${dataset.ageDays === 1 ? "" : "s"} old)` : "Unknown" },
-        { label: "Measures reading it", value: dataset.measures.map((measure) => measure.name).join(", ") || "none" },
-        { label: "Permissions", value: `Visible to the ${context.role} view in ${context.org.shortName}` },
+      <FactGrid columns={2} items={[
+        { label: "Newest record", value: dataset.known ? context.date(dataset.asOf) : "Unknown", mono: true, tone: dataset.stale ? "warning" : undefined },
+        { label: "Visible to", value: `${context.role} view` },
+        { label: "Measures reading it", value: dataset.measures.map((measure) => measure.name).join(", ") || "None" },
       ]} />
       {dataset.documented && <p>{dataset.documented.summary}</p>}
       <Stack gap={2}>

@@ -311,7 +311,7 @@ function SourceLibrary({ context, view }: { context: ScreenContext; view: "Docum
           { key: "scan", header: "Scanned", cell: (row) => row.fields.scanned === true ? "Reviewed" : <Pill tone="warning">Not scanned</Pill> },
         ]}
         bulkActions={[
-          { label: "Retire", onRun: (selected) => selected.forEach((source) => void context.mutate.patch(source.id, { status: "retired" }, { event: `${source.title} retired from the knowledge base` })) },
+          { label: "Retire", onRun: (selected) => void retireSources(context, selected) },
         ]}
       />
       <Notice tone="info" title="Ingestion is isolated by default">
@@ -656,6 +656,15 @@ function assertionFromLine(line: string): { subject: string; value: string } | u
   return { subject: match[1].trim(), value: match[2].trim().replace(/\.$/, "") };
 }
 
+async function retireSources(context: ScreenContext, sources: Rec[]): Promise<void> {
+  let saved = 0;
+  for (const source of sources) {
+    if (await context.mutate.patch(source.id, { status: "retired" }, { expectRevision: source.revision, event: `${source.title} retired from the knowledge base` })) saved += 1;
+  }
+  if (saved === 0) return;
+  context.toast(saved === sources.length ? `${saved} source${saved === 1 ? "" : "s"} retired` : `${saved} of ${sources.length} retired`, "Retired sources are out of retrieval and stay on the record for the retention period.");
+}
+
 /** Verify or reject assertions one by one, saying how many were really saved. */
 async function decideFacts(context: ScreenContext, facts: Rec[], verdict: "verified" | "rejected"): Promise<void> {
   let saved = 0;
@@ -780,9 +789,9 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
       )}
       <Grid>
         {domains.map((domain) => (
-          <Card key={domain} span={6} prov="unknown" title={domain} subtitle={`${rows.filter((conflict) => conflict.fields.domain === domain).length} in this domain`}>
+          <Card key={domain} span={6} prov="unknown" title={domain} subtitle={`${rows.filter((conflict) => String(conflict.fields.domain ?? "general") === domain).length} in this domain`}>
             <Stack gap={3}>
-              {rows.filter((conflict) => conflict.fields.domain === domain).map((conflict) => {
+              {rows.filter((conflict) => String(conflict.fields.domain ?? "general") === domain).map((conflict) => {
                 const options = conflictOptions(conflict);
                 const ledger = conflict.fields.requiresLedgerReview === true;
                 const affected = (conflict.body as { affected?: string[] } | undefined)?.affected ?? [];
@@ -1382,7 +1391,7 @@ function UploadDialog({ context, close }: { context: ScreenContext; close: () =>
 
 function SourceSummary({ context }: { context: ScreenContext }) {
   const source = useRecord(context.selectedId);
-  if (!source || source.collection !== "sources") return <OverlaySummary eyebrow="Source" title="No source chosen" />;
+  if (!source || source.collection !== "sources") return null;
   return (
     <OverlaySummary
       eyebrow="Source"
@@ -1697,7 +1706,7 @@ function usedFact(data: Record<string, Rec[]>, context: ScreenContext): Rec | un
 function FactSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
   const data = useKnowledge();
   const fact = usedFact(data, context);
-  if (!fact) return <OverlaySummary eyebrow={eyebrow} title="No assertion chosen" />;
+  if (!fact) return null;
   return (
     <OverlaySummary
       eyebrow={eyebrow}
@@ -1862,7 +1871,7 @@ function ConflictSummary({ context, eyebrow }: { context: ScreenContext; eyebrow
   const data = useKnowledge();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const conflict = data.conflicts.find((item) => item.id === (payload?.id ?? context.selectedId));
-  if (!conflict) return <OverlaySummary eyebrow={eyebrow} title="No conflict chosen" />;
+  if (!conflict) return null;
   const urgency = String(conflict.fields.urgency ?? "normal");
   return (
     <OverlaySummary
@@ -1894,8 +1903,9 @@ function ComparisonDrawer({ context }: { context: ScreenContext }) {
           const source = sourceOf(data, option.sourceId);
           const chosen = closed && String(conflict.fields.chosen ?? "") === option.factId;
           return (
-            <OverlaySection key={option.id} title={option.value} hint={`Version ${String.fromCharCode(65 + index)}${chosen ? " · chosen" : ""}`} tone={chosen ? "success" : "neutral"}>
+            <OverlaySection key={option.id} title={`Version ${String.fromCharCode(65 + index)}${chosen ? " · chosen" : ""}`} tone={chosen ? "success" : "neutral"}>
               <Stack gap={3}>
+                <h4>{option.value}</h4>
                 <FactGrid columns={2} dense items={[
                   { label: "Recorded", value: context.date(option.recordedAt), mono: true },
                   { label: "Source state", value: <Pill tone={source?.status === "indexed" ? "success" : "warning"}>{source?.status ?? "no source record"}</Pill> },
@@ -2004,7 +2014,7 @@ function DecisionDraft({ context, close }: { context: ScreenContext; close: () =
 
 function DecisionSummary({ context }: { context: ScreenContext }) {
   const decision = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
-  if (!decision) return <OverlaySummary eyebrow="Decision" title="No decision chosen" />;
+  if (!decision) return null;
   return (
     <OverlaySummary
       eyebrow="Decision"

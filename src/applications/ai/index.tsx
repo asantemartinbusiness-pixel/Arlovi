@@ -376,20 +376,26 @@ function ConversationLibrary({ context, view }: { context: ScreenContext; view: 
         bulkActions={[
           {
             label: "Archive",
-            onRun: (selected) => selected.forEach((conversation) => {
-              void context.mutate.patch(conversation.id, { status: "archived", fields: { ...conversation.fields, archived: true } }, { event: `${conversation.title} archived` });
-            }),
+            onRun: (selected) => void patchThreads(context, selected, (conversation) => ({ status: "archived", fields: { ...conversation.fields, archived: true } }), "archived", "They are out of the chat surface and still held for the retention schedule."),
           },
           {
             label: "Share with the workspace",
-            onRun: (selected) => selected.forEach((conversation) => {
-              void context.mutate.patch(conversation.id, { fields: { ...conversation.fields, shared: true } }, { event: `${conversation.title} shared` });
-            }),
+            onRun: (selected) => void patchThreads(context, selected, (conversation) => ({ fields: { ...conversation.fields, shared: true } }), "shared with the workspace", "Everyone with a role view that opens Ask Arlovi can read them."),
           },
         ]}
       />
     </Stack>
   );
+}
+
+/** Apply one change to each selected thread and report how many were really saved. */
+async function patchThreads(context: ScreenContext, rows: Rec[], make: (row: Rec) => Partial<Rec>, done: string, detail: string): Promise<void> {
+  let saved = 0;
+  for (const row of rows) {
+    if (await context.mutate.patch(row.id, make(row), { expectRevision: row.revision, event: `${row.title} ${done}` })) saved += 1;
+  }
+  if (saved === 0) return;
+  context.toast(saved === rows.length ? `${saved} thread${saved === 1 ? "" : "s"} ${done}` : `${saved} of ${rows.length} threads ${done}`, saved === rows.length ? detail : "The rest changed elsewhere and were left as they were.");
 }
 
 function TranscriptSearch({ context }: { context: ScreenContext }) {
@@ -1823,7 +1829,7 @@ function useAuthorisingAgent() {
 
 function TaskAuthorizationSummary({ context }: { context: ScreenContext }) {
   const { agent } = useAuthorisingAgent();
-  if (!agent) return <OverlaySummary eyebrow="Mission authorisation" title="No AI employee holds this contract" />;
+  if (!agent) return null;
   return (
     <OverlaySummary
       eyebrow="Mission authorisation"
@@ -1947,10 +1953,11 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
             { label: "Status after this", value: "Proposed" },
             { label: "Approval policy", value: policy ? `${policy.title}: ${requiresApproval === "all" ? "every action" : requiresApproval.split(",").join(", ")}` : "Every action (no policy recorded)" },
             { label: "Your role view", value: context.can("approve_mission") ? "Can approve" : "Cannot approve" },
-            { label: "Target", value: targetRecord?.title ?? "Not chosen" },
-            { label: "Outside this workspace", value: "Nothing is sent or published" },
           ]}
         />
+        <p className="ds-subtle" style={{ marginBlockStart: "var(--space-2)" }}>
+          {targetRecord ? `Target: ${targetRecord.title}. ` : ""}Nothing is sent or published outside this workspace: no provider is connected.
+        </p>
       </OverlaySection>
     </form>
   );
@@ -1959,7 +1966,7 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
 function ThreadPreviewSummary({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const conversation = useRecord(payload?.id ?? context.selectedId);
-  if (!conversation) return <OverlaySummary eyebrow="Thread" title="No thread chosen" />;
+  if (!conversation) return null;
   return (
     <OverlaySummary
       eyebrow={String(conversation.fields.kind ?? "chief") === "chief" ? "Chief of Staff thread" : "Specialist thread"}
@@ -2063,7 +2070,7 @@ function SharingDialog({ context, close }: { context: ScreenContext; close: () =
 function AgentSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const agent = useRecord(payload?.id ?? context.params.id);
-  if (!agent) return <OverlaySummary eyebrow={eyebrow} title="No specialist selected" />;
+  if (!agent) return null;
   return (
     <OverlaySummary
       eyebrow={eyebrow}
@@ -3140,7 +3147,7 @@ function MissionHeading({ context, part }: { context: ScreenContext; part: "titl
   const agent = agents.find((item) => item.id === mission.fields.agentId);
   return (
     <>
-      {agent ? `${agent.title} · ` : ""}
+      {agent ? `${agent.title} ·\u00a0` : ""}
       <span className="ds-num">ceiling {context.money(Number(mission.fields.budgetMinor ?? 0))}, committed {context.money(Number(mission.fields.committedMinor ?? 0))}, spent {context.money(Number(mission.fields.spentMinor ?? 0))}</span>
     </>
   );

@@ -1260,6 +1260,57 @@ function ModelRouting({ context, view }: { context: ScreenContext; view: "Provid
  * Overlays
  * ====================================================================== */
 
+/** Identity block for agent-backed overlays: the one place the contract's name, role and state are shown. */
+function agentStatusTone(status: string): "success" | "warning" | "neutral" {
+  return status === "active" ? "success" : status === "paused" ? "warning" : "neutral";
+}
+
+function AgentSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const asked = useRecord(payload?.id ?? context.selectedId ?? context.params.id);
+  const agent = asked?.collection === "agents" ? asked : undefined;
+  if (!agent) return null;
+  return (
+    <OverlaySummary
+      eyebrow="AI employee"
+      avatar={<Avatar name={agent.title} kind="ai" size="lg" />}
+      title={agent.title}
+      status={<Pill tone={agentStatusTone(agent.status)} dot>{agent.status}</Pill>}
+      meta={[String(agent.fields.role ?? ""), `Reports to ${String(agent.fields.manager ?? "nobody yet")}`]}
+    />
+  );
+}
+
+function MemberSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const record = useRecord(payload?.id ?? context.selectedId);
+  const data = useWorkforce();
+  if (!record) return null;
+  const isAgent = record.collection === "agents" || record.fields.kind === "ai";
+  return (
+    <OverlaySummary
+      eyebrow={isAgent ? "AI employee" : "Person"}
+      avatar={<Avatar name={record.title} kind={isAgent ? "ai" : "human"} size="lg" />}
+      title={record.title}
+      meta={[String(record.fields.role ?? record.fields.title ?? ""), data.departments.find((department) => department.id === record.fields.departmentId)?.title ?? "No department"]}
+    />
+  );
+}
+
+function SkillSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const skill = useRecord(payload?.id ?? context.selectedId);
+  if (!skill || skill.collection !== "skills") return null;
+  return (
+    <OverlaySummary
+      eyebrow="Skill"
+      title={skill.title}
+      status={<Pill tone={skill.status === "deprecated" ? "warning" : "neutral"}>{skill.status}</Pill>}
+      meta={[`v${String(skill.fields.version ?? "1.0")}`, String(skill.fields.origin ?? "native")]}
+    />
+  );
+}
+
 function QuickProfile({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const agent = useRecord(payload?.id ?? context.selectedId);
@@ -1269,20 +1320,13 @@ function QuickProfile({ context }: { context: ScreenContext }) {
   const run = latestRunFor(data.evaluations, agent.id);
   return (
     <Stack gap={4}>
-      <Row gap={3}>
-        <Avatar name={agent.title} kind="ai" size="lg" />
-        <div>
-          <h3>{agent.title}</h3>
-          <p className="ds-subtle">{String(agent.fields.role ?? "")} · {agent.status}</p>
-        </div>
-      </Row>
-      <Properties rows={[
-        { label: "Manager", value: String(agent.fields.manager ?? "Unassigned") },
+      <FactGrid items={[
         { label: "Autonomy", value: String(agent.fields.autonomy ?? "draft") },
-        { label: "Skills", value: String((body.skills ?? []).length) },
-        { label: "Tools granted", value: `${(body.tools ?? []).filter((tool) => tool.granted).length} of ${(body.tools ?? []).length}` },
-        { label: "Latest evaluation", value: run ? `${String(run.fields.score)} / 100` : "Never evaluated" },
-        { label: "Model", value: <Pill tone="warning">Not connected</Pill> },
+        { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)), mono: true },
+        { label: "Skills", value: String((body.skills ?? []).length), mono: true },
+        { label: "Tools granted", value: `${(body.tools ?? []).filter((tool) => tool.granted).length} of ${(body.tools ?? []).length}`, mono: true },
+        { label: "Latest evaluation", value: run ? `${String(run.fields.score)} / 100` : "Never evaluated", mono: Boolean(run), tone: run && Number(run.fields.score) < SAFETY_SCORE ? "warning" : undefined },
+        { label: "Model", value: "Not connected", tone: "warning" },
       ]} />
       {agent.status === "paused" && <Notice tone="warning" title="Paused">{String(agent.fields.pausedReason || "No reason recorded.")}</Notice>}
       <DrawerActions><OverlayActions primary={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/${agent.id}`)}>Open the contract</Button>} secondary={<><Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/ai/agents/${agent.id}/chat`)}>Message</Button></>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
@@ -1702,15 +1746,7 @@ function EmployeeInspector({ context }: { context: ScreenContext }) {
   const isAgent = record.collection === "agents" || record.fields.kind === "ai";
   return (
     <Stack gap={4}>
-      <Row gap={3}>
-        <Avatar name={record.title} kind={isAgent ? "ai" : "human"} size="lg" />
-        <div>
-          <h3>{record.title}</h3>
-          <p className="ds-subtle">{String(record.fields.role ?? record.fields.title ?? "")}</p>
-        </div>
-      </Row>
       <Properties rows={[
-        { label: "Kind", value: isAgent ? "AI employee" : "Person" },
         { label: "Department", value: data.departments.find((department) => department.id === record.fields.departmentId)?.title ?? "Unassigned" },
         { label: "Reports to", value: String(record.fields.manager ?? data.departments.find((department) => department.id === record.fields.departmentId)?.fields.lead ?? "—") },
         { label: "About", value: record.summary },
@@ -1778,11 +1814,9 @@ function SkillDetail({ context }: { context: ScreenContext }) {
   const users = data.agents.filter((agent) => (agentBody(agent).skills ?? []).includes(skill.id));
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Version", value: String(skill.fields.version ?? "1.0") },
-        { label: "Origin", value: String(skill.fields.origin ?? "native") },
+      <FactGrid items={[
         { label: "Owner", value: skill.ownerName },
-        { label: "Trusted", value: skill.fields.trusted === false ? <Pill tone="warning">Sandboxed</Pill> : <Pill tone="success">Reviewed</Pill> },
+        { label: "Review", value: skill.fields.trusted === false ? "Sandboxed" : "Reviewed", tone: skill.fields.trusted === false ? "warning" : "success" },
         { label: "Installed on", value: users.map((agent) => agent.title).join(", ") || "No contract" },
       ]} />
       <Card title="Contract" pad="tight">
@@ -2341,14 +2375,14 @@ export const teamApp = registerApp({
         { id: "view department", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/team/organization`) },
       ],
       overlays: [
-        { id: "Agent creation", kind: "modal", title: "Build a contract", width: 520, render: ({ ...context }) => (
+        { id: "Agent creation", kind: "modal", title: "Build a contract", width: OVERLAY_WIDTH.form, render: ({ ...context }) => (
           <Stack gap={4}>
             <Notice tone="info" title="A contract is built in six steps">Identity, skills, knowledge, tools, autonomy and a test. It cannot be activated until each one is complete.</Notice>
             <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/new`)}>Open the builder</Button>
           </Stack>
         ) },
-        { id: "quick profile", kind: "drawer", title: "AI employee", width: 480, render: ({ ...context }) => <QuickProfile context={context} /> },
-        { id: "cost inspector", kind: "drawer", title: "Where cost would come from", width: 520, render: ({ ...context }) => <CostInspector context={context} /> },
+        { id: "quick profile", kind: "drawer", title: "AI employee", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <QuickProfile context={context} />, summary: (context) => <AgentSummary context={context} /> },
+        { id: "cost inspector", kind: "drawer", title: "Where cost would come from", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <CostInspector context={context} /> },
       ],
     },
 
@@ -2366,10 +2400,10 @@ export const teamApp = registerApp({
         { id: "clone tested contract", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a contract first"), run: (context) => void cloneContract(context) },
       ],
       overlays: [
-        { id: "Agent quick view", kind: "drawer", title: "AI employee", width: 480, render: ({ ...context }) => <QuickProfile context={context} /> },
-        { id: "assignment", kind: "modal", title: "Assign work", width: 560, render: ({ close, ...context }) => <AgentAssignment context={context} close={close} /> },
-        { id: "archive confirmation", kind: "modal", title: "Archive this contract", tone: "danger", width: 560, render: ({ close, ...context }) => <ArchiveConfirmation context={context} close={close} /> },
-        { id: "agent team", kind: "modal", title: (context) => ((context.overlayPayload as { id?: string } | undefined)?.id ? "Edit agent team" : "New agent team"), width: 600, render: ({ close, ...context }) => <AgentTeamFormHost context={context} close={close} /> },
+        { id: "Agent quick view", kind: "drawer", title: "AI employee", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <QuickProfile context={context} />, summary: (context) => <AgentSummary context={context} /> },
+        { id: "assignment", kind: "modal", title: "Assign work", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AgentAssignment context={context} close={close} />, summary: (context) => <AgentSummary context={context} /> },
+        { id: "archive confirmation", kind: "modal", title: "Archive this contract", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ArchiveConfirmation context={context} close={close} />, summary: (context) => <AgentSummary context={context} /> },
+        { id: "agent team", kind: "modal", title: (context) => ((context.overlayPayload as { id?: string } | undefined)?.id ? "Edit agent team" : "New agent team"), width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AgentTeamFormHost context={context} close={close} /> },
       ],
     },
 
@@ -2389,10 +2423,10 @@ export const teamApp = registerApp({
         { id: "pause", placement: "overflow", run: (context) => { context.select(context.params.id); void pauseAgent(context); } },
       ],
       overlays: [
-        { id: "Role edit", kind: "modal", title: "Edit the contract", width: 560, render: ({ close, ...context }) => <RoleEdit context={context} close={close} />, footer: submitFooter("role-edit", "Save contract") },
-        { id: "permission inspector", kind: "drawer", title: "Permissions", width: 560, presentation: { guidance: "Inspect the AI employee’s permitted tools, human oversight and execution boundaries." }, render: ({ close, ...context }) => <PermissionInspector context={context} close={close} /> },
-        { id: "test panel", kind: "modal", title: "Run an evaluation", width: 680, render: ({ ...context }) => <TestPanel context={context} /> },
-        { id: "reassign work", kind: "modal", title: "Reassign open work", width: 560, render: ({ close, ...context }) => <ReassignWork context={context} close={close} /> },
+        { id: "Role edit", kind: "modal", title: "Edit the contract", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RoleEdit context={context} close={close} />, footer: submitFooter("role-edit", "Save contract"), summary: (context) => <AgentSummary context={context} /> },
+        { id: "permission inspector", kind: "drawer", title: "Permissions", width: OVERLAY_WIDTH.form, presentation: { guidance: "Inspect the AI employee’s permitted tools, human oversight and execution boundaries." }, render: ({ close, ...context }) => <PermissionInspector context={context} close={close} />, summary: (context) => <AgentSummary context={context} /> },
+        { id: "test panel", kind: "modal", title: "Run an evaluation", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <TestPanel context={context} /> },
+        { id: "reassign work", kind: "modal", title: "Reassign open work", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReassignWork context={context} close={close} />, summary: (context) => <AgentSummary context={context} /> },
       ],
     },
 
@@ -2417,12 +2451,12 @@ export const teamApp = registerApp({
         { id: "test", placement: "overflow", run: (context) => context.openOverlay("test draft") },
       ],
       overlays: [
-        { id: "Skill picker", kind: "drawer", title: "Skills", width: 560, render: ({ ...context }) => <SkillPicker context={context} /> },
-        { id: "connector grant", kind: "modal", title: "Granting an external tool", width: 620, render: ({ ...context }) => <ConnectorGrant context={context} /> },
-        { id: "simulation", kind: "modal", title: "Evaluation run", width: 680, render: ({ ...context }) => <SimulationOverlay context={context} /> },
-        { id: "publish confirmation", kind: "modal", title: "Activate this contract", width: 560, render: ({ close, ...context }) => <PublishConfirmation context={context} close={close} /> },
-        { id: "configure limits", kind: "modal", title: "Autonomy and spend limits", width: 540, render: ({ close, ...context }) => <ConfigureLimits context={context} close={close} /> },
-        { id: "test draft", kind: "modal", title: "Test the draft contract", width: 680, render: ({ close, ...context }) => <TestDraft context={context} close={close} /> },
+        { id: "Skill picker", kind: "drawer", title: "Skills", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SkillPicker context={context} /> },
+        { id: "connector grant", kind: "modal", title: "Granting an external tool", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ConnectorGrant context={context} /> },
+        { id: "simulation", kind: "modal", title: "Evaluation run", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <SimulationOverlay context={context} /> },
+        { id: "publish confirmation", kind: "modal", title: "Activate this contract", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PublishConfirmation context={context} close={close} /> },
+        { id: "configure limits", kind: "modal", title: "Autonomy and spend limits", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ConfigureLimits context={context} close={close} /> },
+        { id: "test draft", kind: "modal", title: "Test the draft contract", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <TestDraft context={context} close={close} /> },
       ],
     },
 
@@ -2441,11 +2475,11 @@ export const teamApp = registerApp({
         { id: "line impact", label: "What this line carries", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a member first"), run: (context) => context.openOverlay("hierarchy impact") },
       ],
       overlays: [
-        { id: "Employee inspector", kind: "drawer", title: "Member", width: 480, render: ({ ...context }) => <EmployeeInspector context={context} /> },
-        { id: "transfer approval", kind: "modal", title: "Transfer", width: 560, render: ({ close, ...context }) => <TransferApproval context={context} close={close} /> },
-        { id: "hierarchy impact", kind: "modal", title: "What this line carries", width: 560, render: ({ ...context }) => <HierarchyImpact context={context} /> },
-        { id: "assign lead", kind: "modal", title: "Assign a department lead", width: 560, render: ({ close, ...context }) => <AssignLead context={context} close={close} /> },
-        { id: "create department", kind: "modal", title: "Create a department", width: 540, render: ({ close, ...context }) => <CreateDepartment context={context} close={close} /> },
+        { id: "Employee inspector", kind: "drawer", title: "Member", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <EmployeeInspector context={context} />, summary: (context) => <MemberSummary context={context} /> },
+        { id: "transfer approval", kind: "modal", title: "Transfer", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TransferApproval context={context} close={close} /> },
+        { id: "hierarchy impact", kind: "modal", title: "What this line carries", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <HierarchyImpact context={context} /> },
+        { id: "assign lead", kind: "modal", title: "Assign a department lead", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AssignLead context={context} close={close} /> },
+        { id: "create department", kind: "modal", title: "Create a department", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CreateDepartment context={context} close={close} /> },
       ],
     },
 
@@ -2464,9 +2498,9 @@ export const teamApp = registerApp({
         { id: "deprecate", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Choose a skill first"), run: (context) => void deprecateSkill(context) },
       ],
       overlays: [
-        { id: "Skill detail", kind: "drawer", title: "Skill", width: 520, render: ({ ...context }) => <SkillDetail context={context} /> },
-        { id: "install permission", kind: "modal", title: "Install on a contract", width: 560, render: ({ close, ...context }) => <InstallPermission context={context} close={close} /> },
-        { id: "compatibility test", kind: "modal", title: "Which contracts could run it", width: 620, render: ({ ...context }) => <CompatibilityTest context={context} /> },
+        { id: "Skill detail", kind: "drawer", title: "Skill", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SkillDetail context={context} />, summary: (context) => <SkillSummary context={context} /> },
+        { id: "install permission", kind: "modal", title: "Install on a contract", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <InstallPermission context={context} close={close} />, summary: (context) => <SkillSummary context={context} /> },
+        { id: "compatibility test", kind: "modal", title: "Which contracts could run it", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <CompatibilityTest context={context} /> },
       ],
     },
 
@@ -2485,10 +2519,10 @@ export const teamApp = registerApp({
         { id: "evaluation lab", label: "Evaluation lab", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/team/evaluations`) },
       ],
       overlays: [
-        { id: "Training asset upload", kind: "modal", title: "Record a procedure", width: 620, render: ({ close, ...context }) => <TrainingAssetUpload context={context} close={close} />, footer: submitFooter("training-upload", "Record") },
-        { id: "assessment builder", kind: "modal", title: "Assessment", width: 560, render: ({ close, ...context }) => <AssessmentBuilder context={context} close={close} /> },
-        { id: "publishing review", kind: "modal", title: "Publish with a scope", width: 560, render: ({ close, ...context }) => <PublishingReview context={context} close={close} /> },
-        { id: "academy test", kind: "modal", title: "Test an AI employee", width: 700, render: ({ close, ...context }) => <AcademyTest context={context} close={close} /> },
+        { id: "Training asset upload", kind: "modal", title: "Record a procedure", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TrainingAssetUpload context={context} close={close} />, footer: submitFooter("training-upload", "Record") },
+        { id: "assessment builder", kind: "modal", title: "Assessment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AssessmentBuilder context={context} close={close} /> },
+        { id: "publishing review", kind: "modal", title: "Publish with a scope", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PublishingReview context={context} close={close} /> },
+        { id: "academy test", kind: "modal", title: "Test an AI employee", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <AcademyTest context={context} close={close} /> },
       ],
     },
 
@@ -2507,10 +2541,10 @@ export const teamApp = registerApp({
         { id: "rollback", placement: "overflow", tone: "danger", capability: "edit_people", run: (context) => context.openOverlay("rollback") },
       ],
       overlays: [
-        { id: "Scenario editor", kind: "modal", title: "Scenario", width: 620, render: ({ close, ...context }) => <ScenarioEditor context={context} close={close} />, footer: submitFooter("scenario-editor", "Save scenario") },
-        { id: "detailed trace", kind: "drawer", title: "Run trace", width: 560, render: ({ ...context }) => <DetailedTrace context={context} /> },
-        { id: "promotion approval", kind: "modal", title: "Promote a version", width: 560, render: ({ close, ...context }) => <PromotionApproval context={context} close={close} /> },
-        { id: "rollback", kind: "modal", title: "Roll a contract back", width: 580, tone: "danger", render: ({ close, ...context }) => <RollbackVersion context={context} close={close} /> },
+        { id: "Scenario editor", kind: "modal", title: "Scenario", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ScenarioEditor context={context} close={close} />, footer: submitFooter("scenario-editor", "Save scenario") },
+        { id: "detailed trace", kind: "drawer", title: "Run trace", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <DetailedTrace context={context} /> },
+        { id: "promotion approval", kind: "modal", title: "Promote a version", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PromotionApproval context={context} close={close} /> },
+        { id: "rollback", kind: "modal", title: "Roll a contract back", width: OVERLAY_WIDTH.modal, tone: "danger", render: ({ close, ...context }) => <RollbackVersion context={context} close={close} /> },
       ],
     },
 
@@ -2528,11 +2562,11 @@ export const teamApp = registerApp({
         { id: "adjust resource policy", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("resource policy") },
       ],
       overlays: [
-        { id: "Metric definition", kind: "modal", title: "How each figure is counted", width: 560, render: () => <MetricDefinition /> },
-        { id: "incident trace", kind: "drawer", title: "Failed run", width: 560, render: ({ ...context }) => <DetailedTrace context={context} /> },
-        { id: "performance note", kind: "modal", title: "Coaching note", width: 560, render: ({ close, ...context }) => <PerformanceNote context={context} close={close} />, footer: submitFooter("performance-note", "Record note") },
-        { id: "compare agents", kind: "drawer", title: "Two AI employees side by side", width: 680, render: ({ ...context }) => <CompareAgents context={context} /> },
-        { id: "resource policy", kind: "modal", title: "Resource policy", width: 560, render: ({ close, ...context }) => <AdjustResourcePolicy context={context} close={close} /> },
+        { id: "Metric definition", kind: "modal", title: "How each figure is counted", width: OVERLAY_WIDTH.modal, render: () => <MetricDefinition /> },
+        { id: "incident trace", kind: "drawer", title: "Failed run", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <DetailedTrace context={context} /> },
+        { id: "performance note", kind: "modal", title: "Coaching note", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PerformanceNote context={context} close={close} />, footer: submitFooter("performance-note", "Record note") },
+        { id: "compare agents", kind: "drawer", title: "Two AI employees side by side", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <CompareAgents context={context} /> },
+        { id: "resource policy", kind: "modal", title: "Resource policy", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AdjustResourcePolicy context={context} close={close} /> },
       ],
     },
 
@@ -2551,9 +2585,9 @@ export const teamApp = registerApp({
         { id: "inspect spend", placement: "overflow", run: (context) => context.setTab("Budgets") },
       ],
       overlays: [
-        { id: "Provider setup", kind: "modal", title: "What connecting would need", width: 560, render: ({ ...context }) => <ProviderSetup context={context} /> },
-        { id: "routing simulator", kind: "drawer", title: "Routing simulation", width: 620, render: ({ ...context }) => <RoutingSimulator context={context} /> },
-        { id: "policy warning", kind: "modal", title: "What would leave this browser", tone: "danger", width: 560, render: ({ ...context }) => <PolicyWarning context={context} /> },
+        { id: "Provider setup", kind: "modal", title: "What connecting would need", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ProviderSetup context={context} /> },
+        { id: "routing simulator", kind: "drawer", title: "Routing simulation", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <RoutingSimulator context={context} /> },
+        { id: "policy warning", kind: "modal", title: "What would leave this browser", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PolicyWarning context={context} /> },
       ],
     },
   },

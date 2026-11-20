@@ -2807,10 +2807,10 @@ export const missionApp = registerApp({
         { id: "bulk tag", placement: "overflow", run: (context) => context.openOverlay("bulk tag") },
       ],
       overlays: [
-        { id: "Mission quick view", kind: "drawer", title: "Mission", width: 520, render: ({ ...context }) => <MissionQuickView context={context} /> },
-        { id: "create mission", kind: "modal", title: "Create a mission", width: 560, render: ({ ...context }) => <CreateMissionOverlay context={context} /> },
-        { id: "archive confirmation", kind: "modal", title: "Archive this mission", tone: "danger", width: 560, render: ({ close, ...context }) => <MissionArchive context={context} close={close} /> },
-        { id: "bulk tag", kind: "modal", title: "Tag missions", width: 560, render: ({ close, ...context }) => <BulkTagMissions context={context} close={close} /> },
+        { id: "Mission quick view", kind: "drawer", title: "Mission", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MissionQuickView context={context} /> },
+        { id: "create mission", kind: "modal", title: "Create a mission", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <CreateMissionOverlay context={context} /> },
+        { id: "archive confirmation", kind: "modal", title: "Archive this mission", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionArchive context={context} close={close} /> },
+        { id: "bulk tag", kind: "modal", title: "Tag missions", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BulkTagMissions context={context} close={close} /> },
       ],
     },
 
@@ -2833,13 +2833,13 @@ export const missionApp = registerApp({
         { id: "revise plan", placement: "overflow", run: (context) => context.openOverlay("revise plan") },
       ],
       overlays: [
-        { id: "Source picker", kind: "drawer", title: "Context records", width: 520, render: ({ ...context }) => <SourcePicker context={context} /> },
-        { id: "team selector", kind: "drawer", title: "Who can do what", width: 560, render: ({ ...context }) => <TeamSelector context={context} /> },
-        { id: "risk review", kind: "modal", title: "Risk review", width: 560, render: ({ ...context }) => <RiskReview context={context} /> },
-        { id: "approval sheet", kind: "modal", title: "Submit for approval", width: 620, render: ({ close, ...context }) => <ApprovalSheet context={context} close={close} /> },
-        { id: "describe goal", kind: "modal", title: "Describe the goal", width: 580, render: ({ close, ...context }) => <DescribeGoal context={context} close={close} /> },
-        { id: "attach records", kind: "modal", title: "Attach records", width: 580, render: ({ close, ...context }) => <AttachMissionRecords context={context} close={close} /> },
-        { id: "revise plan", kind: "modal", title: "Revise the plan", width: 640, render: ({ close, ...context }) => <RevisePlan context={context} close={close} /> },
+        { id: "Source picker", kind: "drawer", title: "Context records", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourcePicker context={context} /> },
+        { id: "team selector", kind: "drawer", title: "Who can do what", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <TeamSelector context={context} /> },
+        { id: "risk review", kind: "modal", title: "Risk review", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <RiskReview context={context} /> },
+        { id: "approval sheet", kind: "modal", title: "Submit for approval", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ApprovalSheet context={context} close={close} /> },
+        { id: "describe goal", kind: "modal", title: "Describe the goal", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DescribeGoal context={context} close={close} /> },
+        { id: "attach records", kind: "modal", title: "Attach records", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AttachMissionRecords context={context} close={close} /> },
+        { id: "revise plan", kind: "modal", title: "Revise the plan", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RevisePlan context={context} close={close} /> },
       ],
     },
 
@@ -2858,10 +2858,10 @@ export const missionApp = registerApp({
         { id: "cancel", label: "Cancel the mission", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("cancel mission") },
       ],
       overlays: [
-        { id: "Status explanation", kind: "drawer", title: "How this status is computed", width: 520, render: ({ ...context }) => <StatusExplanation context={context} /> },
-        { id: "pause dialog", kind: "modal", title: "Pause execution", width: 560, render: ({ close, ...context }) => <PauseDialog context={context} close={close} /> },
-        { id: "amendment request", kind: "modal", title: "Request an amendment", width: 560, render: ({ close, ...context }) => <AmendmentRequest context={context} close={close} />, footer: submitFooter("amendment", "Record the request") },
-        { id: "cancel mission", kind: "modal", title: "Cancel this mission?", tone: "danger", width: 480, render: ({ close, ...context }) => <CancelMission context={context} close={close} /> },
+        { id: "Status explanation", kind: "drawer", title: "How this status is computed", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <StatusExplanation context={context} /> },
+        { id: "pause dialog", kind: "modal", title: "Pause execution", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PauseDialog context={context} close={close} /> },
+        { id: "amendment request", kind: "modal", title: "Request an amendment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AmendmentRequest context={context} close={close} />, footer: submitFooter("amendment", "Record the request") },
+        { id: "cancel mission", kind: "modal", title: "Cancel this mission?", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <CancelMission context={context} close={close} /> },
       ],
     },
 
@@ -2879,9 +2879,9 @@ export const missionApp = registerApp({
         { id: "compare versions", placement: "overflow", run: (context) => context.openOverlay("plan revision") },
       ],
       overlays: [
-        { id: "Task inspector", kind: "drawer", title: "Task", width: 560, render: ({ close, ...context }) => <TaskInspector context={context} close={close} /> },
-        { id: "plan revision", kind: "modal", title: "Revise the plan", width: 560, render: ({ close, ...context }) => <PlanRevision context={context} close={close} /> },
-        { id: "scope change approval", kind: "modal", title: "Scope change", width: 560, render: ({ ...context }) => <ScopeChangeApproval context={context} /> },
+        { id: "Task inspector", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskInspector context={context} close={close} /> },
+        { id: "plan revision", kind: "modal", title: "Revise the plan", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PlanRevision context={context} close={close} /> },
+        { id: "scope change approval", kind: "modal", title: "Scope change", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ScopeChangeApproval context={context} /> },
       ],
     },
 
@@ -2900,9 +2900,9 @@ export const missionApp = registerApp({
         { id: "reopen task", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a card first"), run: (context) => void reopenTask(context) },
       ],
       overlays: [
-        { id: "Task detail", kind: "drawer", title: "Task", width: 560, render: ({ close, ...context }) => <TaskDetail context={context} close={close} /> },
-        { id: "reassign", kind: "modal", title: "Reassign", width: 520, render: ({ close, ...context }) => <ReassignTask context={context} close={close} /> },
-        { id: "move impact", kind: "modal", title: "What a move changes", width: 520, render: ({ ...context }) => <MoveImpact context={context} /> },
+        { id: "Task detail", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskDetail context={context} close={close} /> },
+        { id: "reassign", kind: "modal", title: "Reassign", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReassignTask context={context} close={close} /> },
+        { id: "move impact", kind: "modal", title: "What a move changes", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MoveImpact context={context} /> },
       ],
     },
 
@@ -2928,9 +2928,9 @@ export const missionApp = registerApp({
         { id: "stop", placement: "overflow", tone: "danger", run: (context) => void stopMission(context) },
       ],
       overlays: [
-        { id: "Action receipt", kind: "drawer", title: "Receipts", width: 560, render: ({ ...context }) => <ActionReceipt context={context} /> },
-        { id: "retry confirmation", kind: "modal", title: "Retry this step", width: 560, render: ({ close, ...context }) => <RetryConfirmation context={context} close={close} /> },
-        { id: "execution trace", kind: "drawer", title: "Trace", width: 560, render: ({ ...context }) => <ExecutionTrace context={context} /> },
+        { id: "Action receipt", kind: "drawer", title: "Receipts", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ActionReceipt context={context} /> },
+        { id: "retry confirmation", kind: "modal", title: "Retry this step", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RetryConfirmation context={context} close={close} /> },
+        { id: "execution trace", kind: "drawer", title: "Trace", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ExecutionTrace context={context} /> },
       ],
     },
 
@@ -2948,10 +2948,10 @@ export const missionApp = registerApp({
         { id: "accept handoff", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a task first"), run: (context) => void acceptHandoff(context) },
       ],
       overlays: [
-        { id: "Agent selector", kind: "drawer", title: "AI employees on this mission", width: 520, render: ({ ...context }) => <AgentSelectorOverlay context={context} /> },
-        { id: "handoff view", kind: "modal", title: "Request a review", width: 560, render: ({ close, ...context }) => <HandoffView context={context} close={close} /> },
-        { id: "decision record", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <MissionDecisionRecord context={context} close={close} />, footer: submitFooter("mission-decision", "Record decision") },
-        { id: "post message", kind: "modal", title: "Message the room", width: 560, render: ({ close, ...context }) => <PostMissionMessage context={context} close={close} /> },
+        { id: "Agent selector", kind: "drawer", title: "AI employees on this mission", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <AgentSelectorOverlay context={context} /> },
+        { id: "handoff view", kind: "modal", title: "Request a review", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <HandoffView context={context} close={close} /> },
+        { id: "decision record", kind: "modal", title: "Record a decision", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionDecisionRecord context={context} close={close} />, footer: submitFooter("mission-decision", "Record decision") },
+        { id: "post message", kind: "modal", title: "Message the room", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PostMissionMessage context={context} close={close} /> },
       ],
     },
 
@@ -2970,10 +2970,10 @@ export const missionApp = registerApp({
         { id: "share", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a deliverable first"), run: (context) => context.openOverlay("publish verification") },
       ],
       overlays: [
-        { id: "Artifact preview", kind: "drawer", title: "Deliverable", width: 620, render: ({ ...context }) => <ArtifactPreviewOverlay context={context} /> },
-        { id: "approval", kind: "modal", title: "Approve the deliverable", width: 560, render: ({ close, ...context }) => <DeliverableApproval context={context} close={close} /> },
-        { id: "version diff", kind: "modal", title: "Versions", width: 620, render: ({ ...context }) => <VersionDiff context={context} /> },
-        { id: "publish verification", kind: "modal", title: "Publishing outside this workspace", tone: "danger", width: 560, render: ({ ...context }) => <PublishVerification context={context} /> },
+        { id: "Artifact preview", kind: "drawer", title: "Deliverable", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ArtifactPreviewOverlay context={context} /> },
+        { id: "approval", kind: "modal", title: "Approve the deliverable", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DeliverableApproval context={context} close={close} /> },
+        { id: "version diff", kind: "modal", title: "Versions", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <VersionDiff context={context} /> },
+        { id: "publish verification", kind: "modal", title: "Publishing outside this workspace", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PublishVerification context={context} /> },
       ],
     },
 
@@ -2992,10 +2992,10 @@ export const missionApp = registerApp({
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => void exportBudget(context) },
       ],
       overlays: [
-        { id: "Budget variance", kind: "drawer", title: "Variance", width: 520, render: ({ ...context }) => <BudgetVariance context={context} /> },
-        { id: "limit increase approval", kind: "modal", title: "Raise the ceiling", width: 560, render: ({ close, ...context }) => <LimitIncrease context={context} close={close} /> },
-        { id: "cost source", kind: "drawer", title: "Where this cost came from", width: 520, render: ({ ...context }) => <CostSource context={context} /> },
-        { id: "set alert", kind: "modal", title: "Set a budget alert", width: 520, render: ({ close, ...context }) => <SetBudgetAlert context={context} close={close} /> },
+        { id: "Budget variance", kind: "drawer", title: "Variance", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <BudgetVariance context={context} /> },
+        { id: "limit increase approval", kind: "modal", title: "Raise the ceiling", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <LimitIncrease context={context} close={close} /> },
+        { id: "cost source", kind: "drawer", title: "Where this cost came from", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <CostSource context={context} /> },
+        { id: "set alert", kind: "modal", title: "Set a budget alert", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SetBudgetAlert context={context} close={close} /> },
       ],
     },
 
@@ -3013,9 +3013,9 @@ export const missionApp = registerApp({
         { id: "issue report", placement: "overflow", capability: "export_data", run: (context) => void exportResults(context) },
       ],
       overlays: [
-        { id: "Source inspector", kind: "drawer", title: "Evidence", width: 520, render: ({ ...context }) => <ActionReceipt context={context} /> },
-        { id: "results approval", kind: "modal", title: "Close the mission", width: 560, render: ({ close, ...context }) => <ResultsApproval context={context} close={close} /> },
-        { id: "reopen", kind: "modal", title: "Create a follow-up", width: 560, render: ({ close, ...context }) => <ReopenTask context={context} close={close} /> },
+        { id: "Source inspector", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ActionReceipt context={context} /> },
+        { id: "results approval", kind: "modal", title: "Close the mission", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ResultsApproval context={context} close={close} /> },
+        { id: "reopen", kind: "modal", title: "Create a follow-up", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReopenTask context={context} close={close} /> },
       ],
     },
 
@@ -3034,9 +3034,9 @@ export const missionApp = registerApp({
         { id: "publish", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a template first"), run: (context) => void publishTemplate(context) },
       ],
       overlays: [
-        { id: "Template editor", kind: "modal", title: "Template", width: 560, render: ({ close, ...context }) => <TemplateEditor context={context} close={close} />, footer: submitFooter("template-editor", "Save template") },
-        { id: "example data", kind: "drawer", title: "What would happen", width: 520, render: ({ ...context }) => <ExampleData context={context} /> },
-        { id: "approval grant", kind: "modal", title: "Create a mission from this template", width: 560, render: ({ close, ...context }) => <ApprovalGrant context={context} close={close} /> },
+        { id: "Template editor", kind: "modal", title: "Template", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TemplateEditor context={context} close={close} />, footer: submitFooter("template-editor", "Save template") },
+        { id: "example data", kind: "drawer", title: "What would happen", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ExampleData context={context} /> },
+        { id: "approval grant", kind: "modal", title: "Create a mission from this template", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ApprovalGrant context={context} close={close} /> },
       ],
     },
   },

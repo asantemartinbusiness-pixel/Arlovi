@@ -94,7 +94,7 @@ export const portalApp = registerApp({
       overlays: [
         { id: "Module picker", kind: "drawer", title: "Page modules", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ModuleArranger context={context} close={close} />, footer: submitFooter("module-picker", "Save page") },
         { id: "data grant", kind: "modal", title: "Share one record", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <DataGrant context={context} close={close} />, footer: submitFooter("data-grant", "Share this record") },
-        { id: "publish review", kind: "modal", title: "Publish review", width: OVERLAY_WIDTH.modal, summary: ({ close, ...context }) => <PublishSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} />, footer: ({ close, ...context }) => <PublishFooter context={context} close={close} /> },
+        { id: "publish review", kind: "modal", title: "Publish review", width: OVERLAY_WIDTH.modal, summary: ({ close: _c, ...context }) => <PublishSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} />, footer: ({ close, ...context }) => <PublishFooter context={context} close={close} /> },
         { id: "portal test", kind: "drawer", title: "Access test", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PortalTestResult context={context} /> },
       ],
     },
@@ -221,7 +221,7 @@ export const portalApp = registerApp({
       ],
       overlays: [
         { id: "External invite", kind: "modal", title: "Invite an external user", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ExternalInvite context={context} close={close} />, footer: submitFooter("external-invite", "Record invitation") },
-        { id: "scope preview", kind: "drawer", title: "What they will see", width: OVERLAY_WIDTH.wide, summary: ({ close, ...context }) => <ScopeSummary context={context} />, render: ({ ...context }) => <ScopePreview context={context} /> },
+        { id: "scope preview", kind: "drawer", title: "What they will see", width: OVERLAY_WIDTH.wide, summary: ({ close: _c, ...context }) => <ScopeSummary context={context} />, render: ({ ...context }) => <ScopePreview context={context} /> },
         { id: "account recovery", kind: "modal", title: "Extend or revoke access", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AccountRecovery context={context} close={close} />, footer: submitFooter("account-recovery", "Apply") },
         { id: "set expiry", kind: "modal", title: "Set expiry", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SetExpiry context={context} close={close} />, footer: submitFooter("account-recovery", "Set expiry") },
         { id: "revoke access", kind: "modal", title: "Revoke access", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RevokeAccess context={context} close={close} /> },

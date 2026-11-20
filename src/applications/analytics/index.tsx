@@ -13,7 +13,7 @@ import {
   ReportBuilder, ScheduleOverlay, SourceInspection, checkBlocks, readReport,
 } from "./reports";
 import {
-  DataModelling, DatasetCatalogue, DatasetDetails, DocumentDataset, FormulaEditor, GrantReview,
+  DataModelling, DatasetCatalogue, DatasetDetails, DatasetSummary, DocumentDataset, FormulaEditor, GrantReview,
   ImpactReview, JoinProperties, MetricDefinitionInspector, MetricDefinitions, MetricQA, ModelTest, QualityPanel, TransformEditor,
 } from "./catalogue";
 import {
@@ -353,7 +353,7 @@ export const analyticsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Dataset details", kind: "drawer", title: "Dataset", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <DatasetDetails context={context} /> },
+        { id: "Dataset details", kind: "drawer", title: "Dataset", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <DatasetSummary context={context} />, render: ({ ...context }) => <DatasetDetails context={context} /> },
         { id: "grant review", kind: "modal", title: "Access to this dataset", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <GrantReview context={context} /> },
         { id: "quality", kind: "drawer", title: "Data quality", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <QualityPanel context={context} /> },
         { id: "document dataset", kind: "modal", title: "Document a dataset", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DocumentDataset context={context} close={close} /> },
