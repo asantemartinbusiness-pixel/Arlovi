@@ -1,3 +1,16 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/northline-collective",
+      "destination": "/northline-collective/index.html"
+    },
+    {
+      "source": "/northline-collective/",
+      "destination": "/northline-collective/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
