@@ -404,6 +404,17 @@ function NotBuilt({ title, application }: { title: string; application: string }
 
 function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { context: ScreenContext; def?: ScreenDef; overlayId?: string; onClose: () => void }) {
   const found = screenDef?.overlays?.find((item) => item.id === overlayId);
+  /* Hooks run before any early return. A required record that does not resolve
+     in this organisation (or collection) also suppresses the footer action. */
+  const earlyPayloadId = (ctx.overlayPayload as { id?: unknown } | undefined)?.id;
+  const earlyIds = [typeof earlyPayloadId === "string" ? earlyPayloadId : undefined, ctx.params.id, ctx.selectedId].filter((id): id is string => Boolean(id));
+  const earlyRequiredId = found?.presentation?.selectedRecord ? earlyIds[0] : undefined;
+  const earlyCollection = found?.presentation?.collection;
+  const requiredAvailable = useLiveQuery(async () => {
+    if (!earlyRequiredId) return true;
+    const record = await getRecordInOrg(ctx.org.id, earlyRequiredId);
+    return Boolean(record && (!earlyCollection || record.collection === earlyCollection));
+  }, [ctx.org.id, earlyRequiredId, earlyCollection], true);
   if (!overlayId) return null;
   if (!found) {
     return (
@@ -419,7 +430,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.params.id, ctx.selectedId].filter((id): id is string => Boolean(id));
   const requiredId = found.presentation?.selectedRecord ? ids[0] : undefined;
   /* A "choose a record first" guard must not carry an enabled footer action. */
-  const guarded = Boolean(found.presentation?.selectedRecord && !requiredId);
+  const guarded = Boolean(found.presentation?.selectedRecord && (!requiredId || !requiredAvailable));
   const footer = guarded ? undefined : found.footer?.(overlayContext);
   const requiredCollection = found.presentation?.collection;
   const body = found.presentation?.selectedRecord && !requiredId
