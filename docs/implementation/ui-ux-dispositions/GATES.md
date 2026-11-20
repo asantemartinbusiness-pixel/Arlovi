@@ -297,3 +297,9 @@ Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint c
   run before paint; 30/30 repeats and 56/56 across a11y, header and search suites. (2) WF-06 clicking a candidate
   did not leave Recruitment; not reproduced locally (17/17, including 12 at four workers). The candidate card is a
   plain navigating button and the screen host's URL writes were checked; left open pending a repeat in CI.
+- `ci.yml` on cbe4e51: palette passed; WF-06 again, plus Brain "Saturday closing time". Reproduced Brain under
+  CPU load: the screen host drew an application as soon as its screens registered, before that application's own
+  fixtures were written, so the conflicts board showed only the base seed's conflict (no recorded versions). The
+  host now shows the loading state until the application is ready. WF-06: Marta Nowak is on both the Offers and
+  Candidates panels; the spec looked her up before the panel switched and clicked the Offers card. It now waits for
+  the Candidates tab and clicks her candidate button. Under load: 16/16 (Brain and WF-06, 4 repeats); vitest 829/829.

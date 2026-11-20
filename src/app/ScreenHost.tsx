@@ -210,6 +210,11 @@ export function ScreenHost() {
   }
 
 
+  // An application is usable once its own records are written, not merely once
+  // its screens register: a board drawn first would show the workspace without them.
+  if (app && applicationStatus(screen.applicationCode) === "loading") {
+    return <div className="pg" role="status" aria-busy="true"><div className="pg-head"><h1>Opening {screen.applicationName}…</h1></div><div className="pg-body"><span className="ds-spinner" aria-hidden="true"/> Loading this native application.</div></div>;
+  }
   if (!app) {
     const status = applicationStatus(screen.applicationCode);
     if (status === "idle" || status === "loading") return <div className="pg" role="status" aria-busy="true"><div className="pg-head"><h1>Opening {screen.applicationName}…</h1></div><div className="pg-body"><span className="ds-spinner" aria-hidden="true"/> Loading this native application.</div></div>;

@@ -531,7 +531,9 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
 
   // Acceptance must be recordable so the candidate becomes an employee from the offer.
   await page.getByRole("tab", { name: "Candidates" }).click();
-  await main(page).getByRole("tabpanel").getByText("Marta Nowak").click();
+  // Marta is also on the Offers panel; wait for the Candidates panel before choosing her card.
+  await expect(page.getByRole("tab", { name: "Candidates" })).toHaveAttribute("aria-selected", "true");
+  await main(page).getByRole("tabpanel", { name: "Candidates" }).getByRole("button", { name: /Marta Nowak/ }).click();
   await expect(page).toHaveURL(/\/hr\/candidates\//);
   await action(page, "Review and move stage");
   const stages = await dialog(page).getByRole("combobox").first().locator("option").allInnerTexts();
