@@ -3,7 +3,7 @@ import "@/domain/seeds/flagshipOperations";
 import { NORTHLINE_COLLECTIVE_IDENTITY } from "@/domain/flagship/identity";
 import { NORTHLINE_FLAGSHIP_SCENARIO_MONTHS } from "@/domain/seeds/flagshipOperations";
 import { collectSeedsByContributor } from "@/domain/seedRegistry";
-import { ORG_NORTHLINE,SEED_NOW } from "@/domain/types";
+import { ORG_COLLECTIVE,SEED_NOW } from "@/domain/types";
 
 const group=collectSeedsByContributor(SEED_NOW).find(item=>item.key==="flagship-operations");
 const records=group?.records??[];
@@ -30,7 +30,7 @@ describe("Northline Collective / identity and operations scenario",()=>{
   it("keeps financial records unposted and protects against fake external evidence",()=>{
     expect(records.length).toBeGreaterThan(400);
     expect(new Set(records.map(record=>record.id)).size).toBe(records.length);
-    expect(records.every(record=>record.organizationId===ORG_NORTHLINE)).toBe(true);
+    expect(records.every(record=>record.organizationId===ORG_COLLECTIVE)).toBe(true);
     expect(records.every(record=>record.fields.fictional===true&&record.fields.scenarioOnly===true)).toBe(true);
     expect(records.every(record=>record.fields.ledgerPosted===false&&record.fields.externalState==="not_connected")).toBe(true);
     for(const record of records.filter(record=>["invoices","bills","expenses","purchaseOrders"].includes(record.collection))){
