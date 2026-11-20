@@ -1,4 +1,4 @@
-import { ORG_HARBOR, ORG_NORTHLINE } from "@/domain/types";
+import { ORG_COLLECTIVE, ORG_HARBOR, ORG_NORTHLINE } from "@/domain/types";
 import { db } from "@/runtime/db";
 
 export interface OrgProfile {
@@ -31,6 +31,18 @@ export const ORGS: OrgProfile[] = [
     jurisdiction: "GB",
     registration: "GB 418 2275 61",
     accent: "#2D6B65",
+  },
+  {
+    id: ORG_COLLECTIVE,
+    slug: "collective",
+    name: "Northline Collective",
+    shortName: "Collective",
+    ownerName: "Maya Chen",
+    currency: "GBP",
+    locale: "en-GB",
+    timezone: "Europe/London",
+    jurisdiction: "GB",
+    accent: "#7e57ff",
   },
   {
     id: ORG_HARBOR,
