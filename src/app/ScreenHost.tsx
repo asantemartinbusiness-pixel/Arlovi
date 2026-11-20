@@ -424,8 +424,8 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   const requiredCollection = found.presentation?.collection;
   const body = found.presentation?.selectedRecord && !requiredId
     ? <Notice tone="warning" title="Choose a record first">
-        Select the {nativeOverlayDomain(ctx.screen.applicationCode).entity.toLowerCase()} to work with before opening this {found.kind}.
-        Nothing has been selected or changed.
+        Select the {nativeOverlayDomain(ctx.screen.applicationCode).entity.toLowerCase()} to work with, then open this again.
+        Nothing has been changed.
       </Notice>
     : <PrimedOverlayBody ids={ids} orgId={ctx.org.id} requiredId={requiredId}
         requiredCollection={requiredCollection} render={() => found.render(overlayContext)} />;
