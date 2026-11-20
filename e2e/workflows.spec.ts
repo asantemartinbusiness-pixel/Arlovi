@@ -897,7 +897,9 @@ test("WF-07 Design-to-publish: editable file, brand rules, review approval, publ
   // Human review: a version is approved on the record.
   await open(page, `${designUrl}/review`, "Design Review");
   await action(page, "Approve this version");
-  await expect(dialog(page).getByText(/This decision binds to version \w+ \(revision \d+\)/)).toBeVisible();
+  // A3/B-design: the binding is now two facts ("Binds to version <id>", "Revision <n>").
+  await expect(dialog(page).getByText("Binds to version", { exact: true })).toBeVisible();
+  await expect(dialog(page).getByText("Revision", { exact: true })).toBeVisible();
   await dialog(page).getByLabel("Decision").selectOption({ label: "Approved" });
   await dialog(page).getByLabel("Note").fill("Brand type and palette checked against the master kit.");
   await dialog(page).getByRole("button", { name: "Record the decision" }).click();
