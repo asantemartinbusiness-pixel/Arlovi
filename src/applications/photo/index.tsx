@@ -935,7 +935,7 @@ function BatchQueue({ context }: { context: ScreenContext }) {
           onOpen={(id) => setChosen((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))}
           columns={[
             { key: "title", header: "Image", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => row.title },
-            { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "unreadable" ? "danger" : "neutral"}>{row.status}</Pill> },
+            { key: "status", header: "Status", cell: (row) => <Row gap={1} wrap><Pill tone={row.status === "unreadable" ? "danger" : "neutral"}>{row.status}</Pill>{chosen.includes(row.id) && <Pill tone="info" dot>In the batch</Pill>}</Row> },
             { key: "album", header: "Album", cell: (row) => String(row.fields.album ?? "Unfiled") },
             {
               key: "pick", header: "In the batch", align: "end", cell: (row) => (

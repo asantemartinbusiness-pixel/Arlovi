@@ -66,3 +66,22 @@ test("motion keyframe inspector leads the panel once a keyframe is selected", as
   expect(heading!.y).toBeLessThan(transform!.y);
   await expect(panel.getByLabel("Easing out of this keyframe")).toBeVisible();
 });
+
+test("photo batch: one image can be picked on a phone-sized screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/o/northline/photo/batch?${CLOCK}`);
+  const main = page.locator("#main");
+  await main.getByRole("button", { name: /^Arc Lamp study/ }).first().click();
+  await expect(main.getByText("1 of 4 selected")).toBeVisible();
+  await expect(main.getByText("In the batch").first()).toBeVisible();
+  await main.getByRole("tabpanel", { name: "Queue" }).getByRole("button", { name: "Build the batch" }).click();
+  await expect(main.getByRole("list", { name: "Planned output files" }).getByRole("listitem")).toHaveCount(1);
+});
+
+test("easing: Edit easing enables as soon as a segment is chosen", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/o/northline/motion/projects/nl-motions-001/easing?${CLOCK}`);
+  await expect(page.getByRole("button", { name: "Edit easing" })).toBeDisabled();
+  await page.locator("button.mo-layer").first().click();
+  await expect(page.getByRole("button", { name: "Edit easing" })).toBeEnabled();
+});
