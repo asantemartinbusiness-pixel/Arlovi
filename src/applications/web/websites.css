@@ -1,3 +1,6 @@
+/* Optional editorial font faces for native Web previews. Browsers fall back
+   to system fonts when external CSS cannot load. Only the Web chunk uses them. */
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&display=swap");
 /* Websites native library — extends existing Arlovi tokens without reskinning. */
 .web-library{display:flex;flex-direction:column;gap:var(--space-4);min-width:0}
 .web-library-overview{border:1px solid var(--border-default);background:var(--bg-surface);border-radius:var(--radius-lg);padding:var(--space-5);display:flex;flex-direction:column;gap:var(--space-5);min-width:0}
