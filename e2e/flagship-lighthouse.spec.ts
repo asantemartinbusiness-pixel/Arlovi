@@ -68,3 +68,12 @@ test("the native CRM, Projects and Finance surfaces return to the Lighthouse cas
   await invoiceLink.click();
   await expect(page).toHaveURL(/\/workspace\/showcase\/lighthouse$/);
 });
+
+test("Lighthouse opening and handover journey stages open their actual native records",async ({page})=>{
+  await page.goto("/o/northline/workspace/showcase/lighthouse");
+  await page.getByRole("button",{name:/The brief/}).click();
+  await expect(page).toHaveURL(/\/crm\/deals\/nl-deals-910$/);
+  await page.goto("/o/northline/workspace/showcase/lighthouse");
+  await page.getByRole("button",{name:/The handover/}).click();
+  await expect(page).toHaveURL(/\/project\/tasks\/nl-tasks-905$/);
+});
