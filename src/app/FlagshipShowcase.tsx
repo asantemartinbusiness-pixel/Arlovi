@@ -7,7 +7,7 @@ import type { Rec } from "@/domain/types";
 import "./flagship-showcase.css";
 import "./flagship-identity.css";
 
-const GROUPS = ["designs","publications","photos","videos","decks","sites","forms","projects","deals","employees","agents","orders","campaigns"];
+const GROUPS = ["designs","publications","photos","videos","decks","sites","forms","projects","deals","employees","agents","orders","campaigns","datasets"];
 const STUDIO: { title:string; kind:string; code:string; id:string; description:string; style:string; icon:typeof Palette }[] = [
   {title:"The Collective identity",kind:"DESIGN SYSTEM / VECTOR",code:"DESIGN",id:"nl-designs-910",description:"Three original editable vector artboards. Explore the mark, campaign and architectural visual language.",style:"identity",icon:Palette},
   {title:"Material. Space. Experience.",kind:"EDITORIAL / PUBLICATION",code:"LAYOUT",id:"nl-publications-910",description:"An eight-page editorial book with live text stories, intentional typography, page geometry and folios.",style:"publication",icon:FileText},
@@ -49,6 +49,16 @@ export default function FlagshipShowcase() {
   const staff=(records.employees??[]).filter(record=>record.fields.flagship==="Northline Collective"&&record.id!=="nl-employees-900").length;
   const agents=(records.agents??[]).filter(record=>record.fields.flagship==="Northline Collective"&&record.id!=="nl-agents-900").length;
   const works=(records.projects??[]).filter(record=>record.fields.flagship==="Northline Collective").length;
+  const monthly=(records.datasets??[])
+    .filter(record=>record.fields.flagship==="Northline Collective" && record.fields.scenarioOnly===true && typeof record.fields.scenarioRevenueMinor==="number")
+    .sort((a,b)=>String(a.fields.period).localeCompare(String(b.fields.period)));
+  const revenueMinor=monthly.reduce((sum,record)=>sum+Number(record.fields.scenarioRevenueMinor),0);
+  const commerceMinor=monthly.reduce((sum,record)=>sum+Number(record.fields.commerceMinor??0),0);
+  const servicesMinor=monthly.reduce((sum,record)=>sum+Number(record.fields.servicesMinor??0),0);
+  const experienceMinor=monthly.reduce((sum,record)=>sum+Number(record.fields.experienceMinor??0),0);
+  const maxRevenue=Math.max(1,...monthly.map(record=>Number(record.fields.scenarioRevenueMinor)));
+  const sterling=(minor:number)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP",maximumFractionDigits:0}).format(minor/100);
+
   if(org.slug!=="northline")return <div className="fs-access"><h1>This showcase is not in this organisation</h1><p>Northline Collective is only available in the existing Northline local demonstration workspace.</p><Link to={`/o/${org.slug}/workspace/home`}>Return to your workspace</Link></div>;
   return <div className="fs">
     <div className="fs-utility"><Link to={`/o/${org.slug}/workspace/home`}><ArrowLeft size={15}/> Back to workspace</Link><span>FICTIONAL COMPANY · BROWSER-LOCAL DEMONSTRATION</span></div>
@@ -80,6 +90,32 @@ export default function FlagshipShowcase() {
       <div><strong>{agents||"—"}</strong><span>AI specialist drafts</span></div>
       <div><strong>{works||"—"}</strong><span>Flagship projects</span></div>
       <div><strong>{flagshipCount||"—"}</strong><span>Loaded showcase records in tracked collections</span></div>
+    </section>
+    <section className="fs-scenario" aria-labelledby="fs-scenario-title">
+      <div className="fs-scenario-heading"><div><span className="fs-overline">SCENARIO LAB / DEC 2025 — NOV 2026</span>
+        <h2 id="fs-scenario-title">The business, <em>in numbers.</em></h2>
+        <p>These are illustrative planning assumptions, not recognised revenue or posted accounting actuals. Every customer invoice and supplier bill in this scenario remains a local draft.</p></div>
+        <div className="fs-scenario-total"><span>FICTIONAL ANNUAL REVENUE TARGET</span><strong>{monthly.length===12?sterling(revenueMinor):"Not loaded"}</strong><small>{monthly.length} of 12 planned periods in this browser</small></div></div>
+      <div className="fs-scenario-body">
+        <div className="fs-bars" role="img" aria-label={monthly.length===12?"Twelve-month fictional revenue scenario; figures range from "+sterling(Math.min(...monthly.map(record=>Number(record.fields.scenarioRevenueMinor))))+" to "+sterling(maxRevenue)+".":"Scenario data is not available in this workspace."}>
+          {monthly.map(record=>{
+            const amount=Number(record.fields.scenarioRevenueMinor);
+            const month=String(record.fields.period).slice(-2);
+            const label=new Date("2026-"+month+"-01T00:00:00Z").toLocaleString("en-GB",{month:"short"});
+            return <div key={record.id} className="fs-bar-item"><span className="fs-bar-value">{sterling(amount)}</span>
+              <div className="fs-bar-track"><div className="fs-bar-fill" style={{height:`${Math.round(amount/maxRevenue*100)}%`}}/></div>
+              <span className="fs-bar-label">{label}</span></div>;
+          })}
+          {!monthly.length&&<p className="fs-scenario-empty">The scenario has not been loaded. Open the Northline workspace and refresh after seed reconciliation.</p>}
+        </div>
+        <div className="fs-scenario-division"><span className="fs-overline">THREE DESIGN DISCIPLINES / PLANNING MIX</span>
+          <div><span>Supply / products</span><strong>{sterling(commerceMinor)}</strong></div>
+          <div><span>Atelier / services</span><strong>{sterling(servicesMinor)}</strong></div>
+          <div><span>Experiences</span><strong>{sterling(experienceMinor)}</strong></div>
+          <p>Read-only simulation. Forecasts cannot be substituted for bank reconciliations, verified sales or issued invoices.</p>
+          <Link to={appEntry("ANALYTICS",org.slug)}>Explore business intelligence <ArrowRight size={16}/></Link>
+        </div>
+      </div>
     </section>
     <section className="fs-intro"><span className="fs-overline">A COLLECTIVE, NOT A COLLECTION OF SOFTWARE</span><p>Every application is part of the same story. The customer brief informs the concept; the concept shapes the project; the project informs procurement, finance and the final customer experience.</p></section>
     <section id="creative-work" className="fs-work">
