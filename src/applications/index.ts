@@ -11,7 +11,7 @@ export type ApplicationLoadStatus = "idle" | "loading" | "ready" | "failed";
 interface NativeLoader { group: string; load: () => Promise<unknown>; }
 const HQ: NativeLoader = {
   group: "Headquarters",
-  load: () => Promise.all([import("@/domain/seeds/hq"),import("@/domain/seeds/flagshipCollective"),import("@/domain/seeds/flagshipStudio"),import("@/domain/seeds/flagshipOperations"),import("@/domain/seeds/flagshipLighthouse"),import("./hq/index")]),
+  load: () => Promise.all([import("@/domain/seeds/hq"),import("@/domain/seeds/flagshipOrganization"),import("@/domain/seeds/flagshipCollective"),import("@/domain/seeds/flagshipStudio"),import("@/domain/seeds/flagshipOperations"),import("@/domain/seeds/flagshipLighthouse"),import("./hq/index")]),
 };
 const NATIVE: Record<string, NativeLoader> = {
   INBOX: { group: "Workplace / inbox", load: () => Promise.all([import("@/domain/seeds/inbox"),import("./inbox/index")]) },
