@@ -59,7 +59,7 @@ export default function FlagshipShowcase() {
   const maxRevenue=Math.max(1,...monthly.map(record=>Number(record.fields.scenarioRevenueMinor)));
   const sterling=(minor:number)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP",maximumFractionDigits:0}).format(minor/100);
 
-  if(org.slug!=="northline")return <div className="fs-access"><h1>This showcase is not in this organisation</h1><p>Northline Collective is only available in the existing Northline local demonstration workspace.</p><Link to={`/o/${org.slug}/workspace/home`}>Return to your workspace</Link></div>;
+  if(org.slug!=="collective")return <div className="fs-access"><h1>This showcase is not in this organisation</h1><p>Northline Collective is only available in the existing Northline local demonstration workspace.</p><Link to={`/o/${org.slug}/workspace/home`}>Return to your workspace</Link></div>;
   if(role==="client")return <div className="fs-access"><h1>Internal showcase unavailable</h1><p>This fictional casefile and its internal records cannot be inspected in the Client role preview.</p><Link to={`/o/${org.slug}/workspace/home`}>Return to your workspace</Link></div>;
   return <div className="fs">
     <div className="fs-utility"><Link to={`/o/${org.slug}/workspace/home`}><ArrowLeft size={15}/> Back to workspace</Link><span>FICTIONAL COMPANY · BROWSER-LOCAL DEMONSTRATION</span></div>
@@ -79,7 +79,7 @@ export default function FlagshipShowcase() {
         <h1>Northline<br/><em>Collective.</em></h1>
         <p className="fs-hero-description">Material. Space. Experience. A connected creative business, presented through the work it makes and the systems that move it forward.</p>
         <div className="fs-hero-actions">
-          <a className="fs-primary" href="/northline-collective/" target="_blank" rel="noopener noreferrer">Experience the website <ArrowUpRight size={17}/></a>
+          <a className="fs-primary" href="/northline-collective/index.html" target="_blank" rel="noopener noreferrer">Experience the website <ArrowUpRight size={17}/></a>
           <a className="fs-secondary" href="#creative-work">Explore native Studio <ArrowRight size={17}/></a>
           <a className="fs-secondary fs-film-link" href="/northline-collective/film.html" target="_blank" rel="noopener noreferrer">Watch original motion study <ArrowUpRight size={17}/></a>
         </div>
@@ -152,6 +152,6 @@ export default function FlagshipShowcase() {
       <div><Boxes size={25}/><h2>Products worth making.</h2><p>Follow considered lighting and furniture concepts through catalogue, sourcing, campaigns and order drafts. Payments and fulfilment connections are deliberately not invented.</p><Link to={appEntry("COMMERCE",org.slug)}>Open Commerce <ArrowRight size={16}/></Link></div>
       <div><Users size={25}/><h2>People behind the work.</h2><p>Explore a fictional workforce across creative, commercial and operational functions, with structured employee records and bounded AI assistance.</p><Link to={appEntry("HR",org.slug)}>Open People <ArrowRight size={16}/></Link></div>
     </section>
-    <footer className="fs-foot"><p>Northline Collective is a fictional flagship reference, operating as an additive data layer in the Northline Atelier local demo workspace. The separate Harbor tenant is not part of this simulation.</p><Link to={`/o/${org.slug}/workspace/apps`}>Discover all native applications <ArrowRight size={16}/></Link></footer>
+    <footer className="fs-foot"><p>Northline Collective is a fictional flagship reference, operating as its own fictional browser-local company, separately from the original Northline Atelier and Harbor Supply demonstrations.</p><Link to={`/o/${org.slug}/workspace/apps`}>Discover all native applications <ArrowRight size={16}/></Link></footer>
   </div>;
 }
