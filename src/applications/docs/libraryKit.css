@@ -22,9 +22,12 @@
 .lk-card-actions { display: flex; gap: var(--space-1); margin-top: auto; padding-top: var(--space-1); border-top: 1px solid var(--border-subtle, var(--border-default)); }
 
 /* Overview tiles and hero rows that remain on the sub-screens: one compact line each. */
-.dx-library-header, .pr-library-heading, .sx-library-header, .sx-formula-header { padding: 0; border: 0; background: none; justify-content: flex-end; min-height: 0; }
-.dx-library-header > div:empty, .pr-library-heading > div:empty, .sx-library-header > div:empty { display: none; }
-.dx-library-metrics, .pr-library-overview, .sx-library-metrics, .sx-formula-metrics { gap: var(--space-2); }
-.dx-library-metrics > div, .pr-library-overview > div, .sx-library-metrics > div, .sx-formula-metrics > div { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
-.dx-library-metrics strong, .pr-library-overview strong, .sx-library-metrics strong, .sx-formula-metrics strong { font-size: var(--text-lg); letter-spacing: 0; font-family: var(--font-mono); font-weight: 600; }
-.dx-library-metrics small, .sx-library-metrics small, .sx-formula-metrics small { flex-basis: 100%; font-size: var(--text-2xs); }
+.pg .dx-library-header,.pg .pr-library-heading,.pg .sx-library-header,.pg .sx-formula-header { padding: 0; border: 0; background: none; justify-content: flex-end; min-height: 0; }
+.pg .dx-library-header > div:empty,.pg .pr-library-heading > div:empty,.pg .sx-library-header > div:empty { display: none; }
+.pg .dx-library-metrics,.pg .pr-library-overview,.pg .sx-library-metrics,.pg .sx-formula-metrics { gap: var(--space-2); }
+.pg .dx-library-metrics > div,.pg .pr-library-overview > div,.pg .sx-library-metrics > div,.pg .sx-formula-metrics > div { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+.pg .dx-library-metrics strong,.pg .pr-library-overview strong,.pg .sx-library-metrics strong,.pg .sx-formula-metrics strong { font-size: var(--text-lg); letter-spacing: 0; font-family: var(--font-mono); font-weight: 600; }
+.pg .dx-library-metrics small,.pg .sx-library-metrics small,.pg .sx-formula-metrics small { flex-basis: 100%; font-size: var(--text-2xs); }
+
+.lk-toolbar select, .lk-toolbar .ds-select { width: auto; min-width: 9rem; }
+.lk-toolbar > :not(.lk-grow) { flex: 0 0 auto; }

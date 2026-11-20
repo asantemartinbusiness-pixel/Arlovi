@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Copy, PauseCircle, PlayCircle, Workflow as WorkflowIcon } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, Notice, Pill, Properties, Row, Select,
-  Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, KeyValueList, ModalActions, ModalInFlight, Notice,
+  OverlayActions, OverlaySection, OverlaySummary, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -172,11 +172,19 @@ export function AutomationLibrary({ context, tab }: { context: ScreenContext; ta
             {
               label: "Pause",
               disabled: (selected) => selected.every((row) => row.record.status !== "active"),
-              onRun: (selected) => {
-                for (const row of selected.filter((item) => item.record.status === "active")) {
-                  void context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the library" });
+              onRun: async (selected) => {
+                const active = selected.filter((item) => item.record.status === "active");
+                let paused = 0;
+                for (const row of active) {
+                  const saved = await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the library" });
+                  if (saved) paused += 1;
                 }
-                context.toast("Paused", `${selected.length} automation${selected.length === 1 ? "" : "s"} will not start a new run.`);
+                if (paused === 0) return;
+                context.toast(
+                  paused === active.length ? "Paused" : "Paused in part",
+                  `${paused} automation${paused === 1 ? "" : "s"} will not start a new run.${paused < active.length ? ` ${active.length - paused} changed elsewhere and kept their status.` : ""}`,
+                  paused === active.length ? "ok" : "info",
+                );
               },
             },
           ]}
@@ -188,6 +196,20 @@ export function AutomationLibrary({ context, tab }: { context: ScreenContext; ta
 
 /* ------------------------------ overlays ------------------------------ */
 
+export function WorkflowQuickSummary({ context }: { context: ScreenContext }) {
+  const rows = useWorkflowRows();
+  const row = rows.find((item) => item.record.id === context.selectedId);
+  if (!row) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Automation"
+      title={row.record.title}
+      status={<Pill tone={statusTone(row.record.status)} dot>{row.record.status}</Pill>}
+      meta={[row.record.ownerName, row.trigger]}
+    />
+  );
+}
+
 export function WorkflowQuickView({ context }: { context: ScreenContext }) {
   const rows = useWorkflowRows();
   const row = rows.find((item) => item.record.id === context.selectedId);
@@ -195,140 +217,163 @@ export function WorkflowQuickView({ context }: { context: ScreenContext }) {
   if (!row) return <Empty title="Choose an automation">Select a row to read its graph, its last run and its open issues.</Empty>;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: <Pill tone={statusTone(row.record.status)} dot>{row.record.status}</Pill> },
-        { label: "Owner", value: row.record.ownerName },
-        { label: "Trigger", value: row.trigger },
-        { label: "Nodes", value: `${row.graph.nodes.length} nodes, ${row.graph.edges.length} connections` },
-        { label: "Runs recorded", value: String(row.runCount) },
+      <FactGrid columns={2} items={[
+        { label: "Graph", value: `${row.graph.nodes.length} nodes, ${row.graph.edges.length} connections` },
+        { label: "Runs recorded", value: String(row.runCount), mono: true },
         { label: "Last run", value: row.lastRun ? `${row.lastRun.status} · ${context.dateTime(row.lastRun.at)}` : "Never run" },
-        { label: "Step limit", value: `${row.graph.limits?.maxSteps ?? 40} steps, ${row.graph.limits?.maxVisits ?? 3} visits per node` },
+        { label: "Limits", value: `${row.graph.limits?.maxSteps ?? 40} steps, ${row.graph.limits?.maxVisits ?? 3} visits per node` },
       ]} />
-      <Stack gap={2}>
-        <strong>Steps in order</strong>
-        {row.graph.nodes.map((node) => (
-          <Row key={node.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
-            <Pill tone="neutral">{node.type}</Pill>
-            <span className="ds-grow ds-truncate">{node.label}</span>
-            <span className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{nodeSummary(node)}</span>
-          </Row>
-        ))}
-      </Stack>
+      <OverlaySection title="Steps in order" hint={`${row.graph.nodes.length} nodes`}>
+        <Stack gap={2}>
+          {row.graph.nodes.map((node) => (
+            <Row key={node.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+              <Pill tone="neutral">{node.type}</Pill>
+              <span className="ds-grow ds-truncate">{node.label}</span>
+              <span className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{nodeSummary(node)}</span>
+            </Row>
+          ))}
+        </Stack>
+      </OverlaySection>
       {stored && (
         <Notice tone={stored.result.status === "completed" ? "success" : "warning"} title={`Last run: ${stored.result.status}`}>
           {stored.result.message}
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/workflows/${row.record.id}`)}>Open the builder</Button>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/runs`)}>Run history</Button>
-      </Row>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/workflows/${row.record.id}`)}>Open the builder</Button>}
+          secondary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/runs`)}>Run history</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
+}
+
+export function ActivationSummary({ context }: { context: ScreenContext }) {
+  const rows = useWorkflowRows();
+  const row = rows.find((item) => item.record.id === activationTarget(context));
+  if (!row) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Activation review"
+      title={row.record.title}
+      status={<Pill tone={statusTone(row.record.status)} dot>{row.record.status}</Pill>}
+      meta={[row.trigger, `${row.graph.nodes.length} nodes`]}
+    />
+  );
+}
+
+function activationTarget(context: ScreenContext): string | undefined {
+  const payload = context.overlayPayload as { id?: unknown } | undefined;
+  return typeof payload?.id === "string" ? payload.id : context.selectedId ?? context.params.id;
 }
 
 export function ActivationReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const rows = useWorkflowRows();
   const workflows = useCollection("workflows");
   const pool = useTriggerPool(workflows);
-  const payload = context.overlayPayload as { id?: unknown } | undefined;
-  const requestedId = typeof payload?.id === "string" ? payload.id : context.selectedId ?? context.params.id;
+  const requestedId = activationTarget(context);
   const row = requestedId ? rows.find((item) => item.record.id === requestedId) : undefined;
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
-  if (!row) return <Empty title="No automation selected" />;
+  if (!row) return <Empty title="No automation selected">Choose an automation in the library, then open its activation review.</Empty>;
   const issues = validateWorkflow(row.graph, pool);
   const errors = issues.filter((issue) => issue.severity === "error");
   const warnings = issues.filter((issue) => issue.severity === "warning");
   const providerNodes = row.graph.nodes.filter((node) => node.config?.kind === "provider.call");
+  const isActive = row.record.status === "active";
 
   return (
     <Stack gap={4}>
       <ModalInFlight when={busy} />
-      <Properties rows={[
-        { label: "Automation", value: row.record.title },
-        { label: "Current status", value: row.record.status },
-        { label: "Nodes", value: String(row.graph.nodes.length) },
-        { label: "Blocking errors", value: <Pill tone={errors.length ? "danger" : "success"}>{errors.length}</Pill> },
-        { label: "Warnings", value: <Pill tone={warnings.length ? "warning" : "success"}>{warnings.length}</Pill> },
+      <FactGrid columns={3} items={[
+        { label: "Status now", value: row.record.status },
+        { label: "Blocking errors", value: String(errors.length), mono: true, tone: errors.length ? "danger" : "success" },
+        { label: "Warnings", value: String(warnings.length), mono: true, tone: warnings.length ? "warning" : "success" },
       ]} />
       {errors.length > 0 ? (
-        <Notice tone="danger" title="Activation is blocked">
-          <ul style={{ margin: 0, paddingInlineStart: "1.2em" }}>
-            {errors.map((issue) => <li key={issue.id}>{issue.title} — {issue.detail}</li>)}
+        <OverlaySection tone="danger" title="Activation is blocked">
+          <ul className="auto-plan">
+            {errors.map((issue) => <li key={issue.id}><strong>{issue.title}</strong><span>{issue.detail}</span></li>)}
           </ul>
-        </Notice>
+        </OverlaySection>
       ) : (
-        <Notice tone="success" title="The graph passes validation">An active automation still only runs when a run is started here; no scheduler is running in this browser.</Notice>
+        <Notice tone={isActive ? "info" : "success"} title={isActive ? "Already active" : "The graph passes validation"}>
+          {isActive
+            ? "Activating again would change nothing. Pause it, or leave it as it is."
+            : "An active automation still only runs when someone starts a run here. No scheduler is running in this browser."}
+        </Notice>
       )}
       {warnings.length > 0 && (
-        <Notice tone="warning" title={`${warnings.length} warning${warnings.length === 1 ? "" : "s"}`}>
-          <ul style={{ margin: 0, paddingInlineStart: "1.2em" }}>
-            {warnings.map((issue) => <li key={issue.id}>{issue.title}</li>)}
+        <OverlaySection tone="warning" title={`${warnings.length} warning${warnings.length === 1 ? "" : "s"}`}>
+          <ul className="auto-plan">
+            {warnings.map((issue) => <li key={issue.id}><strong>{issue.title}</strong></li>)}
           </ul>
-        </Notice>
+        </OverlaySection>
       )}
       {providerNodes.length > 0 && (
         <Notice tone="warning" title={`${providerNodes.length} step${providerNodes.length === 1 ? "" : "s"} would call a provider`}>
-          Those steps will stop at the provider boundary and record that they did not run until a connection exists.
+          They stop at the provider boundary and record that they did not run until a connection exists.
         </Notice>
       )}
-      <Checkbox
-        label="I have read what this automation changes in the workspace"
-        checked={acknowledged}
-        onChange={(event) => setAcknowledged(event.target.checked)}
-      />
+      {!isActive && (
+        <Checkbox
+          label="I have read what this automation changes in the workspace"
+          checked={acknowledged}
+          onChange={(event) => setAcknowledged(event.target.checked)}
+        />
+      )}
       <ModalActions>
-        <Button
-          variant="primary"
-          icon={<PlayCircle size={15} />}
-          disabled={errors.length > 0 || !acknowledged || busy}
-          busy={busy}
-          onClick={async () => {
-            if (busy) return;
-            setBusy(true);
-            try {
-              if (!await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" })) {
-                context.toast("Activation not saved", "The automation changed since you opened it. Reload before activating.", "blocked");
-                return;
-              }
-              context.toast("Activated", `${row.record.title} is active. No scheduler or external action was started.`);
-              close();
-            } catch (error) {
-              context.toast("Activation failed", error instanceof Error ? error.message : "Review and retry.", "failed");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Activate
-        </Button>
-        {row.record.status === "active" && (
-          <Button
-            variant="secondary"
-            icon={<PauseCircle size={15} />}
-            busy={busy}
-            disabled={busy}
-            onClick={async () => {
-              if (busy) return;
-              setBusy(true);
-              try {
-                if (!await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" })) {
-                  context.toast("Pause not saved", "This automation changed. Reload before retrying.", "blocked");
-                  return;
+        <OverlayActions
+          primary={isActive ? (
+            <Button
+              variant="primary"
+              icon={<PauseCircle size={15} />}
+              busy={busy}
+              disabled={busy}
+              onClick={async () => {
+                if (busy) return;
+                setBusy(true);
+                try {
+                  const saved = await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" });
+                  if (!saved) return;
+                  context.toast("Paused", `${row.record.title} will not start a new run.`);
+                  close();
+                } catch (error) {
+                  context.toast("Pause failed", error instanceof Error ? error.message : "Review and retry.", "failed");
+                } finally {
+                  setBusy(false);
                 }
-                context.toast("Paused", `${row.record.title} will not start a new run.`);
-                close();
-              } catch (error) {
-                context.toast("Pause failed", error instanceof Error ? error.message : "Review and retry.", "failed");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Pause instead
-          </Button>
-        )}
+              }}
+            >
+              Pause the automation
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              icon={<PlayCircle size={15} />}
+              disabled={errors.length > 0 || !acknowledged || busy}
+              busy={busy}
+              onClick={async () => {
+                if (busy) return;
+                setBusy(true);
+                try {
+                  const saved = await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" });
+                  if (!saved) return;
+                  context.toast("Activated", `${row.record.title} is active. No scheduler or external action was started.`);
+                  close();
+                } catch (error) {
+                  context.toast("Activation failed", error instanceof Error ? error.message : "Review and retry.", "failed");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Activate
+            </Button>
+          )}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
       </ModalActions>
     </Stack>
   );
@@ -342,23 +387,31 @@ export function ArchiveWorkflow({ context, close }: { context: ScreenContext; cl
   return (
     <Stack gap={4}>
       <p>
-        Archiving {row.record.title} keeps its {row.runCount} recorded run{row.runCount === 1 ? "" : "s"} and its graph. It stops appearing in the
-        working library and cannot start a run.
+        Archiving keeps its {row.runCount} recorded run{row.runCount === 1 ? "" : "s"} and its graph. It leaves the working library and cannot start a run.
       </p>
       <Field label={`Type the name to confirm: ${row.record.title}`}>
         <TextInput value={confirm} onChange={(event) => setConfirm(event.target.value)} />
       </Field>
-      <Button
-        variant="outline-danger"
-        disabled={confirm.trim() !== row.record.title}
-        onClick={async () => {
-          if (!await context.mutate.patch(row.record.id, { status: "archived" }, { expectRevision: row.record.revision, event: "Automation archived" })) return;
-          context.toast("Archived", `${row.record.title} is archived. Its runs are still in the run history.`);
-          close();
-        }}
-      >
-        Archive automation
-      </Button>
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+          primary={(
+            <Button
+              variant="outline-danger"
+              disabled={confirm.trim() !== row.record.title}
+              onClick={async () => {
+                const saved = await context.mutate.patch(row.record.id, { status: "archived" }, { expectRevision: row.record.revision, event: "Automation archived" });
+                if (!saved) return;
+                context.toast("Archived", `${row.record.title} is archived. Its runs are still in the run history.`);
+                close();
+              }}
+            >
+              Archive automation
+            </Button>
+          )}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -381,7 +434,9 @@ export function DuplicateWorkflow({ context, close }: { context: ScreenContext; 
         {providers.length > 0 && `${providers.length} provider step${providers.length === 1 ? "" : "s"} will keep the capability it names but lose any stored connection reference. `}
         The copy is created as a draft and must pass the activation review on its own.
       </Notice>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         icon={<Copy size={15} />}
         disabled={name.trim() === ""}
@@ -410,7 +465,10 @@ export function DuplicateWorkflow({ context, close }: { context: ScreenContext; 
         }}
       >
         Create the copy
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -499,17 +557,17 @@ export function WorkflowInspector({ context }: { context: ScreenContext }) {
   }
   return (
     <Stack gap={4}>
-      <div>
-        <h4 style={{ margin: 0 }}>{record.title}</h4>
-        <p className="ds-subtle">{record.summary}</p>
-      </div>
-      <Properties rows={[
-        { label: "Status", value: <Pill tone={statusTone(record.status)} dot>{record.status}</Pill> },
+      <OverlaySummary
+        title={record.title}
+        status={<Pill tone={statusTone(record.status)} dot>{record.status}</Pill>}
+        meta={[record.summary]}
+      />
+      <KeyValueList items={[
         { label: "Trigger", value: row.trigger },
-        { label: "Graph", value: `${row.graph.nodes.length} nodes · ${row.graph.edges.length} edges` },
-        { label: "Issues", value: row.errors ? `${row.errors} errors` : row.warnings ? `${row.warnings} warnings` : "None" },
-        { label: "Runs", value: String(row.runCount) },
-        { label: "Updated", value: context.dateTime(record.updatedAt) },
+        { label: "Graph", value: `${row.graph.nodes.length} nodes · ${row.graph.edges.length} edges`, mono: true },
+        { label: "Issues", value: row.errors ? `${row.errors} errors` : row.warnings ? `${row.warnings} warnings` : "None", tone: row.errors ? "danger" : undefined },
+        { label: "Runs", value: String(row.runCount), mono: true },
+        { label: "Updated", value: context.dateTime(record.updatedAt), mono: true },
       ]} />
       <Row gap={2} wrap>
         <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/workflows/${record.id}`)}>Open builder</Button>

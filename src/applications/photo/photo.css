@@ -11,7 +11,9 @@
 .ph-picker-item:focus-visible { outline: 2px solid var(--focus-ring, currentColor); outline-offset: 2px; }
 .ph-licence { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
 .ph-plan { display: grid; gap: 1px; border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; background: var(--border-default); }
-.ph-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: var(--space-2); align-items: center; padding: var(--space-1) var(--space-2); background: var(--bg-surface); font-size: var(--text-sm); }
+.ph-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: 0; align-items: center; padding: var(--space-1) var(--space-2); background: var(--bg-surface); font-size: var(--text-sm); }
+.ph-plan-title { grid-column: 1; }
+.ph-plan-name { grid-column: 1; font-size: var(--text-xs); }
+.ph-plan-row > .ds-pill, .ph-plan-row > [class*="pill"] { grid-column: 2; grid-row: 1 / span 2; }
 .ph-plan-row[data-collision] { background: var(--warning-soft, var(--bg-surface)); }
-.ph-plan-name { color: var(--text-secondary); }
-@media (max-width: 640px) { .ph-plan-row { grid-template-columns: minmax(0, 1fr) auto; } .ph-plan-name { grid-column: 1 / -1; grid-row: 2; } }
+.ph-plan-name { color: var(--text-secondary); overflow-wrap: anywhere; }

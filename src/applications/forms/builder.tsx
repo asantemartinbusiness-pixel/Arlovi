@@ -4,7 +4,7 @@ import {
   AlignLeft, Calendar, CheckSquare, ChevronsUpDown, FileText, Hash, Heading, ListChecks,
   Mail, Minus, Paperclip, Star, Type,
 } from "lucide-react";
-import { Button, Card, Checkbox, Empty, Field, Grid, KeyValueList, Notice, Pill, Row, Segmented, Select, Stack, Tabs, TextArea, TextInput, Toolbar, ToolbarSeparator } from "@/design-system";
+import { Button, Card, Checkbox, Empty, Field, Grid, KeyValueList, Notice, OverlaySection, OverlaySummary, Pill, Row, Segmented, Select, Stack, Tabs, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -88,19 +88,16 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
 
   const palette = (
     <div className="t6-pane" key="palette">
-      <Stack gap={4}>
+      <Stack gap={3}>
         <div>
           <h3 style={{ fontSize: "var(--text-md)" }}>Fields</h3>
-          <p className="ds-subtle">Press to add after the selection, or drag onto a position.</p>
+          <p className="ds-subtle">Press to add after the selection, or drag onto a position. Every field also has move up and down buttons, and its grip works with Space and the arrow keys.</p>
         </div>
         <div className="t6-palette">
           {FIELD_TYPES.map((type) => (
             <PaletteChip key={type} type={type} label={FIELD_LABELS[type]} hint={FIELD_HINTS[type]} icon={ICONS[type]} onInsert={() => insert(type)} />
           ))}
         </div>
-        <Notice tone="info" title="Keyboard equivalent">
-          Every field has <strong>Move up</strong> and <strong>Move down</strong> buttons, and the grip picks a field up with Space and moves it with the arrow keys. Nothing here needs a pointer.
-        </Notice>
       </Stack>
     </div>
   );
@@ -108,14 +105,6 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
   const canvas = (
     <div className="t6-pane" data-kind="canvas" key="canvas">
       <Stack gap={3}>
-        <Row gap={2} wrap>
-          <strong>{record.title}</strong>
-          <Pill tone="neutral">{model.fields.filter((field) => !STRUCTURAL.includes(field.type)).length} questions</Pill>
-          <Pill tone={issues.some((issue) => issue.level === "fail") ? "danger" : issues.length ? "warning" : "success"}>
-            {issues.length === 0 ? "Logic clear" : `${issues.length} logic note${issues.length === 1 ? "" : "s"}`}
-          </Pill>
-          <Pill tone="info">Version {model.settings.version}</Pill>
-        </Row>
         {model.fields.length === 0 ? (
           <Empty title="No fields yet" icon={<Type size={20} />}>Add one from the palette on the left.</Empty>
         ) : (
@@ -226,47 +215,35 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
 
   return (
     <div className="t6-shell">
-      <section className="t6-editor-overview" aria-label="Form editor overview">
+      <section className="t6-editor-overview" aria-label="Form editor overview" data-compact="true">
         <div className="t6-editor-overview-heading">
-          <div><span className="ds-subtle">FORMS / BUILDER</span>
-            <h2>{record.title}</h2>
-            <p className="ds-subtle">Build the questions, validate branching, preview the response experience and review publication readiness.</p>
-          </div>
-          <Row gap={2} wrap>
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/logic`)}>Logic</Button>
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/submissions`)}>Submissions</Button>
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/analytics`)}>Analytics</Button>
-          </Row>
-        </div>
-        <div className="t6-directory-metrics" aria-label="Form editor health">
-          <div><span>Questions</span><strong>{answerableCount}</strong></div>
-          <div><span>Required</span><strong>{requiredCount}</strong></div>
-          <div><span>Logic rules</span><strong>{model.logic.length}</strong></div>
-          <div><span>Review notes</span><strong>{issues.length + sensitiveCount}</strong></div>
-        </div>
-        {issues.some((issue) => issue.level === "fail") && <Notice tone="warning" title="Logic needs review">Resolve the failing branches before publishing. <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/logic`)}>Review logic</Button></Notice>}
-      </section>
-      <div className="t6-shell-bar">
-        <Toolbar label="Form builder">
-          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms`)}>All forms</Button>
-          <ToolbarSeparator />
           <MiniField label="Form">
             <Select value={record.id} onChange={(event) => context.navigate(`/o/${context.org.slug}/forms/forms/${event.target.value}`)} aria-label="Form being edited">
               {forms.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
             </Select>
           </MiniField>
-          <ToolbarSeparator />
           <Pill tone={record.status === "live" ? "success" : "neutral"} dot>{record.status}</Pill>
           <Pill tone="info">Version {model.settings.version}</Pill>
-        </Toolbar>
-        <span className="ds-grow" />
-        <Row gap={2}>
-          <Button size="sm" variant="secondary" onClick={() => context.openOverlay("insert field")}>Insert field</Button>
-          <Button size="sm" variant="ghost" onClick={() => context.openOverlay("move field")}>Reorder</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/publish`)}>Design and publish</Button>
-          <Button size="sm" variant="primary" onClick={() => context.openOverlay("publish review")}>Publish</Button>
-        </Row>
-      </div>
+          <span className="ds-grow" />
+          <Row gap={2} wrap>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/logic`)}>Logic</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/submissions`)}>Submissions</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/analytics`)}>Analytics</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("insert field")}>Insert field</Button>
+            <Button size="sm" variant="primary" onClick={() => context.openOverlay("publish review")}>Publish</Button>
+          </Row>
+        </div>
+        <ul className="forms-health" aria-label="Form editor health">
+          <li><strong>{answerableCount}</strong> questions</li>
+          <li><strong>{requiredCount}</strong> required</li>
+          <li><strong>{model.logic.length}</strong> logic rules</li>
+          <li data-tone={issues.some((issue) => issue.level === "fail") ? "danger" : issues.length ? "warning" : "success"}>
+            {issues.length === 0 ? "Logic clear" : `${issues.length} logic note${issues.length === 1 ? "" : "s"}`}
+          </li>
+          {sensitiveCount > 0 && <li data-tone="warning"><strong>{sensitiveCount}</strong> sensitive</li>}
+        </ul>
+        {issues.some((issue) => issue.level === "fail") && <Notice tone="warning" title="Logic needs review">Resolve the failing branches before publishing. <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/logic`)}>Review logic</Button></Notice>}
+      </section>
       <div className="t6-shell-tabs">
         <Tabs
           label="Builder views"
@@ -358,73 +335,85 @@ export function VisibilityEditor({ field, model, onLogic }: { field: FormField; 
 }
 
 export function FieldInspector({
-  field, model, onEdit, onRemove, onLogic,
-}: { field: FormField; model: FormModel; onEdit: (patch: Partial<FormField>) => void; onRemove?: () => void; onLogic?: (logic: LogicRule[], label: string) => void }) {
+  field, model, onEdit, onRemove, onLogic, showHead = true,
+}: { field: FormField; model: FormModel; onEdit: (patch: Partial<FormField>) => void; onRemove?: () => void; onLogic?: (logic: LogicRule[], label: string) => void; showHead?: boolean }) {
   const governed = model.logic.filter((rule) => rule.targetId === field.id);
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const confirmingRemoval = pendingRemovalId === field.id;
+  const structural = STRUCTURAL.includes(field.type);
+  const hasRules = field.type === "text" || field.type === "longtext" || field.type === "email" || field.type === "fileref"
+    || field.type === "number" || field.type === "rating" || field.type === "date" || field.type === "select" || field.type === "multiselect";
   return (
     <Stack gap={3}>
-      <div className="t6-field-context" aria-label="Selected field context">
-        <span className="ds-subtle">FORM BUILDER / FIELD SETTINGS</span>
-        <Row gap={2} wrap><strong className="ds-grow">{field.label || "Untitled field"}</strong><Pill tone="neutral">{FIELD_LABELS[field.type]}</Pill></Row>
-        <p className="ds-subtle">{STRUCTURAL.includes(field.type) ? "This element structures the form; it does not collect an answer." : `Question ${model.fields.findIndex((item) => item.id === field.id) + 1} of ${model.fields.length} · ${field.required ? "Required" : "Optional"} · ${governed.length} conditional rules`}</p>
-      </div>
-      <Field label={field.type === "section" ? "Heading" : "Question"} required>
-        <TextInput value={field.label} onChange={(event) => onEdit({ label: event.target.value })} />
-      </Field>
-      {!STRUCTURAL.includes(field.type) && (
-        <>
-          <Field label="Help text" hint="Shown under the question."><TextInput value={field.help} onChange={(event) => onEdit({ help: event.target.value })} /></Field>
-          <Checkbox label="Required" checked={field.required} onChange={(event) => onEdit({ required: event.target.checked })} />
-          <Checkbox label="Treat the answer as sensitive" checked={field.sensitive} onChange={(event) => onEdit({ sensitive: event.target.checked })} />
-          <Field label="Change the type" hint="Validation rules that do not apply to the new type are dropped.">
-            <Select value={field.type} onChange={(event) => {
-              const type = event.target.value as FieldType;
-              const fresh = makeField(type);
-              onEdit({ type, options: type === "select" || type === "multiselect" ? (field.options.length ? field.options : fresh.options) : [], pattern: fresh.pattern, min: fresh.min, max: fresh.max, maxLength: fresh.maxLength });
-            }}>
-              {FIELD_TYPES.map((type) => <option key={type} value={type}>{FIELD_LABELS[type]}</option>)}
-            </Select>
+      {showHead && <FieldSummary field={field} model={model} />}
+      <OverlaySection title={field.type === "section" ? "Heading" : "Question"}>
+        <Stack gap={3}>
+          <Field label={field.type === "section" ? "Heading" : "Question"} required>
+            <TextInput value={field.label} onChange={(event) => onEdit({ label: event.target.value })} />
           </Field>
-        </>
+          {!structural && (
+            <>
+              <Field label="Help text" hint="Shown under the question."><TextInput value={field.help} onChange={(event) => onEdit({ help: event.target.value })} /></Field>
+              <Field label="Placeholder"><TextInput value={field.placeholder} onChange={(event) => onEdit({ placeholder: event.target.value })} /></Field>
+              <Field label="Change the type" hint="Validation rules that do not apply to the new type are dropped.">
+                <Select value={field.type} onChange={(event) => {
+                  const type = event.target.value as FieldType;
+                  const fresh = makeField(type);
+                  onEdit({ type, options: type === "select" || type === "multiselect" ? (field.options.length ? field.options : fresh.options) : [], pattern: fresh.pattern, min: fresh.min, max: fresh.max, maxLength: fresh.maxLength });
+                }}>
+                  {FIELD_TYPES.map((type) => <option key={type} value={type}>{FIELD_LABELS[type]}</option>)}
+                </Select>
+              </Field>
+            </>
+          )}
+        </Stack>
+      </OverlaySection>
+      {!structural && (
+        <OverlaySection title="Validation" hint="Checked before a response is recorded; a field hidden by a rule is skipped.">
+          <Stack gap={3}>
+            <Checkbox label="Required" checked={field.required} onChange={(event) => onEdit({ required: event.target.checked })} />
+            <Checkbox label="Treat the answer as sensitive" checked={field.sensitive} onChange={(event) => onEdit({ sensitive: event.target.checked })} />
+            {(field.type === "select" || field.type === "multiselect") && (
+              <Field label="Options" hint="One per line. A rule that compares against a value not in this list is reported as unreachable.">
+                <TextArea rows={4} value={field.options.join("\n")} onChange={(event) => onEdit({ options: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} />
+              </Field>
+            )}
+            {(field.type === "text" || field.type === "longtext" || field.type === "email" || field.type === "fileref") && (
+              <>
+                <Row gap={2}>
+                  <Field label="Least characters"><TextInput type="number" min={0} value={String(field.minLength)} onChange={(event) => onEdit({ minLength: Number(event.target.value) || 0 })} /></Field>
+                  <Field label="Most characters"><TextInput type="number" min={0} value={String(field.maxLength)} onChange={(event) => onEdit({ maxLength: Number(event.target.value) || 0 })} /></Field>
+                </Row>
+                <Field label="Pattern" hint="Checked when the answer is not empty.">
+                  <Select value={field.pattern} onChange={(event) => onEdit({ pattern: event.target.value as FormField["pattern"] })}>
+                    <option value="">No pattern</option>
+                    <option value="email">Email address</option>
+                    <option value="phone">Telephone number</option>
+                    <option value="postcode">Postal code</option>
+                    <option value="url">Web address</option>
+                  </Select>
+                </Field>
+              </>
+            )}
+            {(field.type === "number" || field.type === "rating" || field.type === "date") && (
+              <Row gap={2}>
+                <Field label={field.type === "date" ? "Earliest" : "Smallest"}>
+                  <TextInput type={field.type === "date" ? "date" : "number"} value={String(field.min)} onChange={(event) => onEdit({ min: Number(event.target.value) || 0 })} />
+                </Field>
+                <Field label={field.type === "date" ? "Latest" : "Largest"}>
+                  <TextInput type={field.type === "date" ? "date" : "number"} value={String(field.max)} onChange={(event) => onEdit({ max: Number(event.target.value) || 0 })} />
+                </Field>
+              </Row>
+            )}
+            {!hasRules && <span className="ds-subtle">This type has no value rules beyond required.</span>}
+          </Stack>
+        </OverlaySection>
       )}
-      {(field.type === "select" || field.type === "multiselect") && (
-        <Field label="Options" hint="One per line. A rule that compares against a value not in this list is reported as unreachable.">
-          <TextArea rows={4} value={field.options.join("\n")} onChange={(event) => onEdit({ options: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} />
-        </Field>
+      {onLogic && !structural && (
+        <OverlaySection title="Visibility" hint="Reads only earlier questions, so the condition can always be answered.">
+          <VisibilityEditor key={field.id} field={field} model={model} onLogic={onLogic} />
+        </OverlaySection>
       )}
-      {(field.type === "text" || field.type === "longtext" || field.type === "email" || field.type === "fileref") && (
-        <>
-          <Row gap={2}>
-            <Field label="Least characters"><TextInput type="number" min={0} value={String(field.minLength)} onChange={(event) => onEdit({ minLength: Number(event.target.value) || 0 })} /></Field>
-            <Field label="Most characters"><TextInput type="number" min={0} value={String(field.maxLength)} onChange={(event) => onEdit({ maxLength: Number(event.target.value) || 0 })} /></Field>
-          </Row>
-          <Field label="Pattern" hint="Checked when the answer is not empty.">
-            <Select value={field.pattern} onChange={(event) => onEdit({ pattern: event.target.value as FormField["pattern"] })}>
-              <option value="">No pattern</option>
-              <option value="email">Email address</option>
-              <option value="phone">Telephone number</option>
-              <option value="postcode">Postal code</option>
-              <option value="url">Web address</option>
-            </Select>
-          </Field>
-        </>
-      )}
-      {(field.type === "number" || field.type === "rating" || field.type === "date") && (
-        <Row gap={2}>
-          <Field label={field.type === "date" ? "Earliest" : "Smallest"}>
-            <TextInput type={field.type === "date" ? "date" : "number"} value={String(field.min)} onChange={(event) => onEdit({ min: Number(event.target.value) || 0 })} />
-          </Field>
-          <Field label={field.type === "date" ? "Latest" : "Largest"}>
-            <TextInput type={field.type === "date" ? "date" : "number"} value={String(field.max)} onChange={(event) => onEdit({ max: Number(event.target.value) || 0 })} />
-          </Field>
-        </Row>
-      )}
-      {!STRUCTURAL.includes(field.type) && (
-        <Field label="Placeholder"><TextInput value={field.placeholder} onChange={(event) => onEdit({ placeholder: event.target.value })} /></Field>
-      )}
-      {onLogic && !STRUCTURAL.includes(field.type) && <VisibilityEditor key={field.id} field={field} model={model} onLogic={onLogic} />}
       {governed.length > 0 && (
         <Notice tone="info" title={`${governed.length} rule${governed.length === 1 ? "" : "s"} governs this field`}>
           {governed.map((rule) => `${rule.action} when ${model.fields.find((item) => item.id === rule.whenFieldId)?.label ?? "a missing field"} ${rule.operator.replace("_", " ")} ${rule.value}`).join("; ")}
@@ -440,6 +429,23 @@ export function FieldInspector({
         </Notice>
       ) : <Button size="sm" variant="outline-danger" onClick={() => setPendingRemovalId(field.id)}>Remove this field</Button>)}
     </Stack>
+  );
+}
+
+/** Identity of the selected field: its label, type, position and how many rules touch it. */
+export function FieldSummary({ field, model }: { field: FormField; model: FormModel }) {
+  const governed = model.logic.filter((rule) => rule.targetId === field.id).length;
+  const position = model.fields.findIndex((item) => item.id === field.id) + 1;
+  const structural = STRUCTURAL.includes(field.type);
+  return (
+    <OverlaySummary
+      eyebrow={FIELD_LABELS[field.type]}
+      title={field.label || "Untitled field"}
+      status={!structural && field.required ? <Pill tone="warning">required</Pill> : undefined}
+      meta={structural
+        ? ["Structures the form; collects no answer"]
+        : [`Question ${position} of ${model.fields.length}`, field.sensitive ? "Sensitive" : "", governed ? `${governed} conditional ${governed === 1 ? "rule" : "rules"}` : ""]}
+    />
   );
 }
 

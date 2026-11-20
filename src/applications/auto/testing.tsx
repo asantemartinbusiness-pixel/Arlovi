@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, FlaskConical, ListChecks, Receipt, XCircle } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties, Row,
-  Select, Stack, Stat, StatRow, TextInput,
+  Button, Card, DataGrid, Empty, FactGrid, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
@@ -312,7 +311,9 @@ export function AssertionBuilder({ context, close }: { context: ScreenContext; c
       <Field label="Expected value">
         <TextInput aria-label="Expected value" value={value} onChange={(event) => setValue(event.target.value)} />
       </Field>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         disabled={subject === "status" ? nodeId === "" : name.trim() === ""}
         onClick={() => {
@@ -330,9 +331,12 @@ export function AssertionBuilder({ context, close }: { context: ScreenContext; c
         }}
       >
         Add assertion
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
       <Notice tone="info" title="Assertions are stored on the graph">
-        They travel with the workflow, so a duplicate of the automation keeps its tests.
+        They travel with the workflow, so a duplicate keeps its tests.
       </Notice>
     </Stack>
   );
@@ -440,21 +444,23 @@ export function RunDryRun({ context, close }: { context: ScreenContext; close: (
   const providerSteps = draft.graph.nodes.filter((node) => node.config?.kind === "provider.call");
   return (
     <Stack gap={4}>
+      <ModalInFlight when={busy} />
       <Notice tone="info" title="A dry run writes nothing and sends nothing">
-        Conditions, expressions and gates are evaluated against the records this company holds. Steps that would send an email, take a payment or call a provider are simulated and recorded as not run.
+        Steps that would send an email, take a payment or call a provider are simulated and recorded as not run.
       </Notice>
-      <Properties rows={[
-        { label: "Automation", value: record.title },
-        { label: "Steps in the graph", value: String(draft.graph.nodes.length) },
-        { label: "Provider steps simulated", value: String(providerSteps.length) },
-        { label: "Fixture", value: Object.keys(draft.fixture ?? {}).length ? `${Object.keys(draft.fixture).length} fixture values over this company's records` : "Records from this company" },
-        { label: "Assertions", value: String(draft.graph.assertions?.length ?? 0) },
+      <FactGrid columns={2} items={[
+        { label: "Steps in the graph", value: String(draft.graph.nodes.length), mono: true },
+        { label: "Provider steps simulated", value: String(providerSteps.length), mono: true },
+        { label: "Fixture", value: Object.keys(draft.fixture ?? {}).length ? `${Object.keys(draft.fixture).length} values` : "None, real records" },
+        { label: "Assertions", value: String(draft.graph.assertions?.length ?? 0), mono: true },
       ]} />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
+            if (busy) return;
             setBusy(true);
             try {
               const result = executeDry({ context, graph: draft.graph, pool, fixture: draft.fixture });
@@ -469,10 +475,11 @@ export function RunDryRun({ context, close }: { context: ScreenContext; close: (
           }}
         >
           Run the dry run
-        </Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("Fixture editor")}>Edit the fixture first</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          secondary={<Button variant="secondary" onClick={() => context.openOverlay("Fixture editor")}>Edit the fixture first</Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -493,36 +500,43 @@ export function ApproveTestResult({ context, close }: { context: ScreenContext; 
           : draft.dirty ? "The graph has unsaved changes since it was tested. Save it and run again." : undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Automation", value: record.title },
-        { label: "Latest dry run", value: draft.dryRunAt ? context.dateTime(draft.dryRunAt) : "None" },
-        { label: "Outcome", value: run ? run.status.replace(/_/g, " ") : "—" },
-        { label: "Assertions passing", value: `${checks.length - failing.length} of ${checks.length}` },
+      <ModalInFlight when={busy} />
+      <FactGrid columns={2} items={[
+        { label: "Latest dry run", value: draft.dryRunAt ? context.dateTime(draft.dryRunAt) : "None yet" },
+        { label: "Outcome", value: run ? run.status.replace(/_/g, " ") : "No dry run", tone: run?.status === "failed" ? "danger" : undefined },
+        { label: "Assertions passing", value: `${checks.length - failing.length} of ${checks.length}`, mono: true, tone: failing.length ? "danger" : undefined },
         { label: "Previously approved", value: record.fields.testApprovedBy ? `${String(record.fields.testApprovedBy)}, ${context.dateTime(String(record.fields.testApprovedAt ?? ""))}` : "Never" },
       ]} />
       <Notice tone={blocked ? "danger" : "info"} title={blocked ? "This result cannot be approved" : "Approval is recorded against this tested version"}>
         {blocked ?? `${context.actor} is recorded as approving revision ${record.revision}. Activation still asks separately.`}
       </Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("run_automation")}
           onClick={async () => {
+            if (busy) return;
             setBusy(true);
-            const saved = await context.mutate.patch(record.id, {
-              fields: { ...record.fields, testApprovedBy: context.actor, testApprovedAt: clockIso(), testApprovedRevision: record.revision, testAssertions: checks.length },
-            }, { expectRevision: record.revision, event: `Test result approved by ${context.actor}: ${checks.length} assertions pass` });
-            if (saved) context.toast("Test result approved", `${record.title} is approved as tested by ${context.actor}.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(record.id, {
+                fields: { ...record.fields, testApprovedBy: context.actor, testApprovedAt: clockIso(), testApprovedRevision: record.revision, testAssertions: checks.length },
+              }, { expectRevision: record.revision, event: `Test result approved by ${context.actor}: ${checks.length} assertions pass` });
+              if (!saved) return;
+              context.toast("Test result approved", `${record.title} is approved as tested by ${context.actor}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Approve the test result
-        </Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("assertion builder")}>Add an assertion</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          secondary={<Button variant="secondary" onClick={() => context.openOverlay("assertion builder")}>Add an assertion</Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

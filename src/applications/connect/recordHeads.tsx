@@ -35,7 +35,7 @@ export function connectorRecordHeader(context: ScreenContext, kind: "connector" 
       `Consent: none given · 0 of ${entry.scopes.length} scopes granted`,
       `${readScopes} read · ${writeScopes} write`,
       kind === "connection" && record?.ownerName ? `Owner ${record.ownerName}` : null,
-      `Contract ${entry.version}`,
+      entry.version,
     ],
   };
 }

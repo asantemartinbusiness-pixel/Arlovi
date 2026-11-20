@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Bot, GitBranch, ShieldCheck, Sparkles, Wrench } from "lucide-react";
 import {
-  Button, Card, Empty, Field, Grid, Meter, Notice, Pill, Properties, Row, Select,
+  Button, Card, Empty, FactGrid, Field, Grid, Meter, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select,
   Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES, capabilityById } from "@/platform/capability";
@@ -352,9 +352,13 @@ export function ActionParameter({ context, close }: { context: ScreenContext; cl
         </Select>
       </Field>
       <Notice tone="info" title="Retries are honest">
-        The interpreter is deterministic: a step that fails because a binding is missing fails the same way on every attempt. Each attempt is still recorded with its backoff so the policy is visible.
+        The interpreter is deterministic: a step that fails on a missing binding fails the same way each attempt. Every attempt is still recorded with its backoff.
       </Notice>
-      <Button variant="primary" onClick={() => { context.toast("Mapping updated", `${node.label} now maps ${node.config?.titleExpr || "no title"}. Save the graph to keep it.`); close(); }}>Done</Button>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => { context.toast("Mapping updated", `${node.label} now maps ${node.config?.titleExpr || "no title"}. Save the graph to keep it.`); close(); }}>Done</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -366,12 +370,11 @@ export function PolicySimulation({ context }: { context: ScreenContext }) {
   const capability = node?.config?.capability ? capabilityById(node.config.capability) : undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Step", value: node?.label ?? "none selected" },
-        { label: "Action", value: ACTION_KINDS.find((kind) => kind.id === node?.config?.kind)?.label ?? "—" },
-        { label: "Impact", value: node?.config?.impact ?? "low" },
-        { label: "Role view", value: context.role },
-        { label: "May run automations", value: context.can("run_automation") ? "yes" : "no" },
+      <FactGrid columns={2} items={[
+        { label: "Step", value: node?.label ?? "None selected" },
+        { label: "Action", value: ACTION_KINDS.find((kind) => kind.id === node?.config?.kind)?.label ?? "Not set" },
+        { label: "Impact", value: node?.config?.impact ?? "low", tone: node?.config?.impact === "high" ? "danger" : undefined },
+        { label: "May run automations", value: context.can("run_automation") ? `Yes, as ${context.role}` : `No, as ${context.role}` },
       ]} />
       {capability ? (
         <Notice tone={CAPABILITY_TONE[capability.state] === "success" ? "success" : "warning"} title={`${capability.label} — ${CAPABILITY_LABELS[capability.state]}`}>
@@ -386,7 +389,7 @@ export function PolicySimulation({ context }: { context: ScreenContext }) {
         </Notice>
       )}
       <Notice tone="info" title="Not server-side enforcement">
-        These checks shape what this browser offers. A future service would enforce them on the server; this screen does not claim that it does.
+        These checks shape what this browser offers. They are not enforced on a server.
       </Notice>
     </Stack>
   );

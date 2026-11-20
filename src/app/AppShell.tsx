@@ -316,11 +316,21 @@ export function AppShell() {
     const container = document.querySelector<HTMLElement>(".hq-scroll");
     // A keyboard/screen-reader user needs a reliable focus destination after
     // client-side routing. Skip the focus move for the first shell mount.
-    const heading = container?.querySelector<HTMLElement>("h1");
-    if (heading) {
+    /* Lazily loaded surfaces render their heading after this effect runs, so
+       keep watching the scroll region briefly until an h1 exists. */
+    const focusHeading = () => {
+      const heading = container?.querySelector<HTMLElement>("h1");
+      if (!heading) return false;
       heading.setAttribute("tabindex", "-1");
       heading.focus({ preventScroll: true });
-    }
+      return true;
+    };
+    if (focusHeading() || !container) return;
+    const observer = new MutationObserver(() => { if (focusHeading()) stop(); });
+    const timer = window.setTimeout(() => stop(), 2500);
+    function stop() { observer.disconnect(); window.clearTimeout(timer); }
+    observer.observe(container, { childList: true, subtree: true });
+    return stop;
   }, [location.pathname]);
 
   useEffect(() => {

@@ -329,9 +329,9 @@ export function ComponentLibrary({ context, lens }: { context: ScreenContext; le
   }
 
   if (lens === "Variants") {
+    if (rows.length === 0) return <Empty title="No variants recorded" icon={<Layers size={20} />}>A variant is a named alternative of a component, for example a hero with the image on the right.</Empty>;
     return (
       <Grid>
-        {rows.length === 0 && <Empty title="No variants recorded" icon={<Layers size={20} />}>A variant is a named alternative of a component, for example a hero with the image on the right.</Empty>}
         {rows.map((component) => (
           <Card key={component.id} span={6} title={component.name} subtitle={`${component.variants.length} variants`}
             footer={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("Component property", { id: component.id })}>Properties</Button>}>
@@ -345,14 +345,16 @@ export function ComponentLibrary({ context, lens }: { context: ScreenContext; le
     );
   }
 
+  if (rows.length === 0) {
+    return (
+      <Empty title={lens === "Shared" ? "Nothing is shared yet" : "No local components"} icon={<Shapes size={20} />}
+        action={<Button variant="primary" onClick={() => context.openOverlay("Component property")}>Extract a section</Button>}>
+        Extract repeated blocks into a component so one edit reaches every page that uses it.
+      </Empty>
+    );
+  }
   return (
     <Grid>
-      {rows.length === 0 && (
-        <Empty title={lens === "Shared" ? "Nothing is shared yet" : "No local components"} icon={<Shapes size={20} />}
-          action={<Button variant="primary" onClick={() => context.openOverlay("Component property")}>Extract a section</Button>}>
-          Extract repeated blocks into a component so one edit reaches every page that uses it.
-        </Empty>
-      )}
       {rows.map((component) => (
         <Card key={component.id} span={4} title={component.name}
           subtitle={component.blocks.map((block) => BLOCK_LABELS[block.type]).join(" · ")}

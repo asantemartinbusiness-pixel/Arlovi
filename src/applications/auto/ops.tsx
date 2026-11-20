@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { AlertOctagon, CalendarClock, Gauge, PlugZap, ShieldQuestion } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
-  Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, Meter, ModalActions, ModalInFlight, Notice,
+  OverlayActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -140,7 +140,10 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
               <Stack gap={3}>
                 <Field label="Parallel runs allowed" hint="A firing beyond this number queues instead of starting.">
                   <TextInput aria-label="Parallel runs allowed" type="number" min={1} max={8} value={String(spec.concurrency)}
-                    onChange={(event) => void context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: Number(event.target.value) } }, { event: "Concurrency changed" })}
+                    onChange={(event) => {
+                      const next = Math.min(8, Math.max(1, Number(event.target.value) || 1));
+                      void context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: next } }, { expectRevision: workflow.revision, event: "Concurrency changed" });
+                    }}
                   />
                 </Field>
                 <Properties rows={[
@@ -155,7 +158,11 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => void context.mutate.patch(workflow.id, { fields: { ...workflow.fields, schedulePaused: !spec.paused } }, { event: spec.paused ? "Schedule resumed" : "Schedule paused" })}
+                    onClick={async () => {
+                      const saved = await context.mutate.patch(workflow.id, { fields: { ...workflow.fields, schedulePaused: !spec.paused } }, { expectRevision: workflow.revision, event: spec.paused ? "Schedule resumed" : "Schedule paused" });
+                      if (!saved) return;
+                      context.toast(spec.paused ? "Schedule resumed" : "Schedule paused", spec.paused ? `Firings are computed again for ${workflow.title}.` : `No firing is computed for ${workflow.title} until it is resumed.`);
+                    }}
                   >
                     {spec.paused ? "Resume the schedule" : "Pause the schedule"}
                   </Button>
@@ -311,10 +318,12 @@ export function ScheduleEditor({ context, close }: { context: ScreenContext; clo
           </Row>
         ))}
       </Stack>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(workflow.id, {
+          const saved = await context.mutate.patch(workflow.id, {
             fields: {
               ...workflow.fields,
               scheduleFrequency: merged.frequency,
@@ -323,12 +332,16 @@ export function ScheduleEditor({ context, close }: { context: ScreenContext; clo
               scheduleTimezone: merged.timezone,
             },
           }, { expectRevision: workflow.revision, event: "Schedule changed" });
-          context.toast("Rescheduled", describeSchedule(merged));
+          if (!saved) return;
+          context.toast("Rescheduled", `${describeSchedule(merged)} Recorded only; nothing fires it.`);
           close();
         }}
       >
         Save the schedule
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -354,16 +367,21 @@ export function QueuePriority({ context, close }: { context: ScreenContext; clos
       <Notice tone="info" title="One worker runs here">
         This browser executes one run at a time, in the tab. The concurrency figure is what a scheduler would honour, and the queue screen measures waiting runs against it.
       </Notice>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         onClick={async () => {
-          if (!await context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: value } }, { expectRevision: workflow.revision, event: "Concurrency changed" })) return;
-          context.toast("Concurrency changed", `${workflow.title} allows ${value} parallel run${value === 1 ? "" : "s"}.`);
+          if (!await context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: Math.min(8, Math.max(1, value)) } }, { expectRevision: workflow.revision, event: "Concurrency changed" })) return;
+          context.toast("Concurrency changed", `${workflow.title} allows ${Math.min(8, Math.max(1, value))} parallel run${value === 1 ? "" : "s"}.`);
           close();
         }}
       >
         Save
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -379,10 +397,10 @@ export function ImpactWarning({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Firings in the next seven days", value: String(firings.length) },
-        { label: "Runs already waiting", value: String(waiting.length) },
-        { label: "Steps that would call a provider", value: String(providerSteps.length) },
+      <FactGrid columns={2} items={[
+        { label: "Firings in the next seven days", value: String(firings.length), mono: true },
+        { label: "Runs already waiting", value: String(waiting.length), mono: true },
+        { label: "Steps that would call a provider", value: String(providerSteps.length), mono: true },
         { label: "Workers available", value: "1 local interpreter" },
       ]} />
       {providerSteps.length > 0 && (
@@ -644,33 +662,53 @@ export function AutomationExceptions({ context, tab }: { context: ScreenContext;
 
 /* ------------------------------ 009 overlays ------------------------------ */
 
+export function IncidentSummary({ context }: { context: ScreenContext }) {
+  const exception = useRecord(context.selectedId);
+  if (!exception) return null;
+  const done = ["resolved", "closed"].includes(exception.status);
+  const verified = exception.fields.providerVerified === true;
+  return (
+    <OverlaySummary
+      eyebrow="Automation exception"
+      title={exception.title}
+      status={<Pill tone={done ? (verified || exception.fields.cause !== "provider" ? "success" : "warning") : "warning"} dot>{exception.status.replace(/_/g, " ")}</Pill>}
+      meta={[`Owner ${exception.ownerName}`, `Raised ${context.dateTime(exception.createdAt)}`]}
+    />
+  );
+}
+
 export function IncidentDetail({ context }: { context: ScreenContext }) {
   const exception = useRecord(context.selectedId);
   const run = useRecord(String(exception?.fields.runId ?? ""));
   const stored = readRun(run);
   if (!exception) return <Empty title="Choose an exception" />;
   const step = stored?.result.steps.find((item) => item.nodeId === exception.fields.nodeId);
+  const done = ["resolved", "closed"].includes(exception.status);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: <Pill tone={["resolved", "closed"].includes(exception.status) ? "success" : "warning"} dot>{exception.status}</Pill> },
+      <FactGrid columns={2} items={[
         { label: "Cause", value: String(exception.fields.cause ?? "unknown") },
         { label: "Severity", value: String(exception.fields.severity ?? "medium") },
-        { label: "Run", value: String(exception.fields.runId ?? "—") },
-        { label: "Node", value: String(exception.fields.nodeId || "—") },
-        { label: "Assigned to", value: exception.ownerName },
-        { label: "Raised", value: context.dateTime(exception.createdAt) },
+        { label: "Run", value: String(exception.fields.runId ?? "Not recorded"), mono: true },
+        { label: "Node", value: String(exception.fields.nodeId || "Not recorded"), mono: true },
       ]} />
       <p>{exception.summary}</p>
       {step && (
-        <Notice tone={step.status === "failed" ? "danger" : "warning"} title={`${step.label} — ${step.status}`}>
+        <Notice tone={step.status === "failed" ? "danger" : "warning"} title={`${step.label}: ${step.status}`}>
           {step.message}
         </Notice>
       )}
-      <Row gap={2} wrap>
-        {run && <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/runs/${run.id}`)}>Open the run</Button>}
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("resolution record")}>Record a resolution</Button>
-      </Row>
+      {done && exception.fields.cause === "provider" && exception.fields.providerVerified !== true && (
+        <Notice tone="warning" title="Resolved locally, provider unverified">
+          No provider has confirmed the fix, so this is not a verified resolution.
+        </Notice>
+      )}
+      <DrawerActions>
+        <OverlayActions
+          primary={run ? <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/runs/${run.id}`)}>Open the run</Button> : undefined}
+          secondary={!done ? <Button variant="secondary" onClick={() => context.openOverlay("resolution record")}>Record a resolution</Button> : undefined}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -692,23 +730,29 @@ export function ConnectorReconnect({ context, close }: { context: ScreenContext;
         </Notice>
       )}
       <Notice tone="danger" title="A connection cannot be made from here">
-        There is no server to hold a credential and no provider to authorise it. Pressing the button below records that a reconnection was attempted and moves the exception to awaiting user; it does not connect anything and does not mark the exception resolved.
+        There is no server to hold a credential and no provider to authorise it. The button below only records the attempt and moves the exception to awaiting user. It does not connect anything and does not resolve the exception.
       </Notice>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="secondary"
         disabled={!exception}
         onClick={async () => {
           if (!exception) return;
-          await context.mutate.patch(exception.id, {
+          const saved = await context.mutate.patch(exception.id, {
             status: "awaiting_user",
             fields: { ...exception.fields, reconnectAttemptedAt: new Date(context.now).toISOString(), capability: capabilityId, providerVerified: false },
           }, { expectRevision: exception.revision, event: `Reconnection attempt recorded for ${capabilityId}` });
+          if (!saved) return;
           context.toast("Recorded, not connected", `${capability?.label} is still ${capability ? CAPABILITY_LABELS[capability.state].toLowerCase() : "unavailable"}. The exception is awaiting a person.`, "blocked");
           close();
         }}
       >
         Record the reconnection attempt
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -744,11 +788,13 @@ export function ResolutionRecord({ context, close }: { context: ScreenContext; c
           )}
         </>
       )}
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         disabled={note.trim() === ""}
         onClick={async () => {
-          await context.mutate.patch(exception.id, {
+          const saved = await context.mutate.patch(exception.id, {
             status: "resolved",
             summary: note.trim(),
             fields: {
@@ -759,6 +805,7 @@ export function ResolutionRecord({ context, close }: { context: ScreenContext; c
               resolvedAt: new Date(context.now).toISOString(),
             },
           }, { expectRevision: exception.revision, event: `Exception resolved${providerCause && !verified ? " locally, provider unverified" : ""}` });
+          if (!saved) return;
           context.toast(
             providerCause && !verified ? "Resolved locally" : "Resolved",
             providerCause && !verified ? "Recorded as resolved locally with the provider unverified." : "The exception is closed with the resolution on the record.",
@@ -768,7 +815,10 @@ export function ResolutionRecord({ context, close }: { context: ScreenContext; c
         }}
       >
         Record the resolution
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -787,19 +837,25 @@ export function AssignException({ context, close }: { context: ScreenContext; cl
           ))}
         </Select>
       </Field>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(exception.id, {
+          const saved = await context.mutate.patch(exception.id, {
             status: "investigating",
             ownerName: owner,
           }, { expectRevision: exception.revision, event: `Exception assigned to ${owner}` });
+          if (!saved) return;
           context.toast("Assigned", `${owner} owns ${exception.title}. It is now under investigation.`);
           close();
         }}
       >
         Assign and start investigating
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -823,15 +879,19 @@ export function RetryFromException({ context, close }: { context: ScreenContext;
           The cause was a provider boundary, which has not changed. The retry is still recorded, and the new run will show the same block, which is the honest result.
         </Notice>
       )}
-      <Button
+      <ModalInFlight when={busy} />
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         busy={busy}
         disabled={!context.can("run_automation")}
         onClick={async () => {
+          if (busy) return;
           setBusy(true);
           try {
             const outcome = await executeRun({ context, workflow, graph: stored.graph, pool, mode: "live", trigger: `Retry from exception ${exception.id}` });
-            await context.mutate.patch(exception.id, {
+            const saved = await context.mutate.patch(exception.id, {
               status: outcome.run.status === "completed" ? "resolved" : "investigating",
               fields: {
                 ...exception.fields,
@@ -840,7 +900,13 @@ export function RetryFromException({ context, close }: { context: ScreenContext;
                 resolution: outcome.run.status === "completed" ? `A retry completed as run ${outcome.runId}.` : `A retry finished as ${outcome.run.status}.`,
               },
             }, { expectRevision: exception.revision, event: `Retry recorded as ${outcome.runId}` });
-            context.toast("Retried", `The new run finished as ${outcome.run.status.replace(/_/g, " ")}.`, outcome.run.status === "completed" ? "ok" : "info");
+            context.toast(
+              "Retried",
+              saved
+                ? `The new run finished as ${outcome.run.status.replace(/_/g, " ")}.`
+                : `The new run finished as ${outcome.run.status.replace(/_/g, " ")}, but the exception changed elsewhere and was not updated.`,
+              saved && outcome.run.status === "completed" ? "ok" : "info",
+            );
             context.navigate(`/o/${context.org.slug}/auto/runs/${outcome.runId}`);
             close();
           } finally {
@@ -849,7 +915,10 @@ export function RetryFromException({ context, close }: { context: ScreenContext;
         }}
       >
         Retry the automation now
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

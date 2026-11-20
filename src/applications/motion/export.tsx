@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CircleSlash, Download, TriangleAlert } from "lucide-react";
-import { Button, Card, DataGrid, Empty, Grid, Meter, Notice, Pill, Row, Select, Stack, TextArea, TextInput, ModalActions, OverlayActions, OverlayCancel, OverlaySection, FactGrid, KeyValueList } from "@/design-system";
+import { Button, Card, DataGrid, Empty, Grid, Meter, Notice, Pill, Row, Select, Stack, TextArea, TextInput, ModalActions, OverlayActions, OverlayCancel } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
 import {

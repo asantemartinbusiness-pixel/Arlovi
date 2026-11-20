@@ -100,22 +100,18 @@ export function NodePalette({ onAdd, disabled }: { onAdd: (type: NodeKind) => vo
             key={kind.id}
             type="button"
             className="auto-palette-item"
+            title={kind.hint}
             aria-disabled={disabled || undefined}
             draggable={!disabled}
             onDragStart={(event) => event.dataTransfer.setData("text/arlovi-node", kind.id)}
             onClick={() => { if (!disabled) onAdd(kind.id); }}
           >
             <Icon size={16} />
-            <span>
-              <strong>{kind.label}</strong>
-              <span>{kind.hint}</span>
-            </span>
+            <strong>{kind.label}</strong>
           </button>
         );
       })}
-      <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
-        Drag a card onto the canvas, or press it to drop the node at the next free slot. Every drag has a keyboard equivalent in the list view.
-      </p>
+      <p className="ds-subtle auto-palette-note">Drag onto the canvas, or press to drop at the next free slot. The list view has a keyboard path for every drag.</p>
     </div>
   );
 }

@@ -127,6 +127,7 @@ export function Modal({
             <Dialog.Overlay className="ds-overlay" />
             <Dialog.Content
               className="ds-modal"
+              {...(description ? {} : { "aria-describedby": undefined })}
               data-native-app={application}
               style={{ ["--modal-w" as string]: `${width}px` }}
               onOpenAutoFocus={(event) => focusInitial(event, initialFocus)}
@@ -141,7 +142,7 @@ export function Modal({
                   </Dialog.Title>
                   {description
                     ? <Dialog.Description className="ds-card-sub">{description}</Dialog.Description>
-                    : <Dialog.Description className="ds-overlay-visually-hidden">Review the details and available actions in this dialog.</Dialog.Description>}
+                    : null}
                 </div>
                 {head}
                 <Dialog.Close asChild>
@@ -264,6 +265,7 @@ export function Drawer({
             <Dialog.Overlay className="ds-overlay ds-drawer-scrim" />
             <Dialog.Content
               className="ds-drawer"
+              {...(subtitle ? {} : { "aria-describedby": undefined })}
               data-native-app={application}
               style={{ ["--drawer-w" as string]: `${width}px` }}
               onOpenAutoFocus={(event) => focusInitial(event)}
@@ -276,7 +278,7 @@ export function Drawer({
                   <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
                   {subtitle
                     ? <Dialog.Description className="ds-card-sub">{subtitle}</Dialog.Description>
-                    : <Dialog.Description className="ds-overlay-visually-hidden">Review details and available actions in this panel.</Dialog.Description>}
+                    : null}
                 </div>
                 {head}
                 <Dialog.Close asChild>

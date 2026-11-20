@@ -143,7 +143,7 @@ function PhotoLibrary({ context, lens }: { context: ScreenContext; lens: "Recent
               key={record.id}
               span={4}
               title={record.title}
-              subtitle={`${doc.width} × ${doc.height} · ${doc.layers.length} layers · ${relative(record.updatedAt)}`}
+              subtitle={`${doc.width} × ${doc.height} · ${doc.layers.length} layer${doc.layers.length === 1 ? "" : "s"} · ${relative(record.updatedAt)}`}
               actions={<Button size="sm" variant="secondary" onClick={() => { context.select(record.id); context.navigate(context.path("/o/:org/photo/photos/:id", record.id)); }}>Open</Button>}
             >
               <Stack gap={2}>
@@ -701,13 +701,13 @@ function CompositeScreen({ context, lens }: { context: ScreenContext; lens: "Lay
       <Card span={4} title="Layer stack" subtitle={`${doc.layers.length} layers, topmost first`}>
         <PhotoLayers handle={handle} bank={bank} onOpenBlend={() => context.openOverlay("Blend picker")} />
       </Card>
-      <Card span={8} title="Layer table" subtitle="Reorder, blend, replace">
-        <LayerTable handle={handle} bank={bank} context={context} />
-      </Card>
-      <Card span={12} title="Composite" flush>
-        <div style={{ position: "relative", height: 380 }}>
+      <Card span={8} title="Composite" subtitle="The image as the layers stack it now" flush>
+        <div style={{ position: "relative", height: 340 }}>
           <PhotoCanvas handle={handle} bank={bank} showSelectionOverlay={false} />
         </div>
+      </Card>
+      <Card span={12} title="Layer table" subtitle="Reorder, blend, replace">
+        <LayerTable handle={handle} bank={bank} context={context} />
       </Card>
     </Grid>
   );
@@ -811,17 +811,14 @@ async function requestRun(context: ScreenContext): Promise<void> {
 }
 
 function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" | "Presets" | "Results" | "Failed" }) {
-  const photos = useCollection("photos");
   const batch = useStore(batchUi);
   useGuardRefresh(context);
-  const { jobs, chosen, format, quality, longEdge, pattern, running, done } = batch;
+  const { jobs, chosen, format, quality, longEdge, pattern, running } = batch;
   const set = (patch: Partial<typeof batch>) => batchUi.set((current) => ({ ...current, ...patch }));
   const setFormat = (value: typeof format) => set({ format: value });
   const setQuality = (value: number) => set({ quality: value });
   const setLongEdge = (value: number) => set({ longEdge: value });
   const setPattern = (value: string) => set({ pattern: value });
-  const setChosen = (next: string[] | ((current: string[]) => string[])) => batchUi.set((current) => ({ ...current, chosen: typeof next === "function" ? next(current.chosen) : next }));
-  const build = () => buildBatch(context, new Map(photos.map((row) => [row.id, row.title])));
   const execute = (onlyFailed = false) => runBatch(context, onlyFailed);
 
   if (lens === "Presets") {
@@ -840,8 +837,14 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
             <Field label="Longest edge" hint="Images smaller than this are left alone rather than enlarged.">
               <TextInput type="number" value={longEdge} onChange={(event) => setLongEdge(Math.max(16, Number(event.target.value)))} />
             </Field>
-            <Field label="File name" hint="{name}, {w} and {h} are replaced. A collision adds a counter rather than overwriting.">
+            <Field label="File name" hint="{name}, {w} and {h} are replaced.">
               <TextInput value={pattern} onChange={(event) => setPattern(event.target.value)} />
+            </Field>
+            <Field label="If a name is already taken" hint="This page cannot overwrite a file on your disk. The names are previewed before any run.">
+              <Select value={batch.onCollision} onChange={(event) => set({ onCollision: event.target.value as "counter" | "skip" })}>
+                <option value="counter">Keep both: add a counter to the new file</option>
+                <option value="skip">Skip the duplicate</option>
+              </Select>
             </Field>
             {format === "jpeg" && <Notice tone="warning" title="JPEG has no alpha">Transparent areas are flattened onto white. Choose PNG or WebP to keep them.</Notice>}
             <Button variant="secondary" onClick={() => context.openOverlay("Preset editor")}>Name and store this preset</Button>
@@ -948,7 +951,7 @@ function BatchQueue({ context }: { context: ScreenContext }) {
                 return (
                   <div key={job.id} role="listitem" className="ph-plan-row" data-collision={item?.collision && job.state === "queued" ? "true" : undefined}>
                     <span className="ph-plan-title ds-truncate">{job.title}</span>
-                    <span className="ph-plan-name ds-num ds-truncate" title={name}>{name ?? "…"}</span>
+                    <span className="ph-plan-name ds-num" title={name}>{name ?? "…"}</span>
                     {item?.collision && job.state === "queued"
                       ? <Pill tone="warning">name taken</Pill>
                       : <Pill tone={job.state === "done" ? "success" : job.state === "failed" ? "danger" : job.state === "running" ? "info" : "neutral"} dot>{job.state}</Pill>}
@@ -2219,7 +2222,7 @@ function OutputNames({ context, close }: { context: ScreenContext; close: () => 
         {plan.map((item) => (
           <div key={item.jobId} role="listitem" className="ph-plan-row" data-collision={item.collision ? "true" : undefined}>
             <span className="ph-plan-title ds-truncate">{item.title}</span>
-            <span className="ph-plan-name ds-num ds-truncate" title={item.name}>
+            <span className="ph-plan-name ds-num" title={item.name}>
               {item.collision ? (skipping ? <s>{item.root}</s> : <>{item.root} → <strong>{item.name}</strong></>) : item.name}
             </span>
             {item.collision ? <Pill tone="warning">{skipping ? "skipped" : item.collision === "batch" ? "renamed, same batch" : "renamed, written before"}</Pill> : <Pill tone="success">new</Pill>}

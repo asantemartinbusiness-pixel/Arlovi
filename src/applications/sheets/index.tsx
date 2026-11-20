@@ -307,9 +307,8 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
         ]}
       >
         <ViewToggle label="Library view" value={view} onChange={setView} />
-        <Button variant="primary" onClick={() => context.openOverlay("new workbook")}>New workbook</Button>
       </LibraryStrip>
-      {tab === "Shared" && <p className="ds-subtle">A recorded sharing list is not an external permission or invitation.</p>}
+      {tab === "Shared" && <p className="ds-subtle">A recorded sharing list. This is not an external permission or invitation.</p>}
       <div className="lk-toolbar">
         <div className="lk-grow"><TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, summary or tag" /></div>
         <Select aria-label="Workbook status" value={status} onChange={(event) => setStatus(event.target.value)}>

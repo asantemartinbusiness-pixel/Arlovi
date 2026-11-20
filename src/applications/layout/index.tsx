@@ -341,11 +341,6 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
             )}
           </PanelGroup>
           <LayersPanel handle={handle} />
-          {overset.length > 0 && (
-            <Notice tone="danger" title={`${overset.reduce((sum, item) => sum + item.oversetChars, 0)} characters of overset text`} actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("overset warning")}>Show it</Button>}>
-              The copy does not fit the frames it is threaded through. It is kept, never dropped.
-            </Notice>
-          )}
         </Stack>
       }
       leftLabel="Pages"
@@ -1560,7 +1555,7 @@ function OversetSummary({ context }: { context: ScreenContext }) {
       eyebrow="Overset text"
       title={chars > 0 ? <><span className="ds-num">{chars.toLocaleString("en")}</span> characters do not fit</> : "Nothing is overset"}
       status={chars > 0 ? <Pill tone="danger">kept, not placed</Pill> : <Pill tone="success">all placed</Pill>}
-      meta={[record.title, `${overset.length} stor${overset.length === 1 ? "y" : "ies"} affected`]}
+      meta={[record.title, overset.length > 0 ? `${overset.length} stor${overset.length === 1 ? "y" : "ies"} affected` : ""]}
     />
   );
 }
@@ -1572,7 +1567,7 @@ function OversetWarning({ context }: { context: ScreenContext }) {
   const overset = [...compositions.entries()].filter(([, composition]) => composition.oversetChars > 0);
   const exporting = Boolean((context.overlayPayload as { exporting?: boolean } | undefined)?.exporting);
   if (overset.length === 0) {
-    return <Notice tone="success" title="Nothing is overset">Every character of every story is placed.</Notice>;
+    return <p className="vx-mini">Every character of every story is placed in a frame.</p>;
   }
   const first = overset[0][1];
   return (
@@ -1583,12 +1578,10 @@ function OversetWarning({ context }: { context: ScreenContext }) {
         return (
           <OverlaySection key={storyId} title={story?.name ?? storyId} tone="danger" hint={last ? <>Thread ends on page <span className="ds-num">{last.pageIndex + 1}</span></> : undefined}>
             <FactGrid
-              columns={3}
               dense
               items={[
                 { label: "Characters over", value: composition.oversetChars.toLocaleString("en"), mono: true, tone: "danger" },
                 { label: "Words over", value: composition.oversetText.split(/\s+/).filter(Boolean).length.toLocaleString("en"), mono: true },
-                { label: "Placed lines", value: composition.totalLines.toLocaleString("en"), mono: true },
               ]}
             />
             <blockquote className="lx-overset-quote">

@@ -12,7 +12,7 @@ import {
 } from "./reports";
 import {
   DataModelling, DatasetCatalogue, DatasetDetails, DocumentDataset, FormulaEditor, GrantReview,
-  ImpactReview, JoinProperties, MetricDefinitions, MetricQA, ModelTest, QualityPanel, TransformEditor,
+  ImpactReview, JoinProperties, MetricDefinitionInspector, MetricDefinitions, MetricQA, ModelTest, QualityPanel, TransformEditor,
 } from "./catalogue";
 import {
   AssumptionInspector, ConfidenceNote, DataFreshness, DelegateInvestigation, ForecastScreen,
@@ -325,7 +325,9 @@ export const analyticsApp = registerApp({
     /* ------------------------------ 006 ------------------------------ */
     "ARL-ANALYTICS-006": {
       id: "ARL-ANALYTICS-006",
-      subtitle: () => "One canonical definition per figure, with its formula, its owner, its unit and the collection it reads.",
+      subtitle: () => "One definition per figure: its formula, its source and its owner.",
+      inspectorTitle: "Definition",
+      inspector: (context) => <MetricDefinitionInspector context={context} />,
       tabs: ["Metrics", "Dimensions", "Versions", "Validation"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <MetricDefinitions context={context} tab={tab} />,

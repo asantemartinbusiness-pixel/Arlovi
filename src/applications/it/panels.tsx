@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, Archive, CheckCircle2, Cpu, Server, ShieldAlert, Siren,
 } from "lucide-react";
-import { BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, KeyValueList, Meter, Notice, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
+import { BarChart, Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Meter, Notice, OverlaySection, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { clockIso, daysBetween, freshness } from "@/platform/clock";
@@ -455,16 +455,14 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
     <Stack gap={4}>
     <IncidentLifecycle context={context} record={record} />
     <Grid>
-      <Card span={7} eyebrow="INCIDENT" prov="human" title={record.title} subtitle={record.summary}
-        actions={<Pill tone={SEVERITY_TONE[String(record.fields.severity ?? "medium")] ?? "warning"} dot>{String(record.fields.severity ?? "medium")}</Pill>}>
-        <KeyValueList items={[
-          { label: "State", value: <Pill tone={record.status === "resolved" ? "success" : "info"} dot>{record.status.replace(/_/g, " ")}</Pill> },
-          { label: "Started", value: <span className="ds-num">{context.dateTime(record.at)}</span> },
+      <Card span={7} prov="human" title="Details">
+        <KeyValueList columns={2} items={[
+          { label: "Started", value: context.dateTime(record.at), mono: true },
           { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
           { label: "Service", value: incidentService(record, connectors) },
+          { label: "Origin", value: String(record.fields.origin ?? "ours") === "provider" ? "Provider (not repairable by us)" : "Ours" },
           ...(record.fields.latestReport ? [{ label: "Latest report", value: `${String(record.fields.latestReport)} — ${String(record.fields.latestReportBy ?? "")}, ${context.dateTime(String(record.fields.latestReportAt ?? ""))}` }] : []),
-          { label: "Origin", value: String(record.fields.origin ?? "ours") },
-          { label: "Revision", value: <span className="ds-num">{String(record.revision)}</span> },
+          { label: "Revision", value: String(record.revision), mono: true },
         ]} />
       </Card>
       <Card span={5} eyebrow="IMPACT" prov="posted" title="What it affects">
@@ -505,6 +503,11 @@ export function RemediationPanel({ context, record }: { context: ScreenContext; 
           ))}
           <Notice tone="warning" title="No step raises its own privileges">
             Everything a runbook may do here is read-only or reversible. Nothing patches a running system, because there is no running system to patch.
+          </Notice>
+          <Notice tone={context.can("approve_mission") ? "info" : "warning"} title={context.can("approve_mission") ? "You can approve a repair" : "Approving a repair needs approval authority"}>
+            {context.can("approve_mission")
+              ? "Approval is recorded with your name and the plan, and is part of the incident history."
+              : "Your role view can read the plan but not approve it. Ask an owner or finance approver."}
           </Notice>
         </Stack>
       </Card>
@@ -1559,16 +1562,18 @@ export function HealthTestOverlay({ context }: { context: ScreenContext }) {
   const { ui, run } = useDiagnostics(context);
   const totals = summarise(ui.results);
   return (
-    <Stack gap={3}>
-      <KeyValueList items={[
-        { label: "Last run", value: ui.ranAt ? <span className="ds-num">{context.dateTime(ui.ranAt)}</span> : "Not in this session" },
-        { label: "Passed", value: <span className="ds-num">{String(totals.pass)}</span> },
-        { label: "To review", value: <span className="ds-num">{String(totals.warn)}</span> },
-        { label: "Failed", value: <span className="ds-num">{String(totals.fail)}</span> },
-        { label: "Not measurable here", value: <span className="ds-num">{String(totals.unavailable)}</span> },
+    <Stack gap={4}>
+      <FactGrid columns={4} items={[
+        { label: "Passed", value: String(totals.pass), mono: true, tone: "success" },
+        { label: "To review", value: String(totals.warn), mono: true, tone: totals.warn ? "warning" : undefined },
+        { label: "Failed", value: String(totals.fail), mono: true, tone: totals.fail ? "danger" : undefined },
+        { label: "Not measurable", value: String(totals.unavailable), mono: true },
       ]} />
-      <Button variant="primary" busy={ui.running} onClick={() => void run()}>Run the checks now</Button>
-      {ui.results.length > 0 && <div className="t6-checks">{ui.results.slice(0, 6).map((result) => <CheckRow key={result.id} result={result} />)}</div>}
+      <Row gap={3} wrap>
+        <Button variant="primary" busy={ui.running} onClick={() => void run()}>Run the checks now</Button>
+        <span className="ds-subtle">{ui.ranAt ? `Last run ${context.dateTime(ui.ranAt)}` : "Not run in this session"}</span>
+      </Row>
+      {ui.results.length > 0 && <OverlaySection title="Results" flush><div className="t6-checks">{ui.results.slice(0, 6).map((result) => <CheckRow key={result.id} result={result} />)}</div></OverlaySection>}
     </Stack>
   );
 }
@@ -1599,15 +1604,15 @@ export function TraceWaterfall({ context }: { context: ScreenContext }) {
   const event = events.find((item) => item.id === payload?.id) ?? events[0];
   if (!event) return <Empty title="No entry selected" icon={<Activity size={20} />} />;
   return (
-    <Stack gap={3}>
-      <KeyValueList items={[
-        { label: "When", value: <span className="ds-num">{context.dateTime(event.at)}</span> },
+    <Stack gap={4}>
+      <FactGrid columns={2} items={[
+        { label: "When", value: context.dateTime(event.at), mono: true },
         { label: "Actor", value: event.actor },
         { label: "Kind", value: <Pill tone="neutral">{event.type}</Pill> },
-        { label: "Screen", value: <span className="ds-num">{event.screenId ?? "—"}</span> },
-        { label: "Record", value: <span className="ds-num">{event.entityId ?? "—"}</span> },
+        { label: "Screen", value: event.screenId ?? "—", mono: true },
+        { label: "Record", value: event.entityId ?? "—", mono: true },
       ]} />
-      <p className="ds-prose">{event.message}</p>
+      <OverlaySection title="What was recorded">{event.message}</OverlaySection>
       <Notice tone="info" title="No field values are in this entry">
         An audit entry names what changed and on which record. The values themselves stay on the record, where the screen that owns them decides whether to show them.
       </Notice>

@@ -11,9 +11,10 @@ const dialog = (page: Page) => page.getByRole("dialog");
 async function action(page: Page, label: string) {
   const bar = page.locator(".pg-actions");
   const direct = bar.getByRole("button", { name: label, exact: true });
-  await direct.first().waitFor({ state: "visible", timeout: 1500 }).catch(() => undefined);
+  const more = bar.getByRole("button", { name: "More actions" });
+  await direct.or(more).first().waitFor({ state: "visible" });
   if (await direct.count()) { await direct.first().click(); return; }
-  await bar.getByRole("button", { name: "More actions" }).click();
+  await more.click();
   await page.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
@@ -83,7 +84,7 @@ test("COMMERCE the refund state never claims money moved", async ({ page }) => {
   const drawer = dialog(page);
   const stages = drawer.getByRole("list", { name: "Refund stages" });
   await expect(stages.getByText("Not possible here")).toBeVisible();
-  await expect(drawer.getByText("Arlovi shows no processor receipt because none exists.")).toBeVisible();
+  await expect(drawer.getByText("No processor receipt exists, so none is shown.")).toBeVisible();
 });
 
 test("COMMERCE a refund proposal cannot exceed what is left to refund", async ({ page }) => {
@@ -151,4 +152,65 @@ test("PROC requisition review shows approval need and limit, and a rejection nee
   await expect(drawer.getByRole("button", { name: "Reject with reason" })).toBeDisabled();
   await drawer.getByRole("textbox", { name: /Note for the record/ }).fill("Not this quarter");
   await expect(drawer.getByRole("button", { name: "Reject with reason" })).toBeEnabled();
+});
+
+test("PROC a stale order is not marked as issued and the drawer says nothing was saved", async ({ browser }) => {
+  // Two tabs on one store. The first is cut off from change notifications, so it keeps a stale copy.
+  const context = await browser.newContext();
+  const stale = await context.newPage();
+  await stale.addInitScript(() => {
+    class Silent { postMessage() {} close() {} addEventListener() {} removeEventListener() {} onmessage = null; }
+    (window as unknown as { BroadcastChannel: unknown }).BroadcastChannel = Silent;
+  });
+  await stale.goto(`${ORG}/proc/orders?tab=Sent`);
+  await main(stale).getByRole("row", { name: /PO-206/ }).getByText("PO-206", { exact: true }).click();
+  await action(stale, "Issue selected");
+  const staleDrawer = dialog(stale);
+  await expect(staleDrawer.getByRole("button", { name: "Re-record the issue date" })).toBeVisible();
+
+  const fresh = await context.newPage();
+  await fresh.goto(`${ORG}/proc/orders?tab=Sent`);
+  await main(fresh).getByRole("row", { name: /PO-206/ }).getByText("PO-206", { exact: true }).click();
+  await action(fresh, "Issue selected");
+  await dialog(fresh).getByRole("button", { name: "Re-record the issue date" }).click();
+  await expect(fresh.getByText("Marked as issued", { exact: true })).toBeVisible();
+
+  await staleDrawer.getByRole("button", { name: "Re-record the issue date" }).click();
+  await expect(stale.getByText("This record changed elsewhere")).toBeVisible();
+  await expect(stale.getByText("Marked as issued", { exact: true })).toHaveCount(0);
+  await expect(staleDrawer).toBeVisible();
+  await context.close();
+});
+
+test("PROC receiving keeps every count input on a phone and records the receipt", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${ORG}/proc/orders?tab=Sent`);
+  await page.goto(`${ORG}/proc/receiving`);
+  await page.getByRole("button", { name: "Scan a delivery" }).click();
+  const drawer = dialog(page);
+  const input = drawer.getByRole("textbox", { name: /Received now for / }).first();
+  await expect(input).toBeVisible();
+  await input.fill("5");
+  await drawer.getByRole("button", { name: "Record receipt" }).click();
+  await expect(page.getByText("Goods received")).toBeVisible();
+});
+
+test("PROC a stock count keeps every input on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${ORG}/proc/warehouses`);
+  await page.getByRole("button", { name: "Count a site" }).or(page.getByRole("button", { name: "More actions" })).first().waitFor();
+  await page.goto(`${ORG}/proc/warehouses?overlay=stock%20count`);
+  const drawer = dialog(page);
+  const inputs = drawer.getByRole("textbox", { name: /^Counted / });
+  await expect(inputs.first()).toBeVisible();
+  const count = await inputs.count();
+  for (let i = 0; i < count; i += 1) await expect(inputs.nth(i)).toBeVisible();
+});
+
+test("PROC Scan a delivery presets from the selected receipt, not the first order", async ({ page }) => {
+  await page.goto(`${ORG}/proc/receiving`);
+  await main(page).getByRole("row", { name: /GRN-84/ }).first().click();
+  await action(page, "Scan a delivery");
+  await expect(dialog(page).getByRole("combobox", { name: /Receive against/ })).toHaveValue(/.+/);
+  await expect(dialog(page).getByRole("combobox", { name: /Receive against/ }).locator("option:checked")).toContainText("PO-207");
 });

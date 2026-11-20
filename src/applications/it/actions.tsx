@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Siren } from "lucide-react";
-import { Button, Empty, Field, KeyValueList, Notice, Pill, Row, Select, Stack } from "@/design-system";
+import { Button, Empty, FactGrid, Field, KeyValueList, Notice, OverlayActions, Pill, Row, Select, Stack } from "@/design-system";
 import type { Audit, Rec } from "@/domain/types";
 import type { OverlayDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -288,23 +288,18 @@ export function IncidentDetailPanel({ context }: { context: ScreenContext }) {
     return <Empty title="No incident selected" icon={<Siren size={20} />}>Select a row in the queue, then open its detail.</Empty>;
   }
   return (
-    <Stack gap={3}>
-      <strong>{record.title}</strong>
-      <p className="ds-prose">{record.summary}</p>
-      <KeyValueList items={[
-        { label: "State", value: <Pill tone="info" dot>{record.status.replace(/_/g, " ")}</Pill> },
-        { label: "Severity", value: String(record.fields.severity ?? "medium") },
-        { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
-        { label: "Service", value: String(record.fields.service ?? "Workspace") },
-        { label: "Origin", value: String(record.fields.origin ?? "ours") },
-        { label: "Opened", value: <span className="ds-num">{context.dateTime(record.at ?? record.createdAt)}</span> },
+    <Stack gap={4}>
+      {record.summary && <p className="ds-prose">{record.summary}</p>}
+      <FactGrid columns={2} items={[
+        { label: "Opened", value: context.dateTime(record.at ?? record.createdAt), mono: true },
+        { label: "Origin", value: String(record.fields.origin ?? "ours") === "provider" ? "Provider" : "Ours" },
         { label: "Impact", value: String(record.fields.impact ?? "Not recorded") },
         { label: "Paged", value: record.fields.pageRequestedAt ? "Recorded, not sent (no provider)" : "No" },
       ]} />
-      <Row gap={2} wrap>
-        <Button size="sm" variant="primary" onClick={() => context.openOverlay("assign incident", { id: record.id })}>Assign</Button>
-        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/it/incidents/${record.id}`)}>Open the incident</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/it/incidents/${record.id}`)}>Open the incident</Button>}
+        secondary={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("assign incident", { id: record.id })}>Assign</Button>}
+      />
     </Stack>
   );
 }

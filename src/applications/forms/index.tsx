@@ -1,12 +1,12 @@
 import { BarChart3, ClipboardList, Inbox, Send, SlidersHorizontal, Workflow } from "lucide-react";
-import { Empty, Field, KeyValueList, Notice, Pill, Stack, TextInput } from "@/design-system";
+import { OVERLAY_WIDTH, Empty, Field, KeyValueList, Notice, Pill, Stack, TextInput } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection } from "@/platform/workspace";
 import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import { STRUCTURAL, readForm } from "./model";
-import { FieldInspector, FormBuilder, NoForm, useFormRecord } from "./builder";
+import { FieldInspector, FieldSummary, FormBuilder, NoForm, useFormRecord } from "./builder";
 import {
-  AccessControlPanel, EmbedTester, FieldInsight, FormAnalytics, FormsDirectory, InvalidPathPanel,
+  AccessControlPanel, EmbedTester, SubmissionHead, FieldInsight, FormAnalytics, FormsDirectory, InvalidPathPanel,
   LogicScreen, MetricMethods, NewFormDialog, PrivacyControl, PublishReviewForm, PublishScreen,
   RouteRetry, RuleEditorForm, ScenarioTester, ShareDialog, SubmissionDrawer, SubmissionsScreen,
   ThemeInspector,
@@ -26,6 +26,13 @@ import {
  * designed is what is answered and what is answered becomes a record.
  * ====================================================================== */
 
+function FieldInspectorHead({ context }: { context: ScreenContext }) {
+  const { model } = useFormRecord(context);
+  const selectedId = useFormsUi((state) => state.selectedFieldId);
+  const field = model.fields.find((item) => item.id === selectedId);
+  return field ? <FieldSummary field={field} model={model} /> : null;
+}
+
 function FieldInspectorOverlay({ context }: { context: ScreenContext }) {
   const { record, model } = useFormRecord(context);
   const selectedId = useFormsUi((state) => state.selectedFieldId);
@@ -36,6 +43,7 @@ function FieldInspectorOverlay({ context }: { context: ScreenContext }) {
     <FieldInspector
       field={field}
       model={model}
+      showHead={false}
       onEdit={(patch) => void saveForm(context, record, { ...model, fields: model.fields.map((item) => (item.id === field.id ? { ...item, ...patch } : item)) }, `Edited ${field.label}`)}
       onLogic={(logic, label) => void saveForm(context, record, { ...model, logic }, label)}
     />
@@ -170,9 +178,9 @@ export const formsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "New form", kind: "modal", title: "New form", width: 600, render: ({ close, ...context }) => <NewFormDialog context={context} close={close} />, footer: submitFooter("new-form", "Create the form") },
-        { id: "duplicate confirm", kind: "modal", title: "Duplicate this form", width: 520, render: ({ close, ...context }) => <DuplicateConfirm context={context} close={close} />, footer: submitFooter("duplicate-form", "Make the copy") },
-        { id: "share", kind: "drawer", title: "Share", width: 480, render: ({ ...context }) => <ShareDialog context={context} /> },
+        { id: "New form", kind: "modal", title: "New form", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <NewFormDialog context={context} close={close} />, footer: submitFooter("new-form", "Create the form") },
+        { id: "duplicate confirm", kind: "modal", title: "Duplicate this form", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DuplicateConfirm context={context} close={close} />, footer: submitFooter("duplicate-form", "Make the copy") },
+        { id: "share", kind: "drawer", title: "Share", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ShareDialog context={context} /> },
       ],
     },
 
@@ -195,9 +203,9 @@ export const formsApp = registerApp({
         { id: "publish", label: "Publish", placement: "overflow", run: (context) => context.openOverlay("publish review") },
       ],
       overlays: [
-        { id: "Field inspector", kind: "drawer", title: "Field", width: 460, render: ({ ...context }) => <FieldInspectorOverlay context={context} /> },
-        { id: "validation", kind: "modal", title: "Validation on this form", width: 620, render: ({ ...context }) => <ValidationOverlay context={context} />, footer: closeFooter() },
-        { id: "publish review", kind: "modal", title: "Publish review", width: 600, render: ({ close, ...context }) => <PublishReviewForm context={context} close={close} /> },
+        { id: "Field inspector", kind: "drawer", title: "Field", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, summary: ({ close: _close, ...context }) => <FieldInspectorHead context={context} />, render: ({ ...context }) => <FieldInspectorOverlay context={context} /> },
+        { id: "validation", kind: "modal", title: "Validation on this form", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ValidationOverlay context={context} />, footer: closeFooter() },
+        { id: "publish review", kind: "modal", title: "Publish review", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PublishReviewForm context={context} close={close} /> },
         insertField, moveField,
       ],
     },
@@ -219,9 +227,9 @@ export const formsApp = registerApp({
         { id: "scenario tester", label: "Scenario tester", placement: "overflow", run: (context) => context.openOverlay("scenario tester") },
       ],
       overlays: [
-        { id: "Rule editor", kind: "modal", title: "Rule", width: 600, render: ({ close, ...context }) => <RuleEditorForm context={context} close={close} />, footer: submitFooter("rule-editor", "Save rule") },
-        { id: "invalid path", kind: "drawer", title: "Branch check", width: 520, render: ({ ...context }) => <InvalidPathPanel context={context} /> },
-        { id: "scenario tester", kind: "drawer", title: "Scenario", width: 480, render: ({ ...context }) => <ScenarioTester context={context} /> },
+        { id: "Rule editor", kind: "modal", title: "Rule", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RuleEditorForm context={context} close={close} />, footer: submitFooter("rule-editor", "Save rule") },
+        { id: "invalid path", kind: "drawer", title: "Branch check", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <InvalidPathPanel context={context} /> },
+        { id: "scenario tester", kind: "drawer", title: "Scenario", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ScenarioTester context={context} /> },
         connectRule, fixLogic,
       ],
     },
@@ -242,9 +250,9 @@ export const formsApp = registerApp({
         { id: "routing", label: "Notification routing", placement: "overflow", run: (context) => context.openOverlay("route retry") },
       ],
       overlays: [
-        { id: "Submission drawer", kind: "drawer", title: "Submission", width: 520, render: ({ ...context }) => <SubmissionDrawer context={context} /> },
-        { id: "privacy control", kind: "modal", title: "Retention and privacy", tone: "danger", width: 560, render: ({ ...context }) => <PrivacyControl context={context} />, footer: closeFooter() },
-        { id: "route retry", kind: "modal", title: "Routing", width: 520, render: ({ ...context }) => <RouteRetry context={context} />, footer: closeFooter() },
+        { id: "Submission drawer", kind: "drawer", title: "Submission", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <SubmissionHead context={context} />, render: ({ ...context }) => <SubmissionDrawer context={context} /> },
+        { id: "privacy control", kind: "modal", title: "Retention and privacy", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PrivacyControl context={context} />, footer: closeFooter() },
+        { id: "route retry", kind: "modal", title: "Routing", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RouteRetry context={context} />, footer: closeFooter() },
         assignSubmission,
       ],
     },
@@ -264,11 +272,11 @@ export const formsApp = registerApp({
         { id: "preview", label: "Preview the embed", placement: "overflow", run: (context) => context.openOverlay("embed tester") },
       ],
       overlays: [
-        { id: "Theme inspector", kind: "drawer", title: "Appearance", width: 420, render: ({ ...context }) => <ThemeInspector context={context} /> },
-        { id: "access control", kind: "modal", title: "Who can answer", width: 520, render: ({ ...context }) => <AccessControlPanel context={context} />, footer: closeFooter() },
-        { id: "embed tester", kind: "drawer", title: "Embed test", width: 560, render: ({ ...context }) => <EmbedTester context={context} /> },
-        { id: "publish review", kind: "modal", title: "Publish review", width: 600, render: ({ close, ...context }) => <PublishReviewForm context={context} close={close} /> },
-        { id: "share", kind: "drawer", title: "Share", width: 480, render: ({ ...context }) => <ShareDialog context={context} /> },
+        { id: "Theme inspector", kind: "drawer", title: "Appearance", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <ThemeInspector context={context} /> },
+        { id: "access control", kind: "modal", title: "Who can answer", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <AccessControlPanel context={context} />, footer: closeFooter() },
+        { id: "embed tester", kind: "drawer", title: "Embed test", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <EmbedTester context={context} /> },
+        { id: "publish review", kind: "modal", title: "Publish review", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PublishReviewForm context={context} close={close} /> },
+        { id: "share", kind: "drawer", title: "Share", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ShareDialog context={context} /> },
       ],
     },
 
@@ -289,11 +297,11 @@ export const formsApp = registerApp({
         { id: "field insight", label: "Field insight", placement: "overflow", run: (context) => context.openOverlay("field insight") },
       ],
       overlays: [
-        { id: "Metric methods", kind: "modal", title: "How each figure is made", width: 640, render: ({ ...context }) => <MetricMethods context={context} />, footer: closeFooter() },
-        { id: "test report", kind: "drawer", title: "Experiment report", width: 520, render: ({ ...context }) => <ExperimentReport context={context} /> },
-        { id: "compare versions", kind: "modal", title: "Compare versions", width: 640, render: ({ ...context }) => <CompareVersions context={context} />, footer: closeFooter() },
+        { id: "Metric methods", kind: "modal", title: "How each figure is made", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <MetricMethods context={context} />, footer: closeFooter() },
+        { id: "test report", kind: "drawer", title: "Experiment report", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ExperimentReport context={context} /> },
+        { id: "compare versions", kind: "modal", title: "Compare versions", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <CompareVersions context={context} />, footer: closeFooter() },
         createExperiment,
-        { id: "field insight", kind: "drawer", title: "Field insight", width: 480, render: ({ ...context }) => <FieldInsight context={context} /> },
+        { id: "field insight", kind: "drawer", title: "Field insight", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <FieldInsight context={context} /> },
       ],
     },
   },

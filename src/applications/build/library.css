@@ -93,3 +93,6 @@
 .bb-insp-title{display:block;font-size:var(--text-md);font-weight:500;margin:2px 0;overflow-wrap:anywhere}
 .bb-insp-head .ds-subtle{font-size:var(--text-xs)}
 @media(max-width:720px){.bb-bar{padding-inline:var(--space-3)}}
+.bb-tabrow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-1) var(--space-4)}
+.bb-tabrow .bb-bar{padding:0;border:0;background:transparent;flex:1 1 auto;justify-content:flex-end}
+@media(max-width:720px){.bb-tabrow .bb-bar{justify-content:flex-start;padding-block:var(--space-1)}}

@@ -119,9 +119,14 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
   const rows = config ? [] : filterMailView(searchThreads(data.emailThreads, query, folder), view);
   const counts = folderCounts(data.emailThreads);
   const unreadInbox = data.emailThreads.filter((row) => folderOf(row) === "inbox" && row.fields.unread === true).length;
+  const draftTotal = counts.drafts ?? 0;
   useEffect(() => {
-    tabCounts = { Inbox: unreadInbox, Drafts: counts.drafts ?? 0 };
-  }, [unreadInbox, counts.drafts]);
+    if (tabCounts.Inbox === unreadInbox && tabCounts.Drafts === draftTotal) return;
+    tabCounts = { Inbox: unreadInbox, Drafts: draftTotal };
+    /* The tab strip is rendered by the page host and reads the counts when it
+       renders; re-selecting the current tab (a replace navigation) refreshes it. */
+    context.setTab(lens);
+  }, [unreadInbox, draftTotal]);
   const selected = rows.find(row => row.id === selectedId) ?? null;
   const related = selected ? relatedMailContext(selected, data.contacts, tasks) : null;
   const messages = (selected?.body as { messages?: { from?: string; body?: string; at?: string; external?: boolean }[] } | undefined)?.messages ?? [];

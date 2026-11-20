@@ -265,7 +265,8 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
           <span>Tool: {ui.tool}</span>
           {clip && <span>{clip.name}: <span className="ds-num">{timecode(clip.start, doc?.fps ?? 25)}</span> → <span className="ds-num">{timecode(clipEnd(clip), doc?.fps ?? 25)}</span></span>}
           <span className="ds-grow" />
-          <span>J K L shuttle · arrows step a frame · S split · Q W trim to the playhead · V T R N C tools · ⌘Z undo</span>
+          <span>Renders in this browser, on export only</span>
+          <span>J K L shuttle · S split · Q W trim · V T R N C tools · ⌘Z undo</span>
         </>
       }
     >
@@ -640,7 +641,7 @@ function MediaBin({ context, lens }: { context: ScreenContext; lens: "Media" | "
               A clip whose source is offline shows a marked frame in the preview, with the source name on it. It is never replaced by other footage.
             </Notice>
             {missing.map((source) => (
-              <Card key={source.id} eyebrow="OFFLINE" prov="unknown" title={source.name} subtitle={<>Used by <span className="ds-num">{doc.clips.filter((clip) => clip.sourceId === source.id).length}</span> clips</>}>
+              <Card key={source.id} eyebrow="OFFLINE" prov="unknown" title={source.name} subtitle={<>Used by <span className="ds-num">{doc.clips.filter((clip) => clip.sourceId === source.id).length}</span> {doc.clips.filter((clip) => clip.sourceId === source.id).length === 1 ? "clip" : "clips"}</>}>
                 <Stack gap={2}>
                   <Properties rows={[
                     { label: "Duration recorded", value: <span className="ds-num">{timecode(source.duration, doc.fps)}</span> },
@@ -725,7 +726,7 @@ function MediaBin({ context, lens }: { context: ScreenContext; lens: "Media" | "
             eyebrow={source.kind.toUpperCase()}
             prov={source.license === "Unknown" ? "unknown" : "human"}
             title={source.name}
-            subtitle={<><span className="ds-num">{timecode(source.duration, doc.fps)}</span> · used by <span className="ds-num">{doc.clips.filter((clip) => clip.sourceId === source.id).length}</span> clips</>}
+            subtitle={<><span className="ds-num">{timecode(source.duration, doc.fps)}</span> · used by <span className="ds-num">{doc.clips.filter((clip) => clip.sourceId === source.id).length}</span> {doc.clips.filter((clip) => clip.sourceId === source.id).length === 1 ? "clip" : "clips"}</>}
             actions={
               <Button
                 size="sm"
@@ -1852,6 +1853,20 @@ function MediaInspector({ context }: { context: ScreenContext }) {
   );
 }
 
+/** Identity block for the open sequence: the film, its timebase and where it will be rendered. */
+function SequenceSummary({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const doc = handle.doc;
+  if (!record || !doc) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Sequence"
+      title={record.title}
+      meta={[<span className="ds-num" key="d">{timecode(doc.duration, doc.fps)}</span>, <span className="ds-num" key="f">{doc.width}×{doc.height} · {doc.fps} fps</span>, "renders in this browser"]}
+    />
+  );
+}
+
 /** Identity block for a source: its name, licence and length. */
 function SourceSummary({ context }: { context: ScreenContext }) {
   const { record, handle } = useVideoDoc(context);
@@ -2097,6 +2112,7 @@ function RenderSettings({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={3}>
       <OverlaySection title="Settings">
+        <Stack gap={3}>
         <Field label="Preset">
           <Select value={render.preset} disabled={render.busy} onChange={(event) => renderUi.set((current) => ({ ...current, preset: event.target.value }))}>
             {Object.keys(RENDER_PRESETS).map((key) => <option key={key}>{key}</option>)}
@@ -2108,6 +2124,7 @@ function RenderSettings({ context }: { context: ScreenContext }) {
           { label: "Bitrate", value: `${(preset.bitrate / 1_000_000).toFixed(1)} Mb/s`, mono: true },
           { label: "Frames", value: frames, mono: true },
         ]} />
+        </Stack>
       </OverlaySection>
       <OverlaySection title="What happens when you press Render" tone={support.webm ? "info" : "danger"}>
         {support.webm
@@ -3017,7 +3034,6 @@ registerApp({
           /* Rendering takes the machine for as long as the film runs, so the command asks first and says what it will do. */
           run: (context) => { context.setTab("Export"); context.openOverlay("Render settings"); },
         },
-        },
         {
           id: "cancel", label: "Cancel the render", placement: "overflow", tone: "danger",
           guard: () => (renderUi.get().busy ? undefined : "Nothing is rendering"),
@@ -3049,10 +3065,10 @@ registerApp({
         { id: "compatibility", label: "What this browser can encode", placement: "overflow", run: (context) => context.openOverlay("compatibility") },
       ],
       overlays: [
-        { id: "Render settings", kind: "modal", title: "Render", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RenderSettings context={context} /> },
+        { id: "Render settings", kind: "modal", title: "Render", width: OVERLAY_WIDTH.form, summary: (context) => <SequenceSummary context={context} />, render: ({ ...context }) => <RenderSettings context={context} /> },
         { id: "compatibility", kind: "modal", title: "What this browser can encode", width: OVERLAY_WIDTH.modal, render: () => <Compatibility /> },
-        { id: "delivery confirmation", kind: "drawer", title: "Delivery", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <DeliveryConfirmation context={context} /> },
-        { id: "render preview", kind: "modal", title: "Render preview", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <RenderPreview context={context} /> },
+        { id: "delivery confirmation", kind: "drawer", title: "Delivery", width: OVERLAY_WIDTH.form, summary: (context) => <SequenceSummary context={context} />, render: ({ ...context }) => <DeliveryConfirmation context={context} /> },
+        { id: "render preview", kind: "modal", title: "Render preview", width: OVERLAY_WIDTH.modal, summary: (context) => <SequenceSummary context={context} />, render: ({ ...context }) => <RenderPreview context={context} /> },
         { id: "publish render", kind: "modal", title: "Publish a render", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishRender context={context} close={close} />, footer: formFooter("video-publish", "Queue for publishing") },
       ],
     },

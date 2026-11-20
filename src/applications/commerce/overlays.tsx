@@ -121,7 +121,7 @@ export function ProductEditor({ context, close }: { context: ScreenContext; clos
             fields: { ...existing.fields, ...fields },
             body: { ...existingBody, description },
           }, { expectRevision: existing.revision, event: `Product ${title.trim()} edited` });
-          if (!ok15) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok15) return; // the platform has already said the record changed elsewhere
         } else {
           await context.mutate.create({
             collection: "products", title: title.trim(), status: published ? "active" : "draft",
@@ -240,7 +240,7 @@ export function BulkPreview({ context, close }: { context: ScreenContext; close:
               const ready = checks.filter((check) => check.problems.length === 0);
               for (const check of ready) {
                 const ok16 = await context.mutate.patch(check.product.id, { status: "active", fields: { ...check.product.fields, published: true } }, { expectRevision: check.product.revision, event: `${check.product.title} published to the storefront` });
-                if (!ok16) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+                if (!ok16) return; // the platform has already said the record changed elsewhere
               }
               context.toast("Published", `${ready.length} product${ready.length === 1 ? "" : "s"} now appear in the storefront. ${blocked.length} were left alone.`);
               close();
@@ -278,7 +278,7 @@ export function VariantEditor({ context, close }: { context: ScreenContext; clos
         const ok17 = await context.mutate.patch(product.id, {
           body: { ...body, variants: [...(body.variants ?? []), { id: `${sku.trim()}-v`, name: name.trim(), sku: sku.trim().toUpperCase(), priceDeltaMinor: delta }] },
         }, { expectRevision: product.revision, event: `Variant ${name.trim()} added to ${product.title}` });
-        if (!ok17) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok17) return; // the platform has already said the record changed elsewhere
         context.toast("Variant added", `${name.trim()} sells at ${context.money((product.amountMinor ?? 0) + delta)}.`);
         close();
       }}
@@ -312,7 +312,7 @@ export function MediaPicker({ context, close }: { context: ScreenContext; close:
         const ok18 = await context.mutate.patch(product.id, {
           body: { ...body, media: [...(body.media ?? []), { id: `m${(body.media ?? []).length + 1}`, label: label.trim(), kind: "placeholder" }] },
         }, { expectRevision: product.revision, event: `Media reference added to ${product.title}` });
-        if (!ok18) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok18) return; // the platform has already said the record changed elsewhere
         context.toast("Reference added", "The storefront shows the label until a file store is connected.");
         close();
       }}
@@ -401,7 +401,7 @@ export function PublishProduct({ context, close }: { context: ScreenContext; clo
         disabled={problems.length > 0}
         onClick={async () => {
           const ok19 = await context.mutate.patch(product.id, { status: "active", fields: { ...product.fields, published: true } }, { expectRevision: product.revision, event: `${product.title} published to the storefront` });
-          if (!ok19) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok19) return; // the platform has already said the record changed elsewhere
           context.toast("Published", `${product.title} is now in the storefront preview.`);
           close();
         }}
@@ -550,7 +550,7 @@ export function BulkOperation({ context, close }: { context: ScreenContext; clos
             status: stage === "shipped" ? "in_transit" : order.status,
             fields: { ...order.fields, fulfilment: stage },
           }, { expectRevision: order.revision, event: `${order.title} moved to ${stage}` });
-          if (!ok20) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok20) return; // the platform has already said the record changed elsewhere
         }
         context.toast("Orders moved", `${ready.length} order${ready.length === 1 ? "" : "s"} are now ${stage}. ${blocked.length} unpaid order${blocked.length === 1 ? " was" : "s were"} left alone.`);
         close();
@@ -594,7 +594,7 @@ export function RefundApproval({ context, close }: { context: ScreenContext; clo
           fields: { ...order.fields, refundProposedMinor: value, refundProposedBy: actor, payment: "refund_proposed" },
           body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: "Refund proposed", detail: `${context.money(value)} proposed by ${actor}: ${reason}. No processor is connected, so nothing has been sent.` }] },
         }, { expectRevision: order.revision, event: `Refund of ${value} proposed on ${order.title}` });
-        if (!ok21) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok21) return; // the platform has already said the record changed elsewhere
         context.toast("Refund proposed", "The proposal is on the order with its reason. Nothing was sent: the money moves only when someone sends it and records it.");
         close();
       }}
@@ -723,7 +723,7 @@ export function CancellationImpact({ context, close }: { context: ScreenContext;
             fields: { ...order.fields, fulfilment: "cancelled", payment: paid ? String(order.fields.payment) : "void" },
             body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: "Cancelled", detail: `${lines.reduce((sum, line) => sum + line.quantity, 0)} units released back to available.` }] },
           }, { expectRevision: order.revision, event: `${order.title} cancelled` });
-          if (!ok22) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok22) return; // the platform has already said the record changed elsewhere
           context.toast("Cancelled", paid ? "Stock is released. The payment still needs a refund proposal." : "Stock is released and nothing was charged.");
           close();
         }}
@@ -879,7 +879,7 @@ export function CarrierSelector({ context, close }: { context: ScreenContext; cl
         const ready = chosen.filter((order) => !String(order.fields.tracking));
         for (const order of ready) {
           const ok23 = await context.mutate.patch(order.id, { fields: { ...order.fields, carrier } }, { expectRevision: order.revision, event: `${order.title} assigned to ${carrier}` });
-          if (!ok23) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok23) return; // the platform has already said the record changed elsewhere
         }
         context.toast("Carrier set", `${ready.length} order${ready.length === 1 ? "" : "s"} assigned to ${carrier}. ${already.length} already had a reference and were skipped.`);
         close();
@@ -938,7 +938,7 @@ export function DeliveryException({ context, close }: { context: ScreenContext; 
           fields: { ...order.fields, fulfilment: decision === "resend" ? "unfulfilled" : "exception", exceptionDecision: decision },
           body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: `Exception decision: ${decision}`, detail: note || "No note recorded." }] },
         }, { expectRevision: order.revision, event: `Exception on ${order.title} decided: ${decision}` });
-        if (!ok24) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok24) return; // the platform has already said the record changed elsewhere
         context.toast("Decision recorded", decision === "resend" ? "The order is back in the pick queue. No second label was created automatically." : "The decision and its note are on the order.");
         close();
       }}
@@ -1120,7 +1120,7 @@ export function OfferBuilder({ context, close }: { context: ScreenContext; close
         const fields = { kind, value: Number(value), code: code.trim().toUpperCase(), minQuantity: Number(existing?.fields.minQuantity ?? 1), audience: String(existing?.fields.audience ?? "all"), stackable, floorMarginBp: Math.round(Number(floor) * 100), uses: Number(existing?.fields.uses ?? 0) };
         if (existing) {
           const ok25 = await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Offer ${title.trim()} edited` });
-          if (!ok25) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok25) return; // the platform has already said the record changed elsewhere
         } else {
           const end = new Date(now);
           end.setDate(end.getDate() + 30);
@@ -1208,7 +1208,7 @@ export function OfferLaunchApproval({ context, close }: { context: ScreenContext
       onSubmit={async (event) => {
         event.preventDefault();
         const ok26 = await context.mutate.patch(promotion.id, { status: "active", fields: { ...promotion.fields, approvedBy: actor } }, { expectRevision: promotion.revision, event: `Offer ${promotion.title} made live by ${actor}` });
-        if (!ok26) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok26) return; // the platform has already said the record changed elsewhere
         context.toast("Offer live", `${promotion.title} now applies in the storefront checkout.`);
         close();
       }}

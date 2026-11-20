@@ -261,7 +261,7 @@ export const connectApp = registerApp({
       ],
       overlays: [
         { id: "Capability inspector", kind: "drawer", title: "Capability", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <CapabilityInspector context={context} /> },
-        { id: "schema diff", kind: "modal", title: "Schema diff", width: 640, render: ({ ...context }) => <SchemaDiff context={context} />, footer: closeFooter() },
+        { id: "schema diff", kind: "modal", title: "Schema diff", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <SchemaDiff context={context} />, footer: closeFooter() },
         testMock, retireOperation,
       ],
     },

@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarClock, Globe, Inbox, Radio } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select,
-  Stack, Stat, StatRow, TextInput,
+  Button, Card, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, Notice, OverlayActions, OverlaySection, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
@@ -80,17 +79,17 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
           <Stack gap={4}>
             <Field label="Frequency">
               <Select aria-label="Frequency" value={schedule.frequency}
-                onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleFrequency: event.target.value } }, { event: "Schedule frequency changed" })}
+                onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleFrequency: event.target.value } }, { expectRevision: record.revision, event: "Schedule frequency changed" }); }}
               >
                 {["hourly", "daily", "weekly", "monthly"].map((value) => <option key={value} value={value}>{value}</option>)}
               </Select>
             </Field>
             <Row gap={2}>
               <Field label="Hour">
-                <TextInput aria-label="Hour" type="number" min={0} max={23} value={String(schedule.hour)} onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleHour: Number(event.target.value) } }, { event: "Schedule hour changed" })} />
+                <TextInput aria-label="Hour" type="number" min={0} max={23} value={String(schedule.hour)} onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)) } }, { expectRevision: record.revision, event: "Schedule hour changed" }); }} />
               </Field>
               <Field label="Minute">
-                <TextInput aria-label="Minute" type="number" min={0} max={59} value={String(schedule.minute)} onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleMinute: Number(event.target.value) } }, { event: "Schedule minute changed" })} />
+                <TextInput aria-label="Minute" type="number" min={0} max={59} value={String(schedule.minute)} onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)) } }, { expectRevision: record.revision, event: "Schedule minute changed" }); }} />
               </Field>
             </Row>
             <Field label="Time zone" hint="Firings are resolved in this zone, so a clock change moves the UTC instant, not the local time.">
@@ -305,21 +304,23 @@ export function WebhookSetup({ context, close }: { context: ScreenContext; close
   const path = String(record.fields.webhookPath ?? `/hooks/${record.id}`);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Endpoint that would be registered", value: <code className="ds-num" style={{ fontSize: "var(--text-xs)" }}>{path}</code> },
-        { label: "Signature header", value: <code className="ds-num" style={{ fontSize: "var(--text-xs)" }}>X-Arlovi-Signature</code> },
+      <Notice tone="warning" title="This endpoint does not exist">
+        Nothing is hosted from this browser, so no provider can post to it. A test delivery exercises the de-duplication and ordering rules on real rows instead.
+      </Notice>
+      <FactGrid columns={1} items={[
+        { label: "Endpoint that would be registered", value: path, mono: true },
+        { label: "Signature header", value: "X-Arlovi-Signature", mono: true },
         { label: "De-duplication", value: "By the Idempotency-Key header, for 24 hours" },
       ]} />
-      <Notice tone="warning" title="This endpoint does not exist">
-        Nothing is hosted from this browser, so no provider can post to it. Recording a test delivery below exercises the de-duplication and ordering rules on real rows instead.
-      </Notice>
       <Field label="Idempotency key" hint="Use the same key twice to see the duplicate dropped.">
         <TextInput aria-label="Idempotency key" value={key} onChange={(event) => setKey(event.target.value)} placeholder="evt-1001" />
       </Field>
       <Field label="Payload status field">
         <TextInput aria-label="Payload status field" value={status} onChange={(event) => setStatus(event.target.value)} />
       </Field>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         disabled={key.trim() === ""}
         onClick={async () => {
@@ -339,7 +340,10 @@ export function WebhookSetup({ context, close }: { context: ScreenContext; close
         }}
       >
         Record a test delivery
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -383,10 +387,12 @@ export function ScheduleRecurrence({ context, close }: { context: ScreenContext;
           </Row>
         ))}
       </Stack>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(record.id, {
+          const saved = await context.mutate.patch(record.id, {
             fields: {
               ...record.fields,
               scheduleFrequency: value.frequency,
@@ -396,12 +402,16 @@ export function ScheduleRecurrence({ context, close }: { context: ScreenContext;
               scheduleTimezone: value.timezone,
             },
           }, { expectRevision: record.revision, event: "Recurrence changed" });
-          context.toast("Recurrence saved", describeSchedule({ ...current, ...value, frequency: value.frequency as typeof current.frequency }));
+          if (!saved) return;
+          context.toast("Recurrence saved", `${describeSchedule({ ...current, ...value, frequency: value.frequency as typeof current.frequency })} Recorded only; no scheduler fires it.`);
           close();
         }}
       >
         Save recurrence
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -432,7 +442,7 @@ export function SampleInspection({ context }: { context: ScreenContext }) {
             { label: "Overdue by", value: chosen.dueAt ? `${Math.max(0, Math.floor((context.now.getTime() - new Date(chosen.dueAt).getTime()) / 86_400_000))} days` : "No due date" },
           ]} />
           <Notice tone="info" title="This is the real projection">
-            A step reads exactly these keys. Nothing is added for the sample, so a template that refers to a key not shown here will fail at run time and say so.
+            A step reads exactly these keys. A template that refers to a key not shown here fails at run time and says so.
           </Notice>
         </>
       ) : (
@@ -471,7 +481,9 @@ export function TriggerSelection({ context, close }: { context: ScreenContext; c
           ? "A run started with this trigger would fail at the first step, because nothing matches."
           : `The first match is ${candidate[0].title}.`}
       </Notice>
-      <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
         variant="primary"
         onClick={() => {
           setDraftGraph(record.id, {
@@ -483,7 +495,10 @@ export function TriggerSelection({ context, close }: { context: ScreenContext; c
         }}
       >
         Use this trigger
-      </Button>
+      </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

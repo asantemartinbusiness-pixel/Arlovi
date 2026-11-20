@@ -286,9 +286,8 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
         ]}
       >
         <ViewToggle label="Library view" value={view} onChange={setView} />
-        <Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>
       </LibraryStrip>
-      {tab === "Shared" && <p className="ds-subtle">A local sharing record is not a public link: no document here is reachable outside this workspace.</p>}
+      {tab === "Shared" && <p className="ds-subtle">Sharing here is a local record. This does not mean a public link or external access exists.</p>}
       <div className="lk-toolbar">
         <div className="lk-grow">
           <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text (confidential: title and tags only)" />
@@ -1961,7 +1960,6 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
         } finally { setSaving(false); }
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / CREATION</span><h3>Start a new company document</h3><p>Choose a published master or begin blank, then file the record in the appropriate workspace folder.</p></div>
       <Field label="Title" required hint="Shown in the library, the outline and every export.">
         <TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus />
       </Field>
@@ -2624,7 +2622,6 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
         } finally { setSaving(false); }
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / ASSIGNMENT</span><h3>Assign accountable reviewers</h3><p>Existing reviewers remain selected. Choose people responsible for reviewing this particular document.</p></div>
       <Stack gap={2}>
         {members.map((member) => (
           <Checkbox
@@ -2854,7 +2851,6 @@ function PdfSettings({ context, close }: { context: ScreenContext; close: () => 
         close();
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / PRINT LAYOUT</span><h3>Prepare a print-ready document</h3><p>Review page settings, comment inclusion and document confidentiality before generating browser-printable HTML.</p></div>
       <Notice tone="warning" title="No PDF engine is connected">
         A PDF is produced by printing the exported HTML from the browser. Saying it is a native PDF renderer would be untrue, so the export is named for what it is.
       </Notice>

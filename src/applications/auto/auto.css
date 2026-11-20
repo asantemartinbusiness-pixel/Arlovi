@@ -3,8 +3,8 @@
 
 .auto-builder {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "palette canvas canvas" "test test inspect" "validate validate inspect";
+  grid-template-columns: 148px minmax(0, 1fr) minmax(300px, 340px);
+  grid-template-areas: "palette canvas inspect" "palette canvas validate" "test test test";
   gap: var(--space-4);
   align-items: start;
   /* The builder is the page surface, so it carries the page gutter itself. */
@@ -15,9 +15,9 @@
 .auto-builder > :nth-child(3) { grid-area: inspect; min-width: 0; }
 .auto-builder > :nth-child(4) { grid-area: validate; min-width: 0; }
 .auto-builder > :nth-child(5) { grid-area: test; min-width: 0; }
-@media (max-width: 1280px) {
+@media (max-width: 1180px) {
   .auto-builder {
-    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-columns: 148px minmax(0, 1fr);
     grid-template-areas: "palette canvas" "inspect inspect" "test test" "validate validate";
   }
 }
@@ -99,10 +99,10 @@
 .auto-palette-item {
   display: flex;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
   text-align: left;
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -114,7 +114,7 @@
 .auto-palette-item:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .auto-palette-item[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
 .auto-palette-item strong { display: block; font-size: var(--text-sm); }
-.auto-palette-item span { color: var(--fg-muted); font-size: var(--text-xs); }
+.auto-palette-note { font-size: var(--text-xs); margin: var(--space-1) 0 0; }
 
 .auto-canvas-wrap {
   position: relative;
@@ -361,3 +361,8 @@
   white-space: nowrap;
 }
 .auto-cal-fire[data-dst="true"] { background: var(--warning-soft); color: var(--warning); }
+
+/* Replay / retry plan */
+.auto-plan { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.auto-plan > li { display: grid; gap: 2px; }
+.auto-plan > li > span { color: var(--fg-muted); font-size: var(--text-xs); }

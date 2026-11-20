@@ -276,20 +276,6 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
 
   return (
     <div className="t6-shell">
-      <section className="bb-bar" aria-label="Build editor overview">
-        <div className="bb-bar-stats" role="group" aria-label="Builder model status">
-          <span><b className="ds-num">{model.screens.length}</b> screens</span>
-          <span><b className="ds-num">{componentCount}</b> components</span>
-          <span><b className="ds-num">{model.entities.length}</b> entities</span>
-          <span data-tone={unboundCount > 0 ? "warning" : undefined}><b className="ds-num">{unboundCount}</b> unbound</span>
-          {totals.fail > 0 && <button type="button" className="bb-bar-fail" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>{totals.fail} failing {totals.fail === 1 ? "check" : "checks"}</button>}
-        </div>
-        <div className="bb-bar-links">
-          <Button size="sm" variant="ghost" onClick={() => context.setTab("Data")}>Data model</Button>
-          <Button size="sm" variant="ghost" onClick={() => context.setTab("Preview")}>Preview</Button>
-          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Checks</Button>
-        </div>
-      </section>
       <div className="t6-shell-bar">
         <Toolbar label="App builder">
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}`)}>Project</Button>
@@ -329,13 +315,26 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
           }}>New screen</Button>
         </Row>
       </div>
-      <div className="t6-shell-tabs">
+      <div className="t6-shell-tabs bb-tabrow">
         <Tabs
           label="Builder views"
           value={context.tab}
           onChange={context.setTab}
           items={["Design", "Logic", "Data", "Responsive", "Preview"].map((id) => ({ id, label: id }))}
         />
+        <section className="bb-bar" aria-label="Build editor overview">
+          <div className="bb-bar-stats" role="group" aria-label="Builder model status">
+            <span><b className="ds-num">{model.screens.length}</b> screens</span>
+            <span><b className="ds-num">{componentCount}</b> components</span>
+            <span><b className="ds-num">{model.entities.length}</b> entities</span>
+            <span data-tone={unboundCount > 0 ? "warning" : undefined}><b className="ds-num">{unboundCount}</b> unbound</span>
+            {totals.fail > 0 && <button type="button" className="bb-bar-fail" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>{totals.fail} failing {totals.fail === 1 ? "check" : "checks"}</button>}
+          </div>
+          <div className="bb-bar-links">
+            <Button size="sm" variant="ghost" onClick={() => context.setTab("Data")}>Data model</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Checks</Button>
+          </div>
+        </section>
       </div>
       <div className="t6-shell-body" data-panes={panes.length === 1 ? "1" : panes.length === 2 ? "2" : undefined}>
         {panes}

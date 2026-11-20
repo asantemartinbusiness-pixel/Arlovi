@@ -145,7 +145,7 @@ function FilesGallery({ context, lens }: { context: ScreenContext; lens: "Recent
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Files" value={docs.filter((item) => item.record.fields.kind !== "template").length} meta={`${docs.length} records in ${context.org.shortName}`} />
+        <Stat label="Files" value={docs.filter((item) => item.record.fields.kind !== "template").length} meta={`${docs.filter((item) => item.record.fields.kind === "template").length} templates alongside`} />
         <Stat label="Layers in total" value={docs.reduce((sum, item) => sum + item.doc.pages.reduce((n, page) => n + Object.keys(page.nodes).length, 0), 0)} meta="Counted from the documents" />
         <Stat label="Published components" value={docs.reduce((sum, item) => sum + item.doc.components.filter((c) => c.published).length, 0)} meta="Across all files" />
         <Stat label="Files with import notes" value={docs.filter((item) => item.doc.unsupported.length > 0).length} meta="Unsupported features disclosed" />
@@ -162,7 +162,7 @@ function FilesGallery({ context, lens }: { context: ScreenContext; lens: "Recent
             <Stack gap={2}>
               <DesignThumb doc={doc} />
               <Row gap={2} wrap>
-                <Pill tone={record.status === "draft" ? "warning" : "info"} dot>{record.status}</Pill>
+                <Pill tone={record.status === "draft" ? "warning" : "info"} dot>{record.status.replace(/_/g, " ")}</Pill>
                 {record.fields.sharedWith && <Pill tone="accent">{String(record.fields.sharedWith).split(",").length} collaborators</Pill>}
                 {record.fields.format && <Pill>{String(record.fields.format)}</Pill>}
                 {doc.unsupported.length > 0 && (
@@ -367,11 +367,10 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
             <Button size="sm" variant="ghost" disabled={!handle.canUndo} onClick={handle.undo}>Undo</Button>
             <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
             <Button size="sm" variant="ghost" onClick={requestFit}>Fit</Button>
+            <Popover align="end" trigger={<Button size="sm" variant="ghost" aria-label="Keyboard shortcuts">Keys</Button>}>
+              <div className="vx-keys"><ShortcutTable rows={SHORTCUT_ROWS} /></div>
+            </Popover>
           </Toolbar>
-          <ToolbarSeparator />
-          <Popover align="end" trigger={<Button size="sm" variant="ghost" aria-label="Keyboard shortcuts">Keys</Button>}>
-            <div className="vx-keys"><ShortcutTable rows={SHORTCUT_ROWS} /></div>
-          </Popover>
         </>
       }
       left={
@@ -1493,10 +1492,17 @@ function PrototypeScreen({ context, lens }: { context: ScreenContext; lens: "Flo
     const bounds = pageBounds(page);
     return (
       <Stack gap={4}>
-        <Notice tone="info" title={`${frames.length} frames, ${links.length} connection${links.length === 1 ? "" : "s"}`}>
-          The flow is drawn from the links stored on the layers. Add one on the canvas with the prototype tool, or on the Interactions tab.
-        </Notice>
-        <Card title="Screen flow" flush>
+        <Card
+          title="Screen flow"
+          subtitle={<><span className="ds-num">{frames.length}</span> screen{frames.length === 1 ? "" : "s"} · <span className="ds-num">{links.length}</span> connection{links.length === 1 ? "" : "s"}{links.length === 0 && " · link screens to draw the flow"}</>}
+          actions={frames.length > 1 ? (
+            <Select aria-label="Start screen" value={doc.prototype.startNodeId ?? ""} onChange={(event) => handle.edit((current) => ({ ...current, prototype: { ...current.prototype, startNodeId: event.target.value || undefined } }), "Set start frame")}>
+              <option value="">Start: first screen</option>
+              {frames.map((frame) => <option key={frame.id} value={frame.id}>Start: {frame.name}</option>)}
+            </Select>
+          ) : undefined}
+          flush
+        >
           <svg viewBox={`${bounds.x - 40} ${bounds.y - 40} ${bounds.w + 80} ${bounds.h + 80}`} style={{ width: "100%", height: 420, background: "var(--bg-inset)" }} role="img" aria-label={`Flow of ${frames.length} frames with ${links.length} connections`}>
             {links.map(({ from, to }) => {
               if (!to) return null;
@@ -1522,13 +1528,6 @@ function PrototypeScreen({ context, lens }: { context: ScreenContext; lens: "Flo
             })}
           </svg>
         </Card>
-        <Row gap={2} wrap>
-          {frames.map((frame) => (
-            <Button key={frame.id} size="sm" variant={doc.prototype.startNodeId === frame.id ? "primary" : "secondary"} onClick={() => handle.edit((current) => ({ ...current, prototype: { ...current.prototype, startNodeId: frame.id } }), "Set start frame")}>
-              Start at {frame.name}
-            </Button>
-          ))}
-        </Row>
       </Stack>
     );
   }

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { FlaskConical, Play, Save, Workflow as WorkflowIcon } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented,
-  Select, Stack, Stat, StatRow, TextInput,
+  Button, Card, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, ModalActions, Notice, OverlayActions,
+  OverlaySection, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -249,7 +249,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
   /* Design */
   return (
     <div className="auto-builder">
-      <Card eyebrow="PALETTE" title="Palette" subtitle="Six node kinds">
+      <Card title="Add a step" className="auto-palette-card">
         <NodePalette onAdd={(type) => {
           const next = addNode(graph, type);
           change(next, `${type} node added`);
@@ -302,23 +302,67 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
         )}
       </Stack>
 
-      <Card eyebrow="NODE" prov="human" title="Node properties" subtitle={draft.selectedNodeId ? graph.nodes.find((node) => node.id === draft.selectedNodeId)?.label : "Nothing selected"}>
-        <NodeInspector
-          graph={graph}
-          nodeId={draft.selectedNodeId}
-          onChange={change}
-          collections={AUTOMATION_COLLECTIONS}
-          records={pool}
-          lastStep={draft.dryRun?.steps.filter((step) => step.nodeId === draft.selectedNodeId).at(-1)}
-        />
-      </Card>
+      <InspectorCard
+        graph={graph}
+        nodeId={draft.selectedNodeId}
+        issues={issues}
+        onChange={change}
+        pool={pool}
+        lastStep={draft.dryRun?.steps.filter((step) => step.nodeId === draft.selectedNodeId).at(-1)}
+        onClear={() => updateDraft(record.id, { selectedNodeId: undefined })}
+      />
 
-      <Card eyebrow="VALIDATION" prov="agent" title="Validation" subtitle={`${errors.length} error${errors.length === 1 ? "" : "s"}, ${issues.length - errors.length} warning${issues.length - errors.length === 1 ? "" : "s"}`}>
+      <Card title="Validation" subtitle={`${errors.length} error${errors.length === 1 ? "" : "s"}, ${issues.length - errors.length} warning${issues.length - errors.length === 1 ? "" : "s"}`}>
         <ValidationPanel issues={issues} onSelect={(nodeId) => updateDraft(record.id, { selectedNodeId: nodeId, view: draft.view })} />
       </Card>
 
       <LocalTestPanel context={context} record={record} draft={draft} pool={pool} />
     </div>
+  );
+}
+
+
+/** The node inspector: its identity, its issues and its last test receipt follow the selection. */
+function InspectorCard({
+  graph, nodeId, issues, onChange, pool, lastStep, onClear,
+}: {
+  graph: WorkflowGraph;
+  nodeId?: string;
+  issues: ReturnType<typeof validateWorkflow>;
+  onChange: (next: WorkflowGraph, note: string) => void;
+  pool: Rec[];
+  lastStep?: Parameters<typeof NodeInspector>[0]["lastStep"];
+  onClear: () => void;
+}) {
+  const node = graph.nodes.find((item) => item.id === nodeId);
+  const mine = node ? issues.filter((issue) => issue.nodeId === node.id) : [];
+  const kind = node ? NODE_KINDS.find((item) => item.id === node.type)?.label ?? node.type : undefined;
+  return (
+    <Card
+      className="auto-inspector"
+      eyebrow={kind}
+      title={node ? node.label : "Node properties"}
+      subtitle={node ? undefined : "Select a node on the canvas or in the list"}
+      actions={node ? (
+        <Row gap={2}>
+          {mine.length > 0
+            ? <Pill tone={mine.some((issue) => issue.severity === "error") ? "danger" : "warning"} dot>{mine.length} issue{mine.length === 1 ? "" : "s"}</Pill>
+            : <Pill tone="success" dot>Clean</Pill>}
+          <Button size="sm" variant="ghost" onClick={onClear} aria-label="Clear the node selection">Deselect</Button>
+        </Row>
+      ) : undefined}
+    >
+      <div aria-live="polite" data-node={node?.id}>
+        <NodeInspector
+          graph={graph}
+          nodeId={nodeId}
+          onChange={onChange}
+          collections={AUTOMATION_COLLECTIONS}
+          records={pool}
+          lastStep={lastStep}
+        />
+      </div>
+    </Card>
   );
 }
 
@@ -331,10 +375,7 @@ export function NodePicker({ context, close }: { context: ScreenContext; close: 
   if (!record || !draft) return <Empty title="Open an automation first" />;
   return (
     <Stack gap={4}>
-      <p className="ds-subtle">
-        Adding a node here is the keyboard equivalent of dragging a card from the palette. The node is dropped at the next free slot and selected for you.
-      </p>
-      <Field label="Node kind">
+      <Field label="Node kind" hint="Dropped at the next free slot and selected, like a drag from the palette.">
         <Select aria-label="Node kind" value={type} onChange={(event) => setType(event.target.value as typeof type)}>
           {NODE_KINDS.map((kind) => <option key={kind.id} value={kind.id}>{kind.label} — {kind.hint}</option>)}
         </Select>
@@ -342,18 +383,18 @@ export function NodePicker({ context, close }: { context: ScreenContext; close: 
       <Field label="Label" hint="A short name that says what the step does.">
         <TextInput aria-label="Label" value={label} onChange={(event) => setLabel(event.target.value)} placeholder={NODE_KINDS.find((kind) => kind.id === type)?.label} />
       </Field>
-      <Button
-        variant="primary"
-        onClick={() => {
-          const next = addNode(draft.graph, type, label.trim() || undefined);
-          setDraftGraph(record.id, next, `${type} node added`);
-          updateDraft(record.id, { selectedNodeId: next.nodes[next.nodes.length - 1].id });
-          context.toast("Node added", "It is on the canvas and selected. Save the graph when the configuration is finished.");
-          close();
-        }}
-      >
-        Add node
-      </Button>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => {
+            const next = addNode(draft.graph, type, label.trim() || undefined);
+            setDraftGraph(record.id, next, `${type} node added`);
+            updateDraft(record.id, { selectedNodeId: next.nodes[next.nodes.length - 1].id });
+            context.toast("Node added", "It is on the canvas and selected. Save the graph when the configuration is finished.");
+            close();
+          }}>Add node</Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -370,10 +411,7 @@ export function BranchEditor({ context, close }: { context: ScreenContext; close
 
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Connections without a pointer">
-        Choose the step the path leaves, which port it leaves by, and where it goes. A condition has a true and a false port; an approval has approved and rejected.
-      </Notice>
-      <Field label="From step">
+      <Field label="From step" hint="A condition leaves by then or else; an approval by approved or rejected.">
         <Select aria-label="From step" value={from} onChange={(event) => { setFrom(event.target.value); setPort("out"); }}>
           <option value="">Choose a step</option>
           {graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.label} ({node.type})</option>)}
@@ -395,30 +433,28 @@ export function BranchEditor({ context, close }: { context: ScreenContext; close
           A port carries one path. Connecting it again replaces the existing connection to {graph.nodes.find((node) => node.id === graph.edges.find((edge) => edge.from === from && (edge.port ?? "out") === port)?.to)?.label}.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          disabled={!from || !to}
-          onClick={() => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={!from || !to} onClick={() => {
             setDraftGraph(record.id, connect(graph, from, port, to), `Connected ${fromNode?.label} (${port})`);
             context.toast("Connected", `${fromNode?.label} now leads to ${graph.nodes.find((node) => node.id === to)?.label} on the ${port} port.`);
             close();
-          }}
-        >
-          Connect
-        </Button>
-      </Row>
-      <Stack gap={2}>
-        <strong>Existing connections</strong>
+          }}>Connect</Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
+      <OverlaySection title="Existing connections" hint={`${graph.edges.length} in this graph`}>
         {graph.edges.length === 0 && <span className="ds-subtle">None yet.</span>}
-        {graph.edges.map((edge) => (
-          <Row key={edge.id ?? `${edge.from}-${edge.to}`} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
-            <span className="ds-grow" style={{ fontSize: "var(--text-xs)" }}>
-              {graph.nodes.find((node) => node.id === edge.from)?.label} → <Pill tone="neutral">{edge.port ?? "out"}</Pill> → {graph.nodes.find((node) => node.id === edge.to)?.label}
-            </span>
-          </Row>
-        ))}
-      </Stack>
+        <Stack gap={2}>
+          {graph.edges.map((edge) => (
+            <Row key={edge.id ?? `${edge.from}-${edge.to}`} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+              <span className="ds-grow" style={{ fontSize: "var(--text-xs)" }}>
+                {graph.nodes.find((node) => node.id === edge.from)?.label} → <Pill tone="neutral">{edge.port ?? "out"}</Pill> → {graph.nodes.find((node) => node.id === edge.to)?.label}
+              </span>
+            </Row>
+          ))}
+        </Stack>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -455,14 +491,15 @@ export function ConnectorGrants({ context }: { context: ScreenContext }) {
           })}
         </Stack>
       )}
-      <Stack gap={2}>
-        <strong>Every capability this product knows about</strong>
+      <OverlaySection title="Every capability" hint={`${PROVIDER_CAPABILITIES.length} known to this product`}>
         <Properties rows={PROVIDER_CAPABILITIES.map((capability) => ({
           label: capability.label,
           value: <Pill tone={CAPABILITY_TONE[capability.state]}>{CAPABILITY_LABELS[capability.state]}</Pill>,
         }))} />
-      </Stack>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Open connections</Button>
+      </OverlaySection>
+      <DrawerActions>
+        <OverlayActions primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Open connections</Button>} />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -514,7 +551,7 @@ export function FixtureEditor({ context, close }: { context: ScreenContext; clos
   return (
     <Stack gap={4}>
       <Notice tone="info" title="A fixture only changes a dry run">
-        Fixture values are merged over the record the trigger matched, so you can test a branch without editing a real record. A live run ignores the fixture.
+        Values are merged over the matched record to test a branch. A live run ignores them.
       </Notice>
       <Field label="Field">
         <Select aria-label="Field" value={key} onChange={(event) => setKey(event.target.value)}>
@@ -526,22 +563,21 @@ export function FixtureEditor({ context, close }: { context: ScreenContext; clos
       <Field label="Value used in the dry run">
         <TextInput aria-label="Value used in the dry run" value={value} onChange={(event) => setValue(event.target.value)} />
       </Field>
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          disabled={value.trim() === ""}
-          onClick={() => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={value.trim() === ""} onClick={() => {
             const numeric = Number(value);
             updateDraft(record.id, { fixture: { ...draft.fixture, [key]: Number.isFinite(numeric) && value.trim() !== "" ? numeric : value } });
             context.toast("Fixture value set", `${key} will read ${value} in the next dry run.`);
             close();
-          }}
-        >
-          Add to the fixture
-        </Button>
-      </Row>
+          }}>Add to the fixture</Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
       {Object.keys(draft.fixture).length > 0 && (
-        <Properties rows={Object.entries(draft.fixture).map(([name, item]) => ({ label: name, value: String(item) }))} />
+        <OverlaySection title="Fixture so far">
+          <FactGrid columns={2} dense items={Object.entries(draft.fixture).map(([name, item]) => ({ label: name, value: String(item), mono: true }))} />
+        </OverlaySection>
       )}
     </Stack>
   );

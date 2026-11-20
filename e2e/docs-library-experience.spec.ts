@@ -10,7 +10,7 @@ test("Documents library presents distinct working states and filters across view
   const draftFilter = main.getByRole("button", { name: "Drafts", exact: true });
   await draftFilter.click();
   await expect(draftFilter).toHaveAttribute("aria-pressed", "true");
-  await main.getByRole("button", { name: "Clear filters" }).click();
+  await main.getByRole("button", { name: "Clear filters" }).first().click();
   await expect(draftFilter).toHaveAttribute("aria-pressed", "false");
   const sizing = await page.evaluate(() => ({
     pageWidth: document.documentElement.scrollWidth,
@@ -135,7 +135,7 @@ test("Document reviewer assignment exposes reason, existing state, and no email 
   await page.goto(`/o/northline/docs/documents/${id}/review?tab=Approvals`);
   await page.locator("#main").getByRole("button", { name: "Assign reviewers" }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Assign accountable reviewers");
+  await expect(dialog.getByRole("heading", { name: "Assign reviewers" })).toBeVisible();
   await expect(dialog.getByText("Reason for review assignment")).toBeVisible();
   await expect(dialog).toContainText("Not sent");
 });
@@ -199,7 +199,7 @@ test("New documents expose master provenance and do not offer unpublished templa
   await page.goto("/o/northline/docs/files");
   await page.locator("#main").getByRole("button", { name: "New document" }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Start a new company document");
+  await expect(dialog.getByRole("heading", { name: "New document" })).toBeVisible();
   await expect(dialog).toContainText("Distribution");
   await expect(dialog).toContainText("browser-local record");
   await expect(dialog.getByRole("combobox", { name: "Start from" })).toBeVisible();

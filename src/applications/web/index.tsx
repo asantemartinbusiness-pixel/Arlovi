@@ -71,10 +71,13 @@ function SiteSettingsForm({ context, close }: { context: ScreenContext; close: (
       }}
     >
       <OverlaySection title="Identity">
+        <Stack gap={3}>
         <Field label="Site title" required><TextInput name="siteTitle" defaultValue={site.seo.siteTitle} required /></Field>
         <Field label="Site description" hint="Used where a page has no description of its own."><TextArea name="description" rows={3} defaultValue={site.seo.description} /></Field>
+        </Stack>
       </OverlaySection>
       <OverlaySection title="Search engines">
+        <Stack gap={3}>
         <Field label="Robots">
           <Select name="robots" defaultValue={site.seo.robots}>
             <option value="index">index — allow listing</option>
@@ -82,8 +85,10 @@ function SiteSettingsForm({ context, close }: { context: ScreenContext; close: (
           </Select>
         </Field>
         <Checkbox name="sitemap" label="Generate a sitemap on export" defaultChecked={site.seo.sitemap} />
+        </Stack>
       </OverlaySection>
       <OverlaySection title="Analytics consent" hint="No banner and no counting; this records the decision.">
+        <Stack gap={3}>
         <Field label="Analytics consent state">
           <Select name="consent" defaultValue={site.analytics.consent}>
             <option value="not_asked">Not asked</option>
@@ -91,9 +96,12 @@ function SiteSettingsForm({ context, close }: { context: ScreenContext; close: (
             <option value="declined">Declined</option>
           </Select>
         </Field>
+        </Stack>
       </OverlaySection>
       <OverlaySection title="New route" hint="Leave empty to change settings only. A new page is added to the menu as well.">
+        <Stack gap={3}>
         <Field label="Add a page"><TextInput name="newPage" placeholder="About" /></Field>
+        </Stack>
       </OverlaySection>
     </form>
   );
@@ -155,7 +163,7 @@ function AiEditDiff({ context }: { context: ScreenContext }) {
       <p className="ds-subtle">A proposal would arrive here as a diff of the blocks added, removed and reordered, accepted or rejected as a whole.</p>
       <DrawerActions>
         <OverlayActions
-          primary={<Button variant="primary" onClick={() => context.openOverlay("Element inspector")}>Edit the selected block directly</Button>}
+          primary={<Button variant="primary" disabled={!block} title={block ? undefined : "Select a block on the canvas first"} onClick={() => context.openOverlay("Element inspector")}>Edit the selected block directly</Button>}
           end={<OverlayCancel>Close</OverlayCancel>}
         />
       </DrawerActions>

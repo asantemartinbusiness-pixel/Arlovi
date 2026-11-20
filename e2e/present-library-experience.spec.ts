@@ -133,7 +133,6 @@ test("Review approval records do not imply identity verification or publish auto
 test("Present empty archive preserves overview and offers an actionable next step", async ({ page }) => {
   await page.goto("/o/northline/present/decks?tab=Archived");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Presentation archive." })).toBeVisible();
   await expect(main.getByLabel("Presentation library overview")).toBeVisible();
   await expect(main.getByRole("searchbox", { name: "Find a presentation" })).toBeVisible();
 });

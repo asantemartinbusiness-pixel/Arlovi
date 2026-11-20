@@ -91,7 +91,7 @@ function RequisitionFormBody({ context, close, existing, loaded }: { context: Sc
             fields: { ...existing.fields, ...fields, number: String(existing.fields.number ?? number) },
             body: { lines, revisions: existingBody.revisions ?? [] },
           }, { expectRevision: existing.revision, event: `Requisition ${existing.title} edited` });
-          if (!ok1) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok1) return; // the platform has already said the record changed elsewhere
         } else {
           await context.mutate.create({
             collection: "purchaseOrders", title: number, status: "awaiting_approval",
@@ -407,7 +407,7 @@ export function SupplierForm({ context, close }: { context: ScreenContext; close
         };
         if (existing) {
           const ok2 = await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Supplier ${title.trim()} edited` });
-          if (!ok2) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok2) return; // the platform has already said the record changed elsewhere
         } else {
           await context.mutate.create({ collection: "suppliers", title: title.trim(), status: "review", summary: "", tags: [category.toLowerCase()], fields, body: { deliveries: [], notes: "" } }, `Supplier ${title.trim()} added for review`);
         }
@@ -463,7 +463,7 @@ export function SupplierVerification({ context, close }: { context: ScreenContex
           status: "approved",
           fields: { ...supplier.fields, bankLast4: last4.trim(), bankVerifiedAt: now.toISOString(), approvedBy: actor, verifiedWith: contact.trim() },
         }, { expectRevision: supplier.revision, event: `Bank detail verified for ${supplier.title} with ${contact.trim()} by ${actor}` });
-        if (!ok3) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok3) return; // the platform has already said the record changed elsewhere
         context.toast("Verification recorded", `${supplier.title} is approved with an account ending ${last4.trim()}, verified with ${contact.trim()}.`);
         close();
       }}
@@ -549,7 +549,7 @@ export function RiskEscalation({ context, close }: { context: ScreenContext; clo
           status: "review",
           fields: { ...supplier.fields, flaggedBy: actor, flagReason: reason.trim() },
         }, { expectRevision: supplier.revision, event: `${supplier.title} flagged for review by ${actor}: ${reason.trim()}` });
-        if (!ok4) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok4) return; // the platform has already said the record changed elsewhere
         context.toast("Flagged for review", `${supplier.title} is under review. New requisitions will show the state to the approver.`);
         close();
       }}
@@ -635,7 +635,7 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
                 : existingBody.revisions ?? [],
             },
           }, { expectRevision: existing.revision, event: `${existing.title} revised to version ${fields.version}` });
-          if (!ok5) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok5) return; // the platform has already said the record changed elsewhere
           context.toast(alreadySent ? "Revision recorded" : "Order saved", alreadySent ? `${existing.title} is now version ${fields.version}. The supplier would need the revision, not a second order.` : "The draft is saved.");
         } else {
           await context.mutate.create({
@@ -645,7 +645,7 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
           }, `Purchase order ${number} raised`);
           if (source) {
             const ok6 = await context.mutate.patch(source.id, { status: "converted" }, { expectRevision: source.revision, event: `${source.title} converted into ${number}` });
-            if (!ok6) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+            if (!ok6) return; // the platform has already said the record changed elsewhere
           }
           context.toast("Purchase order raised", source ? `${number} carries ${source.title}'s approval by ${String(source.fields.approver)}.` : `${number} is a draft and needs approval before it can be issued.`);
         }
@@ -845,7 +845,7 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
                   status: "sent",
                   fields: { ...order.fields, sentAt: now.toISOString(), sentBy: actor },
                 }, { expectRevision: order.revision, event: `${order.title} marked as issued by ${actor}` });
-                if (!ok7) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+                if (!ok7) return; // the platform has already said the record changed elsewhere
                 context.toast("Marked as issued", `${order.title} is recorded as issued. Nothing was sent: no supplier connection exists.`);
                 close();
               }}
@@ -883,7 +883,7 @@ export function LocationEditor({ context, close }: { context: ScreenContext; clo
         const fields = { code: code.trim().toUpperCase(), capacityUnits: Number(capacity) || 0, bins: Number(bins) || 0, managerName: manager.trim(), locationId: String(existing?.fields.locationId ?? "") };
         if (existing) {
           const ok8 = await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Warehouse ${title.trim()} edited` });
-          if (!ok8) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok8) return; // the platform has already said the record changed elsewhere
         } else {
           await context.mutate.create({ collection: "warehouses", title: title.trim(), status: "active", summary: "", fields }, `Warehouse ${title.trim()} created`);
         }
@@ -1083,7 +1083,7 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
             },
             body: { lines: receiptLines, scans },
           }, { expectRevision: receipt.revision, event: `${receipt.title} received by ${actor}` });
-          if (!ok9) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+          if (!ok9) return; // the platform has already said the record changed elsewhere
         } else {
           await context.mutate.create({
             collection: "receipts",
@@ -1110,7 +1110,7 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
           status: complete ? "received" : order.status,
           body: { ...body, lines },
         }, { expectRevision: order.revision, event: `${order.title} receipted: ${totalReceived} units` });
-        if (!ok10) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok10) return; // the platform has already said the record changed elsewhere
 
         for (const row of outstanding) {
           const quantity = countFor(row.line.id);
@@ -1212,7 +1212,7 @@ export function Discrepancy({ context, close }: { context: ScreenContext; close:
           status: "exception",
           fields: { ...receipt.fields, discrepancy: kind, discrepancyNote: note.trim(), flaggedBy: actor },
         }, { expectRevision: receipt.revision, event: `Discrepancy on ${receipt.title}: ${kind}` });
-        if (!ok11) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok11) return; // the platform has already said the record changed elsewhere
         context.toast("Discrepancy recorded", "The supplier invoice for this order will not match until it is resolved.");
         close();
       }}
@@ -1576,7 +1576,7 @@ export function ThreeWayMatch({ context, close }: { context: ScreenContext; clos
                   status: "approved",
                   fields: { ...bill.fields, matchState: "matched", approvedBy: actor, payment: "approved_local" },
                 }, { expectRevision: bill.revision, event: `${bill.title} approved for payment by ${actor} after a three-way match` });
-                if (!ok12) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+                if (!ok12) return; // the platform has already said the record changed elsewhere
                 context.toast("Approved for payment", `${bill.title} is cleared by the match. Paying it is a separate step in the ledger, outside this screen.`);
                 close();
               }}
@@ -1661,7 +1661,7 @@ export function SupplierReview({ context, close }: { context: ScreenContext; clo
           status: outcome === "approve" ? "approved" : outcome === "archive" ? "archived" : "review",
           fields: { ...supplier.fields, reviewedBy: actor, reviewNote: note.trim() },
         }, { expectRevision: supplier.revision, event: `${supplier.title} reviewed by ${actor}: ${outcome}` });
-        if (!ok13) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
+        if (!ok13) return; // the platform has already said the record changed elsewhere
         context.toast("Review recorded", `${supplier.title} is now ${outcome === "approve" ? "approved" : outcome === "archive" ? "archived" : "still under review"}.`);
         close();
       }}

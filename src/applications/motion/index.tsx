@@ -1,5 +1,5 @@
 import { Clapperboard, Cpu, Download, FolderOpen, MousePointerClick, Spline } from "lucide-react";
-import { Button, OVERLAY_WIDTH, OverlayActions, OverlayCancel, OverlaySummary } from "@/design-system";
+import { OVERLAY_WIDTH, OverlayActions, OverlayCancel } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { stagger } from "./anim";
 import { motionUi, parseMotion } from "./model";
@@ -290,7 +290,6 @@ registerApp({
   screens: {
     "ARL-MOTION-001": {
       id: "ARL-MOTION-001",
-      subtitle: () => "Compositions, brand motion templates, linked assets and every render made in this browser.",
       tabs: (["Recent", "Shared", "Templates", "Renders"] as ProjectLens[]).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ProjectsTab context={context} lens={lens} />,

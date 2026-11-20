@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { Button, Checkbox, Field, KeyValueList, Notice, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Field, Notice, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
 import {

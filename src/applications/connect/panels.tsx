@@ -275,14 +275,18 @@ export function ConnectorDetail({ context, lens }: { context: ScreenContext; len
   </Empty>;
   const reads = entry.scopes.filter(scope => scope.kind === "read").length;
   return <Stack gap={4}>
-    {lens === "Overview" && (
-      <section aria-label="Connector scope summary"><StatRow>
-        <Stat label="Read permissions" value={String(reads)} meta="Look, never change" />
-        <Stat label="Write permissions" value={String(entry.scopes.length - reads)} meta="Proposed, none granted" />
-        <Stat label="Operations" value={String(entry.operations.length)} meta="Named in the capability contract" />
-        <Stat label="Grants held" value="0" meta="No provider has been authorised" />
-      </StatRow></section>
-    )}
+    <section className="connect-band" aria-label="Connector details overview">
+      <ul className="connect-band-counts" aria-label="Connector scope summary">
+        <li><strong>{reads}</strong> read permissions</li>
+        <li><strong>{entry.scopes.length - reads}</strong> proposed write</li>
+        <li><strong>{entry.operations.length}</strong> operations</li>
+        <li><strong>0</strong> external grants</li>
+      </ul>
+      <Row gap={2} wrap>
+        <Button size="sm" variant="ghost" onClick={() => context.setTab("Permissions")}>Review permissions</Button>
+        <Button size="sm" variant="secondary" onClick={() => openConnector(context, records, entry, "connect")}>Connection requirements</Button>
+      </Row>
+    </section>
     <ConnectorDetailBody context={context} lens={lens} entry={entry} records={records} />
   </Stack>;
 }
@@ -426,13 +430,20 @@ function ConnectorDetailBody({ context, lens, entry, records }: { context: Scree
  * ================================================================ */
 
 export function ConnectionWizard({ context, lens }: { context: ScreenContext; lens: "Account" | "Permissions" | "Test" | "Confirm" }) {
-  const { entry } = useConnector(context);
+  const { entry, records } = useConnector(context);
   const [attempted, setAttempted] = useState(false);
   if (!entry) return <Empty title="No connector" icon={<Plug size={20} />} />;
   const steps = authorisationSteps(entry);
 
   return (
-    <Stack gap={5}>
+    <Stack gap={4}>
+      <section className="connect-band" aria-label="Connector authorisation overview">
+        <p className="connect-band-note">A provider redirect and callback are not available in this browser.</p>
+        <Row gap={2} wrap>
+          <Button size="sm" variant="ghost" onClick={() => context.setTab("Permissions")}>Review scopes</Button>
+          <Button size="sm" variant="secondary" onClick={() => openConnector(context, records, entry, "marketplace")}>Connector details</Button>
+        </Row>
+      </section>
       <ul className="t6-steps">
         {steps.slice(0, 4).map((step) => (
           <li key={step.id} className="t6-step" data-state={step.state}>
@@ -860,7 +871,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
 
   return (
     <Grid>
-      <Card span={7} eyebrow="CONNECTION" prov="unknown" title={record.title} subtitle={entry.capability.provider} actions={<StateCell entry={entry} />}>
+      <Card span={7} prov="unknown" title="Account and authorisation">
         <KeyValueList items={[
           { label: "Setup state", value: <Row gap={2} wrap><ConnectionStatePill state={connectionState(record, entry.capability.state, entry.capability.id)} /><Button size="sm" variant="ghost" onClick={() => context.setTab("Sync")}>Edit the data mapping</Button></Row> },
           { label: "Account identity", value: <Pill tone="warning">no account linked</Pill> },

@@ -69,7 +69,7 @@ test("COMMS email: a draft is kept as you type, never sent, and found by search"
   await expect(dialog(page)).toHaveCount(0);
 
   // Search runs across every folder.
-  await page.getByRole("tab", { name: "Inbox", exact: true }).click();
+  await page.getByRole("tab", { name: /^Inbox/ }).click();
   await main(page).getByRole("searchbox", { name: "Search email conversations" }).fill("cordierite eight");
   await expect(main(page).getByText("1 conversation", { exact: true })).toBeVisible();
   await expect(main(page).getByRole("button", { name: /Kiln shelf replacement/ })).toBeVisible();

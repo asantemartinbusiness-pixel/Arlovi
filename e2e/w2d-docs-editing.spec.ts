@@ -86,3 +86,38 @@ test("the document editor with table tools fits a phone-width screen", async ({ 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test("link and table tools are anchored popovers, never blocking modals, and undo removes what they added", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const id = await newDocument(page);
+  await page.goto(`/o/northline/docs/documents/${id}`);
+  const body = page.locator("#main").getByLabel("Document body");
+  await expect(body).toContainText("Opening paragraph.");
+
+  // Link: a popover on the toolbar, the page stays interactive behind it.
+  await body.getByText("Opening paragraph.").dblclick();
+  await page.getByRole("button", { name: /^Link \(/ }).click();
+  const pop = page.locator(".dx-pop");
+  await expect(pop).toBeVisible();
+  await expect(page.locator("[aria-modal='true']")).toHaveCount(0);
+  await pop.getByLabel("Link address").fill("https://example.com/brief");
+  await pop.getByRole("button", { name: "Apply link" }).click();
+  await expect(pop).toHaveCount(0);
+  await expect(body.locator("a.dx-link, .dx-link").first()).toBeVisible();
+  await page.getByRole("button", { name: /^Undo/ }).click();
+  await expect(body.locator(".dx-link")).toHaveCount(0);
+
+  // Escape dismisses a popover without touching the text.
+  await page.getByRole("button", { name: "Insert table" }).click();
+  await expect(page.locator(".dx-pop")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".dx-pop")).toHaveCount(0);
+  await expect(body.locator(".dx-tablewrap")).toHaveCount(1);
+
+  // A second table through the popover is one undo step.
+  await page.getByRole("button", { name: "Insert table" }).click();
+  await page.locator(".dx-pop").getByRole("button", { name: "Insert table" }).click();
+  await expect(body.locator(".dx-tablewrap")).toHaveCount(2);
+  await page.getByRole("button", { name: /^Undo/ }).click();
+  await expect(body.locator(".dx-tablewrap")).toHaveCount(1);
+});

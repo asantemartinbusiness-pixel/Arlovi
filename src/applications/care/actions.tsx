@@ -49,7 +49,8 @@ export function ReassignCase({ context, close }: { context: ScreenContext; close
         const owner = String(form.get("owner") ?? "");
         const queue = String(form.get("queue") ?? "");
         if (!ticket || !owner) return;
-        await context.mutate.patch(ticket.id, { status: ticket.status === "new" ? "open" : ticket.status, fields: { ...ticket.fields, assignee: owner, queue: queue || String(ticket.fields.queue ?? ""), previousAssignee: String(ticket.fields.assignee ?? ""), assignedBy: context.actor } }, { expectRevision: ticket.revision, event: `${ref(ticket)} assigned to ${owner}${queue ? ` in ${queue}` : ""} by ${context.actor}` });
+        const saved1 = await context.mutate.patch(ticket.id, { status: ticket.status === "new" ? "open" : ticket.status, fields: { ...ticket.fields, assignee: owner, queue: queue || String(ticket.fields.queue ?? ""), previousAssignee: String(ticket.fields.assignee ?? ""), assignedBy: context.actor } }, { expectRevision: ticket.revision, event: `${ref(ticket)} assigned to ${owner}${queue ? ` in ${queue}` : ""} by ${context.actor}` });
+        if (!saved1) return;
         context.toast("Case assigned", `${ref(ticket)} now belongs to ${owner}.`);
         close();
       }}
@@ -111,8 +112,10 @@ export function Staffing({ context, close }: { context: ScreenContext; close: ()
           const form = new FormData(event.currentTarget);
           const chosen = queues.filter((queue) => form.get(queue) === "on");
           const fields = { kind: "careRota", person, queues: chosen.join(","), onRota: chosen.length > 0, setBy: context.actor };
-          if (current) await context.mutate.patch(current.id, { fields }, { expectRevision: current.revision, event: `${person}'s care rota set to ${chosen.join(", ") || "off"} by ${context.actor}` });
-          else await context.mutate.create({ collection: "preferences", title: `Care rota · ${person}`, status: "active", summary: "Which care queues this person covers.", fields }, `${person} put on the care rota by ${context.actor}`);
+          if (current) {
+            const savedRota = await context.mutate.patch(current.id, { fields }, { expectRevision: current.revision, event: `${person}'s care rota set to ${chosen.join(", ") || "off"} by ${context.actor}` });
+            if (!savedRota) return;
+          } else await context.mutate.create({ collection: "preferences", title: `Care rota · ${person}`, status: "active", summary: "Which care queues this person covers.", fields }, `${person} put on the care rota by ${context.actor}`);
           context.toast("Rota saved", chosen.length ? `${person} covers ${chosen.join(", ")}.` : `${person} is off the care rota.`);
           close();
         }}
@@ -141,7 +144,8 @@ export function TagCase({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         const tags = listOf(new FormData(event.currentTarget).get("tags")).map((tag) => tag.toLowerCase());
-        await context.mutate.patch(ticket.id, { tags }, { expectRevision: ticket.revision, event: `${ref(ticket)} tagged ${tags.join(", ") || "with nothing"} by ${context.actor}` });
+        const saved2 = await context.mutate.patch(ticket.id, { tags }, { expectRevision: ticket.revision, event: `${ref(ticket)} tagged ${tags.join(", ") || "with nothing"} by ${context.actor}` });
+        if (!saved2) return;
         context.toast("Tags saved", tags.join(", ") || "No tags.");
         close();
       }}
@@ -168,7 +172,8 @@ export function LinkRecord({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         const orderId = String(new FormData(event.currentTarget).get("order") ?? "");
         const contact = data.contacts.find((row) => row.id === contactId);
-        await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, contactId, orderId } }, { expectRevision: ticket.revision, event: `${ref(ticket)} linked to ${contact?.title ?? "no customer"}${orderId ? ` and order ${data.orders.find((row) => row.id === orderId)?.title ?? orderId}` : ""} by ${context.actor}` });
+        const saved3 = await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, contactId, orderId } }, { expectRevision: ticket.revision, event: `${ref(ticket)} linked to ${contact?.title ?? "no customer"}${orderId ? ` and order ${data.orders.find((row) => row.id === orderId)?.title ?? orderId}` : ""} by ${context.actor}` });
+        if (!saved3) return;
         context.toast("Linked", `${ref(ticket)} now points at ${contact?.title ?? "no customer"}.`);
         close();
       }}
@@ -246,10 +251,11 @@ export async function reopenCase(context: ScreenContext): Promise<void> {
     ],
     confirm: "Reopen the case",
     run: async () => {
-      await context.mutate.patch(ticket.id, {
+      const saved4 = await context.mutate.patch(ticket.id, {
         status: "open",
         fields: { ...ticket.fields, reopened: true, reopenCount: Number(ticket.fields.reopenCount ?? 0) + 1, previousStatus: ticket.status, previousResolvedAt: String(ticket.fields.resolvedAt ?? ""), resolvedAt: "", reopenedBy: context.actor },
       }, { expectRevision: ticket.revision, event: `${ref(ticket)} reopened by ${context.actor}; prior resolution ${String(ticket.fields.resolvedAt ?? "")} kept` });
+      if (!saved4) return;
       context.toast("Case reopened", "The earlier resolution is preserved on the case.");
     },
   });
@@ -269,7 +275,8 @@ export function AssignSpecialist({ context, close }: { context: ScreenContext; c
         const specialist = String(form.get("specialist") ?? "");
         const reason = String(form.get("reason") ?? "").trim();
         if (!specialist || !reason) return;
-        await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, assignee: specialist, specialist, previousAssignee: String(ticket.fields.assignee ?? ""), specialistReason: reason } }, { expectRevision: ticket.revision, event: `${ref(ticket)} assigned to specialist ${specialist} by ${context.actor}: ${reason}` });
+        const saved5 = await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, assignee: specialist, specialist, previousAssignee: String(ticket.fields.assignee ?? ""), specialistReason: reason } }, { expectRevision: ticket.revision, event: `${ref(ticket)} assigned to specialist ${specialist} by ${context.actor}: ${reason}` });
+        if (!saved5) return;
         await context.mutate.create({ collection: "messages", title: `${ref(ticket)} — internal`, status: "note", summary: `Handed to ${specialist}: ${reason}`, parentId: ticket.id, at: context.now.toISOString(), fields: { kind: "ticket", author: context.actor, side: "agent", channel: "internal", internal: true } }, `Hand-off note on ${ref(ticket)}`);
         context.toast("Specialist assigned", `${specialist} owns ${ref(ticket)}; the hand-off note is internal.`);
         close();
@@ -347,7 +354,8 @@ export function ArticleRevision({ context, close }: { context: ScreenContext; cl
           await context.mutate.create({ collection: "articles", title, status: "draft", summary: text.slice(0, 140), fields: { ...article.fields, version: next, supersedes: article.id, helpful: 0, unhelpful: 0, supersededBy: "" }, body }, `Draft version ${next} of ${article.title} started by ${context.actor}; version ${version} stays published`);
           context.toast("New draft version", `Version ${version} stays published until v${next} is reviewed and published.`);
         } else {
-          await context.mutate.patch(article.id, { title, summary: text.slice(0, 140), body }, { expectRevision: article.revision, event: `Draft ${article.title} updated by ${context.actor}` });
+          const saved6 = await context.mutate.patch(article.id, { title, summary: text.slice(0, 140), body }, { expectRevision: article.revision, event: `Draft ${article.title} updated by ${context.actor}` });
+          if (!saved6) return;
           context.toast("Draft updated", "It is still a draft.");
         }
         close();
@@ -366,7 +374,8 @@ export async function retireSuperseded(context: ScreenContext, draft: Rec): Prom
   if (!supersedes) return;
   const old = await recordOf(context, supersedes, "articles");
   if (!old || old.status === "retired") return;
-  await context.mutate.patch(old.id, { status: "retired", fields: { ...old.fields, supersededBy: draft.id } }, { expectRevision: old.revision, event: `${old.title} v${String(old.fields.version ?? "")} retired, superseded by v${String(draft.fields.version ?? "")}` });
+  const saved7 = await context.mutate.patch(old.id, { status: "retired", fields: { ...old.fields, supersededBy: draft.id } }, { expectRevision: old.revision, event: `${old.title} v${String(old.fields.version ?? "")} retired, superseded by v${String(draft.fields.version ?? "")}` });
+  if (!saved7) return;
 }
 
 /* ---------------- ARL-CARE-007 · activate / review ---------------- */
@@ -390,7 +399,8 @@ export async function activateMacro(context: ScreenContext): Promise<void> {
     body: active ? "It stops being offered in the reply composer. Replies that already used it are unchanged." : "It is offered in the reply composer. A person still chooses to use it and reads the reply before it is recorded.",
     confirm: active ? "Deactivate" : "Activate",
     run: async () => {
-      await context.mutate.patch(macro.id, { status: active ? "draft" : "active", fields: { ...macro.fields, activatedBy: active ? "" : context.actor } }, { expectRevision: macro.revision, event: `${macro.title} ${active ? "deactivated" : "activated"} by ${context.actor}` });
+      const saved8 = await context.mutate.patch(macro.id, { status: active ? "draft" : "active", fields: { ...macro.fields, activatedBy: active ? "" : context.actor } }, { expectRevision: macro.revision, event: `${macro.title} ${active ? "deactivated" : "activated"} by ${context.actor}` });
+      if (!saved8) return;
       context.toast(active ? "Deactivated" : "Activated", `${macro.title} is ${active ? "no longer" : "now"} offered in replies.`);
     },
   });
@@ -410,7 +420,8 @@ export function ReviewMacro({ context, close }: { context: ScreenContext; close:
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const outcome = String(form.get("outcome") ?? "approved");
-        await context.mutate.patch(macro.id, { status: outcome === "approved" ? macro.status : "draft", fields: { ...macro.fields, reviewedBy: context.actor, reviewedAt: context.now.toISOString(), reviewOutcome: outcome, reviewNote: String(form.get("note") ?? "") } }, { expectRevision: macro.revision, event: `${macro.title} reviewed by ${context.actor}: ${outcome}` });
+        const saved9 = await context.mutate.patch(macro.id, { status: outcome === "approved" ? macro.status : "draft", fields: { ...macro.fields, reviewedBy: context.actor, reviewedAt: context.now.toISOString(), reviewOutcome: outcome, reviewNote: String(form.get("note") ?? "") } }, { expectRevision: macro.revision, event: `${macro.title} reviewed by ${context.actor}: ${outcome}` });
+        if (!saved9) return;
         context.toast("Review recorded", outcome === "approved" ? "The macro is approved as it stands." : "The macro is back to draft until it is fixed.");
         close();
       }}
@@ -475,7 +486,8 @@ export function acknowledgeBreach(context: ScreenContext, tickets: Rec[], slas: 
       body: "Records that a named person has seen this breach. The clock and the breach stay exactly as counted; acknowledging does not pause or excuse anything.",
       confirm: "Acknowledge the breach",
       run: async () => {
-        await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, breachAcknowledgedBy: context.actor, breachAcknowledgedAt: context.now.toISOString() } }, { expectRevision: ticket.revision, event: `SLA breach on ${ref(ticket)} acknowledged by ${context.actor}` });
+        const saved10 = await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, breachAcknowledgedBy: context.actor, breachAcknowledgedAt: context.now.toISOString() } }, { expectRevision: ticket.revision, event: `SLA breach on ${ref(ticket)} acknowledged by ${context.actor}` });
+        if (!saved10) return;
         context.toast("Breach acknowledged", `${ref(ticket)} still counts as breached; your acknowledgement is on the record.`);
       },
     }),
@@ -502,7 +514,8 @@ export function Annotate({ context }: { context: ScreenContext }) {
           <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
             <TextInput aria-label={`Annotation for ${String(message.fields.author ?? "message")} at ${context.dateTime(message.at)}`} value={notes[message.id] ?? ""} onChange={(event) => setNotes({ ...notes, [message.id]: event.target.value })} placeholder="What a reviewer noticed here" />
             <Button size="sm" variant="secondary" disabled={!notes[message.id]?.trim()} onClick={async () => {
-              await context.mutate.patch(message.id, { fields: { ...message.fields, qaNote: notes[message.id].trim(), qaNoteBy: context.actor } }, { expectRevision: message.revision, event: `QA annotation on ${ref(ticket)} by ${context.actor}` });
+              const saved11 = await context.mutate.patch(message.id, { fields: { ...message.fields, qaNote: notes[message.id].trim(), qaNoteBy: context.actor } }, { expectRevision: message.revision, event: `QA annotation on ${ref(ticket)} by ${context.actor}` });
+              if (!saved11) return;
               setNotes({ ...notes, [message.id]: "" });
               context.toast("Annotation saved", "It is on the message, attributed to you.");
             }}>Annotate</Button>

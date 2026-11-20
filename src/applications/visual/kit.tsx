@@ -33,8 +33,9 @@ export interface EditorFrameProps {
   backTo?: { label: string; to: string };
   /**
    * One slim row (title, status, tabs) instead of breadcrumbs + a second action
-   * cluster. Use it where the page's command bar already carries the screen
-   * actions. Additive: omitted, the frame renders exactly as before.
+   * cluster. The page command bar already carries primary, secondary and overflow
+   * actions, so only `toolbar`-placed actions (which it does not show) stay here.
+   * Additive: omitted, the frame renders exactly as before.
    */
   lean?: boolean;
 }
@@ -87,6 +88,7 @@ export function EditorFrame({
                 <PanelRight size={16} />
               </Button>
             )}
+            {lean && allowed.filter((action) => action.placement === "toolbar").map((action) => <FrameAction key={action.id} action={action} context={context} variant="secondary" />)}
             {!lean && secondary.map((action) => <FrameAction key={action.id} action={action} context={context} variant="secondary" />)}
             {!lean && primary.map((action) => <FrameAction key={action.id} action={action} context={context} variant="primary" />)}
             {!lean && overflow.length > 0 && (

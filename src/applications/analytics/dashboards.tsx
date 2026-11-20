@@ -3,8 +3,8 @@ import {
   ChevronDown, ChevronUp, GripVertical, LayoutDashboard, Maximize2, Minimize2, Pin, Plus, Share2,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row,
-  Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, ModalActions, Notice, OverlayActions, Pill, Properties,
+  Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -227,7 +227,13 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
  * ARL-ANALYTICS-003 — Dashboard editor
  * ====================================================================== */
 
+/** The editor is a full-bleed surface, so it carries the page gutter itself. */
 export function DashboardEditor({ context }: { context: ScreenContext }) {
+  return <div className="an-surface"><DashboardEditorBody context={context} /></div>;
+}
+
+function DashboardEditorBody({ context }: { context: ScreenContext }) {
+  const { context: queryContext } = useAnalytics();
   const record = useRecord(context.params.id);
   const [drag, setDrag] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -436,107 +442,189 @@ export function DashboardEditor({ context }: { context: ScreenContext }) {
   }
 
   /* ---------------- Layout ---------------- */
+  const ordered = [...body.tiles].sort((left, right) => left.order - right.order);
+  const measureIds = [...new Set(ordered.map((tile) => tile.measureId))];
+  const scope = runQuery({ measureIds, filters: body.filters }, queryContext);
+  const age = freshness(scope.asOf, context.now, 7);
+  const picked = ordered.find((tile) => tile.id === context.selectedId);
+  const hasMonthly = ordered.some((tile) => tile.viz === "line");
+
   return (
     <Stack gap={4}>
       <Row gap={2} wrap>
         <Button variant="primary" icon={<Plus size={15} />} onClick={() => context.openOverlay("Widget chooser")}>Add a tile</Button>
-        <Button variant="secondary" onClick={() => context.setTab("Data")}>Edit the query</Button>
+        <Button variant="secondary" disabled={!picked} title={picked ? undefined : "Select a tile first"} onClick={() => context.setTab("Data")}>Edit the query</Button>
         <span className="ds-grow" />
         <Pill tone={record.status === "published" ? "success" : "neutral"} dot>{record.status}</Pill>
       </Row>
 
-      {body.tiles.length === 0 ? (
+      <section className="an-scope" aria-label="What these figures cover">
+        <FactGrid columns={4} dense items={[
+          {
+            label: "Time range",
+            value: hasMonthly ? "Last 6 months" : "All records",
+            hint: hasMonthly ? "Monthly lines. Totals and groups cover every record." : "No time filter applies to a total or a group.",
+          },
+          {
+            label: "Freshness",
+            value: age.known ? `Newest ${context.date(scope.asOf)}` : "Age unknown",
+            tone: age.known && age.stale ? "warning" : undefined,
+            hint: age.known ? `${age.days} day${age.days === 1 ? "" : "s"} old${age.stale ? ", stale" : ""}. Computed when this page opens.` : "No contributing record carries a date.",
+          },
+          {
+            label: "Filters",
+            value: body.filters.length === 0 ? "None" : `${body.filters.length} applied to every tile`,
+            hint: body.filters.length === 0 ? undefined : body.filters.map((filter) => `${dimensionById(filter.dimensionId)?.name ?? filter.dimensionId} ${filter.op} ${filter.value}`).join("; "),
+          },
+          {
+            label: "Reads",
+            value: scope.sources.length ? scope.sources.join(", ") : "No collection",
+            hint: `${scope.recordCount} record${scope.recordCount === 1 ? "" : "s"} contribute${scope.unavailable.length ? `, ${scope.unavailable.length} measure${scope.unavailable.length === 1 ? "" : "s"} without a source` : ""}`,
+          },
+        ]} />
+      </section>
+
+      {ordered.length === 0 ? (
         <Empty title="No tile yet" icon={<LayoutDashboard size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Widget chooser")}>Add the first tile</Button>}>
-          A tile names a measure and, optionally, a dimension to group it by. Every tile recomputes when the page renders.
+          A tile names a measure and, optionally, a dimension to group it by.
         </Empty>
       ) : (
-        <div className="an-grid">
-          {[...body.tiles].sort((left, right) => left.order - right.order).map((tile, index, all) => (
-            <Card
-              key={tile.id}
-              className={`an-span-${tile.w} an-h-${tile.h} an-tile`}
-              eyebrow={(dimensionById(tile.dimensionId)?.name ?? measureById(tile.measureId)?.collection ?? "TILE").toUpperCase()}
-              title={tile.title}
-              prov={measureById(tile.measureId)?.unavailable ? "unknown" : "posted"}
-              data-selected={context.selectedId === tile.id ? "true" : undefined}
-              data-dragover={dragOver === tile.id ? "true" : undefined}
-              actions={<span className="ds-eyebrow ds-num">{tile.w}/12</span>}
-              footer={
-                <Row gap={1} wrap>
-                  <Button
-                    size="sm" variant="ghost" iconOnly aria-label={`Move ${tile.title} earlier`}
-                    disabled={index === 0} onClick={() => reorder(tile.id, -1)}
-                  ><ChevronUp size={14} /></Button>
-                  <Button
-                    size="sm" variant="ghost" iconOnly aria-label={`Move ${tile.title} later`}
-                    disabled={index === all.length - 1} onClick={() => reorder(tile.id, 1)}
-                  ><ChevronDown size={14} /></Button>
-                  <Button size="sm" variant="ghost" iconOnly aria-label={`Make ${tile.title} narrower`} disabled={tile.w === 3} onClick={() => resize(tile.id, -1)}><Minimize2 size={14} /></Button>
-                  <Button size="sm" variant="ghost" iconOnly aria-label={`Make ${tile.title} wider`} disabled={tile.w === 12} onClick={() => resize(tile.id, 1)}><Maximize2 size={14} /></Button>
-                  <span className="ds-grow" />
-                  <span
-                    className="an-tile-grip"
-                    draggable
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Reorder ${tile.title} by dragging, or use the arrow buttons`}
-                    onDragStart={() => setDrag(tile.id)}
-                    onDragEnd={() => { setDrag(null); setDragOver(null); }}
-                    onKeyDown={(event) => {
-                      if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); reorder(tile.id, -1); }
-                      if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); reorder(tile.id, 1); }
-                    }}
-                  >
-                    <GripVertical size={14} />
-                  </span>
-                </Row>
-              }
-              onDragOver={(event) => { if (drag && drag !== tile.id) { event.preventDefault(); setDragOver(tile.id); } }}
-              onDragLeave={() => setDragOver((current) => (current === tile.id ? null : current))}
-              onDrop={(event) => { event.preventDefault(); if (drag) moveBefore(drag, tile.id); setDrag(null); setDragOver(null); }}
-              onClick={() => context.select(tile.id)}
-            >
-              <MeasureView
-                spec={{ measureIds: [tile.measureId], dimensionId: tile.dimensionId, filters: body.filters }}
-                viz={tile.viz}
-                context={context}
-                title={tile.title}
-                onInspect={(id) => { context.select(tile.id); context.openOverlay("query editor", { measureId: id }); }}
-              />
-              <button
-                type="button"
-                className="an-tile-handle"
-                aria-label={`Resize ${tile.title}. Currently ${tile.w} of 12 columns and ${tile.h} rows. Use the arrow keys.`}
-                onPointerDown={(event) => { setResizing(tile.id); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }}
-                onPointerMove={(event) => {
-                  if (resizing !== tile.id) return;
-                  const card = (event.currentTarget as HTMLElement).parentElement;
-                  const grid = card?.parentElement;
-                  if (!card || !grid) return;
-                  const column = grid.getBoundingClientRect().width / 12;
-                  const wanted = Math.round((event.clientX - card.getBoundingClientRect().left) / column);
-                  const nearest = WIDTHS.reduce((best, width) => (Math.abs(width - wanted) < Math.abs(best - wanted) ? width : best), WIDTHS[0]);
-                  if (nearest !== tile.w) patchTile(tile.id, { w: nearest }, `${tile.title} resized to ${nearest} of 12 columns`);
-                }}
-                onPointerUp={(event) => { setResizing(null); try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* already released */ } }}
-                onKeyDown={(event) => {
-                  if (event.key === "ArrowRight") { event.preventDefault(); resize(tile.id, 1); }
-                  if (event.key === "ArrowLeft") { event.preventDefault(); resize(tile.id, -1); }
-                  if (event.key === "ArrowDown") { event.preventDefault(); resizeHeight(tile.id, 1); }
-                  if (event.key === "ArrowUp") { event.preventDefault(); resizeHeight(tile.id, -1); }
-                }}
+        <div className="an-editor-split">
+          <div className="an-grid">
+            {ordered.map((tile, index, all) => (
+              <Card
+                key={tile.id}
+                className={`an-span-${tile.w} an-h-${tile.h} an-tile`}
+                eyebrow={(dimensionById(tile.dimensionId)?.name ?? measureById(tile.measureId)?.collection ?? "TILE").toUpperCase()}
+                title={(
+                  <h2>
+                    <button type="button" className="an-tile-title" aria-pressed={context.selectedId === tile.id} onClick={() => context.select(tile.id)}>{tile.title}</button>
+                  </h2>
+                )}
+                prov={measureById(tile.measureId)?.unavailable ? "unknown" : "posted"}
+                data-selected={context.selectedId === tile.id ? "true" : undefined}
+                data-dragover={dragOver === tile.id ? "true" : undefined}
+                actions={<span className="ds-eyebrow ds-num">{tile.w}/12</span>}
+                footer={
+                  <Row gap={1} wrap>
+                    <Button
+                      size="sm" variant="ghost" iconOnly aria-label={`Move ${tile.title} earlier`}
+                      disabled={index === 0} onClick={() => reorder(tile.id, -1)}
+                    ><ChevronUp size={14} /></Button>
+                    <Button
+                      size="sm" variant="ghost" iconOnly aria-label={`Move ${tile.title} later`}
+                      disabled={index === all.length - 1} onClick={() => reorder(tile.id, 1)}
+                    ><ChevronDown size={14} /></Button>
+                    <Button size="sm" variant="ghost" iconOnly aria-label={`Make ${tile.title} narrower`} disabled={tile.w === 3} onClick={() => resize(tile.id, -1)}><Minimize2 size={14} /></Button>
+                    <Button size="sm" variant="ghost" iconOnly aria-label={`Make ${tile.title} wider`} disabled={tile.w === 12} onClick={() => resize(tile.id, 1)}><Maximize2 size={14} /></Button>
+                    <span className="ds-grow" />
+                    <span
+                      className="an-tile-grip"
+                      draggable
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Reorder ${tile.title} by dragging, or use the arrow buttons`}
+                      onDragStart={() => setDrag(tile.id)}
+                      onDragEnd={() => { setDrag(null); setDragOver(null); }}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); reorder(tile.id, -1); }
+                        if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); reorder(tile.id, 1); }
+                      }}
+                    >
+                      <GripVertical size={14} />
+                    </span>
+                  </Row>
+                }
+                onDragOver={(event) => { if (drag && drag !== tile.id) { event.preventDefault(); setDragOver(tile.id); } }}
+                onDragLeave={() => setDragOver((current) => (current === tile.id ? null : current))}
+                onDrop={(event) => { event.preventDefault(); if (drag) moveBefore(drag, tile.id); setDrag(null); setDragOver(null); }}
+                onClick={() => context.select(tile.id)}
               >
-                <GripVertical size={12} />
-              </button>
-            </Card>
-          ))}
+                <MeasureView
+                  spec={{ measureIds: [tile.measureId], dimensionId: tile.dimensionId, filters: body.filters }}
+                  viz={tile.viz}
+                  context={context}
+                  title={tile.title}
+                  onInspect={(id) => { context.select(tile.id); context.openOverlay("query editor", { measureId: id }); }}
+                />
+                <button
+                  type="button"
+                  className="an-tile-handle"
+                  aria-label={`Resize ${tile.title}. Currently ${tile.w} of 12 columns and ${tile.h} rows. Use the arrow keys.`}
+                  onPointerDown={(event) => { setResizing(tile.id); (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); }}
+                  onPointerMove={(event) => {
+                    if (resizing !== tile.id) return;
+                    const card = (event.currentTarget as HTMLElement).parentElement;
+                    const grid = card?.parentElement;
+                    if (!card || !grid) return;
+                    const column = grid.getBoundingClientRect().width / 12;
+                    const wanted = Math.round((event.clientX - card.getBoundingClientRect().left) / column);
+                    const nearest = WIDTHS.reduce((best, width) => (Math.abs(width - wanted) < Math.abs(best - wanted) ? width : best), WIDTHS[0]);
+                    if (nearest !== tile.w) patchTile(tile.id, { w: nearest }, `${tile.title} resized to ${nearest} of 12 columns`);
+                  }}
+                  onPointerUp={(event) => { setResizing(null); try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* already released */ } }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowRight") { event.preventDefault(); resize(tile.id, 1); }
+                    if (event.key === "ArrowLeft") { event.preventDefault(); resize(tile.id, -1); }
+                    if (event.key === "ArrowDown") { event.preventDefault(); resizeHeight(tile.id, 1); }
+                    if (event.key === "ArrowUp") { event.preventDefault(); resizeHeight(tile.id, -1); }
+                  }}
+                >
+                  <GripVertical size={12} />
+                </button>
+              </Card>
+            ))}
+          </div>
+          <TileInspector tile={picked} context={context} filters={body.filters} />
         </div>
       )}
-      <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
-        Drag the grip to reorder a tile and the corner to resize it. The arrow buttons on each tile do the same from the keyboard, and the resize handle takes the arrow keys when focused.
-      </p>
       <p className="ds-sr-only" role="status" aria-live="polite">{announcement}</p>
     </Stack>
+  );
+}
+
+/** The widget inspector follows the selected tile: what it measures, where it reads and how it is shown. */
+function TileInspector({ tile, context, filters }: { tile?: Tile; context: ScreenContext; filters: QueryFilter[] }) {
+  const { context: queryContext } = useAnalytics();
+  if (!tile) {
+    return (
+      <aside className="an-inspector" aria-label="Tile inspector">
+        <Card title="Tile inspector">
+          <p className="ds-subtle">Select a tile to read its measure, its source and its size.</p>
+        </Card>
+      </aside>
+    );
+  }
+  const measure = measureById(tile.measureId);
+  const result = runQuery({ measureIds: [tile.measureId], dimensionId: tile.dimensionId, filters }, queryContext);
+  const age = freshness(result.asOf, context.now, 7);
+  return (
+    <aside className="an-inspector" aria-label="Tile inspector">
+      <Card
+        eyebrow={measure?.collection?.toUpperCase()}
+        title={tile.title}
+        subtitle={measure?.name !== tile.title ? measure?.name : undefined}
+        prov={measure?.unavailable ? "unknown" : "posted"}
+        actions={measure?.unavailable ? <Pill tone="warning" dot>No source</Pill> : <Pill tone="success" dot>Computed</Pill>}
+      >
+        <Stack gap={3}>
+          <KeyValueList items={[
+            { label: "Formula", value: measure?.formula ?? "Unknown measure", mono: true },
+            { label: "Grouped by", value: dimensionById(tile.dimensionId)?.name ?? "Nothing, a single figure" },
+            { label: "Shown as", value: VIZ_LABELS[tile.viz] },
+            { label: "Size", value: `${tile.w} of 12 columns, ${tile.h} row${tile.h === 1 ? "" : "s"}`, mono: true },
+            { label: "Records", value: String(result.recordCount), mono: true },
+            { label: "Newest record", value: age.known ? `${context.date(result.asOf)}, ${age.days} day${age.days === 1 ? "" : "s"} old` : "Unknown", tone: age.known && age.stale ? "warning" : undefined },
+          ]} />
+          {measure?.unavailable && <Notice tone="warning" title="This tile cannot be computed">{measure.unavailable}</Notice>}
+          <Row gap={2} wrap>
+            <Button size="sm" variant="primary" onClick={() => context.setTab("Data")}>Edit the query</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("query editor", { measureId: tile.measureId })}>Where it comes from</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("resize tile")}>Resize</Button>
+          </Row>
+        </Stack>
+      </Card>
+    </aside>
   );
 }
 

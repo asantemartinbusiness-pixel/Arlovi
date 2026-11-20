@@ -243,9 +243,8 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
           { label: "Archived", value: decks.filter((record) => record.status === "archived").length },
         ]}
       >
-        <Button variant="primary" onClick={() => context.openOverlay("new deck")}>New presentation</Button>
       </LibraryStrip>
-      {tab === "Shared" && <p className="ds-subtle">A recorded sharing entry does not grant public or workspace access.</p>}
+      {tab === "Shared" && <p className="ds-subtle">These records do not grant public or workspace access.</p>}
       <div className="lk-toolbar">
         <div className="lk-grow"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></div>
       </div>

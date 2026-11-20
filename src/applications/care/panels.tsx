@@ -385,7 +385,8 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
                   size="sm"
                   variant="primary"
                   onClick={async () => {
-                    await context.mutate.patch(active.id, { status: active.status === "new" ? "open" : active.status, fields: { ...active.fields, assignee: actor } }, { expectRevision: active.revision, event: `${String(active.fields.ref ?? active.title)} taken by ${actor}` });
+                    const saved1 = await context.mutate.patch(active.id, { status: active.status === "new" ? "open" : active.status, fields: { ...active.fields, assignee: actor } }, { expectRevision: active.revision, event: `${String(active.fields.ref ?? active.title)} taken by ${actor}` });
+                    if (!saved1) return;
                     setActiveId(active.id);
                     context.toast("Assigned to you", `${String(active.fields.ref ?? active.title)} is in your queue.`);
                   }}
@@ -442,7 +443,8 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
                   variant="ghost"
                   disabled={!draft.trim() || draft === savedDraft}
                   onClick={async () => {
-                    await context.mutate.patch(active.id, { fields: { ...active.fields, replyDraft: draft } }, { event: `Reply draft saved on ${String(active.fields.ref ?? "")} by ${actor}` });
+                    const saved2 = await context.mutate.patch(active.id, { fields: { ...active.fields, replyDraft: draft } }, { event: `Reply draft saved on ${String(active.fields.ref ?? "")} by ${actor}` });
+                    if (!saved2) return;
                     setActiveId(active.id);
                     context.toast("Draft saved", "It is kept on the case for whoever picks it up. Nothing was sent.");
                   }}
@@ -1165,7 +1167,8 @@ export function ResponseComposer({ context, close }: { context: ScreenContext; c
           if (!saved) return;
         }
         if (macro) {
-          await context.mutate.patch(macro.id, { fields: { ...macro.fields, uses: Number(macro.fields.uses ?? 0) + 1 } }, { event: `${macro.title} used` });
+          const saved3 = await context.mutate.patch(macro.id, { fields: { ...macro.fields, uses: Number(macro.fields.uses ?? 0) + 1 } }, { event: `${macro.title} used` });
+          if (!saved3) return;
         }
         context.toast("Reply recorded", "It is on the case with your name. Nothing was sent outside this browser.");
         close();
@@ -1272,10 +1275,11 @@ export function Escalation({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const to = String(form.get("to") ?? "");
-        await context.mutate.patch(ticket.id, {
+        const saved4 = await context.mutate.patch(ticket.id, {
           status: "open",
           fields: { ...ticket.fields, assignee: to, priority: String(form.get("priority") ?? ticket.fields.priority), queue: String(form.get("queue") ?? ticket.fields.queue), escalatedBy: context.actor },
         }, { expectRevision: ticket.revision, event: `${String(ticket.fields.ref ?? "")} escalated to ${to} by ${context.actor}` });
+        if (!saved4) return;
         await context.mutate.create({
           collection: "messages",
           title: `${String(ticket.fields.ref ?? "")} — internal note`,
@@ -1328,7 +1332,7 @@ export function InternalNote({ context, close }: { context: ScreenContext; close
           fields: { kind: "ticket", author: context.actor, side: "agent", channel: "internal", internal: true },
         }, `Internal note added to ${String(ticket.fields.ref ?? "")}`);
         if (reopen && resolved) {
-          await context.mutate.patch(ticket.id, {
+          const saved5 = await context.mutate.patch(ticket.id, {
             status: "open",
             fields: {
               ...ticket.fields,
@@ -1338,6 +1342,7 @@ export function InternalNote({ context, close }: { context: ScreenContext; close
               resolvedAt: "",
             },
           }, { expectRevision: ticket.revision, event: `${String(ticket.fields.ref ?? "")} reopened by ${context.actor}; earlier resolution preserved` });
+          if (!saved5) return;
         }
         context.toast(reopen && resolved ? "Case reopened" : "Note added", reopen && resolved ? "The earlier resolution and its date are kept on the record." : "It is on the case and not visible to the customer.");
         close();
@@ -1401,7 +1406,8 @@ export function RefundRequest({ context, close }: { context: ScreenContext; clos
           summary: `${context.money(Math.round(Number(amount) * 100))} requested by ${context.actor}. Awaiting a finance decision. No payment processor is connected.`,
           fields: { stage: "ready", assignee: "Jonah Adeyemi", priority: "high", estimateHours: 1, loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false, ticketId: ticket.id },
         }, `Refund requested on ${String(ticket.fields.ref ?? "")} by ${context.actor}`);
-        await context.mutate.patch(ticket.id, { status: "pending", fields: { ...ticket.fields, refundRequested: true } }, { event: `Refund requested on ${String(ticket.fields.ref ?? "")}` });
+        const saved6 = await context.mutate.patch(ticket.id, { status: "pending", fields: { ...ticket.fields, refundRequested: true } }, { event: `Refund requested on ${String(ticket.fields.ref ?? "")}` });
+        if (!saved6) return;
         context.toast("Refund requested", "A finance task was created. Nothing has been refunded and no card has been touched.");
         close();
       }}

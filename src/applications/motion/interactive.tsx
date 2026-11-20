@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Keyboard, MonitorSmartphone, MousePointer2, Plus, Trash2 } from "lucide-react";
-import { Button, DataGrid, Empty, Notice, Pill, Row, Segmented, Select, Stack, TextInput, ModalActions, OverlayActions, OverlayCancel, DrawerActions, OverlaySection, FactGrid, KeyValueList } from "@/design-system";
+import { Button, DataGrid, Empty, Notice, Pill, Row, Segmented, Select, Stack, TextInput, ModalActions, OverlayActions, OverlayCancel, DrawerActions } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { ColorBox, EditorFrame, NumberBox, PanelGroup, SaveState, downloadText, slug, useStore, type DocHandle } from "@/applications/visual/kit";
 import { clamp, uid } from "@/applications/visual/geometry";
@@ -435,6 +435,7 @@ export function StateInspector({ close }: { close: () => void }) {
   const stateId = ui.selectedStateId ?? doc?.states.find((item) => item.id !== REST)?.id;
   const state = doc?.states.find((item) => item.id === stateId);
   const [draft, setDraft] = useState<{ state: MotionState; layers: Record<string, Partial<Record<AnimatableProperty, number | string>>> } | null>(() => (doc && state ? { state: { ...state }, layers: Object.fromEntries(doc.layers.map((layer) => [layer.id, { ...(layer.states?.[state.id] ?? {}) }])) } : null));
+  useEffect(() => { if (doc && state && !draft) setDraft({ state: { ...state }, layers: Object.fromEntries(doc.layers.map((layer) => [layer.id, { ...(layer.states?.[state.id] ?? {}) }])) }); }, [doc, state, draft]);
   if (!handle || !doc || !state || !draft) return <Notice tone="warning" title="Choose a state first">Select a state other than Rest on the States tab.</Notice>;
   const setValue = (layer: MotionLayer, property: AnimatableProperty, value: number | string | undefined) => {
     const next = { ...draft.layers[layer.id] };

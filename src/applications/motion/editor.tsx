@@ -1,6 +1,6 @@
-import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowDown, ArrowUp, Circle, Copy, Diamond, Eye, EyeOff, Film, ImageDown, Keyboard, Lock, Square, Trash2, Type, Unlock } from "lucide-react";
-import { Button, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar, ModalActions, OverlayActions, OverlayCancel, DrawerActions, OverlaySection, OverlaySummary, FactGrid, KeyValueList } from "@/design-system";
+import { Button, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar, ModalActions, OverlayActions, OverlayCancel, DrawerActions, OverlaySummary } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import {
   ColorBox, EditorFrame, NumberBox, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob, slug, useStore, type DocHandle,
@@ -586,6 +586,8 @@ export function KeyframeEditor({ close }: { close: () => void }) {
   const [value, setValue] = useState<number | string>(() => found?.keyframe.value ?? 0);
   const [easing, setEasingDraft] = useState<Easing>(() => found?.keyframe.easing ?? { kind: "linear" });
   const [error, setError] = useState<string | null>(null);
+  const foundId = found?.keyframe.id;
+  useEffect(() => { if (found) { setTime(found.keyframe.t); setValue(found.keyframe.value); setEasingDraft(found.keyframe.easing); } }, [foundId]);
   if (!handle || !doc || !found) return <Notice tone="warning" title="Select a keyframe first">Click a keyframe on the timeline, or Tab to it, then open the editor.</Notice>;
   const points = easing.points ?? [0.25, 0.1, 0.25, 1];
   const span = found.next ? found.next.t - found.keyframe.t : 0;
@@ -667,6 +669,8 @@ export function LayerInspector({ close }: { close: () => void }) {
   const { handle, doc } = useSession();
   const layer = selectedLayer(doc);
   const [draft, setDraft] = useState<MotionLayer | null>(() => (layer ? JSON.parse(JSON.stringify(layer)) as MotionLayer : null));
+  /* A deep link opens before the composition has loaded: take the draft once the layer exists. */
+  useEffect(() => { if (layer && !draft) setDraft(JSON.parse(JSON.stringify(layer)) as MotionLayer); }, [layer, draft]);
   const keyframes = useMemo(() => (layer ? Object.entries(layer.tracks).flatMap(([property, list]) => (list ?? []).map((keyframe) => ({ property: property as AnimatableProperty, keyframe }))) : []), [layer]);
   if (!handle || !doc || !layer || !draft) return <Notice tone="warning" title="Select a layer first">Choose a layer in the layer list.</Notice>;
   const end = sampleLayer(layer, doc.duration);

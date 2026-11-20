@@ -3,8 +3,8 @@ import {
   AlertTriangle, CheckCircle2, Database, GitMerge, Ruler, Table2,
 } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties, Row,
-  Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, KeyValueList, Meter, ModalActions, Notice, OverlayActions,
+  OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -495,14 +495,15 @@ export function MetricDefinitions({ context, tab }: { context: ScreenContext; ta
   }
 
   /* Metrics */
+  const shown = computed.filter((row) => row.measure.id === context.selectedId);
   return (
     <Grid>
-      <Card span={12} eyebrow="CANONICAL" title="Metric catalogue" subtitle={`${computed.length} measures, each naming the collection it comes from`} prov="posted" flush>
+      <Card span={12} title="Metric catalogue" subtitle={`${computed.length} measures. Select one to read its definition and source.`} prov="posted" flush>
         <DataGrid
           rows={computed.map((row) => ({ ...row, id: row.measure.id }))}
           rowId={(row) => row.id}
           label="Metric catalogue"
-          selectedId={context.selectedId}
+          selectedId={context.selectedId ?? shown[0]?.measure.id}
           onSelect={(id) => context.select(id)}
           onOpen={() => context.openOverlay("metric QA")}
           rowTone={(row) => (row.measure.unavailable ? "warning" : undefined)}
@@ -512,21 +513,74 @@ export function MetricDefinitions({ context, tab }: { context: ScreenContext; ta
               cell: (row) => (
                 <div>
                   <strong>{row.measure.name}</strong>
-                  <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{row.measure.description}</p>
+                  <p className="ds-subtle an-clamp">{row.measure.description}</p>
                 </div>
               ),
               filterValue: (row) => `${row.measure.name} ${row.measure.formula} ${row.measure.collection}`,
               sortValue: (row) => row.measure.name,
             },
-            { key: "formula", header: "Formula", cell: (row) => <code className="ds-num" style={{ fontSize: "var(--text-xs)" }}>{row.measure.formula}</code>, hideBelow: 1200 },
-            { key: "unit", header: "Unit", cell: (row) => row.measure.unit },
-            { key: "owner", header: "Owner", cell: (row) => row.measure.owner, hideBelow: 1000 },
-            { key: "version", header: "Version", align: "end", cell: (row) => <span className="ds-num">v{row.measure.version}</span> },
+            {
+              key: "source", header: "Source",
+              cell: (row) => {
+                const age = freshness(row.asOf, context.now, 7);
+                return (
+                  <div>
+                    <span>{row.measure.collection}</span>
+                    <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
+                      {row.measure.unavailable ? "No source here" : `${row.records} record${row.records === 1 ? "" : "s"}${age.known ? `, ${age.days}d old${age.stale ? " (stale)" : ""}` : ", age unknown"}`}
+                    </p>
+                  </div>
+                );
+              },
+              sortValue: (row) => row.measure.collection,
+              filterValue: (row) => row.measure.collection,
+            },
+            { key: "unit", header: "Unit", cell: (row) => row.measure.unit, hideBelow: 900 },
+            { key: "version", header: "Version", align: "end", cell: (row) => <span className="ds-num">v{row.measure.version}</span>, hideBelow: 900 },
             { key: "value", header: "Now", align: "end", cell: (row) => (row.measure.unavailable ? <Pill tone="warning">unavailable</Pill> : <span className="ds-num">{formatMeasure(row.measure, row.value, context.money)}</span>) },
           ]}
         />
       </Card>
     </Grid>
+  );
+}
+
+/** The selected measure's definition and source: what it computes, what it reads and how current that is. */
+export function MetricDefinitionInspector({ context }: { context: ScreenContext }) {
+  const { context: queryContext } = useAnalytics();
+  const dashboards = useCollection("dashboards");
+  const reports = useCollection("reports");
+  const measure = context.selectedId ? measureById(context.selectedId) : undefined;
+  const result = useMemo(() => (measure ? runQuery({ measureIds: [measure.id], filters: [] }, queryContext) : undefined), [measure, queryContext]);
+  if (!measure || !result) {
+    return <Empty title="No measure selected">Select a measure to read its formula, its source and what depends on it.</Empty>;
+  }
+  const age = freshness(result.asOf, context.now, 7);
+  const users = dashboards.filter((dashboard) => readDashboard(dashboard).tiles.some((tile) => tile.measureId === measure.id));
+  const cited = reports.filter((report) => readReport(report).blocks.some((block) => block.measureId === measure.id));
+  return (
+    <Stack gap={4}>
+      <div>
+        <Pill tone={measure.unavailable ? "warning" : "success"} dot>{measure.unavailable ? "No source here" : "Computed from records"}</Pill>
+        <h4 style={{ margin: "var(--space-2) 0 0" }}>{measure.name}</h4>
+        <p className="ds-subtle">{measure.description}</p>
+      </div>
+      <KeyValueList items={[
+        { label: "Formula", value: measure.formula, mono: true },
+        { label: "Reads", value: measure.collection },
+        { label: "Figure now", value: measure.unavailable ? "Unavailable" : formatMeasure(measure, result.totals[0] ?? null, context.money), mono: true },
+        { label: "Records", value: String(result.recordCount), mono: true },
+        { label: "Newest record", value: age.known ? `${context.date(result.asOf)}, ${age.days} day${age.days === 1 ? "" : "s"} old` : "Unknown", tone: age.known && age.stale ? "warning" : undefined },
+        { label: "Unit and version", value: `${measure.unit}, v${measure.version}`, mono: true },
+        { label: "Owner", value: measure.owner },
+        { label: "Used by", value: `${users.length} dashboard${users.length === 1 ? "" : "s"}, ${cited.length} report${cited.length === 1 ? "" : "s"}` },
+      ]} />
+      {measure.unavailable && <Notice tone="warning" title="Reported as unavailable everywhere">{measure.unavailable}</Notice>}
+      <Row gap={2} wrap>
+        <Button size="sm" variant="primary" onClick={() => context.openOverlay("metric QA")}>Read the lineage</Button>
+        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("test measure")}>Test it</Button>
+      </Row>
+    </Stack>
   );
 }
 
