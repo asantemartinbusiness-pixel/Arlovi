@@ -682,8 +682,8 @@ function AgentBuilder({ context, step }: { context: ScreenContext; step: Builder
           <Stack gap={3}>
             <ol className="team-builder-steps" aria-label="Step completion">
               {BUILDER_STEPS.map((item) => {
-                const last = item === BUILDER_STEPS[BUILDER_STEPS.length - 1];
-                const done = builderProblems(draft, item).length === 0 && (!last || allProblems.length === 0);
+                const earlier = BUILDER_STEPS.slice(0, BUILDER_STEPS.indexOf(item));
+                const done = builderProblems(draft, item).length === 0 && earlier.every((other) => builderProblems(draft, other).length === 0);
                 return (
                   <li key={item} data-done={done || undefined} data-current={item === step || undefined}>
                     <button type="button" onClick={() => context.setTab(item)} aria-current={item === step ? "step" : undefined}>
@@ -1492,6 +1492,7 @@ function PermissionInspector({ context, close }: { context: ScreenContext; close
   const agent = useRecord(context.params.id ?? context.selectedId) ?? data.agents[0];
   const body = agentBody(agent);
   const [tools, setTools] = useState(body.tools ?? []);
+  const [saving, setSaving] = useState(false);
   if (!agent) return <Empty title="No contract" />;
   const queued = data.missionTasks.filter((task) => String(task.fields.assignee) === agent.title && !["verified", "done"].includes(String(task.fields.stage ?? task.status)));
   return (
@@ -1516,13 +1517,17 @@ function PermissionInspector({ context, close }: { context: ScreenContext; close
       </Notice>
       <DrawerActions><OverlayActions primary={<Button
         variant="primary"
+        busy={saving}
         onClick={async () => {
-          if (!(await commitTogether(context, [
-            { record: agent, patch: { body: { ...(agent.body as object), tools } }, event: `Tool grants changed on ${agent.title}` },
-            ...queued.map((task) => ({ record: task, patch: { fields: { reauthorisationRequired: true } }, event: `${task.title} needs re-authorisation after a permission change` })),
-          ]))) return;
-          context.toast("Permissions saved", `${queued.length} queued item${queued.length === 1 ? "" : "s"} now need re-authorisation.`);
-          close();
+          setSaving(true);
+          try {
+            if (!(await commitTogether(context, [
+              { record: agent, patch: { body: { ...(agent.body as object), tools } }, event: `Tool grants changed on ${agent.title}` },
+              ...queued.map((task) => ({ record: task, patch: { fields: { reauthorisationRequired: true } }, event: `${task.title} needs re-authorisation after a permission change` })),
+            ]))) return;
+            context.toast("Permissions saved", `${queued.length} queued item${queued.length === 1 ? "" : "s"} now need re-authorisation.`);
+            close();
+          } finally { setSaving(false); }
         }}
       >
         Save permissions
@@ -1840,6 +1845,11 @@ function SkillDetail({ context }: { context: ScreenContext }) {
           { label: "Returns", value: (body?.outputs ?? []).join(", ") || "Nothing" },
         ]} />
       </OverlaySection>
+      {(body?.changelog ?? []).length === 0 && (
+        <OverlaySection title="Versions">
+          <span className="ds-subtle">Only the current version, v{String(skill.fields.version ?? "1.0")}, is recorded.</span>
+        </OverlaySection>
+      )}
       {(body?.changelog ?? []).length > 0 && (
         <OverlaySection title="Versions">
           <Stack gap={1}>
@@ -2658,16 +2668,17 @@ function ReassignWork({ context, close }: { context: ScreenContext; close: () =>
           onClick={async () => {
             if (!target) return;
             setBusy(true);
+            try {
             /* Every task moves or none does: a stale revision rolls the whole reassignment back. */
             const moved = await commitTogether(context, open.map((task) => ({
               record: task,
-              patch: { fields: { ...task.fields, assignee: target.title, previousAssignee: agent.title, grantCheck: "required", reassignedBy: context.actor } },
+              patch: { ownerName: target.title, fields: { ...task.fields, assignee: target.title, previousAssignee: agent.title, grantCheck: "required", reassignedBy: context.actor } },
               event: `${task.title} reassigned from ${agent.title} to ${target.title}; grants must be checked again`,
             })));
-            if (!moved) { setBusy(false); return; }
+            if (!moved) return;
             context.toast("Work reassigned", `${open.length} task${open.length === 1 ? "" : "s"} moved to ${target.title}, each marked for a grant check.`);
-            setBusy(false);
             close();
+            } finally { setBusy(false); }
           }}
         >
           Reassign {open.length} task{open.length === 1 ? "" : "s"}

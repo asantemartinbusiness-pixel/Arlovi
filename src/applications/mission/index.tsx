@@ -37,6 +37,13 @@ function criteriaOf(mission: Rec | undefined): Criterion[] {
   return body?.criteria ?? [];
 }
 
+/** Money committed to a mission, from its commitment cost records (the same figure Overview and Budget show). */
+function commitmentMinor(costs: Rec[], missionId: string): number {
+  return costs
+    .filter((cost) => cost.fields.missionId === missionId && cost.fields.kind === "commitment")
+    .reduce((sum, cost) => sum + (cost.amountMinor ?? 0), 0);
+}
+
 function useMissionData() {
   return useCollections([
     "missions", "missionTasks", "missionSteps", "missionReceipts", "missionCosts",
@@ -116,15 +123,22 @@ function MissionLibrary({ context, view }: { context: ScreenContext; view: strin
             { key: "status", header: "Status", cell: (row) => <Pill tone={missionTone(row.status)} dot>{row.status}</Pill> },
             { key: "owner", header: "Owner", cell: (row) => <Row gap={2}><Avatar name={row.ownerName} size="sm" />{row.ownerName}</Row> },
             { key: "budget", header: "Ceiling", align: "end", cell: (row) => context.money(Number(row.fields.budgetMinor ?? 0)), sortValue: (row) => Number(row.fields.budgetMinor ?? 0) },
-            { key: "committed", header: "Committed", align: "end", cell: (row) => context.money(Number(row.fields.committedMinor ?? 0)) },
+            { key: "committed", header: "Committed", align: "end", cell: (row) => context.money(commitmentMinor(data.missionCosts, row.id)) },
             { key: "due", header: "Due", align: "end", cell: (row) => context.date(row.dueAt), sortValue: (row) => row.dueAt ?? "~" },
           ]}
           bulkActions={[
             {
               label: "Tag as priority",
-              onRun: (selected) => selected.forEach((mission) => {
-                void context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, "priority"])] }, { event: `${mission.title} tagged priority` });
-              }),
+              onRun: (selected) => {
+                void (async () => {
+                  let tagged = 0;
+                  for (const mission of selected) {
+                    const saved = await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, "priority"])] }, { expectRevision: mission.revision, event: `${mission.title} tagged priority` });
+                    if (saved) tagged += 1;
+                  }
+                  if (tagged > 0) context.toast("Tagged", `${tagged} of ${selected.length} mission${selected.length === 1 ? "" : "s"} tagged priority.`);
+                })();
+              },
             },
           ]}
         />
@@ -148,7 +162,7 @@ function MissionLibrary({ context, view }: { context: ScreenContext; view: strin
                   <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>
                   <Button size="sm" variant="ghost" onClick={() => { context.select(mission.id); context.openOverlay("Mission quick view", { id: mission.id }); }}>Quick view</Button>
                   <span className="ds-grow" />
-                  <span className="ds-subtle ds-num">{context.money(Number(mission.fields.committedMinor ?? 0))} / {context.money(Number(mission.fields.budgetMinor ?? 0))}</span>
+                  <span className="ds-subtle ds-num">{context.money(commitmentMinor(data.missionCosts, mission.id))} / {context.money(Number(mission.fields.budgetMinor ?? 0))}</span>
                 </>}
               >
                 <Stack gap={3}>
@@ -417,8 +431,8 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
           <Stack gap={3}>
           <ol className="mission-builder-steps" aria-label="Step completion">
             {WIZARD_STEPS.map((item, index) => {
-              const last = item === WIZARD_STEPS[WIZARD_STEPS.length - 1];
-              const done = wizardProblems(draft, item).length === 0 && (!last || WIZARD_STEPS.every((other) => wizardProblems(draft, other).length === 0));
+              const earlier = WIZARD_STEPS.slice(0, index);
+              const done = wizardProblems(draft, item).length === 0 && earlier.every((other) => wizardProblems(draft, other).length === 0);
               return (
                 <li key={item} data-done={done || undefined} data-current={item === step || undefined}>
                   <button type="button" onClick={() => context.setTab(item)} aria-current={item === step ? "step" : undefined}>
@@ -673,7 +687,7 @@ function PlanDependencies({ context, view }: { context: ScreenContext; view: str
               </marker>
             </defs>
             {nodes.map(({ task, x, y }) => (
-              <g key={task.id} tabIndex={0} role="button" aria-label={`${task.title}, ${String(task.fields.stage)}, owner ${String(task.fields.assignee)}`}
+              <g key={task.id} tabIndex={0} role="button" aria-label={`${task.title}, ${String(task.fields.stage)}, owner ${String(task.fields.assignee ?? task.ownerName)}`}
                 onClick={() => { context.select(task.id); context.openOverlay("Task inspector", { id: task.id }); }}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); context.select(task.id); context.openOverlay("Task inspector", { id: task.id }); } }}
                 style={{ cursor: "pointer" }}>
@@ -1054,20 +1068,6 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
         </Notice>
       )}
       <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          busy={busy === "next"}
-          disabled={!nextRunnable || held}
-          title={held ? heldReason : nextRunnable ? undefined : "No step is ready to run"}
-          icon={<Play size={16} />}
-          onClick={async () => {
-            if (!nextRunnable) return;
-            setBusy("next");
-            try { await executeStep(context, nextRunnable, mission, pool, money, date, now); } finally { setBusy(null); }
-          }}
-        >
-          Run the next step
-        </Button>
         <span className="ds-subtle">
           {nextRunnable ? `Next: ${nextRunnable.title} (${String(nextRunnable.fields.kind)})` : "Nothing is ready. Steps wait on gates, exceptions or their order."}
         </span>
@@ -1267,7 +1267,7 @@ function Deliverables({ context, view }: { context: ScreenContext; view: string 
     return <Empty title={`No ${view.toLowerCase()} deliverable`} icon={<FileText size={20} />}>A deliverable is produced by a draft step or written by a person. Running the plan's draft steps creates one.</Empty>;
   }
 
-  const approvalLabel = (item: Rec) => String(item.fields.approval ?? item.status).replace(/_/g, " ");
+  const approvalLabel = (item: Rec) => { const label = String(item.fields.approval ?? item.status).replace(/_/g, " "); return label === "review" ? "in review" : label; };
   const versionsOf = (item: Rec) => ((item.body as { versions?: unknown[] } | undefined)?.versions ?? []).length || 1;
   return (
     <Stack gap={3}>
@@ -1632,7 +1632,8 @@ function TaskSummary({ context }: { context: ScreenContext }) {
 
 function DeliverableSummary({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const item = useRecord(payload?.id ?? context.selectedId);
+  const asked = useRecord(payload?.id ?? context.selectedId);
+  const item = asked?.collection === "documents" ? asked : undefined;
   if (!item) return null;
   return (
     <OverlaySummary
@@ -1667,12 +1668,13 @@ function MissionQuickView({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const mission = useRecord(payload?.id ?? context.selectedId);
   const tasks = useCollection("missionTasks").filter((task) => task.parentId === mission?.id);
+  const costs = useCollection("missionCosts");
   if (!mission || mission.collection !== "missions") return <Empty title="Choose a mission" />;
   const criteria = criteriaOf(mission);
   return (
     <Stack gap={4}>
       <FactGrid items={[
-        { label: "Committed", value: context.money(Number(mission.fields.committedMinor ?? 0)), mono: true },
+        { label: "Committed", value: context.money(commitmentMinor(costs, mission.id)), mono: true },
         { label: "Due", value: mission.dueAt ? context.date(mission.dueAt) : "No date", mono: Boolean(mission.dueAt) },
         { label: "Tasks verified", value: `${tasks.filter((task) => String(task.fields.stage) === "verified").length} of ${tasks.length}`, mono: true },
         { label: "Criteria verified", value: `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length}`, mono: true },
@@ -2086,20 +2088,27 @@ function TaskDetail({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const task = tasks.find((item) => item.id === (payload?.id ?? context.selectedId));
   const [evidence, setEvidence] = useState("");
+  const orgRecords = useCollections(["documents", "missionTasks"]);
   if (!task) return <Empty title="Choose a task" />;
   const body = task.body as { evidence?: string[] } | undefined;
+  /* Evidence is a real record in this organisation that is not already attached and is not the task itself. */
+  const evidenceOptions = [...orgRecords.documents, ...orgRecords.missionTasks].filter((record) => record.id !== task.id && !(body?.evidence ?? []).includes(record.id));
   return (
     <Stack gap={4}>
       <FactGrid items={[{ label: "Evidence attached", value: String((body?.evidence ?? []).length), mono: true }]} />
       <p className="ds-prose">{task.summary}</p>
-      <Field label="Attach evidence" hint="The id of a record in this workspace that shows the work was done.">
-        <TextInput value={evidence} onChange={(event) => setEvidence(event.target.value)} placeholder="nl-documents-060" />
+      <Field label="Attach evidence" hint="A document or task in this organisation that shows the work was done.">
+        <Select aria-label="Attach evidence" value={evidence} onChange={(event) => setEvidence(event.target.value)}>
+          <option value="">Choose a record…</option>
+          {evidenceOptions.map((record) => <option key={record.id} value={record.id}>{record.title} · {record.collection === "documents" ? "document" : "task"}</option>)}
+        </Select>
       </Field>
       <DrawerActions><OverlayActions primary={<Button
           variant="primary"
-          disabled={!evidence.trim()}
+          disabled={!evidenceOptions.some((record) => record.id === evidence)}
           onClick={async () => {
-            if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), evidence: [...(body?.evidence ?? []), evidence.trim()] } }, { expectRevision: task.revision, event: `Evidence attached to ${task.title}` }))) return;
+            if (!evidenceOptions.some((record) => record.id === evidence)) return;
+            if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), evidence: [...(body?.evidence ?? []), evidence] } }, { expectRevision: task.revision, event: `Evidence attached to ${task.title}` }))) return;
             context.toast("Evidence attached", "It is on the task and shows on the mission results.");
             setEvidence("");
           }}
@@ -2431,7 +2440,7 @@ function PublishVerification({ context }: { context: ScreenContext }) {
   const item = deliverables.find((document) => document.id === (payload?.id ?? context.selectedId));
   return (
     <Stack gap={4}>
-      <CapabilityLine id="site.publish" title="Publishing outside this workspace is not connected" />
+      <CapabilityLine id="document.publish" title="Publishing outside this workspace is not connected" />
       <Properties rows={[
         { label: "Deliverable", value: item?.title ?? "—" },
         { label: "Inside this workspace", value: "Visible to role views that open Missions" },
@@ -2583,18 +2592,22 @@ function ReopenTask({ context, close }: { context: ScreenContext; close: () => v
         variant="primary"
         disabled={!reason.trim()}
         onClick={async () => {
-          await context.mutate.create({
-            collection: "missionTasks",
-            title: `Follow-up: ${task?.title ?? mission.title}`,
-            status: "todo",
-            parentId: mission.id,
-            summary: reason,
-            fields: { stage: "todo", assignee: context.actor, kind: "human", order: tasks.length + 1, estimateHours: 1, approvalRequired: false, followUpOf: task?.id ?? "" },
-            body: { dependsOn: [], evidence: [] },
-          }, `Follow-up created on ${mission.title}`);
-          if (mission.status === "completed") {
-            if (!(await context.mutate.patch(mission.id, { status: "running", fields: { ...mission.fields, reopenedBy: context.actor } }, { event: `${mission.title} reopened by ${context.actor}` }))) return;
-          }
+          /* The follow-up and the mission reopening are one change. */
+          if (!(await commitTogether(context, [
+            {
+              create: {
+                collection: "missionTasks",
+                title: `Follow-up: ${task?.title ?? mission.title}`,
+                status: "todo",
+                parentId: mission.id,
+                summary: reason,
+                fields: { stage: "todo", assignee: context.actor, kind: "human", order: tasks.length + 1, estimateHours: 1, approvalRequired: false, followUpOf: task?.id ?? "" },
+                body: { dependsOn: [], evidence: [] },
+              },
+              event: `Follow-up created on ${mission.title}`,
+            },
+            ...(mission.status === "completed" ? [{ record: mission, patch: { status: "running", fields: { ...mission.fields, reopenedBy: context.actor } }, event: `${mission.title} reopened by ${context.actor}` }] : []),
+          ]))) return;
           context.toast("Follow-up created", "It is on the board with your reason.");
           close();
         }}
@@ -3222,12 +3235,16 @@ function BulkTagMissions({ context, close }: { context: ScreenContext; close: ()
       </Stack>
       <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={chosen.length === 0 || !tag.trim()} onClick={async () => {
           setBusy(true);
-          for (const mission of missions.filter((item) => chosen.includes(item.id))) {
-            await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag.trim()])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag.trim()}` });
-          }
-          context.toast("Tagged", `${chosen.length} mission${chosen.length === 1 ? "" : "s"} tagged ${tag.trim()}.`);
-          setBusy(false);
-          close();
+          try {
+            let tagged = 0;
+            for (const mission of missions.filter((item) => chosen.includes(item.id))) {
+              const saved = await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag.trim()])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag.trim()}` });
+              if (saved) tagged += 1;
+            }
+            if (tagged === 0) return;
+            context.toast(tagged === chosen.length ? "Tagged" : "Partly tagged", `${tagged} of ${chosen.length} mission${chosen.length === 1 ? "" : "s"} tagged ${tag.trim()}.${tagged < chosen.length ? " The rest changed elsewhere; reopen and try again." : ""}`, tagged === chosen.length ? "ok" : "blocked");
+            close();
+          } finally { setBusy(false); }
         }}>Tag {chosen.length}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );

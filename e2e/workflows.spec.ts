@@ -148,7 +148,9 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   // Lead -> CRM qualify -> convert: conversion writes a real deal linked to the contact and account.
   await open(page, "/crm/leads", "Leads & Qualification");
   await pick(page, /Dublin reseller enquiry/, "Dublin reseller enquiry");
-  await expect(dialog(page).getByRole("heading", { name: "53 of 100, warm" })).toBeVisible();
+  // The lead inspector now shows the score as a fact ("53 / 100" with a "warm" band) rather than a heading.
+  await expect(dialog(page).getByText("53 / 100", { exact: true })).toBeVisible();
+  await expect(dialog(page).getByText("warm", { exact: true })).toBeVisible();
   await dialog(page).getByRole("button", { name: "Convert to a deal" }).click();
   await expect(dialog(page).getByText("This lead cannot be converted")).toBeVisible();
   await dialog(page).getByLabel("Deal amount").fill("3360");
@@ -229,7 +231,8 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   // Financial posting: approving the invoice posts one balanced journal.
   await open(page, "/fin/reconciliation", "Bank Reconciliation");
   await expect(main(page).getByText("statement-2026-11.csv")).toBeVisible();
-  const ledgerBefore = await statAfter(page, /LEDGER BALANCE/);
+  // A1: the reconciliation equation now reads "Ledger at statement end"; the to-date book balance is the source note "Ledger balance to date £x".
+  const ledgerBefore = await statAfter(page, /Ledger balance to date/);
   await open(page, "/fin/invoices?tab=Draft", "Invoice List");
   await main(page).getByRole("row", { name: new RegExp(number) }).getByText(number, { exact: true }).click();
   await expect(page).toHaveURL(/\/fin\/invoices\/[0-9a-f-]{36}/);
@@ -252,7 +255,7 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
 
   await open(page, "/fin/reconciliation", "Bank Reconciliation");
   await expect(main(page).getByText("statement-2026-11.csv")).toBeVisible();
-  await expect.poll(() => statAfter(page, /LEDGER BALANCE/).catch(() => Number.NaN), { timeout: 15_000 }).toBe(ledgerBefore + 1_245_600);
+  await expect.poll(() => statAfter(page, /Ledger balance to date/).catch(() => Number.NaN), { timeout: 15_000 }).toBe(ledgerBefore + 1_245_600);
 
   // Reporting and audit: the paid invoice is in the paid list after a reload, with nothing outstanding.
   await open(page, "/fin/invoices?tab=Paid", "Invoice List");
@@ -295,7 +298,9 @@ test("WF-01 Company onboarding: identity, domain claim, connector boundary, brai
 
   // Optionally connect a provider: the authorisation stops before any provider is reached.
   await open(page, "/connect/marketplace", "Integration directory");
-  await expect(main(page).getByText("Every provider here is not connected")).toBeVisible();
+  // B9/B8: the directory lede now states the boundary as "Review what each provider would need before anything is connected."
+  await expect(main(page).getByText(/Review what each provider would need before anything is connected/)).toBeVisible();
+  await expect(main(page).getByText("Not connected").first()).toBeVisible();
   await tap(main(page).getByRole("button", { name: "What it needs" }).first(), "/connect/marketplace 'What it needs' on Send email");
   await expect(dialog(page).getByText("mail.send")).toBeVisible();
   await dialog(page).getByRole("button", { name: "Open the authorisation flow" }).click();
@@ -343,7 +348,8 @@ test("WF-02 Cross-department campaign: creative rights gate, consented recipient
   await open(page, "/fin/home", "Finance Overview");
 
   // Marketing plan approval is gated on creative being approved (asset rights).
-  await open(page, "/market/campaigns/nl-campaigns-621", "Campaign");
+  // Record screens now title the page with the record (ARL B-packages), not the generic noun.
+  await open(page, "/market/campaigns/nl-campaigns-621", "Clerkenwell open studio");
   await expect(main(page).getByText("Clerkenwell open studio").first()).toBeVisible();
   await action(page, "Approve plan");
   await expect(dialog(page).getByText("All creative approved")).toBeVisible();
@@ -399,7 +405,7 @@ test("WF-02 Cross-department campaign: creative rights gate, consented recipient
   await expect(main(page).getByText(/CONFIRMED BY A PROVIDER\s*0/i)).toBeVisible();
 
   // Rollback limitations are stated, not hidden: pausing cannot stop provider spend.
-  await open(page, "/market/campaigns/nl-campaigns-620", "Campaign");
+  await open(page, "/market/campaigns/nl-campaigns-620", /.+/); // h1 is the campaign title
   await action(page, "Pause");
   await expect(dialog(page).getByText("Cannot be confirmed")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -452,7 +458,7 @@ test("WF-04 Customer request to resolution: verified contact, approved answer, r
   await expect(main(page).getByText("CARE-19").first()).toBeVisible();
 
   // Contact verified: the case shows only what it needs about a linked customer record.
-  await open(page, "/care/tickets/nl-tickets-041", "Case");
+  await open(page, "/care/tickets/nl-tickets-041", "CARE-32 Wrong finish delivered"); // h1 is the case reference and subject
   await expect(main(page).getByText("CARE-32 Wrong finish delivered")).toBeVisible();
   await expect(main(page).getByText("o.delacroix@delacroix.example")).toBeVisible();
 
@@ -481,7 +487,7 @@ test("WF-04 Customer request to resolution: verified contact, approved answer, r
   await expect(main(page).getByText(/£120\.00 requested by Maya Chen/)).toBeVisible();
 
   // No double refund: a second request on the same case must be refused.
-  await open(page, "/care/tickets/nl-tickets-041", "Case");
+  await open(page, "/care/tickets/nl-tickets-041", "CARE-32 Wrong finish delivered"); // h1 is the case reference and subject
   await action(page, "Request a refund");
   const second = dialog(page);
   const refused = (await second.getByText(/already (been )?requested|already has a refund/i).count()) > 0
@@ -1125,7 +1131,7 @@ test("WF-13 AI workforce lifecycle: validated contract, evaluation before activa
 
 test("WF-15 Monthly executive reporting: cited figures, reconciled to the ledger, reviewed, distributed only to the boundary", async ({ page }) => {
   // Freshness and aggregation: every figure in the report names its source and age.
-  await open(page, "/analytics/reports/nl-reports-020", "Report builder");
+  await open(page, "/analytics/reports/nl-reports-020", "Monthly trading review"); // h1 is the report title
   await expect(main(page).getByText("Monthly trading review").first()).toBeVisible();
   await shows(page, /Source: sum\(revenue account credits [−-] debits\) over posted journals, by ledger date; \d+ records, newest \d+ days? old\./);
   await shows(page, /Nothing on this page is generated by a model; no model is connected\./);
@@ -1153,7 +1159,7 @@ test("WF-15 Monthly executive reporting: cited figures, reconciled to the ledger
   expect.soft(hqOverdue, `DEFECT: /hq/home says ${hqOverdue} invoices are past due; /fin/invoices Overdue lists ${financeOverdue}`).toBe(financeOverdue);
 
   // Reviewer approval: citations are checked, then the report is published.
-  await open(page, "/analytics/reports/nl-reports-020", "Report builder");
+  await open(page, "/analytics/reports/nl-reports-020", "Monthly trading review"); // h1 is the report title
   await action(page, "Check the citations");
   if (await dialog(page).count()) await page.keyboard.press("Escape");
   await action(page, "Publish");

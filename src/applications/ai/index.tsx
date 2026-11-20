@@ -1889,7 +1889,7 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
           <Field
             label="Target account"
             required
-            error={needsTarget ? "Choose exactly one account. A mission cannot be authorised against an unknown target." : undefined}
+            error={needsTarget && goal.trim() ? "Choose exactly one account. A mission cannot be authorised against an unknown target." : undefined}
             hint={ambiguous.length > 1 ? `${ambiguous.length} accounts match words in the goal: ${ambiguous.map((item) => item.title).join(", ")}.` : undefined}
           >
             <Select value={target} onChange={(event) => setTarget(event.target.value)} required>
