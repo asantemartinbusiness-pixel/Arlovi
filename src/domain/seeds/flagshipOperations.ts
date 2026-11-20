@@ -1,4 +1,5 @@
 import { registerSeed } from "@/domain/seedRegistry";
+import { ORG_COLLECTIVE } from "@/domain/types";
 import type { Rec } from "@/domain/types";
 
 /**
@@ -151,6 +152,6 @@ registerSeed("flagship-operations",ctx=>{
     body:{content:"NORTHLINE COLLECTIVE — FICTIONAL FINANCIAL MODEL\nPeriod: December 2025 through November 2026.\nScenario annual revenue: £9.6m. This is a hypothetical target, NOT recognised revenue.\nAll customer invoices are unsent drafts. All supplier orders are unsubmitted drafts. All supplier bills and expenses are unposted. Bank transactions, cash balances, tax submissions and payment receipts are NOT simulated as verified external events.\nDivision split: Commerce 62%, Atelier services 32%, Experiences 6%.\nDo not aggregate these records with verified finance dashboards without an explicit scenario filter."},
   });
   return {records};
-});
+}, {organizationId: ORG_COLLECTIVE});
 
 export const NORTHLINE_FLAGSHIP_SCENARIO_MONTHS = MONTHLY_GBP;
