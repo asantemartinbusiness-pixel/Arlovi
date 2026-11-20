@@ -38,12 +38,14 @@ export interface EditorFrameProps {
    * Additive: omitted, the frame renders exactly as before.
    */
   lean?: boolean;
+  /** 1 when the ScreenDef uses `chromeTitle: "surface"`, so this head carries the page h1. */
+  titleLevel?: 1 | 2;
 }
 
 export function EditorFrame({
   context, actions = [], tabs, title, subtitle, tools,
   left, leftLabel = "Layers", right, rightLabel = "Properties",
-  status, children, backTo, lean,
+  status, children, backTo, lean, titleLevel = 2,
 }: EditorFrameProps) {
   const [mobile, setMobile] = useState<"stage" | "left" | "right">("stage");
   const allowed = actions.filter((action) => !action.capability || roleCan(context.role, action.capability));
@@ -65,8 +67,10 @@ export function EditorFrame({
         )}
         <div className="vx-titlerow">
           <div className="vx-titleblock">
-            {/* The page shell owns the level-1 heading; this names the workspace beneath it. */}
-            <h2 className="vx-title">{title ?? context.screen.title}</h2>
+            {/* With `chromeTitle: "surface"` the shell hides its heading and this becomes the page h1. */}
+            {titleLevel === 1
+              ? <h1 className="vx-title">{title ?? context.screen.title}</h1>
+              : <h2 className="vx-title">{title ?? context.screen.title}</h2>}
             {subtitle && <div className="vx-sub">{subtitle}</div>}
           </div>
           {lean && tabs && tabs.length > 1 && (
