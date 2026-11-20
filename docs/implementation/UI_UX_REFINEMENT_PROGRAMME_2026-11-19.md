@@ -196,11 +196,11 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 
 ## 7b. Phase 3 central items (orchestrator-owned, after the last package lands)
 
-1. `data-grid.tsx`: the mobile card layout drops selection checkboxes and editable cells (seen in Photo batch; A2 worked around it with a stacked list) — render a selection control and editable cells in card mode.
+1. DONE (d886c88): `data-grid.tsx` card layout now renders the bulk-selection checkbox per card; editable cells in card mode remain an app concern (A2's stacked `CountList` is the pattern).
 2. Full-chrome editors: the command bar title repeats the screen name above the apps' identity bars — allow a record title there (`ScreenDef.title` already exists; make editors use it or hide the bar title when an identity bar is present).
-3. Journey bar: "Back to X" sometimes shows above unrelated screens — verify `canReturnTo` and the trail scoping.
+3. Reviewed: the journey bar shows the previous application whenever the user arrived from another app; that is the cross-application continuity requirement (§B5), not a defect. `canReturnTo` scopes by organisation, role and app.
 4. Repository-wide sweep for `mutate.patch`/`put`/`putMany` results ignored before a success toast (A2 found and fixed 29 in two apps; others fixed theirs on request; run a grep across all apps and fix stragglers).
-5. Fold the `.hq-state-line` size override from `hq/command.css` into `shell.css`.
+5. DONE (d886c88): `.hq-state-line` size folded into `shell.css`.
 6. Full gate run on a quiet machine: typecheck, lint, unit, build, then Playwright groups on the dev server with `--workers=1..2`; compare with `QA_BASELINE.md`.
 7. Opus HR acceptance sample (≥15% of overlays per package via `?overlay=`), final report, PR body.
 

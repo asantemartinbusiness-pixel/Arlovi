@@ -79,3 +79,4 @@
 .wh-pending{color:var(--fg-subtle)}
 .wh-resume:has(.ws-continuity-none){border:0;background:none;padding:0}
 .ws-continuity-none{font-size:var(--text-sm);color:var(--fg-muted);margin:0}
+.wh-main-grid:has(.ws-continuity-none){grid-template-columns:1fr}.wh-main-grid:has(.ws-continuity-none) .wh-side-column{order:2}

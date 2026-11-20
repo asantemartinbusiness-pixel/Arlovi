@@ -3,7 +3,7 @@ import {
   Boxes, ClipboardCheck, FileText, GitBranch, LayoutTemplate, Play, Receipt, Rocket, Target, Wallet,
 } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalActions, OVERLAY_WIDTH, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, KeyValueList, Meter, Notice, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -911,8 +911,14 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
   /* The interpreter reads across the workspace, so the pool is the whole
      organisation rather than the mission's own collections. */
   const pool = useOrgRecords();
+  const organisation = useRecord(context.org.id);
   if (!mission) return <Empty title="No mission" icon={<Rocket size={20} />} />;
 
+  /* HANDOFF rule 8: no step runs while the organisation or this mission is paused. */
+  const orgPaused = organisation?.fields.executionPaused === true;
+  const missionPaused = mission.status === "paused" || mission.fields.executionPaused === true;
+  const held = orgPaused || missionPaused;
+  const heldReason = orgPaused ? "Automation is paused for the organisation" : "This mission is paused";
   const nextRunnable = steps.find((step) => ["ready", "todo"].includes(step.status));
   const exceptions = steps.filter((step) => ["blocked", "failed", "unknown_side_effect"].includes(step.status));
   const gates = steps.filter((step) => String(step.fields.kind) === "approval");
@@ -1022,12 +1028,17 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
 
   return (
     <Stack gap={4}>
+      {held && (
+        <Notice tone="warning" title={orgPaused ? "Dispatch is held for the whole organisation" : "This mission is paused"}>
+          {orgPaused ? "An owner resumes it from the Autonomy Centre." : "Resume it from the mission overview."} No step starts while it is held. Actions already accepted elsewhere cannot be confirmed from here.
+        </Notice>
+      )}
       <Row gap={2} wrap>
         <Button
           variant="primary"
           busy={busy === "next"}
-          disabled={!nextRunnable}
-          title={nextRunnable ? undefined : "No step is ready to run"}
+          disabled={!nextRunnable || held}
+          title={held ? heldReason : nextRunnable ? undefined : "No step is ready to run"}
           icon={<Play size={16} />}
           onClick={async () => {
             if (!nextRunnable) return;
@@ -1050,47 +1061,41 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
           const tone = step.status === "done" ? "var(--success)" : ["blocked", "failed", "unknown_side_effect"].includes(step.status) ? "var(--warning)" : step.status === "awaiting_approval" ? "var(--info)" : "var(--border-default)";
           return (
             <li key={step.id}>
-              <Row gap={3} style={{ alignItems: "flex-start" }}>
-                <div style={{ width: 120, flex: "none", paddingBlockStart: 6 }}>
-                  <strong className="ds-num">{String(step.fields.order ?? 0)}. {String(step.fields.kind)}</strong>
-                  <div className="ds-subtle ds-num">{step.fields.lastRunAt ? context.dateTime(String(step.fields.lastRunAt)) : "not run"}</div>
-                </div>
-                <div className="ds-panel ds-grow" style={{ padding: "var(--space-3)", borderLeft: `3px solid ${tone}` }}>
-                  <Row gap={2} wrap>
-                    <strong className="ds-grow">{step.title}</strong>
-                    <Pill tone={step.status === "done" ? "success" : ["blocked", "failed", "unknown_side_effect"].includes(step.status) ? "warning" : step.status === "awaiting_approval" ? "info" : "neutral"} dot>
-                      {step.status.replace(/_/g, " ")}
-                    </Pill>
-                    <span className="ds-subtle ds-num">{String(step.fields.attempts ?? 0)} attempts</span>
-                  </Row>
-                  <p className="ds-subtle" style={{ marginBlockStart: 4 }}>{step.summary}</p>
-                  <Properties rows={[
-                    { label: "Operation", value: <code className="ds-num">{String(step.fields.operation ?? "—")}</code> },
-                    { label: "Inputs", value: (body?.inputs ?? []).length ? `${(body?.inputs ?? []).length} record${(body?.inputs ?? []).length === 1 ? "" : "s"} read` : operation?.note ?? "Nothing read yet" },
-                    { label: "Output", value: body?.output || "—" },
-                    ...(body?.reason ? [{ label: "Why it stopped", value: body.reason }] : []),
-                  ]} />
-                  <Row gap={2} wrap style={{ marginBlockStart: "var(--space-2)" }}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      busy={busy === step.id}
-                      disabled={step.status === "done" || step.status === "unknown_side_effect"}
-                      title={blockedReason(step)}
-                      onClick={async () => {
-                        setBusy(step.id);
-                        try { await executeStep(context, step, mission, pool, money, date, now); } finally { setBusy(null); }
-                      }}
-                    >
-                      {Number(step.fields.attempts ?? 0) > 0 ? "Run again" : "Run this step"}
-                    </Button>
-                    <Button size="sm" variant="ghost" disabled={stepReceipts.length === 0} onClick={() => { context.select(step.id); context.openOverlay("Action receipt", { id: step.id }); }}>
-                      {stepReceipts.length} receipt{stepReceipts.length === 1 ? "" : "s"}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => { context.select(step.id); context.openOverlay("execution trace", { id: step.id }); }}>Trace</Button>
-                  </Row>
-                </div>
-              </Row>
+              <div className="ds-panel" style={{ padding: "var(--space-3)", borderLeft: `3px solid ${tone}` }}>
+                <Row gap={2} wrap>
+                  <span className="ds-num ds-subtle">{String(step.fields.order ?? 0)}</span>
+                  <strong className="ds-grow">{step.title}</strong>
+                  <code className="ds-num ds-subtle">{String(step.fields.operation ?? step.fields.kind ?? "")}</code>
+                  <Pill tone={step.status === "done" ? "success" : ["blocked", "failed", "unknown_side_effect"].includes(step.status) ? "warning" : step.status === "awaiting_approval" ? "info" : "neutral"} dot>
+                    {step.status.replace(/_/g, " ")}
+                  </Pill>
+                </Row>
+                <KeyValueList columns={2} items={[
+                  { label: "Inputs", value: (body?.inputs ?? []).length ? `${(body?.inputs ?? []).length} record${(body?.inputs ?? []).length === 1 ? "" : "s"} read` : operation?.note ?? "Nothing read yet" },
+                  { label: "Last run", value: step.fields.lastRunAt ? `${context.dateTime(String(step.fields.lastRunAt))} · ${String(step.fields.attempts ?? 0)} attempt${Number(step.fields.attempts ?? 0) === 1 ? "" : "s"}` : "Not run", mono: true },
+                  { label: "Output", value: body?.output || "—" },
+                  ...(body?.reason ? [{ label: "Why it stopped", value: body.reason }] : []),
+                ]} />
+                <Row gap={2} wrap style={{ marginBlockStart: "var(--space-2)" }}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    busy={busy === step.id}
+                    disabled={step.status === "done" || step.status === "unknown_side_effect" || held}
+                    title={held ? heldReason : blockedReason(step)}
+                    onClick={async () => {
+                      setBusy(step.id);
+                      try { await executeStep(context, step, mission, pool, money, date, now); } finally { setBusy(null); }
+                    }}
+                  >
+                    {Number(step.fields.attempts ?? 0) > 0 ? "Run again" : "Run this step"}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={stepReceipts.length === 0} onClick={() => { context.select(step.id); context.openOverlay("Action receipt", { id: step.id }); }}>
+                    {stepReceipts.length} receipt{stepReceipts.length === 1 ? "" : "s"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { context.select(step.id); context.openOverlay("execution trace", { id: step.id }); }}>Trace</Button>
+                </Row>
+              </div>
             </li>
           );
         })}
@@ -1581,10 +1586,7 @@ function MissionQuickView({ context }: { context: ScreenContext }) {
         { label: "Criteria", value: `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length} verified` },
       ]} />
       <p className="ds-prose">{mission.summary}</p>
-      <Row gap={2} wrap>
-        <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>
-        <Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}/execution`)}>Execution</Button>
-      </Row>
+      <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>} secondary={<><Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}/execution`)}>Execution</Button></>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1632,7 +1634,7 @@ function MissionArchive({ context, close }: { context: ScreenContext; close: () 
         {mission.title} will stay readable with its plan, receipts and costs. No step can be run and no budget committed on it afterwards.
       </Notice>
       {open.length > 0 && <Notice tone="danger" title={`${open.length} open task${open.length === 1 ? "" : "s"}`}>{open.map((task) => task.title).join(", ")} will be archived unfinished, and will show as unresolved on the results.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="danger"
         onClick={async () => {
           if (!(await context.mutate.patch(mission.id, { status: "archived", fields: { ...mission.fields, archivedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} archived by ${context.actor}` }))) return;
@@ -1641,7 +1643,7 @@ function MissionArchive({ context, close }: { context: ScreenContext; close: () 
         }}
       >
         Archive the mission
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1742,7 +1744,7 @@ function ApprovalSheet({ context, close }: { context: ScreenContext; close: () =
           A named target, a bounded ceiling, a team and a plan of typed steps. It is created as proposed; approval is a separate decision.
         </Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={problems.length > 0}
         onClick={async () => {
@@ -1798,7 +1800,7 @@ function ApprovalSheet({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Submit for approval
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1837,7 +1839,7 @@ function PauseDialog({ context, close }: { context: ScreenContext; close: () => 
         Steps here run one at a time and finish in this browser immediately. {running.length === 0 ? "Nothing is mid-flight." : `${running.length} step is mid-flight and will finish.`} Pausing prevents the next step being started.
       </Notice>
       <Field label="Why" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!reason.trim()}
         onClick={async () => {
@@ -1850,7 +1852,7 @@ function PauseDialog({ context, close }: { context: ScreenContext; close: () => 
         }}
       >
         {mission.status === "paused" ? "Resume the mission" : "Pause the mission"}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1928,7 +1930,7 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
           {tasks.filter((item) => item.id !== task.id && !deps.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
       </Field>
-      <Button
+      <DrawerActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!dependency || Boolean(cycle)}
         onClick={async () => {
@@ -1938,7 +1940,7 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Add dependency
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1957,7 +1959,7 @@ function PlanRevision({ context, close }: { context: ScreenContext; close: () =>
         { label: "Tasks", value: String(tasks.length) },
         { label: "Dependencies", value: String(tasks.reduce((sum, task) => sum + dependenciesOf(task).length, 0)) },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(mission.id, { fields: { ...mission.fields, planVersion: version + 1, revisedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} plan revised to version ${version + 1}` }))) return;
@@ -1966,7 +1968,7 @@ function PlanRevision({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         Publish version {version + 1}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1985,7 +1987,7 @@ function ScopeChangeApproval({ context }: { context: ScreenContext }) {
         { label: "Ceiling", value: context.money(Number(mission.fields.budgetMinor ?? 0)) },
         { label: "Your role view", value: context.can("approve_mission") ? "Can approve" : "Cannot approve" },
       ]} />
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("amendment request"); }}>Request an amendment</Button>
+      <ModalActions><OverlayActions primary={<Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("amendment request"); }}>Request an amendment</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2009,8 +2011,7 @@ function TaskDetail({ context, close }: { context: ScreenContext; close: () => v
       <Field label="Attach evidence" hint="The id of a record in this workspace that shows the work was done.">
         <TextInput value={evidence} onChange={(event) => setEvidence(event.target.value)} placeholder="nl-documents-060" />
       </Field>
-      <Row gap={2}>
-        <Button
+      <DrawerActions><OverlayActions primary={<Button
           variant="primary"
           disabled={!evidence.trim()}
           onClick={async () => {
@@ -2020,10 +2021,7 @@ function TaskDetail({ context, close }: { context: ScreenContext; close: () => v
           }}
         >
           Attach
-        </Button>
-        <Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("reassign", { id: task.id }); }}>Reassign</Button>
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        </Button>} secondary={<><Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("reassign", { id: task.id }); }}>Reassign</Button></>} end={<OverlayCancel>Close</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2046,7 +2044,7 @@ function ReassignTask({ context, close }: { context: ScreenContext; close: () =>
       <Notice tone="info" title="A paused contract is not offered">
         Only active contracts and people appear here, because a paused contract is excluded from delegation.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const isAgent = data.agents.some((agent) => agent.title === to);
@@ -2056,7 +2054,7 @@ function ReassignTask({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         Reassign
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2132,7 +2130,7 @@ function RetryConfirmation({ context, close }: { context: ScreenContext; close: 
         { label: "Retry safe", value: safe ? "Yes — it only reads or writes records here" : "No" },
       ]} />
       {!safe && <Notice tone="danger" title="This step cannot be retried">{blockedReason(step) ?? "The outcome of the last attempt is unknown."}</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!safe}
         onClick={async () => {
@@ -2141,7 +2139,7 @@ function RetryConfirmation({ context, close }: { context: ScreenContext; close: 
         }}
       >
         Retry the step
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2232,7 +2230,7 @@ function HandoffView({ context, close }: { context: ScreenContext; close: () => 
           {data.members.filter((member) => member.fields.kind !== "ai").map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
         </Select>
       </Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, reviewer, approvalRequired: true } }, { expectRevision: task.revision, event: `Review requested on ${task.title} from ${reviewer}` }))) return;
@@ -2241,7 +2239,7 @@ function HandoffView({ context, close }: { context: ScreenContext; close: () => 
         }}
       >
         Request the review
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2290,7 +2288,7 @@ function ArtifactPreviewOverlay({ context }: { context: ScreenContext }) {
         { label: "Produced by", value: String(item.fields.producedBy ?? item.ownerName) },
       ]} />
       <article className="ds-panel ds-prose" style={{ padding: "var(--space-4)", whiteSpace: "pre-wrap" }}>{body?.text ?? item.summary}</article>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/documents/${item.id}`)}>Open in Documents</Button>
+      <DrawerActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/documents/${item.id}`)}>Open in Documents</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2306,7 +2304,7 @@ function DeliverableApproval({ context, close }: { context: ScreenContext; close
     <Stack gap={4}>
       {!allowed && <Notice tone="warning" title="This role view does not approve">Your verdict will be recorded as a note instead.</Notice>}
       <Field label="What you checked" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!note.trim()}
         onClick={async () => {
@@ -2320,7 +2318,7 @@ function DeliverableApproval({ context, close }: { context: ScreenContext; close
         }}
       >
         {allowed ? "Approve" : "Record a note"}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2408,7 +2406,7 @@ function LimitIncrease({ context, close }: { context: ScreenContext; close: () =
       </Field>
       <Field label="Why" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
       {!allowed && <Notice tone="warning" title="This role view cannot raise a ceiling">The request will be recorded for an approver.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={amount <= 0 || !reason.trim()}
         onClick={async () => {
@@ -2432,7 +2430,7 @@ function LimitIncrease({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         {allowed ? "Raise the ceiling" : "Record the request"}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2501,7 +2499,7 @@ function ReopenTask({ context, close }: { context: ScreenContext; close: () => v
         The original task keeps its history. The follow-up carries your reason so a reader can see why the work came back.
       </Notice>
       <Field label="Why it is unresolved" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!reason.trim()}
         onClick={async () => {
@@ -2522,7 +2520,7 @@ function ReopenTask({ context, close }: { context: ScreenContext; close: () => v
         }}
       >
         Create the follow-up
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2607,7 +2605,7 @@ function ApprovalGrant({ context, close }: { context: ScreenContext; close: () =
         { label: "Tool grants requested", value: (body?.grants ?? []).join(", ") || "None" },
         { label: "Target account", value: "Not carried — you choose one" },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={() => {
           useMissionWizard.getState().set({
@@ -2624,7 +2622,7 @@ function ApprovalGrant({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Create a mission from this template
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3137,8 +3135,7 @@ function BulkTagMissions({ context, close }: { context: ScreenContext; close: ()
             onChange={(event) => setChosen((list) => (event.target.checked ? [...list, mission.id] : list.filter((id) => id !== mission.id)))} />
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={chosen.length === 0 || !tag.trim()} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={chosen.length === 0 || !tag.trim()} onClick={async () => {
           setBusy(true);
           for (const mission of missions.filter((item) => chosen.includes(item.id))) {
             await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag.trim()])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag.trim()}` });
@@ -3146,9 +3143,7 @@ function BulkTagMissions({ context, close }: { context: ScreenContext; close: ()
           context.toast("Tagged", `${chosen.length} mission${chosen.length === 1 ? "" : "s"} tagged ${tag.trim()}.`);
           setBusy(false);
           close();
-        }}>Tag {chosen.length}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Tag {chosen.length}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3165,10 +3160,7 @@ function DescribeGoal({ context, close }: { context: ScreenContext; close: () =>
       <Field label="What the mission must achieve" required><TextArea aria-label="What the mission must achieve" value={goal} rows={3} onChange={(event) => setGoal(event.target.value)} /></Field>
       <Field label="Success criteria" required hint="Completion is verified against these, not against an agent saying it is done."><TextArea aria-label="Success criteria" value={criteria} rows={3} onChange={(event) => setCriteria(event.target.value)} /></Field>
       {problems.length > 0 && <Notice tone="warning" title="Not complete yet">{problems.join(" ")}</Notice>}
-      <Row gap={2}>
-        <Button variant="primary" disabled={problems.length > 0} onClick={() => { set({ goal: goal.trim(), successCriteria: criteria.trim() }); context.toast("Goal recorded", "The draft holds the goal and its criteria. Nothing is written until you submit."); close(); }}>Save the goal</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" disabled={problems.length > 0} onClick={() => { set({ goal: goal.trim(), successCriteria: criteria.trim() }); context.toast("Goal recorded", "The draft holds the goal and its criteria. Nothing is written until you submit."); close(); }}>Save the goal</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3189,10 +3181,7 @@ function AttachMissionRecords({ context, close }: { context: ScreenContext; clos
             onChange={(event) => setChosen((list) => (event.target.checked ? [...list, record.id] : list.filter((id) => id !== record.id)))} />
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="primary" onClick={() => { set({ contextIds: chosen }); context.toast("Records attached", `${chosen.length} record${chosen.length === 1 ? " is" : "s are"} in the mission's scope.`); close(); }}>Attach {chosen.length}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={() => { set({ contextIds: chosen }); context.toast("Records attached", `${chosen.length} record${chosen.length === 1 ? " is" : "s are"} in the mission's scope.`); close(); }}>Attach {chosen.length}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3218,10 +3207,7 @@ function RevisePlan({ context, close }: { context: ScreenContext; close: () => v
       ))}
       <Button variant="secondary" onClick={() => setSteps([...steps, { title: "", kind: "read" }])}>Add a step</Button>
       {providerWithoutApproval && <Notice tone="warning" title="A provider step has no approval before it">A step that would reach outside the workspace should follow an approval step. It will stop at the provider boundary either way.</Notice>}
-      <Row gap={2}>
-        <Button variant="primary" disabled={steps.length === 0 || steps.some((step) => !step.title.trim())} onClick={() => { set({ steps: steps.map((step) => ({ ...step, title: step.title.trim() })) }); context.toast("Plan revised", `${steps.length} step${steps.length === 1 ? "" : "s"} in the draft plan.`); close(); }}>Save the plan</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" disabled={steps.length === 0 || steps.some((step) => !step.title.trim())} onClick={() => { set({ steps: steps.map((step) => ({ ...step, title: step.title.trim() })) }); context.toast("Plan revised", `${steps.length} step${steps.length === 1 ? "" : "s"} in the draft plan.`); close(); }}>Save the plan</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3236,8 +3222,7 @@ function PostMissionMessage({ context, close }: { context: ScreenContext; close:
     <Stack gap={4}>
       <Field label={`Message to the ${mission.title} room`} required><TextArea aria-label="Message" value={text} rows={4} onChange={(event) => setText(event.target.value)} /></Field>
       <Notice tone="info" title="A message starts nothing">It is recorded in the room with your name. No AI employee acts on it without a task and its grants.</Notice>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!text.trim()} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={!text.trim()} onClick={async () => {
           setBusy(true);
           await context.mutate.create({
             collection: "messages", title: text.trim().slice(0, 60), status: "posted", summary: text.trim(), parentId: mission.id,
@@ -3247,9 +3232,7 @@ function PostMissionMessage({ context, close }: { context: ScreenContext; close:
           context.setTab("Discussion");
           setBusy(false);
           close();
-        }}>Post the message</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Post the message</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3275,8 +3258,7 @@ function SetBudgetAlert({ context, close }: { context: ScreenContext; close: () 
         <TextInput aria-label="Alert when usage reaches" type="number" min={1} max={100} value={percent} onChange={(event) => setPercent(event.target.value)} />
       </Field>
       {crossed && <Notice tone="warning" title="Already past this threshold">The alert raises in the inbox as soon as it is saved.</Notice>}
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={ceiling <= 0} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={ceiling <= 0} onClick={async () => {
           setBusy(true);
           const saved = await context.mutate.patch(mission.id, { fields: { ...mission.fields, alertAtPercent: value, alertSetBy: context.actor } }, { expectRevision: mission.revision, event: `Budget alert on ${mission.title} set at ${value}% by ${context.actor}` });
           if (saved && crossed) {
@@ -3285,9 +3267,7 @@ function SetBudgetAlert({ context, close }: { context: ScreenContext; close: () 
           if (saved) context.toast("Alert set", `An alert raises at ${value}% of the ceiling.`);
           setBusy(false);
           close();
-        }}>Save the alert</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Save the alert</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

@@ -873,7 +873,7 @@ export function ScopePreview({ context }: { context: ScreenContext }) {
         <FactGrid columns={3} dense items={[
           { label: "Workspace records", value: String(everything), mono: true },
           { label: "Named by this portal", value: String(reach.length), mono: true },
-          { label: "Other portals' records", value: String(Math.max(0, everything - reach.length)), mono: true, hint: "Not reachable" },
+          { label: "Not named, so hidden", value: String(Math.max(0, everything - reach.length)), mono: true, hint: "Includes other clients' records" },
         ]} />
         <p className="ds-subtle">No total across clients is drawn anywhere in a portal: every figure comes from the records above.</p>
       </OverlaySection>

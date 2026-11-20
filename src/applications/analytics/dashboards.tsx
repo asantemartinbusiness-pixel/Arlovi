@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronUp, GripVertical, LayoutDashboard, Maximize2, Minimize2, Pin, Plus, Share2,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -713,7 +713,8 @@ export function WidgetChooser({ context, close }: { context: ScreenContext; clos
           title={measure?.name ?? "Tile"}
         />
       </Card>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const tile: Tile = {
@@ -726,13 +727,15 @@ export function WidgetChooser({ context, close }: { context: ScreenContext; clos
             h: viz === "stat" ? 1 : 2,
             order: body.tiles.length,
           };
-          await context.mutate.patch(record.id, { body: { ...body, tiles: [...body.tiles, tile] } }, { event: `Tile added: ${tile.title}` });
+          const saved = await context.mutate.patch(record.id, { body: { ...body, tiles: [...body.tiles, tile] } }, { expectRevision: record.revision, event: `Tile added: ${tile.title}` });
+          if (!saved) return;
           context.toast("Tile added", `${tile.title} is on the dashboard and recomputes from ${measure?.collection ?? "the workspace"}.`);
           close();
         }}
       >
         Add the tile
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -840,16 +843,19 @@ export function SharingPanel({ context, close }: { context: ScreenContext; close
       <Notice tone="warning" title="Sharing is local">
         There is no link to send and no email to invite with. Sharing changes who this browser offers the dashboard to; it is not an account permission.
       </Notice>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(record.id, { fields: { ...record.fields, shared: value } }, { expectRevision: record.revision, event: value ? "Dashboard shared with the workspace" : "Dashboard restricted to its owner" });
+          const saved = await context.mutate.patch(record.id, { fields: { ...record.fields, shared: value } }, { expectRevision: record.revision, event: value ? "Dashboard shared with the workspace" : "Dashboard restricted to its owner" });
+          if (!saved) return;
           context.toast("Access changed", value ? "Everyone in the workspace sees it in the directory." : "Only the owner sees it.");
           close();
         }}
       >
         Save access
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }

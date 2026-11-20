@@ -3,7 +3,7 @@ import {
   AlertTriangle, CheckCircle2, Database, GitMerge, Ruler, Table2,
 } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, KeyValueList, Meter, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, Empty, Field, Grid, KeyValueList, Meter, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -310,15 +310,15 @@ export function DocumentDataset({ context, close }: { context: ScreenContext; cl
         <TextArea aria-label="What this dataset holds" rows={4} value={text} onChange={(event) => setText(event.target.value)} required />
       </Field>
       <Field label="Owner"><TextInput aria-label="Owner" value={owner} onChange={(event) => setOwner(event.target.value)} /></Field>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={text.trim() === ""}
         onClick={async () => {
           const existing = dataset?.documented;
-          if (existing) {
-            await context.mutate.patch(existing.id, { summary: text.trim(), ownerName: owner, status: "documented" }, { expectRevision: existing.revision, event: `Dataset ${collection} documented` });
-          } else {
-            await context.mutate.create({
+          const saved = existing
+            ? await context.mutate.patch(existing.id, { summary: text.trim(), ownerName: owner, status: "documented" }, { expectRevision: existing.revision, event: `Dataset ${collection} documented` })
+            : await context.mutate.create({
               collection: "datasets",
               title: collection,
               status: "documented",
@@ -326,13 +326,14 @@ export function DocumentDataset({ context, close }: { context: ScreenContext; cl
               ownerName: owner,
               fields: { collection, kind: "native" },
             }, `Dataset ${collection} documented`);
-          }
+          if (!saved) return;
           context.toast("Documented", `${collection} now carries a description and an owner on its catalogue record.`);
           close();
         }}
       >
         Save the documentation
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -654,7 +655,8 @@ export function FormulaEditor({ context, close }: { context: ScreenContext; clos
           : `${preview.count} record${preview.count === 1 ? "" : "s"} match. The measure computes ${unit === "money" ? context.money(Math.round(preview.value ?? 0)) : String(Math.round((preview.value ?? 0) * 10) / 10)} right now.`}
       </Notice>
 
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={name.trim() === ""}
         onClick={async () => {
@@ -671,7 +673,8 @@ export function FormulaEditor({ context, close }: { context: ScreenContext; clos
         }}
       >
         Define the measure
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -732,10 +735,11 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
           variant="secondary"
           onClick={async () => {
             const next = Number(definition.fields.version ?? 1) + 1;
-            await context.mutate.patch(definition.id, {
+            const saved = await context.mutate.patch(definition.id, {
               status: "proposed",
               fields: { ...definition.fields, version: next },
             }, { expectRevision: definition.revision, event: `Measure ${definition.title} versioned to v${next}` });
+            if (!saved) return;
             context.toast("Versioned", `${definition.title} is now v${next}, proposed. Everything reading it recomputes under the new definition.`);
           }}
         >
@@ -1016,28 +1020,29 @@ export function TransformEditor({ context, close }: { context: ScreenContext; cl
             ? `One ${from} reaches up to ${preview.maxFanOut} ${to} records, so a sum across the join would read ${context.money(preview.sumAfter)} instead of ${context.money(preview.sumBefore)}.`
             : `Each ${from} reaches at most one ${to}, so totals are safe across this join.`}
       </Notice>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={preview.matched === 0}
         onClick={async () => {
           const relation: Relation = { id: `r${relations.length + 1}-${wallMs().toString(36)}`, from, to, key, kind: preview.fanOut ? "one-to-many" : "many-to-one" };
-          if (model) {
-            await context.mutate.patch(model.id, { body: { relations: [...relations, relation] } }, { event: `Relation ${from} → ${to} added` });
-          } else {
-            await context.mutate.create({
+          const saved = model
+            ? await context.mutate.patch(model.id, { body: { relations: [...relations, relation] } }, { expectRevision: model.revision, event: `Relation ${from} → ${to} added` })
+            : await context.mutate.create({
               collection: "dataModels",
               title: "Northline data model",
               status: "active",
               summary: "Relationships between the collections, tested against the records.",
               body: { relations: [...relations, relation] },
             }, `Relation ${from} → ${to} added`);
-          }
+          if (!saved) return;
           context.toast("Relation added", `${from} → ${to} is tested against the records every time this screen renders.`);
           close();
         }}
       >
         Add the relation
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }

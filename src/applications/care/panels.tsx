@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BookOpen, Headphones, Inbox, MessageSquare, Smile, Timer, Wand2 } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice, OverlaySummary,
   Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -527,6 +527,60 @@ export function TicketList({ context, lens }: { context: ScreenContext; lens: "A
  * ARL-CARE-004 · Ticket Detail
  * ------------------------------------------------------------------ */
 
+/** The clock against the SLA: the figure a case is judged by, drawn once at the top of the case. */
+export function SlaClock({ ticket, policy, state, context }: { ticket: Rec; policy: Rec | undefined; state: SlaState; context: ScreenContext }) {
+  const used = state.targetMinutes === 0 ? 0 : Math.min(100, (state.usedMinutes / state.targetMinutes) * 100);
+  const running = state.status === "due" || state.status === "at_risk" || state.status === "breached";
+  const figure = state.status === "unknown" ? "No target" : state.status === "met" ? formatMinutes(state.usedMinutes) : state.status === "paused" ? "Paused" : `${state.remainingMinutes < 0 ? "+" : ""}${formatMinutes(state.remainingMinutes)}`;
+  return (
+    <section className="cr-clock" data-status={state.status} aria-label="SLA clock">
+      <div className="cr-clock-figure">
+        <span className="ds-eyebrow">{state.which === "first response" ? "First response" : "Resolution"} {state.status === "met" ? "taken" : state.remainingMinutes < 0 ? "over by" : "remaining"}</span>
+        <strong className="cr-clock-value">{figure}</strong>
+      </div>
+      <div className="cr-clock-track">
+        <div className="cr-clock-bar" role="img" aria-label={`${Math.round(used)}% of the ${state.which} target used`}>
+          <i style={{ width: `${used}%` }} />
+          <span className="cr-clock-mark" style={{ left: "75%" }} title="At risk from here" />
+        </div>
+        <div className="cr-clock-scale ds-num"><span>0</span><span>{state.targetMinutes ? `${formatMinutes(state.usedMinutes)} of ${formatMinutes(state.targetMinutes)}` : "No target"}</span></div>
+      </div>
+      <dl className="cr-clock-facts">
+        <div><dt>Policy</dt><dd>{policy?.title ?? "None matched"}</dd></div>
+        <div><dt>Counted in</dt><dd className="ds-num">{String(policy?.fields.businessHours ?? "business hours")}</dd></div>
+        <div><dt>Waiting on customer</dt><dd>{policy?.fields.pauseWhileWaiting === true ? "Pauses the clock" : "Does not pause"}</dd></div>
+        <div><dt>Clock</dt><dd>{running ? "Running" : state.status === "paused" ? "Paused" : state.status === "met" ? "Stopped at resolution" : "Not applicable"}</dd></div>
+      </dl>
+      {ticket.fields.firstResponseRecordedAt && !ticket.fields.firstResponseAt ? <p className="ds-subtle">A reply is recorded {context.dateTime(String(ticket.fields.firstResponseRecordedAt))} but never reached the customer, so the first-response clock keeps running.</p> : null}
+    </section>
+  );
+}
+
+/** Opened, replies, status moves and resolution on one line of time, newest last. */
+function CaseTimeline({ ticket, conversation, context }: { ticket: Rec; conversation: Rec[]; context: ScreenContext }) {
+  const events: { at: string; label: string; detail?: string; tone?: "warning" | "success" }[] = [
+    { at: ticket.at ?? "", label: `Opened by ${ticket.createdBy}`, detail: String(ticket.fields.channel ?? "") ? `via ${String(ticket.fields.channel)}` : undefined },
+    ...conversation.slice(0, 12).map((message) => ({
+      at: message.at ?? "",
+      label: message.fields.internal === true ? `Internal note by ${String(message.fields.author ?? "")}` : `${String(message.fields.side) === "agent" ? "Reply from" : "Message from"} ${String(message.fields.author ?? "")}`,
+      detail: message.summary,
+      tone: message.fields.internal === true ? ("warning" as const) : undefined,
+    })),
+    ...(ticket.fields.escalatedBy ? [{ at: ticket.updatedAt, label: `Escalated by ${String(ticket.fields.escalatedBy)}`, tone: "warning" as const }] : []),
+    ...(ticket.fields.resolvedAt ? [{ at: String(ticket.fields.resolvedAt), label: `Resolved by ${String(ticket.fields.resolvedBy || "someone")}`, detail: String(ticket.fields.resolutionReason ?? ""), tone: "success" as const }] : []),
+  ].filter((event) => event.at).sort((a, b) => a.at.localeCompare(b.at));
+  return (
+    <ol className="cr-timeline" aria-label="Case timeline">
+      {events.map((event, index) => (
+        <li key={`${event.at}-${index}`} data-tone={event.tone}>
+          <time className="ds-num">{context.dateTime(event.at)}</time>
+          <div><strong>{event.label}</strong>{event.detail ? <p className="ds-subtle ds-truncate">{event.detail}</p> : null}</div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function TicketDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useCareData();
   const record = useRecord(context.params.id);
@@ -622,30 +676,22 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
     );
   }
 
+  const policy = policyFor(ticket, data.slas);
   return (
     <Grid>
-      <Card span={7} eyebrow="CASE" prov="human" title={ticket.title} subtitle={[String(ticket.fields.queue ?? ""), `opened ${context.relative(ticket.at)}`].filter(Boolean).join(" · ")} actions={<Pill tone={PRIORITY_TONE[String(ticket.fields.priority ?? "normal")] ?? "neutral"} dot>{String(ticket.fields.priority ?? "")}</Pill>}>
+      <div className="ds-col-12"><SlaClock ticket={ticket} policy={policy} state={state} context={context} /></div>
+      <Card span={7} eyebrow="CASE" prov="human" title="What was reported" subtitle={[String(ticket.fields.queue ?? ""), `opened ${context.relative(ticket.at)}`].filter(Boolean).join(" · ")}>
         <Stack gap={3}>
           <p>{ticket.summary}</p>
           <Properties rows={[
-            { label: "Owner", value: String(ticket.fields.assignee || "Unassigned") },
             { label: "Channel", value: String(ticket.fields.channel ?? "") || "Not recorded" },
-            { label: "Status", value: ticket.status },
             { label: "Satisfaction", value: Number(ticket.fields.csat ?? 0) > 0 ? `${String(ticket.fields.csat)} of 5` : "Not rated" },
           ]} />
         </Stack>
       </Card>
       <TriageCard context={context} ticket={ticket} state={state} />
-      <Card span={6} eyebrow="SLA" prov="human" title="Against the clock" subtitle={policyFor(ticket, data.slas)?.title ?? "No policy matched"}>
-        <Stack gap={3}>
-          <SlaBadge state={state} />
-          <Properties rows={[
-            { label: "Target", value: <span className="ds-num">{state.targetMinutes ? formatMinutes(state.targetMinutes) : "Unavailable"}</span> },
-            { label: "Used", value: <span className="ds-num">{formatMinutes(state.usedMinutes)}</span> },
-            { label: "Counted in", value: String(policyFor(ticket, data.slas)?.fields.businessHours ?? "business hours") },
-            { label: "Paused while waiting", value: policyFor(ticket, data.slas)?.fields.pauseWhileWaiting === true ? "Yes" : "No" },
-          ]} />
-        </Stack>
+      <Card span={6} eyebrow="TIMELINE" prov="human" title="What happened" subtitle={`${conversation.length} ${conversation.length === 1 ? "message" : "messages"} on the case`}>
+        <CaseTimeline ticket={ticket} conversation={conversation} context={context} />
       </Card>
       <Card span={6} eyebrow="CUSTOMER" prov="human" title="Customer" subtitle={contact ? String(contact.fields.company ?? "Retail customer") : "No contact linked"}>
         {contact ? (
@@ -1262,29 +1308,51 @@ export function CustomerInspector({ context }: { context: ScreenContext }) {
   );
 }
 
+export function CaseSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useCareData();
+  const { now } = useWorkspace();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const ticket = useRecord(payload?.id ?? context.params.id ?? context.selectedId) ?? data.tickets[0];
+  if (!ticket) return null;
+  const state = slaState(ticket, policyFor(ticket, data.slas), now);
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={ticket.title}
+      status={<Pill tone={SLA_TONE[state.status]} dot>{state.label}</Pill>}
+      meta={[String(ticket.fields.queue ?? ""), `priority ${String(ticket.fields.priority ?? "normal")}`, `owner ${String(ticket.fields.assignee || "unassigned")}`]}
+    />
+  );
+}
+
 export function Escalation({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCareData();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const ticket = useRecord(payload?.id ?? context.params.id ?? context.selectedId) ?? data.tickets[0];
+  const [why, setWhy] = useState("");
   if (!ticket) return <Empty title="No case" />;
+  const current = String(ticket.fields.assignee ?? "");
+  const people = data.employees.filter((employee) => employee.status !== "alumni" && employee.title !== current);
+  const reason = why.trim();
   return (
     <form
       id="cr-escalate"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (reason.length < 10) { context.toast("Say why", "An escalation needs a reason of at least a sentence.", "blocked"); return; }
         const form = new FormData(event.currentTarget);
         const to = String(form.get("to") ?? "");
-        const saved4 = await context.mutate.patch(ticket.id, {
+        const saved = await context.mutate.patch(ticket.id, {
           status: "open",
-          fields: { ...ticket.fields, assignee: to, priority: String(form.get("priority") ?? ticket.fields.priority), queue: String(form.get("queue") ?? ticket.fields.queue), escalatedBy: context.actor },
+          fields: { ...ticket.fields, assignee: to, previousAssignee: current, priority: String(form.get("priority") ?? ticket.fields.priority), queue: String(form.get("queue") ?? ticket.fields.queue), escalatedBy: context.actor },
         }, { expectRevision: ticket.revision, event: `${String(ticket.fields.ref ?? "")} escalated to ${to} by ${context.actor}` });
-        if (!saved4) return;
+        if (!saved) return;
         await context.mutate.create({
           collection: "messages",
           title: `${String(ticket.fields.ref ?? "")} — internal note`,
           status: "note",
-          summary: `Escalated to ${to}. ${String(form.get("why") ?? "")}`,
+          summary: `Escalated to ${to}. ${reason}`,
           parentId: ticket.id,
           at: context.now.toISOString(),
           fields: { kind: "ticket", author: context.actor, side: "agent", channel: "internal", internal: true },
@@ -1293,18 +1361,19 @@ export function Escalation({ context, close }: { context: ScreenContext; close: 
         close();
       }}
     >
-      <Properties rows={[{ label: "Case", value: ticket.title }, { label: "Currently", value: String(ticket.fields.assignee || "Unassigned") }]} />
       <Field label="Escalate to" required>
         <Select name="to" required>
-          {data.employees.filter((employee) => employee.status !== "alumni").map((employee) => <option key={employee.id}>{employee.title}</option>)}
+          {people.map((employee) => <option key={employee.id}>{employee.title}</option>)}
         </Select>
       </Field>
       <Row gap={3}>
         <Field label="Queue"><Select name="queue" defaultValue={String(ticket.fields.queue ?? "")}>{["Technical", "Orders", "Billing", "Trade"].map((queue) => <option key={queue}>{queue}</option>)}</Select></Field>
         <Field label="Priority"><Select name="priority" defaultValue={String(ticket.fields.priority ?? "normal")}>{["low", "normal", "high", "urgent"].map((priority) => <option key={priority}>{priority}</option>)}</Select></Field>
       </Row>
-      <Field label="Why" required><TextArea name="why" rows={3} required /></Field>
-      <Notice tone="info">Escalating changes the owner on the record and adds an internal note. The customer sees nothing new.</Notice>
+      <Field label="Why" required hint={reason.length < 10 ? "Say what has been tried and what is needed: at least a sentence." : undefined}>
+        <TextArea name="why" rows={3} required value={why} onChange={(event) => setWhy(event.target.value)} />
+      </Field>
+      <Notice tone="info">The owner changes and an internal note records why. The customer sees nothing new.</Notice>
     </form>
   );
 }

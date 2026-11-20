@@ -197,7 +197,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
   if (tab === "Overview") {
     return (
       <Grid>
-        <Card eyebrow="PREVIEW" prov={fileState(record) === "metadata_only" ? "unknown" : "human"} span={7} title="Preview" subtitle={`${String(record.fields.width ?? "?")} × ${String(record.fields.height ?? "?")} · ${String(record.fields.format ?? "").toUpperCase()}`}>
+        <Card eyebrow="PREVIEW" prov={fileState(record) === "metadata_only" ? "unknown" : "human"} span={7} title="Preview" subtitle={[record.fields.width ? `${String(record.fields.width)} × ${String(record.fields.height)}` : "", String(record.fields.format ?? "").toUpperCase()].filter(Boolean).join(" · ") || undefined}>
           <Stack gap={3}>
             <AssetViewer record={record} height={340} fit={["template", "logo", "icon"].includes(String(record.fields.kind)) ? "contain" : "cover"} />
             <FileStateTag record={record} />
@@ -357,6 +357,16 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
               <Notice tone="success" title="No restriction recorded">Use it anywhere in this workspace.</Notice>
             )}
           </Stack>
+        </Card>
+        <Card eyebrow="DEPENDS ON THIS RIGHT" prov="human" span={12} title="Uses that stop when the licence does" subtitle={record.fields.licenceExpiry ? `Until ${context.date(String(record.fields.licenceExpiry))}` : "No expiry, so nothing lapses"}>
+          {uses.length === 0 && csvList(record.fields.linkedIds).length === 0 ? (
+            <span className="ds-subtle">Nothing uses it yet.</span>
+          ) : (
+            <Stack gap={2}>
+              {uses.map((use) => <Row key={use} gap={2}><span className="ds-grow">{use}</span><Pill tone={state.state === "expired" ? "danger" : state.state === "expiring" ? "warning" : "neutral"}>{state.state === "expired" ? "Not permitted now" : record.fields.licenceExpiry ? `Ends ${context.date(String(record.fields.licenceExpiry))}` : "No end date"}</Pill></Row>)}
+              <LinkedRecords context={context} record={record} compact />
+            </Stack>
+          )}
         </Card>
       </Grid>
     );

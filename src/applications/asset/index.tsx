@@ -38,28 +38,8 @@ function AssetHeading({ context, part }: { context: ScreenContext; part: "title"
   const uses = String(record.fields.usedIn ?? "").split(",").filter((entry) => entry.trim()).length + String(record.fields.linkedIds ?? "").split(",").filter((entry) => entry.trim()).length;
   return (
     <span>
-      {String(record.fields.kind ?? "asset")} · {String(record.fields.format ?? "").toUpperCase()}
-      {record.fields.width ? ` · ${String(record.fields.width)} × ${String(record.fields.height)}` : ""} · version {String(record.fields.version ?? 1)} · {uses} {uses === 1 ? "use" : "uses"} · changed {context.relative(record.updatedAt)}
+      {[String(record.fields.kind ?? "asset"), String(record.fields.format ?? "").toUpperCase(), record.fields.width ? `${String(record.fields.width)} × ${String(record.fields.height)}` : "", `version ${String(record.fields.version ?? 1)}`, `${uses} ${uses === 1 ? "use" : "uses"}`, `changed ${context.relative(record.updatedAt)}`].filter(Boolean).join(" · ")}
     </span>
-  );
-}
-
-function AssetInspectorPanel({ context }: { context: ScreenContext }) {
-  const record = useRecord(context.params.id);
-  const { now } = useWorkspace();
-  if (!record) return <Empty title="No asset open" icon={<Images size={20} />}>Open an asset from the library.</Empty>;
-  const state = licence(record, now);
-  return (
-    <Stack gap={4}>
-      <Notice tone={licenceTone(state.state) === "danger" ? "danger" : licenceTone(state.state) === "warning" ? "warning" : "success"} title={state.label}>
-        {String(record.fields.licensor ?? "No licensor recorded")}
-      </Notice>
-      <Row gap={2} wrap>
-        <Button size="sm" variant="secondary" onClick={() => downloadAsset(context, record, now)}>Download</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Variant editor", { id: record.id })}>New variant</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("asset editor", { id: record.id })}>Edit details</Button>
-      </Row>
-    </Stack>
   );
 }
 
@@ -127,8 +107,6 @@ export const assetApp = registerApp({
         status: <AssetHeading context={context} part="status" />,
         meta: [<AssetHeading key="meta" context={context} part="meta" />],
       }),
-      inspector: (context) => <AssetInspectorPanel context={context} />,
-      inspectorTitle: "Rights",
       tabs: (["Overview", "Variants", "Usage", "Rights", "History"] as const).map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <AssetDetail context={context} tab={tab} />,

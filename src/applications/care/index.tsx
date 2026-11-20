@@ -7,11 +7,11 @@ import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import {
-  Automation, CannedReply, CustomerContext, CustomerInspector, Escalation, InternalNote, KnowledgeBase,
+  Automation, CannedReply, CustomerContext, CustomerInspector, Escalation, CaseSummary, InternalNote, KnowledgeBase,
   OmnichannelInbox, QueueRules, Quality, RefundFooter, RefundRequest, ResponseComposer, ServiceOverview, SlaInspector,
   Slas, TicketDetail, TicketList, policyFor, useCareData,
 } from "./panels";
-import { formatMinutes, slaState } from "./sla";
+import { SLA_TONE, formatMinutes, slaState } from "./sla";
 import "./care.css";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
 import {
@@ -21,6 +21,19 @@ import {
 } from "./actions";
 import { listByCollection, revisedRecord } from "@/platform/repo";
 import { submitFooter } from "@/applications/market/kit";
+
+function CaseHeading({ context, part }: { context: ScreenContext; part: "title" | "status" | "meta" }) {
+  const data = useCareData();
+  const { now } = useWorkspace();
+  const record = useRecord(context.params.id);
+  const ticket = record ?? data.tickets[0];
+  if (!ticket) return part === "title" ? <>Case</> : null;
+  const state = slaState(ticket, policyFor(ticket, data.slas), now);
+  if (part === "title") return <>{ticket.title}</>;
+  if (part === "status") return <Row gap={2} wrap><Pill tone={SLA_TONE[state.status]} dot>{state.label}</Pill><Pill tone={String(ticket.fields.priority) === "urgent" ? "danger" : String(ticket.fields.priority) === "high" ? "warning" : "neutral"}>{String(ticket.fields.priority ?? "normal")}</Pill></Row>;
+  const contact = data.contacts.find((row) => row.id === ticket.fields.contactId);
+  return <span>{[String(ticket.status).replace(/_/g, " "), String(ticket.fields.queue ?? ""), contact ? `for ${contact.title}` : "no customer linked", `owner ${String(ticket.fields.assignee || "unassigned")}`, `opened ${context.relative(ticket.at)}`].filter(Boolean).join(" · ")}</span>;
+}
 
 function ServiceReport({ context }: { context: ScreenContext }) {
   const data = useCareData();
@@ -846,11 +859,11 @@ export const careApp = registerApp({
       overlays: [
         { id: "assign case", kind: "modal", title: "Assign the case", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReassignCase context={context} close={close} />, footer: submitFooter("cr-reassign", "Assign") },
         { id: "tag case", kind: "modal", title: "Tag the case", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TagCase context={context} close={close} />, footer: submitFooter("cr-tag", "Save tags") },
-        { id: "link record", kind: "modal", title: "Link a record", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <LinkRecord context={context} close={close} />, footer: submitFooter("cr-link", "Save the link") },
+        { id: "link record", kind: "modal", title: "Link a record", width: OVERLAY_WIDTH.form, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Link" />, render: ({ close, ...context }) => <LinkRecord context={context} close={close} />, footer: submitFooter("cr-link", "Save the link") },
         { id: "Customer inspector", kind: "drawer", title: "Customer", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <CustomerInspector context={context} /> },
         { id: "canned reply", kind: "drawer", title: "Macros", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <CannedReply context={context} /> },
-        { id: "escalation", kind: "modal", title: "Escalate this case", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <Escalation context={context} close={close} />, footer: submitFooter("cr-escalate", "Escalate") },
-        { id: "Response composer", kind: "modal", title: "Reply", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ResponseComposer context={context} close={close} />, footer: submitFooter("cr-response", "Record the reply") },
+        { id: "escalation", kind: "modal", title: "Escalate this case", width: OVERLAY_WIDTH.modal, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Escalation" />, render: ({ close, ...context }) => <Escalation context={context} close={close} />, footer: submitFooter("cr-escalate", "Escalate") },
+        { id: "Response composer", kind: "modal", title: "Reply", width: OVERLAY_WIDTH.record, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Reply" />, render: ({ close, ...context }) => <ResponseComposer context={context} close={close} />, footer: submitFooter("cr-response", "Record the reply") },
       ],
     },
 
@@ -878,7 +891,11 @@ export const careApp = registerApp({
     "ARL-CARE-004": {
       id: "ARL-CARE-004",
       title: () => "Case",
-      subtitle: () => "The issue, the conversation, the clock and what was decided.",
+      record: (context) => ({
+        title: <CaseHeading context={context} part="title" />,
+        status: <CaseHeading context={context} part="status" />,
+        meta: [<CaseHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: ["Overview", "Conversation", "Tasks", "History", "Audit"].map((lens) => ({
         id: lens, render: (context: ScreenContext) => <TicketDetail context={context} lens={lens} />,
       })),
@@ -893,12 +910,12 @@ export const careApp = registerApp({
       ],
       overlays: [
         ...kitOverlays,
-        { id: "escalation", kind: "modal", title: "Escalate this case", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <Escalation context={context} close={close} />, footer: submitFooter("cr-escalate", "Escalate") },
-        { id: "link record", kind: "modal", title: "Link a record", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <LinkRecord context={context} close={close} />, footer: submitFooter("cr-link", "Save the link") },
-        { id: "assign specialist", kind: "modal", title: "Assign a specialist", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <AssignSpecialist context={context} close={close} />, footer: submitFooter("cr-specialist", "Assign") },
-        { id: "Response composer", kind: "modal", title: "Reply", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ResponseComposer context={context} close={close} />, footer: submitFooter("cr-response", "Record the reply") },
-        { id: "internal note", kind: "modal", title: "Internal note", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <InternalNote context={context} close={close} />, footer: submitFooter("cr-note", "Add the note") },
-        { id: "refund request", kind: "modal", title: "Request a refund", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RefundRequest context={context} close={close} />, footer: ({ close, ...context }) => <RefundFooter context={context} close={close} /> },
+        { id: "escalation", kind: "modal", title: "Escalate this case", width: OVERLAY_WIDTH.modal, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Escalation" />, render: ({ close, ...context }) => <Escalation context={context} close={close} />, footer: submitFooter("cr-escalate", "Escalate") },
+        { id: "link record", kind: "modal", title: "Link a record", width: OVERLAY_WIDTH.form, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Link" />, render: ({ close, ...context }) => <LinkRecord context={context} close={close} />, footer: submitFooter("cr-link", "Save the link") },
+        { id: "assign specialist", kind: "modal", title: "Assign a specialist", width: OVERLAY_WIDTH.form, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Assign a specialist" />, render: ({ close, ...context }) => <AssignSpecialist context={context} close={close} />, footer: submitFooter("cr-specialist", "Assign") },
+        { id: "Response composer", kind: "modal", title: "Reply", width: OVERLAY_WIDTH.record, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Reply" />, render: ({ close, ...context }) => <ResponseComposer context={context} close={close} />, footer: submitFooter("cr-response", "Record the reply") },
+        { id: "internal note", kind: "modal", title: "Internal note", width: OVERLAY_WIDTH.modal, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Internal note" />, render: ({ close, ...context }) => <InternalNote context={context} close={close} />, footer: submitFooter("cr-note", "Add the note") },
+        { id: "refund request", kind: "modal", title: "Request a refund", tone: "danger", width: OVERLAY_WIDTH.modal, summary: ({ close: _c, ...context }) => <CaseSummary context={context} eyebrow="Refund request" />, render: ({ close, ...context }) => <RefundRequest context={context} close={close} />, footer: ({ close, ...context }) => <RefundFooter context={context} close={close} /> },
       ],
     },
 

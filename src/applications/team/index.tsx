@@ -3,7 +3,7 @@ import {
   Bot, Cpu, FlaskConical, Gauge, GraduationCap, Network, Users, Wrench,
 } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalActions, OVERLAY_WIDTH, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Meter, Notice, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -1285,10 +1285,7 @@ function QuickProfile({ context }: { context: ScreenContext }) {
         { label: "Model", value: <Pill tone="warning">Not connected</Pill> },
       ]} />
       {agent.status === "paused" && <Notice tone="warning" title="Paused">{String(agent.fields.pausedReason || "No reason recorded.")}</Notice>}
-      <Row gap={2} wrap>
-        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/${agent.id}`)}>Open the contract</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/ai/agents/${agent.id}/chat`)}>Message</Button>
-      </Row>
+      <DrawerActions><OverlayActions primary={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/${agent.id}`)}>Open the contract</Button>} secondary={<><Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/ai/agents/${agent.id}/chat`)}>Message</Button></>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1337,7 +1334,7 @@ function AgentAssignment({ context, close }: { context: ScreenContext; close: ()
         </Select>
       </Field>
       {task?.fields.approvalRequired === true && <Notice tone="info">This item has an approval gate. Assigning it does not pass the gate.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={blocked || !task}
         onClick={async () => {
@@ -1348,7 +1345,7 @@ function AgentAssignment({ context, close }: { context: ScreenContext; close: ()
         }}
       >
         Assign the work
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1369,7 +1366,7 @@ function ArchiveConfirmation({ context, close }: { context: ScreenContext; close
           {agent.title} stays in this workspace with its evaluation history. It is excluded from delegation and tool execution.
         </Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="danger"
         disabled={open.length > 0}
         onClick={async () => {
@@ -1379,7 +1376,7 @@ function ArchiveConfirmation({ context, close }: { context: ScreenContext; close
         }}
       >
         Archive the contract
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1459,7 +1456,7 @@ function PermissionInspector({ context, close }: { context: ScreenContext; close
       <Notice tone="warning" title={`${queued.length} queued item${queued.length === 1 ? "" : "s"} would be re-authorised`}>
         Saving marks queued work as needing re-authorisation, so nothing runs under a grant that has been removed.
       </Notice>
-      <Button
+      <DrawerActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(agent.id, { body: { ...(agent.body as object), tools } }, { expectRevision: agent.revision, event: `Tool grants changed on ${agent.title}` }))) return;
@@ -1471,7 +1468,7 @@ function PermissionInspector({ context, close }: { context: ScreenContext; close
         }}
       >
         Save permissions
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1584,7 +1581,7 @@ function ConnectorGrant({ context }: { context: ScreenContext }) {
           { key: "note", header: "What it would unlock", cell: (row) => row.summary },
         ]}
       />
-      <Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/team/models`)}>Open model routing</Button>
+      <ModalActions><OverlayActions primary={<Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/team/models`)}>Open model routing</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1637,7 +1634,7 @@ function PublishConfirmation({ context, close }: { context: ScreenContext; close
         { label: "Evaluation", value: draft.evaluationScore === undefined ? "Not run" : `${draft.evaluationScore} / 100` },
         { label: "Spend ceiling", value: context.money(draft.spendCapMinor) },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={problems.length > 0}
         onClick={async () => {
@@ -1692,7 +1689,7 @@ function PublishConfirmation({ context, close }: { context: ScreenContext; close
         }}
       >
         Activate the contract
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1738,7 +1735,7 @@ function TransferApproval({ context, close }: { context: ScreenContext; close: (
       <Notice tone="warning" title="A transfer does not carry data rights">
         Moving a contract between departments changes who manages it. Its knowledge grants stay exactly as the policy records them, and they never cross between legal entities.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, departmentId } }, { expectRevision: record.revision, event: `${record.title} transferred` }))) return;
@@ -1747,7 +1744,7 @@ function TransferApproval({ context, close }: { context: ScreenContext; close: (
         }}
       >
         Record the transfer
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1829,7 +1826,7 @@ function InstallPermission({ context, close }: { context: ScreenContext; close: 
       </Field>
       {sandboxed && <Notice tone="danger" title="This bundle is sandboxed">It declares a network call, which nothing here can make. It cannot be installed.</Notice>}
       {missing.length > 0 && <Notice tone="warning" title="Missing tools">{agent?.title} does not hold {missing.join(", ")}. Grant them on the contract first.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={sandboxed || missing.length > 0 || !agent}
         onClick={async () => {
@@ -1842,7 +1839,7 @@ function InstallPermission({ context, close }: { context: ScreenContext; close: 
         }}
       >
         Install the skill
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1928,7 +1925,7 @@ function AssessmentBuilder({ context, close }: { context: ScreenContext; close: 
           </Select>
         </Field>
       )}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (isAssessment) {
@@ -1948,7 +1945,7 @@ function AssessmentBuilder({ context, close }: { context: ScreenContext; close: 
         }}
       >
         {isAssessment ? "Save the assessment" : "Assign the course"}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1965,7 +1962,7 @@ function PublishingReview({ context, close }: { context: ScreenContext; close: (
         {course.title} was {course.fields.extracted === true ? "extracted from completed work" : "written by a person"} and stays proposed until its scope is recorded here.
       </Notice>
       <Field label="Where it applies" required hint="For example: trade quotes only, or care replies for shades."><TextInput value={scope} onChange={(event) => setScope(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!scope.trim()}
         onClick={async () => {
@@ -1975,7 +1972,7 @@ function PublishingReview({ context, close }: { context: ScreenContext; close: (
         }}
       >
         Publish with this scope
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2094,7 +2091,7 @@ function PromotionApproval({ context, close }: { context: ScreenContext; close: 
       ) : (
         <Notice tone="success" title="Safe to promote">This version scored at or above the line on its recorded assertions.</Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={blocked || !agent}
         onClick={async () => {
@@ -2105,7 +2102,7 @@ function PromotionApproval({ context, close }: { context: ScreenContext; close: 
         }}
       >
         Promote this version
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2216,7 +2213,7 @@ function PolicyWarning({ context }: { context: ScreenContext }) {
         { label: "Confidential sources", value: "Excluded from AI retrieval by policy" },
         { label: "Your role view", value: context.role },
       ]} />
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/permissions`)}>Open knowledge permissions</Button>
+      <ModalActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/permissions`)}>Open knowledge permissions</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2602,8 +2599,7 @@ function ReassignWork({ context, close }: { context: ScreenContext; close: () =>
           {targets.map((item) => <option key={item.id} value={item.id}>{item.title} · {String(item.fields.role ?? "")}</option>)}
         </Select>
       </Field>
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!target || open.length === 0 || !context.can("edit_people")}
@@ -2621,9 +2617,7 @@ function ReassignWork({ context, close }: { context: ScreenContext; close: () =>
           }}
         >
           Reassign {open.length} task{open.length === 1 ? "" : "s"}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2647,14 +2641,11 @@ function ConfigureLimits({ context, close }: { context: ScreenContext; close: ()
         <TextInput aria-label="Spend ceiling" align="end" inputMode="decimal" value={cap} invalid={Boolean(problem)} onChange={(event) => setCap(event.target.value)} />
       </Field>
       <Notice tone="info" title="Limits change the draft, and the evaluation must run again">Nothing is written to the workspace until the contract is activated.</Notice>
-      <Row gap={2}>
-        <Button variant="primary" disabled={Boolean(problem)} onClick={() => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" disabled={Boolean(problem)} onClick={() => {
           set({ autonomy, spendCapMinor: capMinor, evaluated: false });
           context.toast("Limits set", `${autonomy.replace(/_/g, " ")}, ceiling ${context.money(capMinor)}. Run the evaluation again before activating.`);
           close();
-        }}>Save the limits</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Save the limits</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2732,8 +2723,7 @@ function AssignLead({ context, close }: { context: ScreenContext; close: () => v
       ]} />
       {isAgent && <Notice tone="danger" title="A department is led by a person">An AI employee cannot be accountable for a department.</Notice>}
       <Notice tone="info" title="A reporting line is not a data grant">Leading a department does not give access to another entity's records.</Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!department || isAgent || String(department.fields.lead ?? "") === member.title || !context.can("edit_people")}
@@ -2747,9 +2737,7 @@ function AssignLead({ context, close }: { context: ScreenContext; close: () => v
           }}
         >
           Assign as lead
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2772,16 +2760,13 @@ function CreateDepartment({ context, close }: { context: ScreenContext; close: (
         </Select>
       </Field>
       <Field label="What it does"><TextInput aria-label="What it does" value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!title.trim() || taken || !lead || !context.can("edit_people")} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={!title.trim() || taken || !lead || !context.can("edit_people")} onClick={async () => {
           setBusy(true);
           await context.mutate.create({ collection: "departments", title: title.trim(), status: "active", summary: summary || `${title.trim()} department.`, fields: { lead, members: 0, createdFrom: "TEAM-005" } }, `Department ${title.trim()} created with ${lead} as lead`);
           context.toast("Department created", `${title.trim()} is led by ${lead}.`);
           setBusy(false);
           close();
-        }}>Create the department</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Create the department</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2828,8 +2813,7 @@ function RollbackVersion({ context, close }: { context: ScreenContext; close: ()
         { label: "Rolls back to", value: previous ? `${String(previous.fields.promotedVersion || "the version before promotion")}, saved ${context.dateTime(previous.at)}` : "No earlier version recorded" },
       ]} />}
       <Notice tone="warning" title="A rollback pauses the contract">The earlier fields and body are restored, the contract is paused so it cannot act on the old version unseen, and it must pass the safety line again before reactivation.</Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="danger"
           busy={busy}
           disabled={!agent || !previous || !context.can("edit_people")}
@@ -2847,9 +2831,7 @@ function RollbackVersion({ context, close }: { context: ScreenContext; close: ()
           }}
         >
           Roll back
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2927,17 +2909,13 @@ function AdjustResourcePolicy({ context, close }: { context: ScreenContext; clos
           {data.connectors.filter((connector) => connector.fields.kind === "model").map((connector) => <option key={connector.id} value={connector.id}>{connector.title}</option>)}
         </Select>
       </Field>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={Boolean(problem) || !context.can("edit_people")} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={Boolean(problem) || !context.can("edit_people")} onClick={async () => {
           setBusy(true);
           const saved = await context.mutate.patch(agent.id, { fields: { ...agent.fields, spendCapMinor: capMinor, provider: providerId, resourcePolicySetBy: context.actor } }, { expectRevision: agent.revision, event: `Resource policy for ${agent.title} set by ${context.actor}: ceiling ${context.money(capMinor)}` });
           if (saved) context.toast("Policy saved", `${agent.title} may commit up to ${context.money(capMinor)}.`);
           setBusy(false);
           close();
-        }}>Save the policy</Button>
-        <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/team/models`); }}>Model routing</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Save the policy</Button>} secondary={<><Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/team/models`); }}>Model routing</Button></>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

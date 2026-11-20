@@ -3,8 +3,7 @@ import {
   AlertTriangle, CalendarClock, ChevronDown, ChevronUp, FileText, Mail, Plus, Quote, Send,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row,
-  Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions,
 } from "@/design-system";
 import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -410,7 +409,8 @@ export function ReportBlockOverlay({ context, close }: { context: ScreenContext;
           No model is connected, so nothing here writes prose for you. The report says who prepared it.
         </Notice>
       )}
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const block: ReportBlock = {
@@ -421,13 +421,15 @@ export function ReportBlockOverlay({ context, close }: { context: ScreenContext;
             dimensionId: kind === "chart" || kind === "table" ? (dimensionId || undefined) : undefined,
             viz: kind === "chart" ? viz : undefined,
           };
-          await context.mutate.patch(record.id, { body: { ...body, blocks: [...body.blocks, block] } }, { event: `Report block added (${kind})` });
+          const saved = await context.mutate.patch(record.id, { body: { ...body, blocks: [...body.blocks, block] } }, { expectRevision: record.revision, event: `Report block added (${kind})` });
+          if (!saved) return;
           context.toast("Block added", kind === "heading" || kind === "commentary" ? "Double-click it in the report to write it." : "It recomputes from the records behind the measure.");
           close();
         }}
       >
         Add the block
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -510,18 +512,21 @@ export function ScheduleOverlay({ context, close }: { context: ScreenContext; cl
       <Notice tone="warning" title="A schedule here is a record, not a job">
         Nothing in this browser wakes up to build and send the report. The schedule says what should happen, and the distribution screen records each prepared delivery.
       </Notice>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(record.id, {
+          const saved = await context.mutate.patch(record.id, {
             fields: { ...record.fields, scheduleFrequency: merged.frequency, scheduleHour: merged.hour, scheduleTimezone: merged.timezone },
           }, { expectRevision: record.revision, event: "Report schedule changed" });
-          context.toast("Schedule recorded", describeSchedule(merged));
+          if (!saved) return;
+          context.toast("Schedule recorded", `${describeSchedule(merged)} Recorded only; nothing runs it.`);
           close();
         }}
       >
         Save the schedule
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -855,7 +860,8 @@ export function RecipientPreview({ context, close }: { context: ScreenContext; c
       {unauthorised && <Notice tone="danger" title="This recipient is blocked">No consent is recorded on {chosen?.name}'s contact record, so a delivery cannot be prepared for them.</Notice>}
       {duplicate && <Notice tone="warning" title="A delivery already exists for this period">The same report, period and recipient has already been prepared. Preparing it again would duplicate the send once a provider exists.</Notice>}
       {blockers.length > 0 && <Notice tone="warning" title="The report has figures that cannot be cited">{blockers.map((check) => check.reason).join(" ")}</Notice>}
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         icon={<Mail size={15} />}
         disabled={!recipient || unauthorised || duplicate}
@@ -882,7 +888,8 @@ export function RecipientPreview({ context, close }: { context: ScreenContext; c
         }}
       >
         Prepare the delivery
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }

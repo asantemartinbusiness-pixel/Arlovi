@@ -144,7 +144,7 @@ export function ResolutionCard({ context, ticket }: { context: ScreenContext; ti
           <Row gap={2} wrap>
             <Button variant="secondary" onClick={() => context.openOverlay("internal note")}>Reopen this case</Button>
             {ticket.status === "resolved" && (
-              <Button variant="ghost" onClick={async () => {
+              <Button variant="ghost" disabled={!ticket.fields.resolutionNote || !ticket.fields.resolutionReason} title={ticket.fields.resolutionNote ? undefined : "This resolution has no note, so it cannot be closed. Reopen and resolve it with one."} onClick={async () => {
                 const saved = await context.mutate.patch(ticket.id, { status: "closed" }, { expectRevision: ticket.revision, event: `${ref} closed by ${context.actor}` });
                 if (!saved) return;
                 context.toast("Case closed", "It moves to the archive. Reopening is still possible.");
@@ -164,11 +164,14 @@ export function ResolutionCard({ context, ticket }: { context: ScreenContext; ti
             {RESOLUTION_REASONS.map((option) => <option key={option}>{option}</option>)}
           </Select>
         </Field>
-        <Field label="Resolution note"><TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+        <Field label="Resolution note" required hint="What was done, so the closure can be audited."><TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
         <Row gap={2}>
           <Button
             variant="primary"
+            disabled={!note.trim()}
+            title={note.trim() ? undefined : "Write what resolved it first"}
             onClick={async () => {
+              if (!note.trim()) return;
               const saved = await context.mutate.patch(ticket.id, {
                 status: "resolved",
                 fields: { ...ticket.fields, resolvedAt: context.now.toISOString(), resolvedBy: context.actor, assignee: String(ticket.fields.assignee || context.actor), resolutionReason: reason, resolutionNote: note.trim(), replyDraft: "" },

@@ -1097,9 +1097,6 @@ function KnowledgePermissions({ context, view }: { context: ScreenContext; view:
             </Stack>
           )}
         </Card>
-        <Notice tone="warning" title="Residency is this browser">
-          Everything is in this browser's storage. There is no second region to choose and no copy anywhere else.
-        </Notice>
       </Stack>
     );
   }
@@ -1124,9 +1121,6 @@ function KnowledgePermissions({ context, view }: { context: ScreenContext; view:
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="These are interface boundaries">
-        A group shapes what a role view and an AI contract are offered in this browser. It is not account security, and a future service would have to enforce it server-side.
-      </Notice>
       <DataGrid
         rows={groups}
         rowId={(row) => row.id}
@@ -1292,7 +1286,7 @@ function SuggestionApproval({ context, close }: { context: ScreenContext; close:
       </Card>
       {!source && <Notice tone="danger" title="This cannot be approved">There is no source record behind the claim, so nothing could be shown to a reader who asks why it is true.</Notice>}
       {source?.status === "quarantined" && <Notice tone="warning" title="The source is held">It has not been reviewed, so a fact that cites it cannot be verified yet.</Notice>}
-      <Row gap={2}>
+      <ModalActions><Row gap={2}>
         <Button
           variant="primary"
           disabled={!source || source.status === "quarantined"}
@@ -1309,7 +1303,7 @@ function SuggestionApproval({ context, close }: { context: ScreenContext; close:
           context.toast("Rejected", "It stays in the registry marked rejected, with who rejected it.");
           close();
         }}>Reject</Button>
-      </Row>
+      </Row></ModalActions>
     </Stack>
   );
 }
@@ -1386,6 +1380,19 @@ function UploadDialog({ context, close }: { context: ScreenContext; close: () =>
   );
 }
 
+function SourceSummary({ context }: { context: ScreenContext }) {
+  const source = useRecord(context.selectedId);
+  if (!source || source.collection !== "sources") return <OverlaySummary eyebrow="Source" title="No source chosen" />;
+  return (
+    <OverlaySummary
+      eyebrow="Source"
+      title={source.title}
+      status={<Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill>}
+      meta={[String(source.fields.kind ?? "file"), visibilityOf(source).label, `Fresh ${context.date(String(source.fields.freshness ?? source.updatedAt))}`]}
+    />
+  );
+}
+
 function SourceDetailDrawer({ context }: { context: ScreenContext }) {
   const source = useRecord(context.selectedId);
   const data = useKnowledge();
@@ -1393,19 +1400,17 @@ function SourceDetailDrawer({ context }: { context: ScreenContext }) {
   const body = source.body as { extracted?: string[]; note?: string } | undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Kind", value: String(source.fields.kind ?? "file") },
-        { label: "Classification", value: String(source.fields.classification ?? "internal") },
-        { label: "Indexing", value: <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> },
-        { label: "Freshness", value: context.date(String(source.fields.freshness ?? source.updatedAt)) },
-        { label: "Assertions", value: String(data.facts.filter((fact) => fact.fields.sourceId === source.id).length) },
+      <FactGrid columns={3} dense items={[
+        { label: "Assertions citing it", value: String(data.facts.filter((fact) => fact.fields.sourceId === source.id).length), mono: true },
+        { label: "Scanned", value: source.fields.scanned === true ? "Reviewed" : "Not scanned" },
+        { label: "Owner", value: source.ownerName },
       ]} />
       {body?.note && <Notice tone="warning">{body.note}</Notice>}
-      <Card title="Extracted" pad="tight">
+      <OverlaySection title="Extracted">
         {(body?.extracted ?? []).length === 0 ? <span className="ds-subtle">Nothing was read from this source.</span> : (
           <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.extracted ?? []).map((line) => <li key={line}>{line}</li>)}</ul>
         )}
-      </Card>
+      </OverlaySection>
       <DrawerActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the full record</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Cancel</Button>} /></DrawerActions>
     </Stack>
   );
@@ -1485,6 +1490,7 @@ function CorrectionForm({ context, close }: { context: ScreenContext; close: () 
       <Notice tone="info" title="Corrections are append-only">
         The original extraction and this change are both kept, with your name and the time. Nothing is overwritten in place.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(note.trim()) || (!annotate && value !== original)} />
       <Field label="Original line"><TextInput value={original} readOnly /></Field>
       {!annotate && <Field label="Corrected line" required><TextInput value={value} onChange={(event) => setValue(event.target.value)} required /></Field>}
       <Field label={annotate ? "Annotation" : "Why"} required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
@@ -1635,7 +1641,7 @@ function MergePreview({ context, close }: { context: ScreenContext; close: () =>
         <Card span={6} title={to?.title ?? String(link.fields.toId)} subtitle={to?.collection}><p className="ds-prose">{to?.summary}</p></Card>
       </Grid>
       <Checkbox label="I have checked both records and they are the same entity" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-      <Row gap={2}>
+      <ModalActions><Row gap={2}>
         <Button
           variant="primary"
           disabled={!confirmed}
@@ -1652,7 +1658,7 @@ function MergePreview({ context, close }: { context: ScreenContext; close: () =>
           context.toast("Rejected", "The candidate is recorded as not a match.");
           close();
         }}>Not a match</Button>
-      </Row>
+      </Row></ModalActions>
     </Stack>
   );
 }
@@ -1976,6 +1982,7 @@ function DecisionDraft({ context, close }: { context: ScreenContext; close: () =
         close();
       }}
     >
+      <ModalUnsavedChanges when={Boolean(title.trim() || rationale.trim() || alternatives.trim())} />
       <Field label="Decision" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Rationale" required><TextArea value={rationale} rows={4} onChange={(event) => setRationale(event.target.value)} required /></Field>
       <Field label="Alternatives considered" hint="One per line."><TextArea value={alternatives} rows={3} onChange={(event) => setAlternatives(event.target.value)} /></Field>
@@ -1995,25 +2002,33 @@ function DecisionDraft({ context, close }: { context: ScreenContext; close: () =
   );
 }
 
+function DecisionSummary({ context }: { context: ScreenContext }) {
+  const decision = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
+  if (!decision) return <OverlaySummary eyebrow="Decision" title="No decision chosen" />;
+  return (
+    <OverlaySummary
+      eyebrow="Decision"
+      title={decision.title}
+      status={<Pill tone={decision.status === "approved" ? "success" : decision.status === "superseded" ? "neutral" : "info"}>{decision.status}</Pill>}
+      meta={[decision.fields.approvers ? `Approved by ${String(decision.fields.approvers)}` : "Not approved", decision.fields.approvedAt ? context.date(String(decision.fields.approvedAt)) : undefined]}
+    />
+  );
+}
+
 function ApprovalDetail({ context }: { context: ScreenContext }) {
   const decision = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
   if (!decision) return <Empty title="Choose a decision" />;
   const body = decision.body as { rationale?: string; alternatives?: string[]; outcome?: string } | undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: <Pill tone={decision.status === "approved" ? "success" : decision.status === "superseded" ? "neutral" : "info"}>{decision.status}</Pill> },
-        { label: "Approvers", value: String(decision.fields.approvers || "None recorded") },
-        { label: "Approved", value: decision.fields.approvedAt ? context.date(String(decision.fields.approvedAt)) : "Not approved" },
-        { label: "Superseded by", value: String(decision.fields.supersededBy || "—") },
-      ]} />
-      <Card title="Rationale" pad="tight"><p className="ds-prose">{body?.rationale ?? decision.summary}</p></Card>
+      {decision.fields.supersededBy ? <FactGrid items={[{ label: "Superseded by", value: String(decision.fields.supersededBy), mono: true }]} /> : null}
+      <OverlaySection title="Rationale"><p className="ds-prose">{body?.rationale ?? decision.summary}</p></OverlaySection>
       {(body?.alternatives ?? []).length > 0 && (
-        <Card title="Alternatives considered" pad="tight">
+        <OverlaySection title="Alternatives considered">
           <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.alternatives ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
-        </Card>
+        </OverlaySection>
       )}
-      {body?.outcome && <Card title="Outcome" pad="tight"><p className="ds-prose">{body.outcome}</p></Card>}
+      {body?.outcome && <OverlaySection title="Outcome"><p className="ds-prose">{body.outcome}</p></OverlaySection>}
     </Stack>
   );
 }
@@ -2046,6 +2061,7 @@ function ImpactReview({ context, close }: { context: ScreenContext; close: () =>
       <Notice tone="warning" title="Superseding keeps the old decision">
         {decision.title} will be marked superseded, not deleted. Anything that cited it still resolves.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(title.trim() || rationale.trim())} />
       <Field label="Replacement decision" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Why it changes" required><TextArea value={rationale} rows={3} onChange={(event) => setRationale(event.target.value)} required /></Field>
     </form>
@@ -2177,9 +2193,12 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
           />
         ))}
       </Stack>
-      <Notice tone="warning" title="A change applies to the next request">
-        An answer already given keeps the records it named. Queued work that was authorised under the old grant is re-checked when it runs.
-      </Notice>
+      <OverlaySection title="What this changes" tone="warning" hint="Applies to the next request. An answer already given keeps the records it named; queued work authorised under the old grant is re-checked when it runs.">
+        <FactGrid columns={2} items={[
+          { label: "Sources in reach now", value: String(data.sources.filter((source) => (current?.groups ?? []).includes(String(source.fields.classification ?? "internal")) && source.status === "indexed").length), mono: true },
+          { label: "Sources in reach after", value: String(data.sources.filter((source) => groups.includes(String(source.fields.classification ?? "internal")) && source.status === "indexed").length), mono: true, tone: groups.includes("confidential") ? "warning" : undefined },
+        ]} />
+      </OverlaySection>
       <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
@@ -2308,7 +2327,7 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
           <option value="confidential">Confidential</option>
         </Select>
       </Field>
-      <Row gap={2} wrap>
+      <ModalActions><Row gap={2} wrap>
         <Button
           variant="primary"
           disabled={failed}
@@ -2337,7 +2356,7 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
         >
           Route without approving
         </Button>
-      </Row>
+      </Row></ModalActions>
     </Stack>
   );
 }
@@ -2371,11 +2390,10 @@ function UnsupportedFormat({ context }: { context: ScreenContext }) {
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 async function records(context: ScreenContext, collection: string): Promise<Rec[]> {
@@ -2529,9 +2547,9 @@ export const brainApp = registerApp({
         { id: "inspect missing source", placement: "overflow", run: (context) => { context.setTab("Quality"); context.toast("Assertions with no source", "They are listed on the Quality tab and cannot be verified until one is attached.", "info"); } },
       ],
       overlays: [
-        { id: "Knowledge inspector", kind: "drawer", title: "Knowledge", width: 560, render: ({ ...context }) => <KnowledgeInspector context={context} /> },
-        { id: "suggestion approval", kind: "modal", title: "Review a suggestion", width: 560, render: ({ close, ...context }) => <SuggestionApproval context={context} close={close} /> },
-        { id: "upload", kind: "modal", title: "Import a source", width: 620, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
+        { id: "Knowledge inspector", kind: "drawer", title: "Knowledge", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <KnowledgeInspector context={context} /> },
+        { id: "suggestion approval", kind: "modal", title: "Review a suggestion", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SuggestionApproval context={context} close={close} /> },
+        { id: "upload", kind: "modal", title: "Import a source", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
       ],
     },
 
@@ -2550,9 +2568,9 @@ export const brainApp = registerApp({
         { id: "retire source", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Select a source first"), run: (context) => context.openOverlay("retention dialog") },
       ],
       overlays: [
-        { id: "Upload dialog", kind: "modal", title: "Add sources", width: 620, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
-        { id: "source detail drawer", kind: "drawer", title: "Source", width: 520, render: ({ ...context }) => <SourceDetailDrawer context={context} /> },
-        { id: "retention dialog", kind: "modal", title: "Retire this source", tone: "danger", width: 560, render: ({ close, ...context }) => <RetentionDialog context={context} close={close} /> },
+        { id: "Upload dialog", kind: "modal", title: "Add sources", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
+        { id: "source detail drawer", kind: "drawer", title: "Source", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <SourceSummary context={context} />, render: ({ ...context }) => <SourceDetailDrawer context={context} /> },
+        { id: "retention dialog", kind: "modal", title: "Retire this source", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <RetentionDialog context={context} close={close} /> },
       ],
     },
 
@@ -2571,9 +2589,9 @@ export const brainApp = registerApp({
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => void exportSource(context) },
       ],
       overlays: [
-        { id: "Correction form", kind: "modal", title: "Correct an extraction", width: 560, render: ({ close, ...context }) => <CorrectionForm context={context} close={close} />, footer: submitFooter("correction-form", "Record the change") },
-        { id: "permission editor", kind: "modal", title: "Restrict this source", width: 520, render: ({ close, ...context }) => <PermissionEditor context={context} close={close} /> },
-        { id: "delete request", kind: "modal", title: "Request deletion", tone: "danger", width: 560, render: ({ close, ...context }) => <DeleteRequest context={context} close={close} /> },
+        { id: "Correction form", kind: "modal", title: "Correct an extraction", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CorrectionForm context={context} close={close} />, footer: submitFooter("correction-form", "Record the change") },
+        { id: "permission editor", kind: "modal", title: "Restrict this source", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <PermissionEditor context={context} close={close} /> },
+        { id: "delete request", kind: "modal", title: "Request deletion", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DeleteRequest context={context} close={close} /> },
       ],
     },
 
@@ -2592,10 +2610,10 @@ export const brainApp = registerApp({
         { id: "split record", placement: "overflow", capability: "edit_knowledge", run: (context) => context.openOverlay("split record") },
       ],
       overlays: [
-        { id: "Entity inspector", kind: "drawer", title: "Entity", width: 520, render: ({ ...context }) => <EntityInspector context={context} /> },
-        { id: "merge preview", kind: "modal", title: "Review a merge", width: 680, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
-        { id: "split record", kind: "modal", title: "Split a merged record", width: 600, render: ({ close, ...context }) => <SplitRecord context={context} close={close} /> },
-        { id: "relationship editor", kind: "modal", title: "Relationship", width: 520, render: ({ close, ...context }) => <RelationshipEditor context={context} close={close} />, footer: submitFooter("relationship-editor", "Save relationship") },
+        { id: "Entity inspector", kind: "drawer", title: "Entity", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <EntityInspector context={context} /> },
+        { id: "merge preview", kind: "modal", title: "Review a merge", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
+        { id: "split record", kind: "modal", title: "Split a merged record", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SplitRecord context={context} close={close} /> },
+        { id: "relationship editor", kind: "modal", title: "Relationship", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RelationshipEditor context={context} close={close} />, footer: submitFooter("relationship-editor", "Save relationship") },
       ],
     },
 
@@ -2659,9 +2677,9 @@ export const brainApp = registerApp({
         { id: "supersede", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a decision first"), run: (context) => context.openOverlay("impact review") },
       ],
       overlays: [
-        { id: "Decision draft", kind: "modal", title: "Record a decision", width: 620, render: ({ close, ...context }) => <DecisionDraft context={context} close={close} />, footer: submitFooter("decision-draft", "Record decision") },
-        { id: "approval detail", kind: "drawer", title: "Decision", width: 560, render: ({ ...context }) => <ApprovalDetail context={context} /> },
-        { id: "impact review", kind: "modal", title: "Supersede this decision", width: 560, render: ({ close, ...context }) => <ImpactReview context={context} close={close} />, footer: submitFooter("impact-review", "Supersede") },
+        { id: "Decision draft", kind: "modal", title: "Record a decision", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DecisionDraft context={context} close={close} />, footer: submitFooter("decision-draft", "Record decision") },
+        { id: "approval detail", kind: "drawer", title: "Decision", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <DecisionSummary context={context} />, render: ({ ...context }) => <ApprovalDetail context={context} /> },
+        { id: "impact review", kind: "modal", title: "Supersede this decision", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImpactReview context={context} close={close} />, footer: submitFooter("impact-review", "Supersede") },
       ],
     },
 
@@ -2679,10 +2697,10 @@ export const brainApp = registerApp({
         { id: "set usage", placement: "overflow", run: (context) => context.openOverlay("Brand rule editor") },
       ],
       overlays: [
-        { id: "Brand rule editor", kind: "modal", title: "Brand rule", width: 560, render: ({ close, ...context }) => <BrandRuleEditor context={context} close={close} />, footer: submitFooter("brand-rule", "Save rule") },
-        { id: "asset selector", kind: "drawer", title: "Assets", width: 520, render: ({ ...context }) => <AssetSelector context={context} /> },
-        { id: "impact preview", kind: "modal", title: "What approving would change", width: 560, render: ({ close, ...context }) => <BrandImpactPreview context={context} close={close} /> },
-        { id: "edit token", kind: "modal", title: "Edit a design token", width: 560, render: ({ close, ...context }) => <EditToken context={context} close={close} /> },
+        { id: "Brand rule editor", kind: "modal", title: "Brand rule", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BrandRuleEditor context={context} close={close} />, footer: submitFooter("brand-rule", "Save rule") },
+        { id: "asset selector", kind: "drawer", title: "Assets", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <AssetSelector context={context} /> },
+        { id: "impact preview", kind: "modal", title: "What approving would change", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BrandImpactPreview context={context} close={close} /> },
+        { id: "edit token", kind: "modal", title: "Edit a design token", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <EditToken context={context} close={close} /> },
       ],
     },
 
@@ -2722,9 +2740,9 @@ export const brainApp = registerApp({
         { id: "retry safe step", placement: "overflow", run: (context) => void retrySafeStep(context) },
       ],
       overlays: [
-        { id: "File chooser", kind: "modal", title: "Add files", width: 620, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
-        { id: "import review", kind: "modal", title: "Review the import", width: 620, render: ({ close, ...context }) => <ImportReview context={context} close={close} /> },
-        { id: "unsupported format error", kind: "modal", title: "Formats this browser cannot read", tone: "danger", width: 560, render: ({ ...context }) => <UnsupportedFormat context={context} /> },
+        { id: "File chooser", kind: "modal", title: "Add files", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
+        { id: "import review", kind: "modal", title: "Review the import", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImportReview context={context} close={close} /> },
+        { id: "unsupported format error", kind: "modal", title: "Formats this browser cannot read", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <UnsupportedFormat context={context} /> },
       ],
     },
   },
