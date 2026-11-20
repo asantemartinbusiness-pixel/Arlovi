@@ -124,21 +124,22 @@ async function runOne(job: BatchJob, taken: Set<string>): Promise<BatchJob> {
   if (!record) return { ...job, state: "failed", reason: "The record is no longer in this workspace." };
   try {
     const doc = parsePhoto(record.body);
-    const { images, masks } = await loadBank(doc);
     const state = batchUi.get();
     const scale = state.longEdge / Math.max(doc.width, doc.height);
     const width = Math.max(1, Math.round(doc.width * Math.min(1, scale)));
     const height = Math.max(1, Math.round(doc.height * Math.min(1, scale)));
+    /* The output name is known before any pixels are rendered, so a job that
+       will be skipped is decided first and never pays for an encode. */
+    const root = `${state.pattern.replace("{name}", slug(record.title)).replace("{w}", String(width)).replace("{h}", String(height))}.${extension(state.format)}`;
+    if (skipDuplicates && (taken.has(root) || WRITTEN.has(root))) {
+      return { ...job, state: "skipped", reason: `${root} was already written in this session; skipped as chosen.` };
+    }
+    const { images, masks } = await loadBank(doc);
     const result = await exportComposite(doc, images, masks, {
       format: state.format, quality: state.quality, width, height,
       background: state.format === "jpeg" ? "#ffffff" : undefined,
     });
     if (result.blob.size === 0) return { ...job, state: "failed", reason: "The encoder produced an empty file." };
-    const settings = batchUi.get();
-    const root = `${settings.pattern.replace("{name}", slug(record.title)).replace("{w}", String(width)).replace("{h}", String(height))}.${extension(settings.format)}`;
-    if (skipDuplicates && (taken.has(root) || WRITTEN.has(root))) {
-      return { ...job, state: "skipped", reason: `${root} was already written in this session; skipped as chosen.` };
-    }
     const outName = nameFor(record.title, width, height, new Set([...taken, ...WRITTEN]));
     taken.add(outName);
     WRITTEN.add(outName);

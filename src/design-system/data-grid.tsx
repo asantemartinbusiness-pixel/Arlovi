@@ -41,6 +41,12 @@ export interface DataGridProps<T> {
   filterable?: boolean;
   /** Mobile card renderer; falls back to primary column + first two columns. */
   card?: (row: T) => ReactNode;
+  /**
+   * Set when the custom card renders its own buttons. The card container is
+   * then a keyboard-operable group instead of a <button>, so buttons are never
+   * nested. Without it the whole card stays one button (its text is its name).
+   */
+  cardHasActions?: boolean;
   dense?: boolean;
   pageSize?: number;
   /** Footer summary, e.g. column totals. */
@@ -49,7 +55,7 @@ export interface DataGridProps<T> {
 
 export function DataGrid<T>({
   rows, columns, rowId, label, selectedId, onSelect, onOpen, rowTone,
-  bulkActions, toolbar, empty, filterable = true, card, pageSize = 60, summary,
+  bulkActions, toolbar, empty, filterable = true, card, cardHasActions = false, pageSize = 60, summary,
 }: DataGridProps<T>) {
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
   const [query, setQuery] = useState("");
@@ -272,7 +278,7 @@ export function DataGrid<T>({
                   // A custom card may hold its own action buttons, so its container
                   // must not itself be a <button> (invalid nesting); it stays
                   // keyboard-operable and keeps the row as its accessible name.
-                  if (card) {
+                  if (card && cardHasActions) {
                     const primary = columns.find((column) => column.primary)?.cell(row);
                     return (
                       <div

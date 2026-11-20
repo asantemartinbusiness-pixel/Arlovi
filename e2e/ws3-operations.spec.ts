@@ -194,6 +194,8 @@ test("COMMS conversation search and mention picker", async ({ page }) => {
   await expect(composer).toHaveValue("Can you check this @Priya Shah ");
   await composer.fill("Can you check the glaze batch @Priya Shah ");
   await main(page).getByRole("button", { name: "Send" }).click();
+  // Reload only after the post is confirmed, as a person would; reloading mid-write races IndexedDB.
+  await expect(page.getByText("Message posted")).toBeVisible();
   await reload(page);
   await expect(main(page).locator("mark.cm-mention", { hasText: "@Priya Shah" }).last()).toBeVisible();
 });

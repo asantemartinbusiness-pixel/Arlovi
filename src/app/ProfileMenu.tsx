@@ -226,14 +226,9 @@ export function ProfileMenu({
                 {ROLE_VIEWS.map(item => (
                   <DropdownMenu.RadioItem className="profile-menu__item" key={item} value={item}
                     onPointerLeave={event => event.preventDefault()}
-                    // Enter/Space and click share one path so keyboard selection
-                    // switches the role view (and redirects) exactly like a click.
-                    onKeyDown={event => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault(); event.stopPropagation();
-                        setRoleExpanded(false); onRoleViewChange(item);
-                      }
-                    }}
+                    // Radix fires onSelect for click, Enter and Space and then closes
+                    // the menu, so the page behind it is exposed again to assistive
+                    // technology. One path: keyboard selection behaves exactly like a click.
                     onSelect={() => { setRoleExpanded(false); onRoleViewChange(item); }}>
                     <span className="profile-menu__item-title">{ROLE_LABELS[item]}</span>
                     {item === role && <Check size={15} aria-hidden="true" className="profile-menu__selection"/>}

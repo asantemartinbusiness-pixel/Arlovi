@@ -1271,6 +1271,7 @@ function Deliverables({ context, view }: { context: ScreenContext; view: string 
         rows={rows}
         rowId={(row) => row.id}
         label="Deliverables"
+        cardHasActions
         selectedId={context.selectedId}
         onSelect={(id) => context.select(id)}
         onOpen={(id) => { context.select(id); context.openOverlay("Artifact preview", { id }); }}

@@ -562,7 +562,7 @@ export const hrApp = registerApp({
         { id: "schedule interview", kind: "modal", title: "Schedule an interview", width: 560, render: ({ close, ...context }) => <ScheduleInterview context={context} close={close} />, footer: submitFooter("hr-interview", "Schedule the interview") },
         { id: "Job spec editor", kind: "modal", title: "Job specification", width: 600, render: ({ close, ...context }) => <PositionEditor context={context} close={close} />, footer: submitFooter("hr-position", "Save position") },
         { id: "candidate profile", kind: "drawer", title: "Candidate", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <CandidateProfileOverlay context={context} /> },
-        { id: "offer approval", kind: "modal", title: "Issue an offer", width: 560, render: ({ close, ...context }) => <OfferApproval context={context} close={close} /> },
+        { id: "offer approval", kind: "modal", title: "Issue an offer", width: 560, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <OfferApproval context={context} close={close} /> },
       ],
     },
 
