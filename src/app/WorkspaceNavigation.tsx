@@ -14,6 +14,7 @@ const WorkspaceHealth = lazy(() => import("@/app/WorkspaceHealth").then(module =
 const CompanySetupCentre = lazy(() => import("@/app/CompanySetupCentre").then(module => ({ default: module.CompanySetupCentre })));
 const AppsDirectory = lazy(() => import("@/app/AppsDirectory").then(module => ({ default: module.AppsDirectory })));
 const FlagshipShowcase = lazy(() => import("@/app/FlagshipShowcase"));
+const FlagshipLighthouse = lazy(() => import("@/app/FlagshipLighthouse"));
 const TaskApprovalBoard = lazy(() => import("@/app/TaskApprovalBoard").then(module => ({ default: module.TaskApprovalBoard })));
 const AgentWorkBoard = lazy(() => import("@/app/AgentWorkBoard").then(module => ({ default: module.AgentWorkBoard })));
 import { appEntry } from "@/app/catalog";
@@ -122,6 +123,7 @@ export function WorkspaceNavigation() {
   const detailKind = path[5] === "department" ? "department" : path[5] === "project" ? "project" : null;
   const detail = detailKind ? (detailKind === "department" ? departments : projects).find(item => item.id === path[6]) : undefined;
 
+  if (path[4] === "showcase" && path[5] === "lighthouse") return <DeferredPanel><FlagshipLighthouse/></DeferredPanel>;
   if (path[4] === "showcase") return <DeferredPanel><FlagshipShowcase/></DeferredPanel>;
   if (path[4] === "setup") return <DeferredPanel><CompanySetupCentre/></DeferredPanel>;
   if (path[4] === "health") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / WORKSPACE OPERATIONS</span><h1>Workspace health</h1><p>Read-only checks for your company records, applications and browser storage.</p></header><DeferredPanel><WorkspaceHealth/></DeferredPanel></div>;
