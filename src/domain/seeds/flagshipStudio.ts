@@ -1,4 +1,5 @@
 import { registerSeed } from "@/domain/seedRegistry";
+import { ORG_COLLECTIVE } from "@/domain/types";
 import { NORTHLINE_COLORS } from "@/domain/flagship/identity";
 import type { Rec } from "@/domain/types";
 import type { DesignDoc, SceneNode, ScenePage } from "@/applications/design/scene";
@@ -257,4 +258,4 @@ registerSeed("flagship-studio", (ctx) => {
     {kind:"sequence",fps:25,width:1920,height:1080,duration:60},
     "Multitrack editable film storyboard, transitions, typographic cuts, captions and locally generated proxies; no filmed footage.");
   return {records};
-});
+}, {organizationId: ORG_COLLECTIVE});
