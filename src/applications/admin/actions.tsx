@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput,
+  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput, ModalActions, DrawerActions, OverlayActions, OverlayCancel,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useOrgRecords } from "@/platform/workspace";
@@ -106,8 +106,9 @@ export function SuspendMember({ context, close }: { context: ScreenContext; clos
         { label: "Kept", value: "Role, grants and API keys, so a suspension can be lifted without rebuilding access" },
       ]} />
       {self && <Notice tone="danger" title="You cannot suspend yourself">Ask another owner.</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant={suspended ? "primary" : "danger"}
           busy={busy}
           disabled={self || !context.can("edit_people")}
@@ -128,9 +129,10 @@ export function SuspendMember({ context, close }: { context: ScreenContext; clos
           }}
         >
           {suspended ? `Reinstate ${member.title}` : `Suspend ${member.title}`}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -143,16 +145,18 @@ export function MembersExport({ context, close }: { context: ScreenContext; clos
     <Stack gap={4}>
       <Checkbox label="Include AI employees" checked={includeAgents} onChange={(event) => setIncludeAgents(event.target.checked)} />
       <p className="ds-subtle">Name, role view, status, second factor, last access and who invited them. Nothing secret is included.</p>
-      <Row gap={2}>
-        <Button variant="primary" onClick={async () => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={async () => {
           const header = "name,kind,role,status,email,mfa,last_access,invited_by\n";
           download(`${context.org.slug}-members.csv`, header + rows.map((row) => [row.title, row.fields.kind, row.fields.role, row.status, row.fields.email, row.fields.mfa, row.fields.lastAccessAt, row.fields.invitedBy].map(cell).join(",")).join("\n"));
           await context.mutate.log(`Member list exported by ${context.actor} (${rows.length} rows)`, { type: "admin.export" });
           context.toast("Exported", `${rows.length} members written to a CSV file in this browser.`);
           close();
-        }}>Download {rows.length} rows</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Download {rows.length} rows</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -187,8 +191,9 @@ export function ApproveIncrease({ context, close }: { context: ScreenContext; cl
         { label: "Provider spend", value: budget.fields.usageKnown === false ? "Unknown: no provider connected" : budget.fields.lagDays ? `Lags ${String(budget.fields.lagDays)} days` : "Local figures" },
       ]} />}
       {blocked && <Notice tone="danger" title="This increase cannot be approved">{blocked}</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("approve_payment")}
@@ -209,9 +214,10 @@ export function ApproveIncrease({ context, close }: { context: ScreenContext; cl
           }}
         >
           Approve the increase
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -226,16 +232,18 @@ export function SessionsExport({ context, close }: { context: ScreenContext; clo
     <Stack gap={4}>
       <Checkbox label="Active sessions only" checked={activeOnly} onChange={(event) => setActiveOnly(event.target.checked)} />
       <Notice tone="info" title="Local session records">These are records in this browser. No identity provider has verified them.</Notice>
-      <Row gap={2}>
-        <Button variant="primary" onClick={async () => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={async () => {
           const header = "session,member,device,platform,location,status,mfa,started\n";
           download(`${context.org.slug}-sessions.csv`, header + rows.map((row) => [row.title, row.fields.member, row.fields.device, row.fields.platform, row.fields.location, row.status, row.fields.mfa, row.at].map(cell).join(",")).join("\n"));
           await context.mutate.log(`Sessions exported by ${context.actor} (${rows.length} rows)`, { type: "admin.export" });
           context.toast("Exported", `${rows.length} sessions written to a CSV file.`);
           close();
-        }}>Download {rows.length} sessions</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Download {rows.length} sessions</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -314,8 +322,9 @@ export function PaySubscription({ context, close }: { context: ScreenContext; cl
         </Select>
       </Field>
       {pending && <Notice tone="info" title="Already awaiting the processor">Requested by {String(invoice?.fields.paymentRequestedBy ?? "someone")}. A second request is refused.</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!invoice || pending || !context.can("manage_policy")}
@@ -332,9 +341,10 @@ export function PaySubscription({ context, close }: { context: ScreenContext; cl
           }}
         >
           Pay {invoice ? context.money(invoice.amountMinor) : ""}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -352,15 +362,17 @@ export function DownloadInvoices({ context, close }: { context: ScreenContext; c
             onChange={(event) => setChosen(event.target.checked ? [...chosen, row.id] : chosen.filter((item) => item !== row.id))} />
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="primary" disabled={rows.length === 0} onClick={() => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={rows.length === 0} onClick={() => {
           const header = "invoice,period,lines,amount_minor,status,due,processor\n";
           download(`${context.org.slug}-subscription-invoices.csv`, header + rows.map((row) => [row.title, row.fields.period, row.fields.lines, row.amountMinor, row.status, row.fields.dueAt, row.fields.processor].map(cell).join(",")).join("\n"));
           context.toast("Downloaded", `${rows.length} invoice${rows.length === 1 ? "" : "s"} in a CSV file from this browser.`);
           close();
-        }}>Download {rows.length}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Download {rows.length}</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -378,8 +390,9 @@ export function UpdatePaymentMethod({ context, close }: { context: ScreenContext
         { label: "Method on file", value: String(subscription?.fields.paymentMethod ?? "None recorded") },
         { label: "Update requested", value: subscription?.fields.methodUpdateRequestedBy ? `${String(subscription.fields.methodUpdateRequestedBy)}, ${context.dateTime(String(subscription.fields.methodUpdateRequestedAt ?? ""))}` : "No" },
       ]} />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!subscription || !context.can("manage_policy")}
@@ -395,9 +408,10 @@ export function UpdatePaymentMethod({ context, close }: { context: ScreenContext
           }}
         >
           Request a method update
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -414,8 +428,9 @@ export function ExportEverything({ context, close }: { context: ScreenContext; c
         { label: "Format", value: "JSON, written by this browser" },
         { label: "Destination", value: "Your downloads folder. Nothing is uploaded." },
       ]} />
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!context.can("export_data")} onClick={async () => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" busy={busy} disabled={!context.can("export_data")} onClick={async () => {
           setBusy(true);
           const payload = JSON.stringify({ organisation: context.org.slug, exportedAt: clockIso(), count: records.length, records }, null, 2);
           download(`${context.org.slug}-export.json`, payload, "application/json");
@@ -427,9 +442,10 @@ export function ExportEverything({ context, close }: { context: ScreenContext; c
           context.toast("Exported", `${records.length} records in a JSON file, and the export is recorded.`);
           setBusy(false);
           close();
-        }}>Export everything</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Export everything</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -500,8 +516,9 @@ export function RotateKey({ context, close }: { context: ScreenContext; close: (
         { label: "Scopes kept", value: String(key.fields.scopes ?? "") },
       ]} />
       <Notice tone="warning" title="The old value stops working at once">Anything still using it fails until it is given the new value.</Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={key.status !== "active" || !context.can("manage_connectors")}
@@ -516,9 +533,10 @@ export function RotateKey({ context, close }: { context: ScreenContext; close: (
           }}
         >
           Rotate the key
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

@@ -240,10 +240,9 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
         { label: "Reply URL", value: <span className="ds-num">not available without a server</span> },
         { label: "Entity id", value: <span className="ds-num">arlovi:{context.org.slug}</span> },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!domainHint}
           onClick={async () => {
@@ -260,8 +259,10 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
           }}
         >
           Save configuration
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -564,10 +565,9 @@ export function ExportAuthorization({ context, close }: { context: ScreenContext
         { label: "Format", value: "CSV, written in this browser" },
         { label: "Leaves this device", value: "Only if you choose to share the downloaded file" },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!allowed || !reason.trim()}
@@ -584,8 +584,10 @@ export function ExportAuthorization({ context, close }: { context: ScreenContext
           }}
         >
           Authorise and export
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1295,10 +1297,9 @@ export function CheckoutOverlay({ context, close }: { context: ScreenContext; cl
         { label: "Yearly total", value: context.money(seats * perSeat * 12) },
         { label: "Charged now", value: "Nothing" },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!subscription || seats < used}
           onClick={async () => {
@@ -1313,8 +1314,10 @@ export function CheckoutOverlay({ context, close }: { context: ScreenContext; cl
           }}
         >
           Save the plan record
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1364,10 +1367,9 @@ export function BillingSupport({ context, close }: { context: ScreenContext; clo
         The question is saved as a document in this workspace with the subscription details attached. Nothing is sent until a mail
         provider is connected.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!subject.trim() || !body.trim()}
           onClick={async () => {
@@ -1384,8 +1386,10 @@ export function BillingSupport({ context, close }: { context: ScreenContext; clo
           }}
         >
           Save the question
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1513,10 +1517,9 @@ export function RetentionCheck({ context, close }: { context: ScreenContext; clo
       <Notice tone="warning" title="A snapshot in the browser is not a backup">
         It lives in the same storage as the records themselves, so clearing site data removes both. Use Export for a copy you keep.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
@@ -1538,8 +1541,10 @@ export function RetentionCheck({ context, close }: { context: ScreenContext; clo
           }}
         >
           Take the snapshot
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1854,10 +1859,9 @@ export function KeyCreation({ context, close }: { context: ScreenContext; close:
           Consider a sandbox key, or read-only, unless something genuinely has to change records without a person.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!name.trim() || scopes.length === 0}
@@ -1882,8 +1886,10 @@ export function KeyCreation({ context, close }: { context: ScreenContext; close:
           }}
         >
           Issue the key
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1987,10 +1993,9 @@ export function WebhookForm({ context, close }: { context: ScreenContext; close:
       <Notice tone="warning" title="It will be saved disabled">
         There is nothing to deliver from, so the endpoint is recorded with no attempts and the state stays disabled.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!valid || events.length === 0}
           onClick={async () => {
@@ -2006,8 +2011,10 @@ export function WebhookForm({ context, close }: { context: ScreenContext; close:
           }}
         >
           Save endpoint
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

@@ -2,7 +2,7 @@ import {
   AlertTriangle, Building2, CreditCard, Database, FileClock, KeyRound, Lock, Scale,
   ShieldCheck, SlidersHorizontal, Users, Wallet,
 } from "lucide-react";
-import { Button, Empty } from "@/design-system";
+import { Button, Empty, OverlayActions } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import {
   ActionSimulator, AutonomyRevoke, AutonomyScreen, BudgetScreen, BudgetWarning, BusinessHoursForm,
@@ -32,11 +32,10 @@ import { AccessRequestForm, AccessReview } from "./access";
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 export const adminApp = registerApp({

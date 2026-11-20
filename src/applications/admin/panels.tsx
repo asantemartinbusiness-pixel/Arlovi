@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Building2, KeyRound, ShieldCheck, Users } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel, Pill,
-  FactGrid, OverlayActions, OverlaySection, OverlaySummary, Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel, Pill, FactGrid, OverlayActions, OverlaySection, OverlaySummary, Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput, ModalActions,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -210,11 +209,12 @@ export function IdentityForm({ context, close }: { context: ScreenContext; close
           ]} />
         </StepUp>
       ) : (
-        <Row gap={2}>
-          <Button variant="ghost" onClick={close}>Cancel</Button>
-          <span className="ds-grow" />
-          <Button variant="primary" busy={busy} onClick={() => void save()}>Save profile</Button>
-        </Row>
+        <ModalActions>
+          <OverlayActions
+            primary={<Button variant="primary" busy={busy} onClick={() => void save()}>Save profile</Button>}
+            end={<OverlayCancel>Cancel</OverlayCancel>}
+          />
+        </ModalActions>
       )}
     </Stack>
   );
@@ -268,10 +268,9 @@ export function DomainVerify({ context, close }: { context: ScreenContext; close
       {existing.length > 0 && (
         <Properties rows={existing.map((record) => ({ label: record.title, value: <Pill tone="warning">{CAPABILITY_LABELS.configuration_required}</Pill> }))} />
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!domain.includes(".")}
           onClick={async () => {
@@ -287,8 +286,10 @@ export function DomainVerify({ context, close }: { context: ScreenContext; close
           }}
         >
           Save the claim
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -310,10 +311,9 @@ export function BusinessHoursForm({ context, close }: { context: ScreenContext; 
         <Field label="Close" required><TextInput type="time" value={shut} onChange={(event) => setShut(event.target.value)} /></Field>
       </Row>
       <Field label="Days"><TextInput value={days} onChange={(event) => setDays(event.target.value)} /></Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           onClick={async () => {
             await context.mutate.create({
@@ -328,8 +328,10 @@ export function BusinessHoursForm({ context, close }: { context: ScreenContext; 
           }}
         >
           Save hours
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1249,10 +1251,9 @@ export function GrantEditor({ context, close }: { context: ScreenContext; close:
           still recorded against the mission budget.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
@@ -1283,8 +1284,10 @@ export function GrantEditor({ context, close }: { context: ScreenContext; close:
           }}
         >
           Save grant
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1584,10 +1587,9 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
         A step reserves its headroom on the budget record first and commits afterwards, so two steps in the same period cannot both
         spend the last of a cap.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={tooLow}
@@ -1613,8 +1615,10 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
           }}
         >
           Save quota
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1640,10 +1644,9 @@ export function CostAllocation({ context, close }: { context: ScreenContext; clo
         { label: "Existing allocation", value: target ? context.money(Number(target.amountMinor ?? 0)) : "None" },
         { label: "After this change", value: context.money(Number(target?.amountMinor ?? 0) + amount) },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!department || amount <= 0}
@@ -1669,8 +1672,10 @@ export function CostAllocation({ context, close }: { context: ScreenContext; clo
           }}
         >
           Allocate
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
