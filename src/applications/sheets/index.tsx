@@ -258,6 +258,15 @@ function StatusStrip({ editor }: { editor: WorkbookEditor }) {
  * ARL-SHEETS-001 — Workbook Library
  * ====================================================================== */
 
+/** A copy is a fresh draft: cell comments, protected ranges, import/export runs and sharing lists do not travel with it. */
+function copyOfWorkbook(row: Rec) {
+  return {
+    collection: "workbooks" as const, title: `${row.title} copy`, status: "active" as const, summary: row.summary,
+    tags: row.tags, fields: { ...row.fields, sharedWith: "" },
+    body: { ...readWorkbook(row.body), comments: [], protection: [], io: [] },
+  };
+}
+
 function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" | "Mine" | "Shared" | "Templates" }) {
   const workbooks = useCollection("workbooks");
   const { org, actor } = useWorkspace();
@@ -337,10 +346,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
               actions: (
                 <>
                   <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/sheets/workbooks/${row.id}`)}>Open</Button>
-                  <Button size="sm" variant="ghost" onClick={() => void context.mutate.create({
-                    collection: "workbooks", title: `${row.title} copy`, status: "active", summary: row.summary,
-                    tags: row.tags, fields: { ...row.fields }, body: readWorkbook(row.body),
-                  }, `${row.title} duplicated`)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" onClick={() => void context.mutate.create(copyOfWorkbook(row), `${row.title} duplicated`).then(() => context.toast("Duplicated", "Sheets, formats and formulas were copied. Comments, protection, import/export runs and sharing lists were not."))}>Duplicate</Button>
                   <Button size="sm" variant="ghost" onClick={() => context.openOverlay("share", { id: row.id })}>Share</Button>
                 </>
               ),
@@ -369,10 +375,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
         bulkActions={[
           {
             label: "Duplicate",
-            onRun: (selected) => selected.forEach((row) => void context.mutate.create({
-              collection: "workbooks", title: `${row.title} copy`, status: "active", summary: row.summary,
-              tags: row.tags, fields: { ...row.fields }, body: readWorkbook(row.body),
-            }, `${row.title} duplicated`)),
+            onRun: (selected) => selected.forEach((row) => void context.mutate.create(copyOfWorkbook(row), `${row.title} duplicated`)),
           },
           { label: "Archive", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { expectRevision: row.revision, event: `${row.title} archived` })) },
         ]}
@@ -2761,11 +2764,8 @@ registerApp({
             if (!id) return;
             const source = await import("@/platform/repo").then((module) => module.getRecord(id));
             if (!source) return;
-            const created = await context.mutate.create({
-              collection: "workbooks", title: `${source.title} copy`, status: "active", summary: source.summary,
-              tags: source.tags, fields: { ...source.fields }, body: readWorkbook(source.body),
-            }, `${source.title} duplicated`);
-            context.toast("Duplicated", `${created.title} has the same sheets, formats and formulas.`);
+            const created = await context.mutate.create(copyOfWorkbook(source), `${source.title} duplicated`);
+            context.toast("Duplicated", `${created.title} has the same sheets, formats and formulas. Comments, protection, import/export runs and sharing lists were not copied.`);
           },
         },
         { id: "search", label: "Search workbooks…", placement: "overflow", run: (context) => context.openOverlay("search workbooks") },

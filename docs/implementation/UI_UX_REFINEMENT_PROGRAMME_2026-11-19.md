@@ -179,25 +179,27 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 | F-A overlay foundations | integrated (commits 9ee8367, ed8bc77) | typecheck pass; 824 unit tests pass incl. `tests/unit/overlay-kit.test.ts`; modal/drawer/native-overlay/toast specs pass except pre-existing `drawer-experience.spec.ts:48` (assigned to A1); shots `shots/F-A/` |
 | F-B page & shell foundations | integrated (commit 5f0169b) | page body top 172.7px → 123.1px on Finance invoices at 1440×900; h1 43.2px → 25.6px; Executive Home toasts 4 → 0; a11y spec 37/37 (baseline had many contrast failures); 5 pre-existing failures remain (display-scale ×3, display-scaling ×1 → A7; execution-preflight ×1 → QA); shots `shots/F-B/` |
 | QA baseline | done | `ui-ux-dispositions/QA_BASELINE.md`: 627 Playwright tests on the untouched build; 427 pass, 164 fail, 36 skipped. 92 failures are environmental (tests import `/src/platform/repo.ts`, which only a Vite dev server serves — later gates run on the dev server). 38 persistent pre-existing failures, classified: outdated expectations (home h1 text, 'AI work assignments' heading, 'explicit deny'), one product defect (deep CRM 'Create a quote' React error), the rest unclear (display-scale slider, profile menu, favourites, drawer-experience, workflows WF-01/06/11/13/19/20, roster specs). a11y contrast unstable across runs. |
-| A1 Finance | complete (a5e3cfb, 656f197), awaiting review | ~62 rows: Rebuilt 3, Restructured 17, Enhanced 11, Refined ~21, Verified 5; Finance specs 16/16 on dev; `shots/A1/` |
+| A1 Finance | review NOT accepted (2 S1 integrity: void/credit-note transaction, payment run); corrections in progress | ~62 rows: Rebuilt 3, Restructured 17, Enhanced 11, Refined ~21, Verified 5; Finance specs 16/16 on dev; `shots/A1/` |
 | A2 Procurement + Commerce | ACCEPTED after corrections (3cce3de + corrections) | 115 rows: Rebuilt 11, Restructured 39, Enhanced 5, Refined 60; S1 phone-width count inputs fixed with e2e proof; 29 write handlers honour revision conflicts; `shots/A2/`, `shots/R-A2/` |
-| A3 CRM + Bookings | complete (e721a96, 656f197), awaiting review | 89 rows: Enhanced 24, Restructured 8, Rebuilt 5, Refined 38, Verified 14; `shots/A3/` |
+| A3 CRM + Bookings | ACCEPTED after corrections (workflow designer, closure evidence, one invoice rule, seed link) | 89 rows: Enhanced 24, Restructured 8, Rebuilt 5, Refined 38, Verified 14; `shots/A3/` |
 | A4 People + Legal | ACCEPTED after corrections (37ba8f2, d4812e1) | 81 rows; review S2s fixed (leave requester name, sign authorization gating); `shots/A4/`, `shots/R-A4/` |
 | A5 HQ + Projects + Inbox | ACCEPTED after corrections | 127 rows; S2s fixed (dependency removal confirmed; approval bound to target revision); summaries moved to head slot; `shots/A5/`, `shots/R-A5/` |
 | A6 Marketing + Communications | ACCEPTED after corrections | 96 rows; launch blocked state, one email navigation layer, footers, loading state, failure toast; `shots/A6/`, `shots/A6-fix/`, `shots/R-A6/` |
-| A7 Administration + shell | committed 8a40488, 7b2e321; review NOT accepted (2 S2); corrections in progress | 51 admin rows + 8 shell surfaces; shell QA failures fixed (profile menu, favourites, display scale, access experience, AI work assignments); `shots/A7/`, `shots/R-A7/` |
-| B2 Design + Layout | complete, awaiting review | 54 rows: Rebuilt 8, Restructured 13, Enhanced 5, Refined 16, Verified 12; specs 11/11; `shots/B2/` |
-| B4 Web + Build | complete, in review | 98 rows; rollback now restores the model; specs 18/18 + 3/3; `shots/B4/` |
-| B5 Connect + IT + Forms | complete, in review | 125 rows; t6kit footer convention and picker fix; specs 19/19 + 3/3; `shots/B5/` |
-| B1 Docs + Sheets + Present | complete, in review | 102 rows; popover tools, change preview, libraries; 47/47 specs; `shots/B1/` |
-| B3 Photo + Video + Motion | complete, awaiting review | 83 rows; render settings gate, batch collision plan, keyframe inspector, lean editor heads; `shots/B3/` |
-| B6, B7, B8, B9 | in progress | |
+| A7 Administration + shell | ACCEPTED after corrections (footers via OverlayActions, guards, head slot, home counts settle) | 51 admin rows + 8 shell surfaces; shell QA failures fixed (profile menu, favourites, display scale, access experience, AI work assignments); `shots/A7/`, `shots/R-A7/` |
+| B2 Design + Layout | review NOT accepted (stroke editing scrims the canvas); corrections in progress | 54 rows: Rebuilt 8, Restructured 13, Enhanced 5, Refined 16, Verified 12; specs 11/11; `shots/B2/` |
+| B4 Web + Build | ACCEPTED after corrections (honest dispositions, migration diff, builder bar) | 98 rows; rollback now restores the model; specs 18/18 + 3/3; `shots/B4/` |
+| B5 Connect + IT + Forms | ACCEPTED after corrections | 125 rows; t6kit footer convention and picker fix; specs 19/19 + 3/3; `shots/B5/` |
+| B1 Docs + Sheets + Present | review NOT accepted (deck duplicate copies comments/approvals; present canvas tools are modals); corrections in progress | 102 rows; popover tools, change preview, libraries; 47/47 specs; `shots/B1/` |
+| B3 Photo + Video + Motion | complete, in review | 83 rows; render settings gate, batch collision plan, keyframe inspector, lean editor heads; `shots/B3/` |
+| B7 Care + Portal + Asset | complete, awaiting review | 105 rows; SLA clock band, scope preview per person, 49 handlers honour conflicts; `shots/B7/` |
+| B6, B8, B9 | in progress | |
+| Integrity sweep (Phase 3 item 4) | in progress | |
 | Central fixes by orchestrator | done | `OverlayDef.summary` head slot; status strip wraps at 390; journey bar names the remembered tab; heading focus waits for lazy surfaces; generic hidden dialog descriptions removed; WF-05 and w2a spec labels aligned |
 
 ## 7b. Phase 3 central items (orchestrator-owned, after the last package lands)
 
 1. DONE (d886c88): `data-grid.tsx` card layout now renders the bulk-selection checkbox per card; editable cells in card mode remain an app concern (A2's stacked `CountList` is the pattern).
-2. Full-chrome editors: the command bar title repeats the screen name above the apps' identity bars — allow a record title there (`ScreenDef.title` already exists; make editors use it or hide the bar title when an identity bar is present).
+2. DONE (66c1a35): `ScreenDef.chromeTitle: "surface"` lets a full-chrome editor own the page title; B1–B4 asked to adopt it.
 3. Reviewed: the journey bar shows the previous application whenever the user arrived from another app; that is the cross-application continuity requirement (§B5), not a defect. `canReturnTo` scopes by organisation, role and app.
 4. Repository-wide sweep for `mutate.patch`/`put`/`putMany` results ignored before a success toast (A2 found and fixed 29 in two apps; others fixed theirs on request; run a grep across all apps and fix stragglers).
 5. DONE (d886c88): `.hq-state-line` size folded into `shell.css`.

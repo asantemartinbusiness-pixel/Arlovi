@@ -217,6 +217,17 @@ function SlideSorter({ editor, context }: { editor: DeckEditor; context: ScreenC
  * ARL-PRESENT-001 — Presentation Library
  * ====================================================================== */
 
+/** A copy is a fresh draft: comments, approvals, export and share records and recorded sharing do not travel with it. */
+async function duplicateDeck(context: ScreenContext, source: Rec): Promise<void> {
+  const deck = readDeck(source.body);
+  const fields = { ...source.fields, sharedWith: "" };
+  await context.mutate.create({
+    collection: "decks", title: `${source.title} copy`, status: "draft", summary: source.summary,
+    tags: source.tags, fields, body: { ...deck, comments: [], approvals: [], exports: [] },
+  }, `${source.title} duplicated`);
+  context.toast("Duplicated", "Slides, objects and theme were copied as a new draft. Comments, approvals, export and share records and sharing lists were not.");
+}
+
 function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" | "Shared" | "Templates" | "Archived" }) {
   const decks = useCollection("decks");
   const { org } = useWorkspace();
@@ -275,10 +286,7 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
               <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/present/decks/${record.id}`)}>Edit</Button>
               <Button size="sm" variant="secondary" icon={<Play size={14} />} onClick={() => context.navigate(`/o/${org.slug}/present/decks/${record.id}/present`)}>Present</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("template preview", { id: record.id })}>Preview</Button>
-              <Button size="sm" variant="ghost" onClick={() => void context.mutate.create({
-                collection: "decks", title: `${record.title} copy`, status: "draft", summary: record.summary,
-                tags: record.tags, fields: { ...record.fields }, body: readDeck(record.body),
-              }, `${record.title} duplicated`).then(() => context.toast("Duplicated", "Every slide, object and theme token was copied."))}>Duplicate</Button>
+              <Button size="sm" variant="ghost" onClick={() => void duplicateDeck(context, record)}>Duplicate</Button>
             </>}
           >
             <Stack gap={3}>
@@ -3104,11 +3112,7 @@ registerApp({
             if (!id) return;
             const source = await import("@/platform/repo").then((module) => module.getRecord(id));
             if (!source) return;
-            await context.mutate.create({
-              collection: "decks", title: `${source.title} copy`, status: "draft", summary: source.summary,
-              tags: source.tags, fields: { ...source.fields }, body: readDeck(source.body),
-            }, `${source.title} duplicated`);
-            context.toast("Duplicated", "Every slide, object and theme token was copied.");
+            await duplicateDeck(context, source);
           },
         },
         {

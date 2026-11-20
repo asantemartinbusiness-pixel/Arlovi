@@ -662,6 +662,7 @@ export const buildApp = registerApp({
     "ARL-BUILD-003": {
       id: "ARL-BUILD-003",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <AppBuilder context={context} />,
       tabs: ["Design", "Logic", "Data", "Responsive", "Preview"].map((id) => ({
         id,

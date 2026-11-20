@@ -333,6 +333,7 @@ export const webApp = registerApp({
     "ARL-WEB-003": {
       id: "ARL-WEB-003",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <PageBuilder context={context} />,
       tabs: (["Build", "Style", "Responsive", "Interactions"] as const).map((lens) => ({
         id: lens,

@@ -278,6 +278,8 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
     <div className="t6-shell">
       <div className="t6-shell-bar">
         <Toolbar label="App builder">
+          <h1 className="bb-bar-h1">{record.title}</h1>
+          <ToolbarSeparator />
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}`)}>Project</Button>
           <ToolbarSeparator />
           <MiniField label="Project">

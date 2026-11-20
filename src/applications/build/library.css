@@ -96,3 +96,4 @@
 .bb-tabrow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-1) var(--space-4)}
 .bb-tabrow .bb-bar{padding:0;border:0;background:transparent;flex:1 1 auto;justify-content:flex-end}
 @media(max-width:720px){.bb-tabrow .bb-bar{justify-content:flex-start;padding-block:var(--space-1)}}
+.bb-bar-h1{margin:0;font:600 var(--text-sm) var(--font-sans);white-space:nowrap;max-width:20ch;overflow:hidden;text-overflow:ellipsis}

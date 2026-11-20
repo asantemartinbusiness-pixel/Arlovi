@@ -205,3 +205,4 @@
 .web-bar-tabs{min-width:0;overflow-x:auto;flex:0 1 auto}
 .web-bar-meta code{font:500 var(--text-xs) var(--font-mono);color:var(--fg-default)}
 @media(max-width:1199px){.web-canvas{order:1;min-height:min(70vh,520px)}}
+.web-bar-h1{margin:0;font:inherit;min-width:0}

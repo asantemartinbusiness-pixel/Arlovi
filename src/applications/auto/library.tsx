@@ -255,7 +255,7 @@ export function ActivationSummary({ context }: { context: ScreenContext }) {
   if (!row) return null;
   return (
     <OverlaySummary
-      eyebrow="Activation review"
+      eyebrow="Automation"
       title={row.record.title}
       status={<Pill tone={statusTone(row.record.status)} dot>{row.record.status}</Pill>}
       meta={[row.trigger, `${row.graph.nodes.length} nodes`]}
@@ -286,7 +286,7 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <ModalInFlight when={busy} />
-      <FactGrid columns={3} items={[
+      <FactGrid columns={3} dense items={[
         { label: "Status now", value: row.record.status },
         { label: "Blocking errors", value: String(errors.length), mono: true, tone: errors.length ? "danger" : "success" },
         { label: "Warnings", value: String(warnings.length), mono: true, tone: warnings.length ? "warning" : "success" },
@@ -565,7 +565,7 @@ export function WorkflowInspector({ context }: { context: ScreenContext }) {
       <KeyValueList items={[
         { label: "Trigger", value: row.trigger },
         { label: "Graph", value: `${row.graph.nodes.length} nodes · ${row.graph.edges.length} edges`, mono: true },
-        { label: "Issues", value: row.errors ? `${row.errors} errors` : row.warnings ? `${row.warnings} warnings` : "None", tone: row.errors ? "danger" : undefined },
+        { label: "Issues", value: row.errors ? `${row.errors} error${row.errors === 1 ? "" : "s"}` : row.warnings ? `${row.warnings} warning${row.warnings === 1 ? "" : "s"}` : "None", tone: row.errors ? "danger" : undefined },
         { label: "Runs", value: String(row.runCount), mono: true },
         { label: "Updated", value: context.dateTime(record.updatedAt), mono: true },
       ]} />

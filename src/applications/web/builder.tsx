@@ -264,7 +264,7 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
     <div className="t6-shell">
       <section className="web-bar" aria-label="Website editor overview">
         <div className="web-bar-id">
-          <button type="button" className="web-bar-site" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}`)} title="Back to the site dashboard">{record.title}</button>
+          <h1 className="web-bar-h1"><button type="button" className="web-bar-site" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}`)} title="Back to the site dashboard">{record.title}</button></h1>
           <span aria-hidden="true" className="ds-subtle">/</span>
           <Select value={page.id} onChange={(event) => ui.setPage(event.target.value)} aria-label="Page being edited" className="web-bar-page">
             {site.pages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

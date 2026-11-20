@@ -2981,11 +2981,10 @@ export const missionApp = registerApp({
       id: "ARL-MISSION-006",
       title: () => "Execution console",
       subtitle: (context) => <MissionLine context={context} />,
-      statusStrip: (context) => (
+      statusStrip: () => (
         <Row gap={2} wrap>
           <Pill tone="warning" dot>Providers: none connected</Pill>
           <Pill tone="neutral">Every run writes a receipt</Pill>
-          <span className="ds-subtle">Nothing leaves {context.org.name}.</span>
         </Row>
       ),
       tabs: ["Timeline", "Actions", "Checkpoints", "Exceptions"].map((view) => ({
