@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, ArrowUpRight, CheckCircle2, CircleDashed, FileText, LockKeyhole, ShieldAlert } from "lucide-react";
 import { appEntry } from "@/app/catalog";
 import { routeForRecord } from "@/platform/attention";
@@ -77,6 +77,7 @@ function ProgressRow({title,done,detail}:{title:string;done:boolean;detail:strin
 }
 export default function FlagshipLighthouse(){
   const {org,role}=useWorkspace();
+  const navigate=useNavigate();
   const all=useCollections(GROUPS);
   const [tab,setTab]=useState<Lens>("journey");
   const project=find(all,PROJECT);
@@ -125,7 +126,7 @@ export default function FlagshipLighthouse(){
         <div className="lh-view-head"><span>SELECTED WORKSTREAM</span><h3>{lenses.find(l=>l.id===tab)?.label}</h3><p>{lenses.find(l=>l.id===tab)?.description}</p></div>
         {tab==="journey"&&<div className="lh-stages">{STAGES.map(stage=>{
           const record=find(all,stage.id);
-          return <button type="button" key={stage.number} onClick={()=>setTab(stage.section)} className="lh-stage">
+          return <button type="button" key={stage.number} onClick={()=>stage.section==="journey"?navigate(route(record,stage.app,org.slug)):setTab(stage.section)} className="lh-stage">
             <span className="lh-stage-number">{stage.number}</span><div><h4>{stage.heading}</h4><p>{stage.caption}</p>
               <small>{record? `Record: ${statusLabel(record.status)}`:"Record not loaded"}</small></div><ArrowRight size={16}/></button>;
         })}</div>}
