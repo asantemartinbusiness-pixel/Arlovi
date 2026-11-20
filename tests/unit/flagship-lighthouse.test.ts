@@ -17,7 +17,7 @@ describe("Lighthouse Hotels / linked review workflow",()=>{
     expect(review!.records.length).toBeGreaterThanOrEqual(22);
     expect(new Set(review!.records.map(r=>r.id)).size).toBe(review!.records.length);
     expect(review!.records.every(r=>r.id.endsWith("-1600")||Number(r.id.split("-").at(-1))>=1600)).toBe(true);
-    expect(review!.records.every(r=>r.organizationId==="org-northline"&&r.fields.fictional===true)).toBe(true);
+    expect(review!.records.every(r=>r.organizationId==="org-northline-collective"&&r.fields.fictional===true)).toBe(true);
     expect(review!.records.every(r=>r.fields.externalState==="not_connected")).toBe(true);
     expect(get("nl-projects-900")).toBeDefined();
     expect(get("nl-deals-910")).toBeDefined();
