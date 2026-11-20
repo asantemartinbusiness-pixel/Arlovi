@@ -497,6 +497,9 @@ test("WF-04 Customer request to resolution: verified contact, approved answer, r
 
   // Case closed with evidence: the resolution names who resolved it and when.
   await page.getByRole("tab", { name: "Overview" }).click();
+  // B7: the resolution note is required, so "Mark resolved" stays disabled until one is written.
+  await expect(main(page).getByRole("button", { name: "Mark resolved" })).toBeDisabled();
+  await main(page).getByLabel("Resolution note").fill("Replacement finish dispatched; customer to return the wrong item.");
   await main(page).getByRole("button", { name: "Mark resolved" }).click();
   await expect(main(page).getByText(/RESOLVED IN/i)).toBeVisible();
   await reload(page);

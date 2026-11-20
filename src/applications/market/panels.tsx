@@ -11,7 +11,7 @@ import { CalendarToolbar, ProviderBoundary, ScheduleCalendar } from "@/applicati
 import { CalendarCheck, Mail, Megaphone, PenLine, Search } from "lucide-react";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, evaluateSegment, networkOf, rollUp, useMarketData,
+  attributionFigures, bodyOf, evaluateSegment, networkOf, rollUp, useMarketData,
   type AudienceBody, type CampaignBody, type ChannelPlan, type PostBody, type SiteBody,
 } from "./data";
 import { attributionFilter, PageChecksCard, useAttributionFilter } from "./actions";
@@ -1290,7 +1290,7 @@ export function Attribution({ context, lens }: { context: ScreenContext; lens: s
   );
 
   const orders = data.orders.filter((order) => order.status !== "cancelled");
-  const unattributed = Math.max(0, orders.length - totals.conversions);
+  const unattributed = attributionFigures(orders, totals.conversions).unattributed;
 
   if (lens === "Funnels") {
     const stages = [
@@ -1327,7 +1327,7 @@ export function Attribution({ context, lens }: { context: ScreenContext; lens: s
           <Stat label="Order revenue" value={context.money(orders.reduce((sum, order) => sum + (order.amountMinor ?? 0), 0))} meta={`${orders.length} orders, excluding cancellations`} onClick={() => context.openOverlay("source inspector", { metric: "orders" })} />
           <Stat label="Claimed by campaigns" value={context.money(totals.revenueMinor)} meta="Sum of the revenue field on channel plans" onClick={() => context.openOverlay("Attribution model")} />
           <Stat label="Double counted" value={context.money(Math.max(0, totals.revenueMinor - orders.reduce((sum, order) => sum + (order.amountMinor ?? 0), 0)))} meta="Where channels claim the same order" />
-          <Stat label="Unattributed orders" value={String(unattributed)} meta="No campaign claims them" />
+          <Stat label="Unattributed orders" value={String(unattributed)} meta="No campaign recorded on the order" />
         </StatRow>
         <Notice tone="danger" title="Campaign revenue exceeds order revenue">
           More than one channel can claim the same order, so the sum of channel revenue is larger than the money actually recorded. The figure on the left is the only one reconciled to order records.
@@ -1413,7 +1413,7 @@ export function Attribution({ context, lens }: { context: ScreenContext; lens: s
       {filterNote}
       <StatRow>
         <Stat label="Orders" value={String(orders.length)} meta="Excluding cancellations" />
-        <Stat label="Claimed conversions" value={String(totals.conversions)} meta="Across all channels" />
+        <Stat label="Claimed conversions" value={String(totals.conversions)} meta={`Self-reported; ${orders.length === 0 ? 0 : (totals.conversions / orders.length).toFixed(1)} claims per order`} />
         <Stat label="Unattributed" value={String(unattributed)} meta={`${orders.length === 0 ? 0 : Math.round((unattributed / orders.length) * 100)}% of orders`} onClick={() => context.openOverlay("metric notes", { metric: "unattributed" })} />
         <Stat label="Consent-limited tracking" value="Unavailable" unavailable meta="No analytics consent record exists" />
       </StatRow>

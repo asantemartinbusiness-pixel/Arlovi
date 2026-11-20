@@ -61,6 +61,20 @@ export function useAudienceDataLoaded(): boolean {
   return loaded === true;
 }
 
+/** A recorded order to campaign link. Claims entered on campaigns do not count as one. */
+export function orderTouch(order: Rec): string {
+  const value = order.fields.campaignId ?? order.fields.campaign ?? order.fields.utmCampaign;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** Orders with no recorded campaign touch, and how far self-reported claims exceed the orders. */
+export function attributionFigures(orders: Rec[], claimed: number) {
+  const live = orders.filter((order) => order.status !== "cancelled");
+  const unattributed = live.filter((order) => !orderTouch(order)).length;
+  const ratio = live.length === 0 ? 0 : claimed / live.length;
+  return { orders: live.length, unattributed, claimed, ratio, overClaim: claimed > live.length };
+}
+
 export const NETWORKS: { id: string; label: string; limit: number; media: string }[] = [
   { id: "instagram", label: "Instagram", limit: 2_200, media: "Square or 4:5 image, or video up to 90s" },
   { id: "facebook", label: "Facebook", limit: 63_206, media: "Any ratio, link preview from the first URL" },

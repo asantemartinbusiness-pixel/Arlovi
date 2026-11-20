@@ -11,7 +11,7 @@ import { ProviderBoundary } from "@/applications/market/kit";
 import { capabilityById } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, evaluateSegment, networkOf, NETWORKS, rollUp, useAudienceDataLoaded, useMarketData,
+  attributionFigures, bodyOf, evaluateSegment, networkOf, NETWORKS, rollUp, useAudienceDataLoaded, useMarketData,
   type AudienceBody, type CampaignBody, type PostBody, type SegmentRule, type SiteBody,
 } from "./data";
 import { NetworkPreview } from "./panels";
@@ -1642,6 +1642,7 @@ export function MetricNotes({ context }: { context: ScreenContext }) {
   const { now } = useWorkspace();
   const orders = data.orders.filter((order) => order.status !== "cancelled");
   const conversions = rollUp(data.campaigns).reduce((sum, channel) => sum + channel.conversions, 0);
+  const figures = attributionFigures(orders, conversions);
   const [note, setNote] = useState("");
   return (
     <form
@@ -1655,13 +1656,14 @@ export function MetricNotes({ context }: { context: ScreenContext }) {
     >
       <Properties rows={[
         { label: "Orders", value: String(orders.length) },
-        { label: "Claimed conversions", value: String(conversions) },
-        { label: "Unattributed", value: String(Math.max(0, orders.length - conversions)) },
+        { label: "Conversions claimed (self-reported)", value: String(conversions) },
+        { label: "Claims per order", value: <span><span className="ds-num">{figures.ratio.toFixed(1)} to 1</span>{figures.overClaim ? " · more claims than orders" : ""}</span> },
+        { label: "Unattributed orders", value: `${figures.unattributed} of ${figures.orders}` },
         { label: "As at", value: context.dateTime(now) },
         { label: "Consent records", value: <Pill tone="warning">None stored</Pill> },
       ]} />
-      <Notice tone="warning" title="Why the unattributed figure is large">
-        Nothing in this workspace links a click to an order. There are no click identifiers, no analytics consent records and no provider reports. The gap is published rather than filled.
+      <Notice tone="warning" title={figures.overClaim ? "Claims outnumber orders" : "How unattributed is counted"}>
+        Unattributed orders are orders with no campaign recorded on them; campaign claims are typed figures and never offset it. Nothing in this workspace links a click to an order. There are no click identifiers, no analytics consent records and no provider reports. The gap is published rather than filled.
       </Notice>
       <Field label="Add a note for whoever reads this next"><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
       <Button type="submit" variant="primary" disabled={!note.trim()}>Record note</Button>
