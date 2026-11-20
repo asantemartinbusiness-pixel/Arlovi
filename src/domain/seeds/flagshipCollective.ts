@@ -1,4 +1,5 @@
 import { registerSeed } from "@/domain/seedRegistry";
+import { ORG_COLLECTIVE } from "@/domain/types";
 import { NORTHLINE_COLORS, NORTHLINE_COLLECTIVE_IDENTITY } from "@/domain/flagship/identity";
 import type { Rec } from "@/domain/types";
 import { LAYOUTS, THEMES, slideFromLayout, type Deck, type Slide } from "@/applications/present/model";
@@ -307,5 +308,5 @@ registerSeed("flagship-collective", (ctx) => {
     fields:{objective:["Engagement","Lead quality","Collection discovery"][i%3],budgetMinor:50000+i*2500,spentMinor:0,
       approval:"draft",delivery:"not_connected"}
   });
-  return {records,events:[{id:"evt-collective-flagship-900",organizationId:ctx.northline,at:ctx.now,actor:"flagship fixture",type:"showcase.created",message:"Northline Collective fictional flagship records loaded locally. No external publication, payment or communication occurred.",capability:"ready_local"}]};
-});
+  return {records,events:[{id:"evt-collective-flagship-900",organizationId:ORG_COLLECTIVE,at:ctx.now,actor:"flagship fixture",type:"showcase.created",message:"Northline Collective fictional flagship records loaded locally. No external publication, payment or communication occurred.",capability:"ready_local"}]};
+}, {organizationId: ORG_COLLECTIVE});
