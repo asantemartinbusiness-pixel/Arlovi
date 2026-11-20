@@ -73,3 +73,46 @@
 .fs-card-info{padding:24px}.fs-journey-step{border-right:0;border-bottom:1px solid var(--fs-border)}
 .fs-journey-step:last-child{border-bottom:0}}
 @media(prefers-reduced-motion:reduce){.fs a.fs-primary:hover,.fs a.fs-secondary:hover{transform:none}}
+
+
+/* Record-backed scenario is a dark editorial analysis stage, not a set of
+   fabricated "live performance" KPIs. */
+.fs-scenario{background:#171717;color:#f3f0e8;padding:clamp(35px,5vw,75px);margin:100px 0 25px;outline:1px solid #151515}
+.fs-scenario-heading{display:grid;grid-template-columns:1.35fr .65fr;gap:55px;align-items:end;border-bottom:1px solid #444;padding-bottom:43px}
+.fs-scenario .fs-overline{font-family:"DM Mono","Courier New",monospace;font-weight:400;color:#dfff3f;letter-spacing:.12em}
+.fs-scenario-heading h2{font:700 clamp(39px,4.2vw,65px)/.97 Manrope,Arial,sans-serif;letter-spacing:-.065em;margin:26px 0}
+.fs-scenario-heading h2 em{font:italic 500 1em/.97 Newsreader,Georgia,serif;color:#dfff3f;letter-spacing:-.07em}
+.fs-scenario-heading p{font-size:13px;line-height:1.65;max-width:570px;color:#bbb;margin:0}
+.fs-scenario-total{display:flex;align-items:start;flex-direction:column;gap:14px}
+.fs-scenario-total span,.fs-scenario-total small{font:400 10px/1.6 "DM Mono",monospace;letter-spacing:.12em;color:#aaa}
+.fs-scenario-total strong{font:500 clamp(40px,4.6vw,74px)/1 Newsreader,Georgia,serif;color:#dfff3f;letter-spacing:-.05em}
+.fs-scenario-body{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:60px;padding-top:45px}
+.fs-bars{min-height:315px;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:9px;align-items:end}
+.fs-bar-item{min-width:0;display:grid;grid-template-rows:29px 230px 30px;gap:6px;align-items:end}
+.fs-bar-value{font:400 10px/1.3 "DM Mono",monospace;color:#b4b4b4;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}
+.fs-bar-track{height:230px;position:relative;border-bottom:1px solid #777;display:flex;align-items:flex-end;background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),#444 25%)}
+.fs-bar-fill{background:#7e57ff;width:100%;min-height:2px;position:relative;transition:height .2s}
+.fs-bar-fill:after{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:#dfff3f}
+.fs-bar-label{font:400 10px/1.3 "DM Mono",monospace;text-transform:uppercase;text-align:center;color:#ddd}
+.fs-scenario-empty{grid-column:1/-1;font:400 15px/1.6 Manrope,Arial,sans-serif;color:#bbb;align-self:center}
+.fs-scenario-division{min-width:0;border-left:1px solid #444;padding-left:35px}
+.fs-scenario-division .fs-overline{display:block;margin-bottom:32px}
+.fs-scenario-division>div{display:flex;align-items:baseline;justify-content:space-between;gap:20px;padding:18px 0;border-top:1px solid #494949}
+.fs-scenario-division>div span{font-size:13px;color:#eee}
+.fs-scenario-division>div strong{font:500 24px/1 Newsreader,Georgia,serif;font-variant-numeric:tabular-nums}
+.fs-scenario-division p{color:#aaa;font-size:12px;line-height:1.65;margin:25px 0}
+.fs-scenario-division a{font:600 13px/1.2 Manrope,Arial,sans-serif;display:inline-flex;align-items:center;gap:7px;border-bottom:1px solid #dfff3f;padding-bottom:7px;color:#dfff3f}
+.fs-scenario-division a:hover{color:#fff}
+@media(max-width:1200px){.fs-scenario-body{grid-template-columns:1fr;gap:50px}.fs-scenario-division{border-left:0;border-top:1px solid #444;padding-left:0;padding-top:30px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 18px}
+.fs-scenario-division>.fs-overline,.fs-scenario-division>p,.fs-scenario-division>a{grid-column:1/-1}
+.fs-scenario-division>div{flex-direction:column;align-items:start;gap:10px}}
+@media(max-width:820px){.fs-scenario-heading{grid-template-columns:1fr;gap:30px}.fs-bars{grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
+.fs-bar-value{font-size:9px;writing-mode:vertical-rl;transform:rotate(180deg);justify-self:center}
+.fs-bar-item{grid-template-rows:65px 190px 28px}.fs-bar-track{height:190px}
+.fs-scenario{margin-top:60px}}
+@media(max-width:540px){.fs-scenario{padding:25px 15px}.fs-scenario-heading h2{font-size:40px}
+.fs-scenario-total strong{font-size:48px}
+.fs-bars{gap:3px}.fs-bar-item{grid-template-rows:65px 155px 22px}
+.fs-bar-track{height:155px}.fs-bar-label{font-size:8px}
+.fs-scenario-division{grid-template-columns:1fr}.fs-scenario-division>div{flex-direction:row;align-items:baseline;gap:8px}}
+@media(prefers-reduced-motion:reduce){.fs-bar-fill{transition:none}}
