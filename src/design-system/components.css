@@ -165,7 +165,7 @@
 .ds-tabs { display: flex; gap: var(--space-1); padding-block: var(--space-1); overflow-x: auto; scrollbar-width: none; }
 .ds-tabs::-webkit-scrollbar { display: none; }
 .ds-tab {
-  position: relative; min-height: max(28px, calc(40px * var(--interface-scale))); min-width: max(28px, calc(40px * var(--interface-scale)));
+  position: relative; flex: 0 0 auto; min-height: max(28px, calc(40px * var(--interface-scale))); min-width: max(28px, calc(40px * var(--interface-scale)));
   padding: 0 var(--space-4); border-radius: 999px;
   font-size: var(--text-sm); font-weight: 500;
   color: var(--fg-muted); white-space: nowrap;
