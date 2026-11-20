@@ -201,3 +201,7 @@
 .web-quality-overview[data-compact]{padding:var(--space-2) var(--space-3);align-items:center}
 .web-quality-overview[data-compact] h2{font:500 var(--text-md) var(--font-display)}
 .web-quality-overview[data-compact] p{margin-top:2px;font-size:var(--text-xs)}
+
+.web-bar-tabs{min-width:0;overflow-x:auto;flex:0 1 auto}
+.web-bar-meta code{font:500 var(--text-xs) var(--font-mono);color:var(--fg-default)}
+@media(max-width:1199px){.web-canvas{order:1;min-height:min(70vh,520px)}}

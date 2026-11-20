@@ -134,7 +134,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
                 onRun: (selected) => {
                   const revokable = selected.filter((row) => row.fields.current !== true && row.status === "active");
                   void Promise.all(revokable.map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() } }, { event: `Session revoked: ${row.title}` })))
-                    .then(() => context.toast(
+                    .then((saved) => saved.every(Boolean) && context.toast(
                       "Revoked",
                       selected.length === revokable.length
                         ? `${revokable.length} ${revokable.length === 1 ? "session" : "sessions"} revoked.`
@@ -1209,7 +1209,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
               label: "Mark paid locally",
               onRun: (selected) => {
                 void Promise.all(selected.filter((row) => row.status !== "paid_locally").map((row) => context.mutate.patch(row.id, { status: "paid_locally", fields: { ...row.fields, paidAt: clockIso(), paidBy: context.actor } }, { event: `Subscription invoice marked paid locally: ${row.title}` })))
-                  .then(() => context.toast("Marked paid locally", "The record says paid locally, which is not the same as a processor confirming a payment.", "info"));
+                  .then((saved) => saved.every(Boolean) && context.toast("Marked paid locally", "The record says paid locally, which is not the same as a processor confirming a payment.", "info"));
               },
               disabled: (selected) => selected.every((row) => row.status === "paid_locally"),
             },
@@ -1711,7 +1711,7 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
                 tone: "danger",
                 onRun: (selected) => {
                   void Promise.all(selected.filter((row) => row.status === "active").map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() } }, { event: `API key revoked: ${row.title}` })))
-                    .then(() => context.toast("Revoked", "The key records say revoked. With no server, nothing was calling them anyway."));
+                    .then((saved) => saved.every(Boolean) && context.toast("Revoked", "The key records say revoked. With no server, nothing was calling them anyway."));
                 },
                 disabled: (selected) => selected.every((row) => row.status !== "active"),
               },

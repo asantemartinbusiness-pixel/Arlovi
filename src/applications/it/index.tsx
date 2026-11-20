@@ -276,7 +276,7 @@ export const itApp = registerApp({
         { id: "Service health detail", kind: "drawer", title: "Checks", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ServiceInspector context={context} /> },
         addMonitor, alertThreshold,
         { id: "Backup and restore", kind: "drawer", title: "Backup and restore", width: 720, render: ({ ...context }) => <BackupOverlay context={context} /> },
-        { id: "Restore confirmation", kind: "modal", title: "Replace the workspace", tone: "danger", width: OVERLAY_WIDTH.modal, blocking: true, render: ({ close, ...context }) => <RestoreConfirmation context={context} close={close} /> },
+        { id: "Restore confirmation", kind: "modal", title: "Replace the workspace", tone: "danger", width: OVERLAY_WIDTH.modal, blocking: true, render: ({ close, ...context }) => <RestoreConfirmation context={context} close={close} />, footer: closeFooter("Close without restoring") },
         { id: "health test", kind: "modal", title: "Health checks", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
         {
           id: "scale request", kind: "modal", title: "Scaling", width: OVERLAY_WIDTH.form,

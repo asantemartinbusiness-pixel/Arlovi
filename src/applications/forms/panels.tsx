@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./library.css";
 import { ClipboardList, Copy, FileText, Inbox, Link2, ShieldAlert, Workflow } from "lucide-react";
-import { BarChart, Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Notice, OverlayActions, OverlaySection, OverlaySummary, Pill, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
+import { BarChart, Button, Card, Checkbox, ConfirmModal, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Notice, OverlayActions, OverlaySection, OverlaySummary, Pill, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useChildren, useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { daysBetween, wallMs } from "@/platform/clock";
@@ -14,7 +14,7 @@ import {
 import { FormRuntime } from "./runtime";
 import { NoForm, useFormRecord } from "./builder";
 import { saveForm } from "./state";
-import { QuestionSummaryView, ResultsTableView, exportResultsCsv } from "./results";
+import { QuestionSummaryView, ResultsTableView } from "./results";
 
 /* ================================================================ *
  * ARL-FORMS-001 — Forms Directory
@@ -72,6 +72,7 @@ export function FormsDirectory({ context, scope }: { context: ScreenContext; sco
   const submissions = useCollection("submissions");
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
+  const [pendingArchive, setPendingArchive] = useState<Rec[] | null>(null);
   const active = forms.filter((record) => record.status !== "archived");
   const live = active.filter((record) => record.status === "live");
   const draft = active.filter((record) => record.status !== "live");
@@ -83,6 +84,20 @@ export function FormsDirectory({ context, scope }: { context: ScreenContext; sco
   const totalResponses = submissions.filter((record) => record.parentId && formIds.has(record.parentId)).length;
   return (
     <Stack gap={4}>
+      <ConfirmModal
+        open={pendingArchive !== null}
+        onOpenChange={(open) => { if (!open) setPendingArchive(null); }}
+        title={`Archive ${pendingArchive?.length ?? 0} ${pendingArchive?.length === 1 ? "form" : "forms"}?`}
+        consequence="Archived forms stop accepting new answers here. Their submissions are kept and stay readable."
+        confirmLabel="Archive"
+        onConfirm={async () => {
+          const rows = pendingArchive ?? [];
+          setPendingArchive(null);
+          let done = 0;
+          for (const row of rows) if (await context.mutate.patch(row.id, { status: "archived" }, { expectRevision: row.revision, event: `Form ${row.title} archived` })) done += 1;
+          context.toast(done === rows.length ? "Archived" : "Some forms were not archived", `${done} of ${rows.length} archived.`, done === rows.length ? "ok" : "blocked");
+        }}
+      />
       <section aria-label="Forms library overview" className="t6-directory-intro" data-compact="true">
         <Row gap={3} wrap>
           <div className="ds-grow" style={{ minWidth: 220, maxWidth: 360 }}>
@@ -155,7 +170,7 @@ export function FormsDirectory({ context, scope }: { context: ScreenContext; sco
           selectedId={context.selectedId}
           summary={<span>Access options are stored locally, not server-enforced invitations or hosted public links. Sensitive answers remain redacted until explicitly revealed.</span>}
           bulkActions={[
-            { label: "Archive", tone: "danger", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { event: `Form ${row.title} archived` })) },
+            { label: "Archive", tone: "danger", onRun: (selected) => setPendingArchive(selected) },
           ]}
         />
       )}
@@ -638,16 +653,43 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
           onSelect={(id) => context.select(id)}
           selectedId={context.selectedId}
           bulkActions={[
-            { label: "Mark reviewed", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "reviewed" }, { event: `Submission ${row.title} marked reviewed` })) },
-            { label: "Assign to me", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "routed", fields: { ...row.fields, assignee: context.actor } }, { event: `Submission ${row.title} assigned to ${context.actor}` })) },
+            { label: "Mark reviewed", onRun: (selected) => void bulkSubmissions(context, selected, "reviewed") },
+            { label: "Assign to me", onRun: (selected) => void bulkSubmissions(context, selected, "assigned") },
           ]}
-          toolbar={
-            <Button size="sm" variant="secondary" onClick={() => exportResultsCsv(context, record, model, rows)}>Export CSV</Button>
-          }
+          filterable={false}
           summary={<span>Sensitive answers always export as <code>[redacted]</code>; revealing on screen does not include them in the CSV. Every reveal is logged.</span>}
         />
       )}
     </Stack>
+  );
+}
+
+async function bulkSubmissions(context: ScreenContext, rows: Rec[], kind: "reviewed" | "assigned") {
+  let done = 0;
+  for (const row of rows) {
+    const saved = kind === "reviewed"
+      ? await context.mutate.patch(row.id, { status: "reviewed" }, { expectRevision: row.revision, event: `Submission ${row.title} marked reviewed` })
+      : await context.mutate.patch(row.id, { status: "routed", fields: { ...row.fields, assignee: context.actor } }, { expectRevision: row.revision, event: `Submission ${row.title} assigned to ${context.actor}` });
+    if (saved) done += 1;
+  }
+  const verb = kind === "reviewed" ? "marked reviewed" : `assigned to ${context.actor}`;
+  if (done === rows.length) context.toast(kind === "reviewed" ? "Marked reviewed" : "Assigned", `${done} ${done === 1 ? "response" : "responses"} ${verb}.`);
+  else context.toast("Some responses were not updated", `${done} of ${rows.length} ${verb}; the rest changed elsewhere. Reload and retry.`, "blocked");
+}
+
+/** Footer actions for the open response: review, assign, with the outcome stated. */
+export function SubmissionFooter({ context }: { context: ScreenContext }) {
+  const { record } = useFormRecord(context);
+  const children = useChildren(record?.id);
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const submission = payload?.id ? children.find((row) => row.id === payload.id) : undefined;
+  if (!submission) return null;
+  return (
+    <OverlayActions
+      primary={<Button variant="primary" disabled={submission.status === "reviewed"} onClick={() => void bulkSubmissions(context, [submission], "reviewed")}>Mark reviewed</Button>}
+      secondary={<Button variant="secondary" disabled={String(submission.fields.assignee ?? "") === context.actor} onClick={() => void bulkSubmissions(context, [submission], "assigned")}>Assign to me</Button>}
+      end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>}
+    />
   );
 }
 
@@ -700,16 +742,12 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
       <OverlaySection title="Where it went">
         <FactGrid columns={2} items={[
           { label: "Assigned to", value: assignee || "No one yet" },
-          { label: "Notification", value: String(submission.fields.notificationState ?? "not recorded").replace(/_/g, " ") },
+          { label: "Notification", value: submission.fields.notificationState === "not_sent_no_mail_provider" ? "Not sent: no mail provider is connected" : String(submission.fields.notificationState ?? "not recorded").replace(/_/g, " ") },
         ]} />
         {submission.fields.notificationState === "not_sent_no_mail_provider" && (
           <BoundaryNotice id="email.send" action="The notification for this submission" />
         )}
       </OverlaySection>
-      <OverlayActions
-        primary={<Button size="sm" variant="primary" disabled={submission.status === "reviewed"} onClick={() => void context.mutate.patch(submission.id, { status: "reviewed" }, { event: `Submission ${submission.title} marked reviewed` })}>Mark reviewed</Button>}
-        secondary={<Button size="sm" variant="secondary" onClick={() => void context.mutate.patch(submission.id, { status: "routed", fields: { ...submission.fields, assignee: context.actor } }, { event: `Submission ${submission.title} assigned to ${context.actor}` })}>Assign to me</Button>}
-      />
     </Stack>
   );
 }
@@ -1215,12 +1253,7 @@ export function ShareDialog({ context }: { context: ScreenContext }) {
   const link = `/o/${context.org.slug}/forms/forms/${record.id}/publish`;
   return (
     <Stack gap={3}>
-      <KeyValueList items={[
-        { label: "Form", value: record.title },
-        { label: "State", value: <Pill tone={record.status === "live" ? "success" : "neutral"}>{record.status}</Pill> },
-        { label: "Version", value: String(model.settings.version) },
-        { label: "Address in this workspace", value: <code>{link}</code> },
-      ]} />
+      <KeyValueList items={[{ label: "Address in this workspace", value: <code>{link}</code>, hint: `${record.title} · version ${model.settings.version}` }]} />
       <Row gap={2}>
         <Button size="sm" variant="secondary" icon={<Copy size={14} />} onClick={() => {
           void navigator.clipboard?.writeText(`${window.location.origin}${link}`).catch(() => undefined);

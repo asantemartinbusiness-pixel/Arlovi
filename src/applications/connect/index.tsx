@@ -229,7 +229,8 @@ export const connectApp = registerApp({
         render: (context: ScreenContext) => <ConnectionDetail context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Test", label: "Test this connection", placement: "primary", run: (context) => context.openOverlay("test connection") },
+        { id: "set up", label: "Set up the connection", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/connect/connect/${context.params.id}`) },
+        { id: "Test", label: "Test this connection", placement: "overflow", run: (context) => context.openOverlay("test connection") },
         { id: "limit agents", label: "Limit what agents may use", placement: "secondary", run: (context) => context.openOverlay("limit agents") },
         { id: "rotate auth", label: "Rotate the authorisation", placement: "overflow", run: (context) => context.openOverlay("rotate auth") },
         { id: "disable", label: "Disable", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("disable connection") },

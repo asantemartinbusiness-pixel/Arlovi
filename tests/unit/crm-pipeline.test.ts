@@ -142,10 +142,10 @@ describe("a converted deal has real documents behind it", () => {
     }
   });
 
-  it("shows the base seed's won deal as having no linked document", () => {
+  it("links the base seed's won deal to the paid invoice its summary names", () => {
     const legacy = DEALS.find((item) => item.id === "nl-deals-001");
     expect(legacy && stageOf(legacy).kind).toBe("won");
-    expect(Boolean(legacy?.fields.invoiceId) || Boolean(legacy?.fields.quoteId)).toBe(false);
+    expect(legacy?.fields.invoiceId).toBe("nl-invoices-001");
   });
 
   it("points each quote at a deal that exists", () => {

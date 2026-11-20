@@ -162,30 +162,36 @@ function ColumnEditor({ context, close }: { context: ScreenContext; close: () =>
 function MigrationDiff({ context }: { context: ScreenContext }) {
   const { record, model } = useAppRecord(context);
   if (!record) return <NoProject />;
+  const hasPrior = record.history.length > 0;
   const previousBody = record.history[0]?.body;
   const before = previousBody ? generateTypes({ ...model, entities: entitiesFrom(previousBody) }) : "";
   const after = generateTypes(model);
   const lines = diff(before, after);
+  const changed = lines.filter((line) => line.kind !== "same");
+  const removed = changed.filter((line) => line.kind === "remove").length;
+  if (!hasPrior) {
+    return (
+      <Notice tone="info" title="Nothing to compare yet">Change the model once and the next diff is against a revision that really existed.</Notice>
+    );
+  }
   return (
     <Stack gap={3}>
       <Properties rows={[
-        { label: "Compared against", value: record.history.length ? <span className="ds-num">{`Revision ${record.revision - 1}`}</span> : "No earlier revision" },
-        { label: "Lines changed", value: <span className="ds-num">{String(lines.filter((line) => line.kind !== "same").length)}</span> },
+        { label: "Compared against", value: <span className="ds-num">{`Revision ${record.revision - 1}`}</span> },
+        { label: "Lines changed", value: <span className="ds-num">{String(changed.length)}</span> },
       ]} />
-      {record.history.length === 0 ? (
-        <Notice tone="info" title="Nothing to compare yet">Change the model once and the next diff is against a revision that really existed.</Notice>
-      ) : (
-        <pre className="t6-code">
-          {lines.map((line, index) => (
-            <div key={index} style={{ color: line.kind === "add" ? "var(--success)" : line.kind === "remove" ? "var(--danger)" : undefined }}>
-              {line.kind === "add" ? "+ " : line.kind === "remove" ? "- " : "  "}{line.text}
-            </div>
-          ))}
-        </pre>
+      <pre className="t6-code">
+        {lines.map((line, index) => (
+          <div key={index} style={{ color: line.kind === "add" ? "var(--success)" : line.kind === "remove" ? "var(--danger)" : undefined }}>
+            {line.kind === "add" ? "+ " : line.kind === "remove" ? "- " : "  "}{line.text}
+          </div>
+        ))}
+      </pre>
+      {removed > 0 && (
+        <Notice tone="warning" title="A removed property is a removed column">
+          Each red line is a field that code and records relied on. Export a backup from the migrations tab before applying a change that removes one.
+        </Notice>
       )}
-      <Notice tone="warning" title="A removed property is a removed column">
-        Every red line below is a field that code and records relied on. Export a backup from the migrations tab before applying a change that removes one.
-      </Notice>
     </Stack>
   );
 }
@@ -742,7 +748,7 @@ export const buildApp = registerApp({
       ],
       overlays: [
         { id: "Column editor", kind: "modal", summary: projectSummary, title: "Field", width: 560, render: ({ close, ...context }) => <ColumnEditor context={context} close={close} />, footer: submitFooter("column-editor", "Save field") },
-        { id: "migration diff", kind: "drawer", summary: projectSummary, title: "Migration diff", width: 640, render: ({ ...context }) => <MigrationDiff context={context} /> },
+        { id: "migration diff", kind: "drawer", summary: projectSummary, title: "Migration diff", width: 520, render: ({ ...context }) => <MigrationDiff context={context} /> },
         {
           id: "access policy", kind: "drawer", summary: projectSummary, title: "Access policy", width: 520,
           render: ({ ...context }) => <MigrationPanel context={context} />,
@@ -877,7 +883,7 @@ export const buildApp = registerApp({
       ],
       overlays: [
         {
-          id: "Secret input", kind: "modal", title: "Keys", tone: "danger", width: 520,
+          id: "Secret input", kind: "modal", title: "Secret input", tone: "danger", width: 520,
           summary: ({ close: _c, ...context }) => <SecretSummary context={context} />,
           render: ({ ...context }) => <SecretInput context={context} />,
           footer: closeFooter(),

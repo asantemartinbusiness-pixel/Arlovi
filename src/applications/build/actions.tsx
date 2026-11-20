@@ -45,9 +45,9 @@ export async function runChecks(context: ScreenContext): Promise<{ fail: number;
   const record = await currentProject(context);
   if (!record) { context.toast("No project", "Create a project first.", "blocked"); return undefined; }
   const totals = issueTotals(validateApp(readApp(record)));
-  await context.mutate.patch(record.id, {
+  if (!(await context.mutate.patch(record.id, {
     fields: { ...record.fields, lastCheckAt: nowIso(context), checkFail: totals.fail, checkWarn: totals.warn, checkPass: totals.pass },
-  }, { expectRevision: record.revision, event: `Checks run on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` });
+  }, { expectRevision: record.revision, event: `Checks run on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` }))) return undefined;
   context.toast("Checks run", `${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing. These read the model; they do not prove the app works.`, totals.fail ? "blocked" : "ok");
   return totals;
 }

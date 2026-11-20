@@ -245,7 +245,8 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
       try {
         if (idRef.current) {
           const previous = existing && existing.id === idRef.current ? existing : undefined;
-          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: JSON.stringify(references) } }, { event: `Email draft updated by ${context.actor}` });
+          const saved = await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: JSON.stringify(references) } }, { event: `Email draft updated by ${context.actor}` });
+          if (!saved) { setFailure("The draft could not be saved."); return false; }
         } else {
           const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...{ ...draftRecord(value, from, at), fields: { ...draftRecord(value, from, at).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: JSON.stringify(references) } } }, `Email draft saved by ${context.actor}`);
           idRef.current = created.id;

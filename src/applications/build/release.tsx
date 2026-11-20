@@ -49,9 +49,7 @@ export function ReleaseApproval({ context, close }: { context: ScreenContext; cl
   return (
     <Stack gap={4}>
       {paused && <Notice tone="warning" title="Deployments are paused">{`Promotion is refused until they are resumed: ${String(record.fields.pauseReason ?? "")}`}</Notice>}
-      <OverlaySection title="What recording this does" tone="warning" hint="Nothing hosts this app, so nothing is deployed.">
-        <p>One attempt is written to the release history as <strong>blocked</strong> at the runtime boundary. The model and the generated code are unchanged and stay available to take away.</p>
-      </OverlaySection>
+      <p>Recording writes one <strong>blocked</strong> attempt to the release history. The model and generated code are unchanged and stay available to take away.</p>
       <OverlaySection title="Gates, in order">
         <ul className="t6-steps">
           <li className="t6-step" data-state={totals.fail === 0 ? "done" : "blocked"}><span className="t6-step-n">1</span>Model checks · {totals.fail === 0 ? "clear" : `${totals.fail} failing`}</li>

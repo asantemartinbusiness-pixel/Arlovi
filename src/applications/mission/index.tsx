@@ -500,10 +500,9 @@ function MissionOverview({ context, view }: { context: ScreenContext; view: stri
       </Grid>
 
       <Grid>
-        <Card span={7} eyebrow="GOAL" prov="human" title={mission.title} subtitle={mission.summary}>
+        <Card span={7} prov="human" title="Completion criteria" subtitle={criteria.length === 0 ? "None recorded" : `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length} verified`}>
           <Stack gap={4}>
             <Stack gap={2}>
-              <strong>Completion criteria</strong>
               {criteria.length === 0 ? <span className="ds-subtle">No criterion is recorded, so this mission cannot be completed honestly.</span> : criteria.map((criterion) => (
                 <Row key={criterion.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
                   <Pill tone={criterion.verified ? "success" : "warning"}>{criterion.verified ? "verified" : "not verified"}</Pill>

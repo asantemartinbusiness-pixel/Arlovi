@@ -67,7 +67,7 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
 
   async function writePages(nextPages: SiteModel["pages"], label: string) {
     setBusy(true);
-    try { await saveSite(context, record!, { ...site, pages: nextPages }, label); } finally { setBusy(false); }
+    try { if (!(await saveSite(context, record!, { ...site, pages: nextPages }, label))) return; } finally { setBusy(false); }
   }
 
   function replaceBlocks(blocks: Block[], label: string) {
@@ -111,7 +111,7 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
   }
 
   const blockCanvas = (
-    <div className="t6-pane" data-kind="canvas" key="canvas">
+    <div className="t6-pane web-canvas" data-kind="canvas" key="canvas">
       <div className="t6-device">
         <div style={{ width: "100%", maxWidth: width }}>
           <div className="t6-device-label">
@@ -269,8 +269,14 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
           <Select value={page.id} onChange={(event) => ui.setPage(event.target.value)} aria-label="Page being edited" className="web-bar-page">
             {site.pages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </Select>
-          <span className="web-bar-meta ds-subtle ds-num">{page.path} · {page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"}</span>
+          <span className="web-bar-meta ds-subtle">Route <code className="ds-num">{page.path}</code> · {page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"}</span>
         </div>
+        <div className="web-bar-tabs"><Tabs
+          label="Builder views"
+          value={context.tab}
+          onChange={context.setTab}
+          items={[{ id: "Build", label: "Build" }, { id: "Style", label: "Style" }, { id: "Responsive", label: "Responsive" }, { id: "Interactions", label: "Interactions" }]}
+        /></div>
         <Segmented
           label="Breakpoint"
           value={breakpoint}
@@ -317,14 +323,6 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
           />
         </div>
       </section>
-      <div className="t6-shell-tabs">
-        <Tabs
-          label="Builder views"
-          value={context.tab}
-          onChange={context.setTab}
-          items={[{ id: "Build", label: "Build" }, { id: "Style", label: "Style" }, { id: "Responsive", label: "Responsive" }, { id: "Interactions", label: "Interactions" }]}
-        />
-      </div>
       <div className="t6-shell-body" data-panes={panes.length === 1 ? "1" : panes.length === 2 ? "2" : undefined}>
         {panes}
       </div>

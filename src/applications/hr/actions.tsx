@@ -151,7 +151,9 @@ export function ProfileEditor({ context, close }: { context: ScreenContext; clos
 export async function rescindQueuedGrants(context: ScreenContext, employeeId: string, tasks: Rec[]): Promise<number> {
   const queued = tasks.filter((task) => task.fields.employeeId === employeeId && task.fields.group === "IT access" && task.status !== "done" && task.status !== "rescinded");
   for (const task of queued) {
-    await context.mutate.patch(task.id, { status: "rescinded", fields: { ...task.fields, stage: "rescinded", rescindedBy: context.actor } }, { event: `Queued grant rescinded on offboarding: ${task.title}` });
+    if (!(await context.mutate.patch(task.id, { status: "rescinded", fields: { ...task.fields, stage: "rescinded", rescindedBy: context.actor } }, { event: `Queued grant rescinded on offboarding: ${task.title}` }))) {
+      throw new Error(`${task.title} could not be rescinded.`);
+    }
   }
   return queued.length;
 }
@@ -1087,7 +1089,7 @@ export function completeModule(context: ScreenContext): void {
         const { getRecord } = await import("@/platform/repo");
         if (!(await context.mutate.patch(record.id, { status: "complete", fields: { ...record.fields, completedAt: clockIso() } }, { expectRevision: record.revision, event: `${record.title} completed` }))) return;
         const course = await getRecord(String(record.fields.courseId ?? ""));
-        if (course) if (!(await context.mutate.patch(course.id, { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, { expectRevision: course.revision, event: `${course.title} completion recorded for ${context.actor}` }))) return;
+        if (course) { if (!(await context.mutate.patch(course.id, { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, { expectRevision: course.revision, event: `${course.title} completion recorded for ${context.actor}` }))) return; }
         context.toast("Module complete", "The completion and the course count both changed.");
       },
     }),

@@ -789,7 +789,12 @@ export function RestoreConfirmation({ context, close }: { context: ScreenContext
   const [typed, setTyped] = useState("");
   const check = ui.restorePreview ? inspectBackup(ui.restorePreview) : undefined;
   if (!check?.ok) {
-    return <Notice tone="danger" title="There is no checked backup to restore">Choose a file on the storage tab first; it is inspected before this dialog will do anything.</Notice>;
+    return (
+      <Stack gap={3}>
+        <Notice tone="danger" title="There is no checked backup to restore">Choose a file on the storage tab first; it is inspected before this dialog will do anything.</Notice>
+        <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/it/health?tab=Storage`); }}>Choose a backup file on the Storage tab</Button>
+      </Stack>
+    );
   }
   return (
     <Stack gap={4}>

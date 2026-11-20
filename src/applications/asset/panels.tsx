@@ -572,7 +572,7 @@ export function AssetSummary({ context, eyebrow }: { context: ScreenContext; eye
       title={record.title}
       avatar={<div style={{ width: 72 }}><AssetPreview record={record} height={48} fit={String(record.fields.kind) === "template" ? "contain" : "cover"} /></div>}
       status={<Pill tone={licenceTone(state.state)}>{state.label}</Pill>}
-      meta={[`${String(record.fields.kind ?? "asset")} · ${String(record.fields.format ?? "").toUpperCase()}`, record.fields.width ? `${String(record.fields.width)} × ${String(record.fields.height)}` : "", `v${String(record.fields.version ?? 1)}`]}
+      meta={[[String(record.fields.kind ?? "asset"), String(record.fields.format ?? "").toUpperCase()].filter(Boolean).join(" · "), record.fields.width ? `${String(record.fields.width)} × ${String(record.fields.height)}` : "", `v${String(record.fields.version ?? 1)}`]}
     />
   );
 }

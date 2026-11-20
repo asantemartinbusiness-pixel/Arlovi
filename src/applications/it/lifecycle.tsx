@@ -119,6 +119,7 @@ export function IncidentLifecycle({ context, record }: { context: ScreenContext;
             <Field label="Severity" htmlFor="it-severity">
               <Select id="it-severity" value={String(record.fields.severity ?? "")} onChange={(event) => void setField("severity", event.target.value)}>
                 <option value="" disabled>Choose a severity</option>
+                {record.fields.severity && !(SEVERITIES as readonly string[]).includes(String(record.fields.severity)) && <option value={String(record.fields.severity)}>{String(record.fields.severity)}</option>}
                 {SEVERITIES.map((level) => <option key={level} value={level} disabled={level === "critical" && !canEscalate && record.fields.severity !== "critical"}>{level}{level === "critical" && !canEscalate ? " (needs approval authority)" : ""}</option>)}
               </Select>
             </Field>

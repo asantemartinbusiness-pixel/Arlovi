@@ -1280,7 +1280,7 @@ function LocationForm({ context, close }: { context: ScreenContext; close: () =>
       onSubmit={async (event) => {
         event.preventDefault();
         if (duplicate) return;
-        if (existing) if (!(await context.mutate.patch(existing.id, { title, summary: hours, fields: { ...existing.fields, timezone } }, { expectRevision: existing.revision, event: "Location updated" }))) return;
+        if (existing) { if (!(await context.mutate.patch(existing.id, { title, summary: hours, fields: { ...existing.fields, timezone } }, { expectRevision: existing.revision, event: "Location updated" }))) return; }
         else await context.mutate.create({ collection: "locations", title, status: "active", summary: hours, fields: { timezone, kind: "office" } }, "Location added");
         context.toast("Location saved", `${title} uses ${timezone}.`);
         close();

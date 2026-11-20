@@ -140,7 +140,7 @@ export const installConnector = actOverlay({
   apply: async ({ values, context }) => {
     const entry = entryById(values.capability);
     if (!entry) throw new Error("Choose a connector.");
-    await findOrCreateConnector(context, entry, { installRequestedAt: nowIso(context), installRequestedBy: context.actor }, `Install requested for ${entry.capability.label}; not connected`);
+    if (!(await findOrCreateConnector(context, entry, { installRequestedAt: nowIso(context), installRequestedBy: context.actor }, `Install requested for ${entry.capability.label}; not connected`))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Install requested for ${entry.capability.label}: stopped before the provider. No grant, no token, no connection.`, { type: "capability", capability: "not_connected" });
     return { title: "Recorded, not installed", body: `${entry.capability.label} stays not connected. The request is in the receipts.`, tone: "blocked" };
   },
@@ -259,7 +259,7 @@ export const attemptAuthorisation = actOverlay({
   submit: "Attempt the authorisation",
   apply: async ({ context, watched }) => {
     const entry = watchedEntry(context, watched) ?? CONNECTOR_ENTRIES[0];
-    await findOrCreateConnector(context, entry, { lastAuthAttemptAt: nowIso(context), lastAuthAttemptBy: context.actor, lastAuthOutcome: "stopped before the provider redirect" }, `Authorisation attempted for ${entry.capability.label}: stopped before the redirect`);
+    if (!(await findOrCreateConnector(context, entry, { lastAuthAttemptAt: nowIso(context), lastAuthAttemptBy: context.actor, lastAuthOutcome: "stopped before the provider redirect" }, `Authorisation attempted for ${entry.capability.label}: stopped before the redirect`))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Authorisation attempted for ${entry.capability.label}: stopped before the provider redirect. No grant, no token, no connection.`, { type: "capability", capability: "not_connected" });
     context.setTab("Confirm");
     return { title: "Authorisation cannot complete", body: "The attempt is recorded in the receipts as blocked, and nothing is marked connected.", tone: "blocked" };
@@ -501,7 +501,7 @@ export const retireOperation = actOverlay({
     const repo = await import("@/platform/repo");
     const existing = recordsFor(entry, await repo.listByCollection(context.org.id, "connectors"))[0];
     const retired = [...new Set([...String(existing?.fields.retiredOps ?? "").split(",").filter(Boolean), name])].join(",");
-    await findOrCreateConnector(context, entry, { retiredOps: retired, retiredReason: values.reason }, `Operation ${entry.capability.label}.${name} retired: ${values.reason}`);
+    if (!(await findOrCreateConnector(context, entry, { retiredOps: retired, retiredReason: values.reason }, `Operation ${entry.capability.label}.${name} retired: ${values.reason}`))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Operation ${name} on ${entry.capability.label} retired by ${context.actor}. ${missions.length} missions reference it.`, { type: "capability", capability: "blocked" });
     return `${name} is retired. ${missions.length} missions reference it.`;
   },

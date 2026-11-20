@@ -1043,11 +1043,6 @@ export function DeployScreen({ context, lens }: { context: ScreenContext; lens: 
             </Card>
           );
         })}
-        <Card span={12} title="The environment label is not decoration">
-          <Notice tone="warning" title="Preview and production are never shown the same way">
-            The builder toolbar, this page and every release row carry the environment in the same colour, so a staging snapshot cannot be mistaken for production. Production itself is unreachable: no runtime is connected.
-          </Notice>
-        </Card>
       </Grid>
       </Stack>
     );

@@ -374,7 +374,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
                 tone: "danger",
                 onRun: (rows) => {
                   void Promise.all(rows.map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor } }, { event: `Invitation revoked: ${row.title}` })))
-                    .then(() => context.toast("Revoked", `${rows.length} ${rows.length === 1 ? "invitation" : "invitations"} can no longer be accepted.`));
+                    .then((saved) => saved.every(Boolean) && context.toast("Revoked", `${rows.length} ${rows.length === 1 ? "invitation" : "invitations"} can no longer be accepted.`));
                 },
                 disabled: (rows) => rows.every((row) => row.status === "revoked"),
               },
@@ -1164,7 +1164,7 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
               tone: "danger",
               onRun: (selected) => {
                 void Promise.all(selected.map((row) => context.mutate.patch(row.id, { status: "suspended", fields: { ...row.fields, suspendedBy: context.actor } }, { event: `Agent suspended: ${row.title}` })))
-                  .then(() => context.toast("Suspended", `${selected.length} ${selected.length === 1 ? "agent" : "agents"} will take no further step.`));
+                  .then((saved) => saved.every(Boolean) && context.toast("Suspended", `${selected.length} ${selected.length === 1 ? "agent" : "agents"} will take no further step.`));
               },
               disabled: (selected) => selected.every((row) => row.status === "suspended"),
             },

@@ -71,7 +71,7 @@ test("a step's field is checked against the trigger's records; a fixed edit save
   await openBuilder(page);
   await page.getByRole("button", { name: "Run local test" }).click();
   await page.getByRole("list", { name: "Path taken" }).getByRole("button", { name: /Older than 7 days/ }).click();
-  await expect(page.locator("section.ds-card").filter({ has: page.getByRole("heading", { name: "Node properties" }) }).getByRole("textbox", { name: "Value" })).toHaveValue("10");
+  await expect(page.locator("section.auto-inspector").getByRole("textbox", { name: "Value" })).toHaveValue("10");
   await expect(page.getByRole("list", { name: "Path taken" }).getByText(/> 10 →/)).toBeVisible();
 });
 

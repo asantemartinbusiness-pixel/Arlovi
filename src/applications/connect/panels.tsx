@@ -887,7 +887,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
           <Notice tone="warning" title="A stale authorisation is never used">
             If a grant existed and had expired, every queued mission step would stop rather than retry with it. With no grant at all, the same rule means nothing is queued.
           </Notice>
-          <Button variant="secondary" onClick={() => context.openOverlay("reconnect dialog")}>Try to reconnect</Button>
+          <Button variant="secondary" onClick={() => context.openOverlay("reconnect dialog")}>Set up the connection</Button>
         </Stack>
       </Card>
     </Grid>
@@ -1624,7 +1624,7 @@ export function ConflictResolver({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="Both sides are kept until someone chooses">
         Nothing is merged automatically. A conflict is resolved by a person picking a side, and the choice is recorded against the record.
       </Notice>
-      <Button variant="secondary" onClick={() => void context.mutate.patch(conflict.id, { status: "resolved" }, { event: `Conflict ${conflict.title} resolved by hand` }).then(() => context.toast("Resolved", "The choice is recorded on the conflict record."))}>
+      <Button variant="secondary" onClick={() => void context.mutate.patch(conflict.id, { status: "resolved" }, { event: `Conflict ${conflict.title} resolved by hand` }).then((saved) => saved && context.toast("Resolved", "The choice is recorded on the conflict record."))}>
         Mark it resolved
       </Button>
     </Stack>

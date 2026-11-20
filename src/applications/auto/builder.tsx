@@ -266,7 +266,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
             options={[{ value: "canvas", label: "Canvas" }, { value: "list", label: "List (keyboard)" }]}
           />
           <span className="ds-grow" />
-          {draft.dirty && <Pill tone="warning" dot>Unsaved: {draft.lastNote}</Pill>}
+          {draft.dirty ? <Pill tone="warning" dot>Unsaved: {draft.lastNote}</Pill> : <Pill tone="success" dot>saved</Pill>}
           <Button
             variant="primary"
             icon={<Save size={15} />}

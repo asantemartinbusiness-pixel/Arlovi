@@ -32,7 +32,7 @@ export function PageManager({ context }: { context: ScreenContext }) {
     try { change = run(); } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); return; }
     setBusy(true);
     try {
-      await saveSite(context, record!, change.site, label);
+      if (!(await saveSite(context, record!, change.site, label))) return;
       setEditingId(change.pageId);
       ui.setPage(change.pageId);
       context.toast("Pages updated", change.notes.join(" "));

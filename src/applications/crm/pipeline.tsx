@@ -42,10 +42,11 @@ export function useStageMove(context: ScreenContext) {
       context.openOverlay("lost reason", { id: deal.id });
       return { ok: false, reason: "A lost deal needs a reason." };
     }
-    await context.mutate.patch(deal.id, {
+    const saved = await context.mutate.patch(deal.id, {
       status: target.id,
       fields: { ...deal.fields, stage: target.id, probability: target.probability },
     }, { expectRevision: deal.revision, event: `${deal.title} moved from ${stageOf(deal).label} to ${target.label}` });
+    if (!saved) return { ok: false, reason: "The deal changed elsewhere. Reload it and move it again." };
     context.toast(
       "Stage changed",
       `${deal.title} is now in ${target.label}. Its weighting moved to ${target.probability}%, so the forecast changed by ${context.money(Math.round((Number(deal.amountMinor ?? 0) * (target.probability - probabilityOf(deal))) / 100))}.`,

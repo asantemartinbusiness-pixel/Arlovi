@@ -384,7 +384,7 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
   const payable = chosen.filter(payableNow);
   const excluded = chosen.filter((bill) => !payableNow(bill));
   // The bills this run was opened with; if any of them changes, the whole run stops.
-  const openedIds = useRef<string[]>();
+  const openedIds = useRef<string[] | undefined>(undefined);
   if (!openedIds.current && payable.length > 0) openedIds.current = payable.map((bill) => bill.id);
   const why = (bill: Rec) => !["approved", "scheduled"].includes(bill.status) ? `${bill.title} is ${bill.status}, not approved` : `${bill.title} has no recorded approver`;
 

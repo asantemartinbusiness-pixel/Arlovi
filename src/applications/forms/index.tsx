@@ -6,7 +6,7 @@ import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import { STRUCTURAL, readForm } from "./model";
 import { FieldInspector, FieldSummary, FormBuilder, NoForm, useFormRecord } from "./builder";
 import {
-  AccessControlPanel, EmbedTester, SubmissionHead, FieldInsight, FormAnalytics, FormsDirectory, InvalidPathPanel,
+  AccessControlPanel, EmbedTester, SubmissionHead, SubmissionFooter, FieldInsight, FormAnalytics, FormsDirectory, InvalidPathPanel,
   LogicScreen, MetricMethods, NewFormDialog, PrivacyControl, PublishReviewForm, PublishScreen,
   RouteRetry, RuleEditorForm, ScenarioTester, ShareDialog, SubmissionDrawer, SubmissionsScreen,
   ThemeInspector,
@@ -250,7 +250,7 @@ export const formsApp = registerApp({
         { id: "routing", label: "Notification routing", placement: "overflow", run: (context) => context.openOverlay("route retry") },
       ],
       overlays: [
-        { id: "Submission drawer", kind: "drawer", title: "Submission", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <SubmissionHead context={context} />, render: ({ ...context }) => <SubmissionDrawer context={context} /> },
+        { id: "Submission drawer", kind: "drawer", title: "Submission", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <SubmissionHead context={context} />, footer: ({ close: _close, ...context }) => <SubmissionFooter context={context} />, render: ({ ...context }) => <SubmissionDrawer context={context} /> },
         { id: "privacy control", kind: "modal", title: "Retention and privacy", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PrivacyControl context={context} />, footer: closeFooter() },
         { id: "route retry", kind: "modal", title: "Routing", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RouteRetry context={context} />, footer: closeFooter() },
         assignSubmission,

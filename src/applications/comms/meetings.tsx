@@ -249,7 +249,7 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
             className="ds-stack ds-gap-3"
             onSubmit={async (event) => {
               event.preventDefault();
-              await patchBody({ notes: value }, `Notes saved on ${meeting.title}`);
+              if (!(await patchBody({ notes: value }, `Notes saved on ${meeting.title}`))) return;
               context.toast("Notes saved", "They are on the meeting record.");
               setNotes(null);
             }}
@@ -273,7 +273,7 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
                   checked={action.done}
                   onChange={async (event) => {
                     const next = actions.map((item, position) => (position === index ? { ...item, done: event.target.checked } : item));
-                    await patchBody({ actions: next }, `Meeting action “${action.label}” ${event.target.checked ? "done" : "reopened"} on ${meeting.title}`);
+                    if (!(await patchBody({ actions: next }, `Meeting action “${action.label}” ${event.target.checked ? "done" : "reopened"} on ${meeting.title}`))) return;
                   }}
                 />
                 <span />
@@ -289,7 +289,7 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
                         fields: { stage: "ready", assignee: action.owner, priority: "normal", estimateHours: 1, loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false, sourceMeetingId: meeting.id },
                       }, `Task raised from ${meeting.title} by ${context.actor}`);
                       const next = actions.map((item, position) => (position === index ? { ...item, taskId: task.id } : item));
-                      await patchBody({ actions: next }, `Action “${action.label}” linked to task ${task.id}`);
+                      if (!(await patchBody({ actions: next }, `Action “${action.label}” linked to task ${task.id}`))) return;
                       context.toast("Task created", `${action.label} is in Projects, assigned to ${action.owner}, with a link back to this meeting.`);
                     } finally { setBusy(false); }
                   }}>Make a task</Button>
@@ -304,7 +304,7 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
                 const label = actionLabel.trim();
                 const owner = actionOwner || attendees[0] || context.actor;
                 if (!label) return;
-                await patchBody({ actions: [...actions, { label, owner, done: false }] }, `Action “${label}” recorded on ${meeting.title} for ${owner}`);
+                if (!(await patchBody({ actions: [...actions, { label, owner, done: false }] }, `Action “${label}” recorded on ${meeting.title} for ${owner}`))) return;
                 setActionLabel("");
                 context.toast("Action recorded", `${label} is on the meeting record for ${owner}.`);
               }}
@@ -421,7 +421,7 @@ export function MeetingWorkspace({ context, lens }: { context: ScreenContext; le
                   checked={item.covered}
                   onChange={async (event) => {
                     const next = agenda.map((row, position) => (position === index ? { ...row, covered: event.target.checked } : row));
-                    await patchBody({ agendaItems: next }, `Agenda item “${item.title}” ${event.target.checked ? "covered" : "reopened"} on ${meeting.title}`);
+                    if (!(await patchBody({ agendaItems: next }, `Agenda item “${item.title}” ${event.target.checked ? "covered" : "reopened"} on ${meeting.title}`))) return;
                   }}
                 />
                 <span className="ds-subtle ds-truncate">{item.owner}</span>

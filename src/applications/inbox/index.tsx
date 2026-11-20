@@ -1088,7 +1088,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
         fields: { ...record!.fields, decision: "approved", decidedBy: actor, decidedPlanVersion: planVersion },
       }, { event: `Approved ${record!.title} at plan version ${planVersion}`, expectRevision: record!.revision });
       if (!saved) {
-        if (target) if (!(await context.mutate.patch(target.id, { fields: { ...target.fields } }, { event: `Approval withdrawn from ${target.title}: the request changed` }))) return;
+        if (target) await context.mutate.patch(target.id, { fields: { ...target.fields } }, { event: `Approval withdrawn from ${target.title}: the request changed` });
         context.toast("Not approved", "The request changed while you were confirming. Reopen it and review it again.", "blocked");
         return;
       }
@@ -1229,7 +1229,7 @@ function MessagesScreen({ context, tab }: { context: ScreenContext; tab: Message
               label: "Mark read",
               onRun: (selected) => {
                 void Promise.all(selected.map((row) => context.mutate.patch(row.id, { fields: { ...row.fields, unread: false } }, { event: `Message marked read: ${row.title}` })))
-                  .then(() => context.toast("Marked read", `${selected.length} ${selected.length === 1 ? "thread" : "threads"} updated.`));
+                  .then((saved) => saved.every(Boolean) && context.toast("Marked read", `${selected.length} ${selected.length === 1 ? "thread" : "threads"} updated.`));
               },
             },
             {
@@ -2470,7 +2470,7 @@ function EscalationsScreen({ context, tab }: { context: ScreenContext; tab: Esca
               tone: "danger",
               onRun: (selected) => {
                 void Promise.all(selected.map((row) => context.mutate.patch(row.id, { fields: { ...row.fields, enabled: false, revokedBy: context.actor } }, { event: `Delegation revoked: ${row.title}` })))
-                  .then(() => context.toast("Revoked", `${selected.length} ${selected.length === 1 ? "rule" : "rules"} turned off. Items go back to their owner.`));
+                  .then((saved) => saved.every(Boolean) && context.toast("Revoked", `${selected.length} ${selected.length === 1 ? "rule" : "rules"} turned off. Items go back to their owner.`));
               },
               disabled: (selected) => selected.some((row) => row.fields.securityFloor === true),
             },

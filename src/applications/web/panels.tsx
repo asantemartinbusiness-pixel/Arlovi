@@ -386,7 +386,7 @@ export function CmsEditor({ context, lens }: { context: ScreenContext; lens: "Co
   const active = collections.find((item) => item.id === collectionId) ?? collections[0];
 
   async function write(next: SiteModel["cms"], label: string) {
-    await saveSite(context, record!, { ...site, cms: next }, label);
+    if (!(await saveSite(context, record!, { ...site, cms: next }, label))) return;
   }
 
   if (lens === "Collections") {
@@ -577,7 +577,7 @@ export function SiteNavigation({ context, lens }: { context: ScreenContext; lens
   const links = which === "footer" ? site.nav.footer : site.nav.header;
 
   async function writeNav(next: SiteModel["nav"], label: string) {
-    await saveSite(context, record!, { ...site, nav: next }, label);
+    if (!(await saveSite(context, record!, { ...site, nav: next }, label))) return;
   }
 
   function setLinks(nextLinks: NavLink[], label: string) {
@@ -742,7 +742,7 @@ export function SiteForms({ context, lens }: { context: ScreenContext; lens: "Fo
   const active = siteForms.find((form) => form.id === selectedFormId) ?? siteForms[0];
 
   async function writeForms(next: SiteModel["forms"], label: string) {
-    await saveSite(context, record!, { ...site, forms: next }, label);
+    if (!(await saveSite(context, record!, { ...site, forms: next }, label))) return;
   }
 
   if (lens === "Forms") {
@@ -1061,7 +1061,7 @@ export function LinkPickerForm({ context, close }: { context: ScreenContext; clo
         const next: NavLink = { id: existing?.id ?? `n-${wallMs().toString(36)}`, label: label.trim(), kind, target: target.trim(), children: existing?.children ?? [] };
         const updated = placeLink(links, next, parentId);
         const under = parentId ? links.find((link) => link.id === parentId)?.label : "";
-        await saveSite(context, record, { ...site, nav: { ...site.nav, [which]: updated } }, existing ? `Menu link ${next.label} updated` : `Menu link ${next.label} added${under ? ` under ${under}` : ""}`);
+        if (!(await saveSite(context, record, { ...site, nav: { ...site.nav, [which]: updated } }, existing ? `Menu link ${next.label} updated` : `Menu link ${next.label} added${under ? ` under ${under}` : ""}`))) return;
         context.toast("Menu saved", `${next.label} points at ${next.target}${under ? `, in the ${under} submenu` : ""}.`);
         close();
       }}
@@ -1111,10 +1111,10 @@ export function RedirectForm({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         if (!from.trim() || loop) return;
-        await saveSite(context, record, {
+        if (!(await saveSite(context, record, {
           ...site,
           nav: { ...site.nav, redirects: [...site.nav.redirects, { id: redirectId(), from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
-        }, `Redirect ${from.trim()} added`);
+        }, `Redirect ${from.trim()} added`))) return;
         context.toast("Redirect added", `${from.trim()} will answer with a ${code}.`);
         close();
       }}
@@ -1198,7 +1198,7 @@ export function SchemaEditorForm({ context, close }: { context: ScreenContext; c
         const collections = existing
           ? site.cms.collections.map((item) => (item.id === existing.id ? collection : item))
           : [...site.cms.collections, collection];
-        await saveSite(context, record, { ...site, cms: { ...site.cms, collections } }, existing ? `Schema of ${collection.name} changed` : `Collection ${collection.name} created`);
+        if (!(await saveSite(context, record, { ...site, cms: { ...site.cms, collections } }, existing ? `Schema of ${collection.name} changed` : `Collection ${collection.name} created`))) return;
         context.toast("Schema saved", `${collection.name} has ${parsed.length} fields.`);
         close();
       }}
@@ -1288,7 +1288,7 @@ export function EntryDetailForm({ context, close }: { context: ScreenContext; cl
           values,
         };
         const entries = existing ? site.cms.entries.map((item) => (item.id === existing.id ? entry : item)) : [...site.cms.entries, entry];
-        await saveSite(context, record, { ...site, cms: { ...site.cms, entries } }, existing ? `Entry ${entry.title} edited` : `Entry ${entry.title} created`);
+        if (!(await saveSite(context, record, { ...site, cms: { ...site.cms, entries } }, existing ? `Entry ${entry.title} edited` : `Entry ${entry.title} created`))) return;
         context.toast("Entry saved", `${entry.title} is ${entry.status} in ${collection.name}.`);
         close();
       }}
@@ -1339,7 +1339,7 @@ export function ComponentPropertyForm({ context, close }: { context: ScreenConte
           blocks: existing?.blocks ?? (source ? source.blocks.slice(0, 2) : []),
         };
         const components = existing ? site.components.map((item) => (item.id === existing.id ? component : item)) : [...site.components, component];
-        await saveSite(context, record, { ...site, components }, existing ? `Component ${component.name} updated` : `Component ${component.name} extracted from ${source?.name ?? "the site"}`);
+        if (!(await saveSite(context, record, { ...site, components }, existing ? `Component ${component.name} updated` : `Component ${component.name} extracted from ${source?.name ?? "the site"}`))) return;
         context.toast("Component saved", `${component.name} holds ${component.blocks.length} blocks.`);
         close();
       }}

@@ -57,14 +57,14 @@ export const useWebUi = create<WebUi>((set, get) => ({
 }));
 
 /** Every structural write goes through here so undo and the audit event exist. */
-export async function saveSite(context: ScreenContext, record: Rec, next: SiteModel, label: string): Promise<void> {
+export async function saveSite(context: ScreenContext, record: Rec, next: SiteModel, label: string): Promise<boolean> {
+  if (!(await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: label }))) return false;
   useWebUi.getState().pushUndo({ siteId: record.id, body: record.body, label });
-  if (!(await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: label }))) return;
+  return true;
 }
 
 export async function undoSite(context: ScreenContext, record: Rec): Promise<boolean> {
   const entry = useWebUi.getState().popUndo(record.id);
   if (!entry) return false;
-  await context.mutate.patch(record.id, { body: entry.body }, { event: `Undid: ${entry.label}` });
-  return true;
+  return Boolean(await context.mutate.patch(record.id, { body: entry.body }, { event: `Undid: ${entry.label}` }));
 }

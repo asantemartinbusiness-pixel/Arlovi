@@ -142,7 +142,7 @@ export function QualityReport({ context, area }: { context: ScreenContext; area:
                     onClick={async () => {
                       const applied = applyFix(site, issue);
                       if (!applied) { context.toast("No fix applied", "There was nothing in the model to copy the value from.", "blocked"); return; }
-                      await saveSite(context, record, applied.next, applied.label);
+                      if (!(await saveSite(context, record, applied.next, applied.label))) return;
                       if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastAuditAt: now.toISOString() } }, { event: `Audit fix applied: ${applied.label}` }))) return;
                       context.toast("Fix applied", `${applied.label}. Re-run the audit to see the new figures.`);
                     }}
@@ -213,7 +213,7 @@ export function CodeDiffPanel({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="The diff is the real export">Both sides are produced by the same generator that writes the HTML file, so what is shown is what would ship.</Notice>
       {applied && (
         <Button variant="primary" onClick={async () => {
-          await saveSite(context, record, applied.next, applied.label);
+          if (!(await saveSite(context, record, applied.next, applied.label))) return;
           if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastFixAt: context.now.toISOString() } }, { event: `Proposed fix applied: ${applied.label}` }))) return;
           context.toast("Fix applied", `${applied.label}. Retest to record the new figures; undo is available in the builder.`);
           context.closeOverlay();
@@ -520,7 +520,7 @@ export function PublishReview({ context, close }: { context: ScreenContext; clos
                     bytes,
                     actor: context.actor,
                   };
-                  await saveSite(context, record, { ...site, deployments: [...site.deployments, entry] }, `Publish to ${environment} recorded as blocked at the hosting boundary`);
+                  if (!(await saveSite(context, record, { ...site, deployments: [...site.deployments, entry] }, `Publish to ${environment} recorded as blocked at the hosting boundary`))) return;
                   await context.mutate.log(`Publish attempt for ${record.title} stopped: no hosting provider is connected.`, { entityId: record.id, type: "capability", capability: "not_connected" });
                   context.toast("Recorded as not published", "The attempt is in the deployment history as blocked. Nothing was uploaded; download the export to take the site away.", "blocked");
                   close();
@@ -569,7 +569,7 @@ export function DomainAttachForm({ context, close }: { context: ScreenContext; c
             { type: "TXT", name: "_arlovi", value: `arlovi-site=${record.id}` },
           ],
         };
-        await saveSite(context, record, { ...site, domains: [...site.domains, domain] }, `Domain ${domain.host} attached as unverified`);
+        if (!(await saveSite(context, record, { ...site, domains: [...site.domains, domain] }, `Domain ${domain.host} attached as unverified`))) return;
         context.toast("Domain recorded", `${domain.host} is attached and unverified. Nothing was looked up.`);
         close();
       }}
@@ -680,10 +680,10 @@ export function DeploymentIssue({ context }: { context: ScreenContext }) {
         <Button
           variant="secondary"
           onClick={async () => {
-            await saveSite(context, record, {
+            if (!(await saveSite(context, record, {
               ...site,
               deployments: site.deployments.map((item) => (item.id === entry.id ? { ...item, state: "rolled_back" as const, note: `Rolled back to the export from ${previous.at}.` } : item)),
-            }, `Deployment ${entry.id} rolled back to the export from ${previous.at}`);
+            }, `Deployment ${entry.id} rolled back to the export from ${previous.at}`))) return;
             context.toast("Rolled back", "The record now shows this attempt as rolled back to the earlier export.");
           }}
         >

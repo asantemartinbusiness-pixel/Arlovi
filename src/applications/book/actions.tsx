@@ -335,7 +335,7 @@ export async function archiveService(context: ScreenContext) {
       const saved = await context.mutate.patch(service.id, { status: "archived", fields: { ...service.fields, published: false, archivedBy: context.actor, archivedAt: iso(context) } }, { expectRevision: service.revision, event: `Service ${service.title} archived by ${context.actor}` });
       if (!saved) return CHANGED_ELSEWHERE;
       if (page && (pageBody.services ?? []).includes(service.id)) {
-        await context.mutate.patch(page.id, { body: { ...pageBody, services: (pageBody.services ?? []).filter((id) => id !== service.id) } }, { expectRevision: page.revision, event: `${service.title} removed from ${page.title}` });
+        if (!(await context.mutate.patch(page.id, { body: { ...pageBody, services: (pageBody.services ?? []).filter((id) => id !== service.id) } }, { expectRevision: page.revision, event: `${service.title} removed from ${page.title}` }))) return CHANGED_ELSEWHERE;
       }
       context.toast("Archived", `${service.title} is no longer offered.`);
     },

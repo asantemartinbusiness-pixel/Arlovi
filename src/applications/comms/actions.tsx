@@ -188,7 +188,7 @@ export function NotificationPreferences({ context, close }: { context: ScreenCon
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const fields = { kind: "commsNotifications", person: context.actor, mentions: form.get("mentions") === "on", direct: form.get("direct") === "on", everyMessage: form.get("every") === "on", announcements: form.get("announcements") === "on" };
-        if (mine) if (!(await context.mutate.patch(mine.id, { fields }, { expectRevision: mine.revision, event: `Notification preferences changed by ${context.actor}` }))) return;
+        if (mine) { if (!(await context.mutate.patch(mine.id, { fields }, { expectRevision: mine.revision, event: `Notification preferences changed by ${context.actor}` }))) return; }
         else await context.mutate.create({ collection: "preferences", title: `${context.actor} · notifications`, status: "active", summary: "Notification preferences.", fields }, `Notification preferences saved by ${context.actor}`);
         context.toast("Notifications saved", "They shape badges in this workspace only.");
         close();
@@ -903,7 +903,7 @@ export function Dialer({ context, close }: { context: ScreenContext; close: () =
       <OverlayActions
         primary={<Button variant="primary" disabled={!target} onClick={async () => {
           const call = await context.mutate.create({ collection: "calls", title: `${target} — not placed`, status: "not placed", summary: `${original ? "Return call" : "Call"} recorded by ${context.actor}; no telephony service is connected.`, at: clockIso(), fields: { contactId: contact?.id ?? "", direction: "outbound", seconds: 0, outcome: "not placed", voicemail: false, queue: "Direct", returnOf: original?.id ?? "", number: contact ? String(contact.fields.phone ?? "") : number.trim() } }, `${original ? "Return call" : "Call"} to ${target} recorded by ${context.actor}`);
-          if (original) if (!(await context.mutate.patch(original.id, { fields: { ...original.fields, returnedBy: context.actor, returnCallId: call.id } }, { expectRevision: original.revision, event: `${original.title} returned by ${context.actor} (not placed: no telephony)` }))) return;
+          if (original) { if (!(await context.mutate.patch(original.id, { fields: { ...original.fields, returnedBy: context.actor, returnCallId: call.id } }, { expectRevision: original.revision, event: `${original.title} returned by ${context.actor} (not placed: no telephony)` }))) return; }
           await logBoundary(context, "telephony", `Call to ${target} not placed`, call.id);
           context.toast("Call recorded, not placed", boundaryText("telephony"), "info");
           close();

@@ -65,7 +65,7 @@ function SiteSettingsForm({ context, close }: { context: ScreenContext; close: (
             next.nav = { ...site.nav, header: [...site.nav.header, { id: `n-${wallMs().toString(36)}`, label: pageName, target: path, kind: "page", children: [] }] };
           }
         }
-        await saveSite(context, record, next, pageName ? `Site settings saved and page ${pageName} added` : "Site settings saved");
+        if (!(await saveSite(context, record, next, pageName ? `Site settings saved and page ${pageName} added` : "Site settings saved"))) return;
         context.toast("Settings saved", pageName ? `${pageName} was added to the site and the menu.` : "Applied to every page and the export.");
         close();
       }}
@@ -343,8 +343,10 @@ export const webApp = registerApp({
         { id: "manage pages", label: "Manage pages", placement: "overflow", run: (context) => context.openOverlay("Manage pages") },
         {
           id: "edit text", label: "Edit block", placement: "secondary",
-          guard: () => (StateModule.useWebUi.getState().selectedBlockId ? undefined : "Select a block on the canvas first"),
-          run: (context) => context.openOverlay("Element inspector"),
+          run: (context) => {
+            if (!StateModule.useWebUi.getState().selectedBlockId) { context.toast("Select a block first", "Choose a block on the canvas or in the list, then edit it.", "blocked"); return; }
+            context.openOverlay("Element inspector");
+          },
         },
         {
           id: "resize", label: "Resize the block", placement: "overflow",
@@ -620,7 +622,7 @@ function SiteFieldEditor({ context, close }: { context: ScreenContext; close: ()
         if (!label) return;
         const next = { id: field?.id ?? `ff-${wallMs().toString(36)}`, label, type: String(data.get("type") ?? "text"), required: data.get("required") === "on" };
         const fields = field ? form.fields.map((item) => (item.id === field.id ? next : item)) : [...form.fields, next];
-        await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? { ...item, fields } : item)) }, `Field ${label} saved on ${form.name}`);
+        if (!(await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? { ...item, fields } : item)) }, `Field ${label} saved on ${form.name}`))) return;
         context.toast("Field saved", `${label} is ${next.required ? "required" : "optional"} on ${form.name}.`);
         close();
       }}
@@ -679,7 +681,7 @@ function RoutingForm({ context, close }: { context: ScreenContext; close: () => 
           webhook: String(data.get("webhook") ?? "").trim(),
           honeypot: data.get("honeypot") === "on",
         };
-        await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? next : item)) }, `Routing for ${form.name} saved`);
+        if (!(await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? next : item)) }, `Routing for ${form.name} saved`))) return;
         context.toast("Routing saved", next.route === "record" ? "A submission creates a record straight away." : "Submissions are held for review before a record is created.");
         close();
       }}
