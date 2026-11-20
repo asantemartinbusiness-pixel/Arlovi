@@ -1241,7 +1241,7 @@ test("WF-16 External client collaboration: scoped portal, invitation at the boun
   await open(page, "/portal/portals/nl-portals-001/billing");
   await expect(main(page).getByText("Paying online is not available")).toBeVisible();
   await expect(main(page).getByText("No processor is connected. No card data is collected or stored here.")).toBeVisible();
-  await open(page, "/portal/portals/nl-portals-001/admin?tab=Audit", "Access and analytics");
+  await open(page, "/portal/portals/nl-portals-001/admin?tab=Audit", "Harrow House Interiors"); // B7: h1 is the portal name; "Access and analytics" is the breadcrumb
   await expect(main(page).getByText("Invited ines@harrow.example as portal member.")).toBeVisible();
 });
 

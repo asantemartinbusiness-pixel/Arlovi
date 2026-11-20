@@ -83,13 +83,13 @@ export function nativeOverlayDomain(appCode: string): Domain {
 }
 
 /** The origin is navigation context, not a generic intro or fake workflow step. */
-export function OverlayOrigin({ context }: { context: ScreenContext }) {
+export function OverlayOrigin({ context, screenTitle }: { context: ScreenContext; screenTitle?: string }) {
   const domain = nativeOverlayDomain(context.screen.applicationCode);
   return (
     <span className="native-overlay-origin" data-group={domain.group}>
       <span>{domain.name}</span>
       <span className="native-overlay-divider" aria-hidden="true">/</span>
-      <span>{context.screen.title}</span>
+      <span>{screenTitle ?? context.screen.title}</span>
     </span>
   );
 }

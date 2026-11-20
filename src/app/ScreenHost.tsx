@@ -291,7 +291,7 @@ export function ScreenHost() {
        happened to duplicate them into its own toolbar. */
     return (
       <div className="pg">
-        {!(def.chromeTitle === "surface" && actions.length === 0) && <div className="pg-cmdbar" role="region" aria-label={`${title} actions`} data-surface-title={def.chromeTitle === "surface" ? "true" : undefined}>
+        {!(def.chromeTitle === "surface" && primary.length + secondary.length + overflow.length === 0) && <div className="pg-cmdbar" role="region" aria-label={`${title} actions`} data-surface-title={def.chromeTitle === "surface" ? "true" : undefined}>
           {def.chromeTitle === "surface"
             ? <span className="pg-cmdbar-title ds-truncate ds-sr-only">{title}</span>
             : <h1 className="pg-cmdbar-title ds-truncate">{title}</h1>}
@@ -431,7 +431,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
         requiredCollection={requiredCollection} render={() => found.render(overlayContext)} />;
   const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
   const appCode = ctx.screen.applicationCode;
-  const origin = <OverlayOrigin context={ctx} />;
+  const origin = <OverlayOrigin context={ctx} screenTitle={screenDef?.title?.(ctx)} />;
   const recordContext = found.summary
     ? found.summary(overlayContext)
     : found.presentation?.noRecordContext
