@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Empty, Field, Notice, Properties, Row, Select, Stack, TextArea, TextInput, ModalActions, OverlayActions } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useOrgRecords, useRecord } from "@/platform/workspace";
+import { internalPeople } from "@/applications/brain/people";
 import type { Rec } from "@/domain/types";
 import { clockIso, wallMs } from "@/platform/clock";
 
@@ -66,6 +67,15 @@ export function AttachToSpecialist({ context, close }: { context: ScreenContext;
         </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
+}
+
+/** Internal, active people (no clients or external parties) once each, plus active AI employees when asked. */
+export function internalRoster(records: Rec[], withAgents = false): Rec[] {
+  const people = internalPeople(records.filter((record) => record.collection === "members" && record.status === "active"));
+  if (!withAgents) return people;
+  const seen = new Set(people.map((person) => person.title));
+  const agents = records.filter((record) => record.collection === "agents" && record.status === "active" && !seen.has(record.title));
+  return [...people, ...agents.filter((agent, index) => agents.findIndex((other) => other.title === agent.title) === index)];
 }
 
 function participantsOf(room: Rec | undefined, records: Rec[]): Rec[] {
@@ -140,7 +150,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
   const tasks = records.filter((record) => record.collection === "missionTasks" && record.parentId === context.params.id);
   const gated = tasks.filter((task) => task.fields.approvalRequired === true);
   const pool = gated.length ? gated : tasks;
-  const people = records.filter((record) => record.collection === "members" && String(record.fields.kind ?? "human") === "human" && record.status === "active");
+  const people = internalRoster(records);
   const [taskIdPicked, setTaskId] = useState<string>();
   const taskId = taskIdPicked ?? (pool[0]?.id ?? "");
   const [reviewer, setReviewer] = useState("");
@@ -268,7 +278,7 @@ export function HostReview({ context, close }: { context: ScreenContext; close: 
   const room = useRecord(context.params.id);
   const listed = participantsOf(room, records);
   // A room with no recorded participants can still host a review: offer the active people and AI employees.
-  const people = listed.length ? listed : records.filter((record) => (record.collection === "members" && String(record.fields.kind ?? "human") === "human" && record.status === "active") || (record.collection === "agents" && record.status === "active"));
+  const people = listed.length ? listed : internalRoster(records, true);
   const [topic, setTopic] = useState("");
   const [picked, setPicked] = useState<string[]>();
   const chosen = picked ?? (listed.length ? listed.map((person) => person.id) : []);

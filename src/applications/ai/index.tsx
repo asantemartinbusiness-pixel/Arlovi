@@ -19,7 +19,7 @@ import {
 } from "@/applications/t2_shared/pieces";
 import { useChatState, usePanelFlags, type LocalAttachment } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
-import { AssignReviewer, AssignRoomTask, AttachToSpecialist, CommentOnArtifact, CorrectTranscript, HostReview, ResolveDisagreement } from "./actions";
+import { internalRoster, AssignReviewer, AssignRoomTask, AttachToSpecialist, CommentOnArtifact, CorrectTranscript, HostReview, ResolveDisagreement } from "./actions";
 
 /* ====================================================================== *
  * AI — Companion & Conversations
@@ -298,7 +298,7 @@ function RelatedMissions({ context }: { context: ScreenContext }) {
   const linked = data.missions.filter((mission) => data.conversations.some((conversation) => conversation.fields.missionId === mission.id));
   if (linked.length === 0) {
     return (
-      <Empty title="No mission came from a thread yet" icon={<Rocket size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("task authorization")}>Authorise a mission</Button>}>
+      <Empty title="No mission came from a thread yet" icon={<Rocket size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("task authorization")}>Propose a mission</Button>}>
         A thread turns into work by authorising a mission with a named target and a spend ceiling.
       </Empty>
     );
@@ -928,7 +928,7 @@ function VoiceLive({ context }: { context: ScreenContext }) {
             <Row gap={3} wrap>
               <Field label="Speaker">
                 <Select value={speaker} onChange={(event) => setSpeaker(event.target.value)}>
-                  {[context.actor, ...members.map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => (
+                  {[context.actor, ...internalRoster(members, true).map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => (
                     <option key={name} value={name}>{name}</option>
                   ))}
                 </Select>
@@ -1807,7 +1807,7 @@ function TaskAuthorizationSummary({ context }: { context: ScreenContext }) {
   if (!agent) return null;
   return (
     <OverlaySummary
-      eyebrow="Mission authorisation"
+      eyebrow="Mission proposal"
       avatar={<Avatar name={agent.title} kind="ai" size="lg" />}
       title={agent.title}
       status={<Pill tone="warning">Proposal only</Pill>}
@@ -1826,7 +1826,9 @@ const MISSION_GRANTS = [
 function TaskAuthorization({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { from?: string } | undefined;
   const { records, agent, policy } = useAuthorisingAgent();
-  const candidates = records.filter((record) => ["contacts", "companies", "suppliers"].includes(record.collection));
+  const candidates = records
+    .filter((record) => ["contacts", "companies", "suppliers"].includes(record.collection))
+    .filter((record, index, all) => all.findIndex((other) => other.collection === record.collection && other.title === record.title) === index);
   const [goal, setGoal] = useState(payload?.from ?? "");
   const [target, setTarget] = useState("");
   const [budget, setBudget] = useState("500");
@@ -1865,7 +1867,7 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
             grants: grants.join(","),
           },
           body: { criteria: [{ id: "c1", label: "Outcome verified against a record", verified: false }] },
-        }, `Mission authorised from a conversation: ${goal.slice(0, 50)}`);
+        }, `Mission proposed from a conversation: ${goal.slice(0, 50)}`);
         await context.mutate.create({
           collection: "missionSteps",
           title: "Read the records the goal names",
@@ -1875,7 +1877,7 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
           fields: { order: 1, kind: "read", operation: "collect.sources", attempts: 0 },
           body: { output: "", reason: "", inputs: [] },
         }, "First mission step created");
-        context.toast("Mission authorised", `${mission.title} is proposed with a ${context.money(amountMinor)} ceiling. Nothing runs until a person approves the plan.`);
+        context.toast("Mission proposed", `${mission.title} is proposed with a ${context.money(amountMinor)} ceiling. Nothing runs until a person approves the plan.`);
         close();
         context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`);
       }}
@@ -1925,8 +1927,8 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
         <FactGrid
           items={[
             { label: "Before any step runs", value: "A person approves the plan" },
-            { label: "Status after this", value: "Proposed" },
-            { label: "Approval policy", value: policy ? `${policy.title}: ${requiresApproval === "all" ? "every action" : requiresApproval.split(",").join(", ")}` : "Every action (no policy recorded)" },
+            { label: "Status after this", value: "Proposed, not running" },
+            { label: "Approval policy", value: policy ? (requiresApproval === "all" ? `${policy.title}: a person approves every action` : `${policy.title}: a person approves ${requiresApproval.split(",").join(", ")}`) : "A person approves every action (no policy recorded)" },
             { label: "Your role view", value: context.can("approve_mission") ? "Can approve" : "Cannot approve" },
           ]}
         />
@@ -2143,7 +2145,7 @@ function MissionEscalation({ context, close }: { context: ScreenContext; close: 
 function ParticipantSelector({ context, close }: { context: ScreenContext; close: () => void }) {
   const records = useOrgRecords();
   const room = useRecord(context.params.id);
-  const people = records.filter((record) => record.collection === "members" || record.collection === "agents");
+  const people = internalRoster(records, true);
   const current = String(room?.fields.participants ?? "").split(",").map((id) => id.trim()).filter(Boolean);
   const [selected, setSelected] = useState<string[]>(current);
   if (!room) return <Empty title="No room selected" />;
@@ -2216,7 +2218,7 @@ function DecisionRecorder({ context, close }: { context: ScreenContext; close: (
       <Field label="Why" required hint="The rationale is kept so the decision can be audited later."><TextArea value={rationale} rows={3} onChange={(event) => setRationale(event.target.value)} required /></Field>
       <Field label="Approver">
         <Select value={approver} onChange={(event) => setApprover(event.target.value)}>
-          {[context.actor, ...members.filter((member) => member.fields.kind === "human").map((member) => member.title)]
+          {[context.actor, ...internalRoster(members).map((member) => member.title)]
             .filter((name, index, all) => all.indexOf(name) === index)
             .map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
@@ -2548,7 +2550,7 @@ function FollowUpApproval({ context, close }: { context: ScreenContext; close: (
       <Field label="Action" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Owner">
         <Select value={owner} onChange={(event) => setOwner(event.target.value)}>
-          {[context.actor, ...members.map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => <option key={name} value={name}>{name}</option>)}
+          {[context.actor, ...internalRoster(members).map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
       </Field>
       <Field label="Due"><TextInput type="date" value={due} onChange={(event) => setDue(event.target.value)} /></Field>
@@ -2894,7 +2896,7 @@ export const aiApp = registerApp({
       ],
       actions: [
         { id: "Send text", placement: "primary", run: (context) => { useChatState.getState().requestSend(chiefThread(context)); } },
-        { id: "create mission", label: "Authorise a mission", placement: "primary", capability: "approve_mission", run: (context) => context.openOverlay("task authorization") },
+        { id: "create mission", label: "Propose a mission", placement: "primary", capability: "approve_mission", run: (context) => context.openOverlay("task authorization") },
         { id: "attach", label: "Attach", placement: "secondary", run: (context) => context.openOverlay("upload review") },
         { id: "mention record", label: "Pin records", placement: "secondary", run: (context) => context.openOverlay("Source selector") },
         { id: "dictate", label: "Dictate", placement: "overflow", run: (context) => context.toast("Dictation needs a speech service", "No speech service is connected, so nothing was recorded. Type the message instead; it is kept exactly as written.", "blocked") },
@@ -2904,7 +2906,7 @@ export const aiApp = registerApp({
         { id: "Source selector", kind: "drawer", title: "Pin records into scope", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourceSelector context={context} /> },
         { id: "upload review", kind: "modal", title: "Attach a file by reference", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <UploadReview context={context} /> },
         { id: "message action menu", kind: "drawer", title: "Message actions", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MessageActionMenu context={context} close={close} /> },
-        { id: "task authorization", kind: "modal", title: "Authorise a mission", width: OVERLAY_WIDTH.modal, summary: ({ close: _close, ...context }) => <TaskAuthorizationSummary context={context} />, render: ({ close, ...context }) => <TaskAuthorization context={context} close={close} />, footer: submitFooter("task-authorization", "Authorise the mission") },
+        { id: "task authorization", kind: "modal", title: "Propose a mission", width: OVERLAY_WIDTH.modal, summary: ({ close: _close, ...context }) => <TaskAuthorizationSummary context={context} />, render: ({ close, ...context }) => <TaskAuthorization context={context} close={close} />, footer: submitFooter("task-authorization", "Propose the mission") },
       ],
     },
 
