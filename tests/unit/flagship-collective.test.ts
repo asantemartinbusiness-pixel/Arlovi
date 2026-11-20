@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import "@/domain/seeds/flagshipCollective";
 import { collectSeedsByContributor } from "@/domain/seedRegistry";
-import { ORG_NORTHLINE, SEED_NOW } from "@/domain/types";
+import { ORG_COLLECTIVE, SEED_NOW } from "@/domain/types";
 
 const flagship = collectSeedsByContributor(SEED_NOW).find(group => group.key === "flagship-collective");
 
@@ -11,7 +11,7 @@ describe("Northline Collective flagship fixtures", () => {
     expect(flagship!.records.length).toBeGreaterThan(60);
     expect(new Set(flagship!.records.map(record => record.id)).size).toBe(flagship!.records.length);
     expect(flagship!.records.every(record => record.id.startsWith("nl-") && Number(record.id.split("-").at(-1)) >= 900)).toBe(true);
-    expect(flagship!.records.every(record => record.organizationId === ORG_NORTHLINE)).toBe(true);
+    expect(flagship!.records.every(record => record.organizationId === ORG_COLLECTIVE)).toBe(true);
     expect(flagship!.records.every(record => record.fields.fictional === true)).toBe(true);
   });
 
