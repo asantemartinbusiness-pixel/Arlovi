@@ -88,6 +88,8 @@ export interface ComponentDef {
   properties: { name: string; values: string[] }[];
   published: boolean;
   version: number;
+  /** What the library holds at `version`; the baseline a pending change is diffed against. Absent until first published. */
+  publishedSnapshot?: { properties: { name: string; values: string[] }[]; nodes: Record<string, SceneNode>; children: Record<string, string[]> };
 }
 
 export interface TextStyle { id: string; name: string; family: string; size: number; weight: number; lineHeight: number; letterSpacing: number }
@@ -673,6 +675,50 @@ export function instancesOf(doc: DesignDoc, componentId: string): { pageId: stri
     }
   }
   return out;
+}
+
+export interface ComponentChange { id: string; what: string; detail: string; breaking: boolean }
+
+/**
+ * Pending changes of a component against what its library version holds.
+ * `first` is true when nothing has been published yet, so there is nothing to compare.
+ * A change is breaking when an instance that exists today could stop resolving
+ * (a property or value removed that an instance has picked) or lose layers.
+ */
+export function componentChanges(doc: DesignDoc, component: ComponentDef): { first: boolean; changes: ComponentChange[] } {
+  const base = component.publishedSnapshot;
+  if (!base) return { first: true, changes: [] };
+  const uses = instancesOf(doc, component.id);
+  const changes: ComponentChange[] = [];
+  for (const property of base.properties) {
+    const now = component.properties.find((item) => item.name === property.name);
+    if (!now) {
+      const picked = uses.filter((use) => use.node.variant?.[property.name] !== undefined).length;
+      changes.push({ id: `rm-${property.name}`, what: `Property “${property.name}” removed`, detail: picked ? `${picked} instance${picked === 1 ? "" : "s"} picked a value and fall back to the default.` : "No instance had picked a value.", breaking: true });
+      continue;
+    }
+    for (const value of property.values.filter((item) => !now.values.includes(item))) {
+      const picked = uses.filter((use) => use.node.variant?.[property.name] === value).length;
+      changes.push({ id: `rmv-${property.name}-${value}`, what: `Value “${value}” removed from “${property.name}”`, detail: picked ? `${picked} instance${picked === 1 ? "" : "s"} use it and fall back to the default.` : "No instance uses it.", breaking: picked > 0 });
+    }
+    for (const value of now.values.filter((item) => !property.values.includes(item))) {
+      changes.push({ id: `addv-${property.name}-${value}`, what: `Value “${value}” added to “${property.name}”`, detail: "Offered to every instance; none changes.", breaking: false });
+    }
+  }
+  for (const property of component.properties.filter((item) => !base.properties.some((old) => old.name === item.name))) {
+    changes.push({ id: `add-${property.name}`, what: `Property “${property.name}” added`, detail: `${property.values.join(" · ")}. Instances keep their look until a value is chosen.`, breaking: false });
+  }
+  const before = base.nodes[component.root];
+  const after = component.nodes[component.root];
+  if (before && after) {
+    if (Math.round(before.w) !== Math.round(after.w) || Math.round(before.h) !== Math.round(after.h)) {
+      changes.push({ id: "size", what: "Size changed", detail: `${Math.round(before.w)} × ${Math.round(before.h)} → ${Math.round(after.w)} × ${Math.round(after.h)}; ${uses.length} instance${uses.length === 1 ? "" : "s"} resize.`, breaking: uses.length > 0 });
+    }
+    if ((before.fill?.color ?? "") !== (after.fill?.color ?? "")) changes.push({ id: "fill", what: "Fill changed", detail: `${before.fill?.color ?? "none"} → ${after.fill?.color ?? "none"}.`, breaking: false });
+  }
+  const removedLayers = Object.keys(base.nodes).filter((id) => !component.nodes[id]).length;
+  if (removedLayers > 0) changes.push({ id: "layers", what: `${removedLayers} layer${removedLayers === 1 ? "" : "s"} removed`, detail: "Instances lose those layers; overrides that targeted them are dropped.", breaking: true });
+  return { first: false, changes };
 }
 
 /** Detach an instance: the component's nodes become ordinary nodes. */

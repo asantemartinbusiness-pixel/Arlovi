@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarClock, LineChart as LineIcon, Workflow } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, Empty, Field, Grid, LineChart, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  BarChart, Button, Card, DataGrid, Empty, FactGrid, Field, Grid, LineChart, Notice, OverlaySection, OverlaySummary, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -9,9 +9,9 @@ import { addDays, clockIso, clockNow, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { ACTIVITY_LABEL, activitiesFor, activityKind, probabilityOf, stageOf } from "@/domain/crm-pipeline";
 import { periodLabel, recentPeriods } from "@/domain/fin-ledger";
-import { companyOfDeal, contactById, useCrmData } from "./data";
+import { companyOfDeal, contactById, dealsOfContact, useCrmData } from "./data";
 import type { CrmData } from "./data";
-import { ActivityPill, CapabilityNotice, CapabilityPill, ForecastNote, Money, StagePill } from "./parts";
+import { ActivityPill, CapabilityNotice, CapabilityPill, ConsentPill, ForecastNote, Money, StagePill } from "./parts";
 
 /* ---------------------------- CRM-009 ---------------------------- */
 
@@ -134,7 +134,7 @@ export function AllActivity({ context }: { context: ScreenContext }) {
               for (const activity of selected) {
                 if (activity.status === "done") continue;
                 if (activity.status === "draft") continue;
-                await context.mutate.patch(activity.id, { status: "done", fields: { ...activity.fields, completedBy: context.actor } }, { event: `Activity ${activity.title} completed` });
+                if (!(await context.mutate.patch(activity.id, { status: "done", fields: { ...activity.fields, completedBy: context.actor } }, { event: `Activity ${activity.title} completed` }))) return;
                 done += 1;
               }
               context.toast(done ? "Marked complete" : "Nothing changed", `${done} completed. A drafted message is not completed here, because it has not been sent.`, done ? "ok" : "blocked");
@@ -184,7 +184,7 @@ export function FollowUps({ context }: { context: ScreenContext }) {
             { key: "owner", header: "Who", cell: (row) => String(row.fields.owner ?? row.ownerName) },
             { key: "action", header: "", cell: (row) => (
               <Button size="sm" variant="ghost" onClick={async () => {
-                await context.mutate.patch(row.id, { status: "done", fields: { ...row.fields, completedBy: context.actor } }, { expectRevision: row.revision, event: `Activity ${row.title} completed` });
+                if (!(await context.mutate.patch(row.id, { status: "done", fields: { ...row.fields, completedBy: context.actor } }, { expectRevision: row.revision, event: `Activity ${row.title} completed` }))) return;
                 context.toast("Completed", `${row.title} is marked done by ${context.actor}.`);
               }}>Complete</Button>
             ) },
@@ -263,6 +263,8 @@ export function ActivityEntry({ context, close }: { context: ScreenContext; clos
   const [note, setNote] = useState(existing?.summary ?? "");
   const [busy, setBusy] = useState(false);
 
+  const linkedDeal = data.deals.find((deal) => deal.id === dealId);
+  const lastTouch = linkedDeal ? activitiesFor(data.activities, linkedDeal.id).find((activity) => activity.id !== existing?.id) : undefined;
   const clash = data.activities.find((activity) => {
     if (activity.id === existing?.id) return false;
     if (String(activity.fields.owner ?? activity.ownerName) !== context.actor) return false;
@@ -286,7 +288,12 @@ export function ActivityEntry({ context, close }: { context: ScreenContext; clos
       <Field label="What it is" required><TextInput aria-label="What it is" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Row gap={3} wrap>
         <Field label="Deal">
-          <Select aria-label="Deal" value={dealId} onChange={(event) => setDealId(event.target.value)}>
+          <Select aria-label="Deal" value={dealId} onChange={(event) => {
+            setDealId(event.target.value);
+            // A deal names its contact; offer it rather than leave the history unattached.
+            const linked = data.deals.find((deal) => deal.id === event.target.value)?.fields.contactId;
+            if (linked && !contactId) setContactId(String(linked));
+          }}>
             <option value="">Not linked</option>
             {data.deals.map((deal) => <option key={deal.id} value={deal.id}>{deal.title}</option>)}
           </Select>
@@ -303,6 +310,15 @@ export function ActivityEntry({ context, close }: { context: ScreenContext; clos
       </Field>
       <Field label="Notes"><TextArea aria-label="Notes" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
 
+      {linkedDeal && (
+        <OverlaySection title="Evidence it adds" hint="Stage requirements are judged on logged activity and its outcome.">
+          <FactGrid columns={3} dense items={[
+            { label: "Deal", value: linkedDeal.title, hint: stageOf(linkedDeal).label },
+            { label: "Last touch", value: lastTouch ? context.relative(lastTouch.startAt ?? lastTouch.at) : "Never logged" },
+            { label: "Outcome", value: outcome ? "Recorded" : "Missing", tone: outcome ? "success" : "warning" },
+          ]} />
+        </OverlaySection>
+      )}
       {clash && (
         <Notice tone="warning" title="That overlaps something already in your diary">
           {clash.title} runs from {context.dateTime(clash.startAt)}. The entry can still be saved; this workspace does not hold your real calendar.
@@ -317,41 +333,45 @@ export function ActivityEntry({ context, close }: { context: ScreenContext; clos
           disabled={!title.trim()}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = { kind, owner: context.actor, minutes: Number(minutes) || 0 };
-            if (dealId) fields.dealId = dealId;
-            if (contactId) fields.contactId = contactId;
-            if (outcome) fields.outcome = outcome;
-            const start = new Date(when);
-            const end = new Date(start.getTime() + (Number(minutes) || 0) * 60_000);
-            if (existing) {
-              await context.mutate.patch(existing.id, {
-                title: title.trim(), summary: note, startAt: start.toISOString(), endAt: end.toISOString(), at: start.toISOString(),
-                status: start > now ? "open" : existing.status === "draft" ? "draft" : "done",
-                fields: { ...existing.fields, ...fields },
-              }, { expectRevision: existing.revision, event: `Activity ${title.trim()} updated` });
-              context.toast("Activity saved", `${title.trim()} is updated.`);
-            } else {
-              await context.mutate.create({
-                collection: "activities",
-                title: title.trim(),
-                status: start > now ? "open" : "done",
-                summary: note,
-                startAt: start.toISOString(),
-                endAt: end.toISOString(),
-                at: start.toISOString(),
-                parentId: dealId || contactId || undefined,
-                fields,
-              }, `Activity ${title.trim()} logged`);
-              context.toast("Activity logged", start > now
-                ? `${title.trim()} is scheduled for ${context.dateTime(start)} in this workspace only.`
-                : `${title.trim()} is on the record.`);
+            try {
+              const fields: Record<string, string | number | boolean> = { kind, owner: context.actor, minutes: Number(minutes) || 0 };
+              if (dealId) fields.dealId = dealId;
+              if (contactId) fields.contactId = contactId;
+              if (outcome) fields.outcome = outcome;
+              const start = new Date(when);
+              const end = new Date(start.getTime() + (Number(minutes) || 0) * 60_000);
+              if (existing) {
+                if (!(await context.mutate.patch(existing.id, {
+                  title: title.trim(), summary: note, startAt: start.toISOString(), endAt: end.toISOString(), at: start.toISOString(),
+                  status: start > now ? "open" : existing.status === "draft" ? "draft" : "done",
+                  fields: { ...existing.fields, ...fields },
+                }, { expectRevision: existing.revision, event: `Activity ${title.trim()} updated` }))) return;
+                context.toast("Activity saved", `${title.trim()} is updated.`);
+              } else {
+                await context.mutate.create({
+                  collection: "activities",
+                  title: title.trim(),
+                  status: start > now ? "open" : "done",
+                  summary: note,
+                  startAt: start.toISOString(),
+                  endAt: end.toISOString(),
+                  at: start.toISOString(),
+                  parentId: dealId || contactId || undefined,
+                  fields,
+                }, `Activity ${title.trim()} logged`);
+                context.toast("Activity logged", start > now
+                  ? `${title.trim()} is scheduled for ${context.dateTime(start)} in this workspace only.`
+                  : `${title.trim()} is on the record.`);
+              }
+              close();
+            } finally {
+              setBusy(false);
             }
-            setBusy(false);
-            close();
           }}
         >
           {existing ? "Save" : "Log it"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -371,15 +391,26 @@ export function CalendarConflict({ context }: { context: ScreenContext }) {
   }
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Only this workspace's own entries are checked">
-        No calendar provider is connected, so a clash with a real meeting cannot be seen from here.
-      </Notice>
+      <FactGrid columns={2} items={[
+        { label: "Entries checked", value: String(mine.length), mono: true, hint: `for ${context.actor}` },
+        { label: "Overlaps", value: String(clashes.length), mono: true, tone: clashes.length ? "warning" : "success" },
+      ]} />
+      <p className="ds-subtle">Only this workspace's own entries are checked. No calendar provider is connected, so a clash with a real meeting cannot be seen from here.</p>
       {clashes.length === 0 ? <Empty title="No overlap in your logged diary" /> : (
-        <Stack gap={3}>
-          {clashes.map(({ a, b }) => (
-            <Card key={`${a.id}-${b.id}`} eyebrow="OVERLAP" prov="human" title={`${a.title} and ${b.title}`} subtitle={`${context.dateTime(a.startAt)} against ${context.dateTime(b.startAt)}`} />
-          ))}
-        </Stack>
+        <OverlaySection title="Overlapping entries" tone="warning">
+          <ul className="crm-evidence" data-flush>
+            {clashes.map(({ a, b }) => {
+              const overlap = Math.round((Math.min(new Date(a.endAt!).getTime(), new Date(b.endAt!).getTime()) - Math.max(new Date(a.startAt!).getTime(), new Date(b.startAt!).getTime())) / 60_000);
+              return (
+                <li key={`${a.id}-${b.id}`}>
+                  <Pill tone="warning" dot>{overlap} min</Pill>
+                  <span className="crm-evidence-label">{a.title} and {b.title}</span>
+                  <span className="crm-evidence-value ds-subtle ds-num">{context.dateTime(a.startAt)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </OverlaySection>
       )}
     </Stack>
   );
@@ -394,6 +425,11 @@ export function MeetingComposer({ context, close }: { context: ScreenContext; cl
   const [busy, setBusy] = useState(false);
   const contact = contactById(data, contactId);
   const suppressed = contact?.fields.suppressed === true;
+  const contactTouch = contact ? activitiesFor(data.activities, contact.id)[0] : undefined;
+  const meetingStart = new Date(when).getTime();
+  const diaryClash = data.activities.find((activity) => activity.startAt && activity.endAt
+    && String(activity.fields.owner ?? activity.ownerName) === context.actor
+    && new Date(activity.startAt).getTime() < meetingStart + 45 * 60_000 && new Date(activity.endAt).getTime() > meetingStart);
 
   return (
     <Stack gap={4}>
@@ -407,7 +443,17 @@ export function MeetingComposer({ context, close }: { context: ScreenContext; cl
         </Field>
         <Field label="When"><TextInput aria-label="When" type="datetime-local" value={when} onChange={(event) => setWhen(event.target.value)} /></Field>
       </Row>
-      <Field label="Agenda"><TextArea aria-label="Agenda" value={agenda} rows={4} onChange={(event) => setAgenda(event.target.value)} /></Field>
+      <Field label="Agenda"><TextArea aria-label="Agenda" value={agenda} rows={3} onChange={(event) => setAgenda(event.target.value)} /></Field>
+      {contact && (
+        <OverlaySection title={`About ${contact.title}`}>
+          <FactGrid columns={2} dense items={[
+            { label: "Email consent", value: <ConsentPill contact={contact} /> },
+            { label: "Last touch", value: contactTouch ? context.relative(contactTouch.startAt ?? contactTouch.at) : "Never logged" },
+            { label: "Open deals", value: String(dealsOfContact(data, contact.id).filter((deal) => stageOf(deal).kind === "open").length), mono: true },
+            { label: "Diary at that time", value: diaryClash ? `Overlaps ${diaryClash.title}` : "Free", tone: diaryClash ? "warning" : "success" },
+          ]} />
+        </OverlaySection>
+      )}
       {suppressed && <Notice tone="danger" title="This contact is suppressed">No invitation and no draft is prepared for them.</Notice>}
       <Row gap={2}>
         <Button
@@ -416,25 +462,29 @@ export function MeetingComposer({ context, close }: { context: ScreenContext; cl
           disabled={!contactId || suppressed}
           onClick={async () => {
             setBusy(true);
-            const start = new Date(when);
-            await context.mutate.create({
-              collection: "activities",
-              title: `Meeting with ${contact?.title}`,
-              status: "open",
-              summary: agenda || `Proposed meeting in ${org.name}'s workspace.`,
-              startAt: start.toISOString(),
-              endAt: new Date(start.getTime() + 45 * 60_000).toISOString(),
-              at: start.toISOString(),
-              parentId: contactId,
-              fields: { kind: "meeting", contactId, owner: context.actor, delivery: "not_connected" },
-            }, `Meeting with ${contact?.title} proposed`);
-            context.toast("Meeting recorded", `It is in your workspace diary for ${context.dateTime(start)}. Nobody has been invited, because no calendar is connected.`, "info");
-            setBusy(false);
-            close();
+            try {
+              const start = new Date(when);
+              await context.mutate.create({
+                collection: "activities",
+                title: `Meeting with ${contact?.title}`,
+                status: "open",
+                summary: agenda || `Proposed meeting in ${org.name}'s workspace.`,
+                startAt: start.toISOString(),
+                endAt: new Date(start.getTime() + 45 * 60_000).toISOString(),
+                at: start.toISOString(),
+                parentId: contactId,
+                fields: { kind: "meeting", contactId, owner: context.actor, delivery: "not_connected" },
+              }, `Meeting with ${contact?.title} proposed`);
+              context.toast("Meeting recorded", `It is in your workspace diary for ${context.dateTime(start)}. Nobody has been invited, because no calendar is connected.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record the meeting
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -690,17 +740,30 @@ export function ForecastMethodology() {
 
 export function ForecastModel({ context }: { context: ScreenContext }) {
   const data = useCrmData();
-  void context;
+  const open = data.forecast.byStage.filter((entry) => entry.stage.kind === "open");
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Method", value: "Amount × stage probability over open deals" },
-        { label: "Open deals", value: String(data.forecast.openCount) },
-        { label: "Weighted total", value: <Money minor={data.forecast.weightedMinor} context={context} bold /> },
-        { label: "Excluded, no amount", value: String(data.forecast.withoutAmountIds.length) },
+      <FactGrid columns={3} items={[
+        { label: "Open deals", value: String(data.forecast.openCount), mono: true },
+        { label: "Pipeline", value: context.money(data.forecast.pipelineMinor), mono: true },
+        { label: "Weighted", value: context.money(data.forecast.weightedMinor), mono: true, hint: "amount x stage probability" },
       ]} />
+      <OverlaySection title="Stage by stage" hint="Each row is the sum the weighted figure is built from.">
+        <ul className="crm-evidence" data-flush>
+          {open.map((entry) => (
+            <li key={entry.stage.id}>
+              <span className="ds-num">{entry.stage.probability}%</span>
+              <span className="crm-evidence-label">{entry.stage.label} <span className="ds-subtle">({entry.count})</span></span>
+              <span className="crm-evidence-value ds-num">{context.money(entry.amountMinor)} to {context.money(entry.weightedMinor)}</span>
+            </li>
+          ))}
+        </ul>
+        {data.forecast.withoutAmountIds.length > 0 && (
+          <p className="ds-subtle">{data.forecast.withoutAmountIds.length} deal(s) with no amount are excluded, not counted as zero.</p>
+        )}
+      </OverlaySection>
       <Notice tone="info" title="No predictive certainty is claimed">
-        The model is arithmetic over records someone typed. It has no training data, no history of its own accuracy and no opinion about whether a deal will close.
+        The model is arithmetic over records someone typed. It has no training data and no opinion about whether a deal will close.
       </Notice>
     </Stack>
   );
@@ -717,9 +780,13 @@ export function ConfidenceExplanation() {
   }));
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Confidence here means evidence, not a score">
-        A deal with a quote, a close date and logged activity has more behind its weighting than one with none. That is all this view claims.
-      </Notice>
+      <FactGrid columns={4} items={[
+        { label: "Open deals", value: String(evidence.length), mono: true },
+        { label: "With logged activity", value: String(evidence.filter((row) => row.activities > 0).length), mono: true },
+        { label: "With a quote", value: String(evidence.filter((row) => row.hasQuote).length), mono: true },
+        { label: "With a close date", value: String(evidence.filter((row) => row.hasClose).length), mono: true },
+      ]} />
+      <p className="ds-subtle">Confidence here means evidence, not a score. A deal with a quote, a close date and logged activity has more behind its weighting than one with none.</p>
       <DataGrid
         rows={evidence}
         rowId={(row) => row.deal.id}
@@ -751,15 +818,13 @@ export function OverrideReason({ context, close }: { context: ScreenContext; clo
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="An override needs a reason on the record">
-        The stage default is {stageOf(deal).probability}%. Overriding it changes the forecast, so the reason is stored with the figure.
-      </Notice>
-      <Properties rows={[
-        { label: "Deal", value: deal.title },
-        { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
-        { label: "Weighted now", value: <Money minor={before} context={context} /> },
-        { label: "Weighted after", value: <Money minor={after} context={context} bold /> },
+      <OverlaySummary eyebrow="Deal" title={deal.title} status={<StagePill deal={deal} />} meta={[<span className="ds-num" key="a">{context.money(Number(deal.amountMinor ?? 0))}</span>, `stage default ${stageOf(deal).probability}%`]} />
+      <FactGrid columns={3} items={[
+        { label: "Weighted now", value: context.money(before), mono: true, hint: `${probabilityOf(deal)}%` },
+        { label: "Weighted after", value: context.money(after), mono: true, hint: `${value}%` },
+        { label: "Moves the forecast by", value: context.money(after - before), mono: true, tone: after === before ? undefined : after > before ? "success" : "warning" },
       ]} />
+      <p className="ds-subtle">An override changes the forecast, so the reason is stored with the figure.</p>
       <Row gap={3} wrap>
         <Field label="Probability" hint="0 to 100">
           <TextInput aria-label="Probability" align="end" inputMode="numeric" value={probability} onChange={(event) => setProbability(event.target.value.replace(/\D/g, ""))} />
@@ -773,16 +838,20 @@ export function OverrideReason({ context, close }: { context: ScreenContext; clo
           disabled={!reason.trim() || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(deal.id, {
-              fields: { ...deal.fields, probability: value, probabilityOverride: reason, probabilityOverrideBy: context.actor },
-            }, { expectRevision: deal.revision, event: `Weighting on ${deal.title} overridden to ${value}%: ${reason}` });
-            context.toast("Weighting overridden", `${deal.title} is weighted at ${value}%. The forecast moved by ${context.money(after - before)}.`);
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(deal.id, {
+                fields: { ...deal.fields, probability: value, probabilityOverride: reason, probabilityOverrideBy: context.actor },
+              }, { expectRevision: deal.revision, event: `Weighting on ${deal.title} overridden to ${value}%: ${reason}` }))) return;
+              context.toast("Weighting overridden", `${deal.title} is weighted at ${value}%. The forecast moved by ${context.money(after - before)}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Apply the override
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -841,7 +910,7 @@ export function WorkflowsTab({ context }: { context: ScreenContext }) {
                     disabled={!context.can("run_automation")}
                     onClick={async () => {
                       setBusy(workflow.id);
-                      await context.mutate.patch(workflow.id, { status: "stopped", fields: { ...workflow.fields, stoppedBy: context.actor } }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} stopped` });
+                      if (!(await context.mutate.patch(workflow.id, { status: "stopped", fields: { ...workflow.fields, stoppedBy: context.actor } }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} stopped` }))) return;
                       context.toast("Stopped", `${workflow.title} will not run again until it is activated.`, "blocked");
                       setBusy(undefined);
                     }}
@@ -969,15 +1038,39 @@ export function FailuresTab({ context }: { context: ScreenContext }) {
   );
 }
 
+type RuleNode = { id: string; type: string; label: string; config?: { kind?: string } };
+
+/** Which designer action a saved rule's action node stands for. */
+function actionOfNode(node: RuleNode | undefined): string {
+  if (!node) return "assign";
+  const text = `${node.label} ${node.config?.kind ?? ""}`;
+  if (/sms|text message/i.test(text)) return "sms";
+  if (/e-?mail|send/i.test(text)) return "email";
+  if (/draft/i.test(text)) return "draft";
+  if (/task|follow-?up|record\.create/i.test(text)) return "task";
+  return "assign";
+}
+
 export function WorkflowDesigner({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = data.workflows.find((item) => item.id === (payload?.id ?? context.selectedId));
+  const wantedId = payload?.id ?? context.selectedId;
+  const existing = data.workflows.find((item) => item.id === wantedId);
+  // The form seeds its state once, so it must mount only after the rule has loaded.
+  if (wantedId && !existing && data.workflows.length === 0) return <Empty title="Loading the rule" />;
+  return <WorkflowDesignerForm key={existing?.id ?? "new"} context={context} close={close} existing={existing} />;
+}
+
+function WorkflowDesignerForm({ context, close, existing }: { context: ScreenContext; close: () => void; existing?: Rec }) {
+  const nodes = ((existing?.body as { nodes?: RuleNode[] } | undefined)?.nodes ?? []);
+  const initialTrigger = String(existing?.fields.trigger ?? nodes.find((node) => node.type === "trigger")?.label ?? "lead.created");
+  const initialAction = actionOfNode(nodes.find((node) => node.type === "action"));
   const [title, setTitle] = useState(existing?.title ?? "");
-  const [trigger, setTrigger] = useState(String(existing?.fields.trigger ?? "lead.created"));
-  const [action, setAction] = useState("assign");
+  const [trigger, setTrigger] = useState(initialTrigger);
+  const [action, setAction] = useState(initialAction);
   const [summary, setSummary] = useState(existing?.summary ?? "");
   const [busy, setBusy] = useState(false);
+  const changedShape = trigger !== initialTrigger || action !== initialAction;
 
   const ACTIONS = [
     { value: "assign", label: "Assign an owner", safe: true },
@@ -994,7 +1087,7 @@ export function WorkflowDesigner({ context, close }: { context: ScreenContext; c
       <Row gap={3} wrap>
         <Field label="When">
           <Select aria-label="When" value={trigger} onChange={(event) => setTrigger(event.target.value)}>
-            {["lead.created", "deal.idle", "deal.stage_changed", "quote.accepted", "invoice.overdue"].map((item) => <option key={item}>{item}</option>)}
+            {[...new Set([initialTrigger, "lead.created", "deal.idle", "deal.stage_changed", "quote.accepted", "invoice.overdue"])].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
         <Field label="Then">
@@ -1009,9 +1102,17 @@ export function WorkflowDesigner({ context, close }: { context: ScreenContext; c
           There is no mail or telephony provider connected, and an automated message to a customer is exactly the thing this workspace will not fake. The rule can draft a document for a person to send instead.
         </Notice>
       )}
-      <Notice tone="info" title="Every rule skips a suppressed contact">
-        That check is not optional and is not a setting on the rule. A refusal is recorded as a blocked run so you can see it happened.
-      </Notice>
+      <OverlaySection title="The rule reads as" hint="The second step is not a setting. A refusal is recorded as a blocked run so you can see it happened.">
+        <ol className="crm-steps">
+          {existing && !changedShape && nodes.length > 0
+            ? nodes.map((node) => <li key={node.id}><span><strong>{node.type}</strong> {node.label}</span></li>)
+            : <>
+              <li><span><strong>When</strong> {trigger}</span></li>
+              <li><span><strong>Check</strong> the contact is not suppressed</span></li>
+              <li><span><strong>Then</strong> {chosen.label.toLowerCase()}</span></li>
+            </>}
+        </ol>
+      </OverlaySection>
       <Row gap={2}>
         <Button
           variant="primary"
@@ -1020,34 +1121,40 @@ export function WorkflowDesigner({ context, close }: { context: ScreenContext; c
           title={!chosen.safe ? "Choose an action this workspace can actually perform" : undefined}
           onClick={async () => {
             setBusy(true);
-            const nodes = [
-              { id: "n1", type: "trigger", label: trigger, x: 40, y: 80 },
-              { id: "n2", type: "condition", label: "Contact is not suppressed", x: 240, y: 80 },
-              { id: "n3", type: "action", label: chosen.label, x: 460, y: 80 },
-            ];
-            if (existing) {
-              await context.mutate.patch(existing.id, {
-                title: title.trim(), summary,
-                fields: { ...existing.fields, trigger },
-                body: { nodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] },
-              }, { expectRevision: existing.revision, event: `Workflow ${title.trim()} edited` });
-            } else {
-              await context.mutate.create({
-                collection: "workflows",
-                title: title.trim(),
-                status: "draft",
-                summary: summary || `${trigger} then ${chosen.label.toLowerCase()}.`,
-                fields: { trigger, scope: "all records", runs: 0 },
-                body: { nodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] },
-              }, `Workflow ${title.trim()} created`);
+            try {
+              const builtNodes = [
+                { id: "n1", type: "trigger", label: trigger, x: 40, y: 80 },
+                { id: "n2", type: "condition", label: "Contact is not suppressed", x: 240, y: 80 },
+                { id: "n3", type: "action", label: chosen.label, x: 460, y: 80 },
+              ];
+              if (existing) {
+                // A rule whose trigger and action are unchanged keeps its saved steps and their configuration.
+                const saved = await context.mutate.patch(existing.id, {
+                  title: title.trim(), summary,
+                  fields: { ...existing.fields, trigger },
+                  ...(changedShape ? { body: { nodes: builtNodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] } } : {}),
+                }, { expectRevision: existing.revision, event: `Workflow ${title.trim()} edited` });
+                if (!saved) { setBusy(false); return; }
+              } else {
+                await context.mutate.create({
+                  collection: "workflows",
+                  title: title.trim(),
+                  status: "draft",
+                  summary: summary || `${trigger} then ${chosen.label.toLowerCase()}.`,
+                  fields: { trigger, scope: "all records", runs: 0 },
+                  body: { nodes: builtNodes, edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }] },
+                }, `Workflow ${title.trim()} created`);
+              }
+              context.toast("Rule saved as a draft", "A draft rule never runs. Activating it is a separate, recorded decision.");
+              close();
+            } finally {
+              setBusy(false);
             }
-            context.toast("Rule saved as a draft", "A draft rule never runs. Activating it is a separate, recorded decision.");
-            setBusy(false);
-            close();
           }}
         >
           {existing ? "Save the rule" : "Create as a draft"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -1081,16 +1188,12 @@ export function TestData({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="A simulation changes nothing">
-        It runs the rule's conditions against real records in this workspace and reports what would happen. No record is written and no run is recorded.
-      </Notice>
-      <Properties rows={[
-        { label: "Rule", value: workflow.title },
-        { label: "Trigger", value: trigger },
-        { label: "Subjects examined", value: String(simulated.length) },
-        { label: "Would act on", value: String(simulated.filter((entry) => !entry.blocked).length) },
-        { label: "Would refuse", value: String(simulated.filter((entry) => entry.blocked).length) },
+      <FactGrid columns={3} items={[
+        { label: "Examined", value: String(simulated.length), mono: true, hint: trigger },
+        { label: "Would act on", value: String(simulated.filter((entry) => !entry.blocked).length), mono: true, tone: "success" },
+        { label: "Would refuse", value: String(simulated.filter((entry) => entry.blocked).length), mono: true, tone: simulated.some((entry) => entry.blocked) ? "warning" : undefined },
       ]} />
+      <p className="ds-subtle">A simulation changes nothing: it runs {workflow.title} against real records and writes no record and no run.</p>
       <DataGrid
         rows={simulated}
         rowId={(row) => row.record.id}
@@ -1122,12 +1225,13 @@ export function ActivationApproval({ context, close }: { context: ScreenContext;
           ? "No provider is connected, so a sending step would be a lie. Edit the rule to draft a document instead."
           : "It will assign owners, create tasks and draft documents when its trigger matches. It will never contact anyone."}
       </Notice>
-      <Properties rows={[
-        { label: "Rule", value: workflow.title },
-        { label: "Trigger", value: String(workflow.fields.trigger ?? "Not set") },
-        { label: "Steps", value: nodes.map((node) => node.label).join(" → ") || "None" },
-        { label: "Approver", value: context.actor },
-      ]} />
+      <OverlaySection title={workflow.title} hint={`Triggers on ${String(workflow.fields.trigger ?? "nothing yet")}. Approver: ${context.actor}.`}>
+        {nodes.length === 0 ? <span className="ds-subtle">No steps recorded.</span> : (
+          <ol className="crm-steps">
+            {nodes.map((node) => <li key={node.id}><span><strong>{node.type}</strong> {node.label}</span></li>)}
+          </ol>
+        )}
+      </OverlaySection>
       <Row gap={2}>
         <Button
           variant="primary"
@@ -1135,17 +1239,21 @@ export function ActivationApproval({ context, close }: { context: ScreenContext;
           disabled={sends || !context.can("run_automation")}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(workflow.id, {
-              status: "active",
-              fields: { ...workflow.fields, activatedBy: context.actor, activatedAt: clockIso() },
-            }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} activated by ${context.actor}` });
-            context.toast("Rule activated", `${workflow.title} is active. ${context.actor} is recorded as the approver, and every run will be listed under Runs.`);
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(workflow.id, {
+                status: "active",
+                fields: { ...workflow.fields, activatedBy: context.actor, activatedAt: clockIso() },
+              }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} activated by ${context.actor}` }))) return;
+              context.toast("Rule activated", `${workflow.title} is active. ${context.actor} is recorded as the approver, and every run will be listed under Runs.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Activate the rule
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

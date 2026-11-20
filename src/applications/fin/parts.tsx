@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
-import { Notice, Pill, Properties, Row, Skeleton, Stack } from "@/design-system";
+import { DrawerActions, ModalActions, Notice, Pill, Properties, Row, Skeleton, Stack } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
@@ -145,7 +145,7 @@ export function SourceNote({ children }: { children: ReactNode }) {
   return <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{children}</p>;
 }
 
-export function StatementRow({ rows, context }: { rows: { label: string; minor?: number; bold?: boolean; note?: string; indent?: boolean }[]; context: ScreenContext }) {
+export function StatementRow({ rows, context }: { rows: { label: string; minor?: number; text?: string; bold?: boolean; note?: string; indent?: boolean }[]; context: ScreenContext }) {
   return (
     <table className="ds-table">
       <tbody>
@@ -155,7 +155,7 @@ export function StatementRow({ rows, context }: { rows: { label: string; minor?:
               {row.label}
               {row.note && <span className="ds-subtle" style={{ display: "block", fontSize: "var(--text-xs)" }}>{row.note}</span>}
             </th>
-            <td data-align="end"><Amount minor={row.minor} context={context} bold={row.bold} /></td>
+            <td data-align="end">{row.text !== undefined ? <span className="ds-num">{row.text}</span> : <Amount minor={row.minor} context={context} bold={row.bold} />}</td>
           </tr>
         ))}
       </tbody>
@@ -224,4 +224,15 @@ export function groupByType(accounts: Rec[]): { type: AccountType; accounts: Rec
     type,
     accounts: accountOptions(accounts, true).filter((account) => accountType(account) === type),
   }));
+}
+
+/** Overlay footer: actions flow from the left, the dismiss action sits at the end. Portals into the overlay footer. */
+export function FormFooter({ children, end, drawer }: { children?: ReactNode; end?: ReactNode; drawer?: boolean }) {
+  const row = (
+    <div className="ds-ov-actions" data-variant="form">
+      {children}
+      {end && <><span className="ds-grow" aria-hidden="true" />{end}</>}
+    </div>
+  );
+  return drawer ? <DrawerActions>{row}</DrawerActions> : <ModalActions>{row}</ModalActions>;
 }

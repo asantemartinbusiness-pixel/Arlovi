@@ -60,3 +60,21 @@ test.describe("mobile", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 });
+
+test("resolving Saturday closing time leaves a current assertion in the Fact registry", async ({ page }) => {
+  await page.goto("/o/northline/brain/conflicts?clock=2026-11-14T09:30:00Z");
+  await page.getByRole("button", { name: "Choose the source of truth" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Saturday closing time" })).toBeVisible();
+  await dialog.getByRole("radio", { name: /18:00/ }).check();
+  await dialog.getByLabel("Why this one").fill("The location record was checked against the door sign.");
+  await dialog.getByRole("button", { name: "Record the resolution" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.goto("/o/northline/brain/facts?clock=2026-11-14T09:30:00Z");
+  await page.getByRole("tab", { name: "Verified" }).click();
+  const row = page.getByRole("row", { name: /Saturday closing time/ });
+  await expect(row).toContainText("18:00");
+  await page.getByRole("tab", { name: "Conflicting" }).click();
+  await expect(page.getByRole("row", { name: /Saturday closing time/ })).toHaveCount(0);
+});

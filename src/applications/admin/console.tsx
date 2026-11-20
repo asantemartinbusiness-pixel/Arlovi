@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Database, FileClock, KeyRound, Lock, Scale, Server } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill,
-  Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
+  FactGrid, OverlayActions, OverlaySection, Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useOrgRecords, useWorkspace } from "@/platform/workspace";
@@ -43,9 +43,8 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
       <Grid>
         <Card eyebrow="SIGN-IN" prov="human" span={7} title="Sign-in" subtitle={policy?.summary ?? "No sign-in policy recorded"}>
           <Stack gap={3}>
-            <Notice tone="warning" title="There is no identity provider">
-              Role views are chosen in this browser from the account menu. Nothing here authenticates anybody, so every setting below
-              is a statement of intent that a future service would enforce.
+            <Notice tone="warning" title="No identity provider is connected">
+              Every setting below records intent for a future sign-in service. None of it is enforced today.
             </Notice>
             <Properties rows={[
               { label: "Single sign-on", value: <Pill tone={CAPABILITY_TONE.not_connected}>{CAPABILITY_LABELS.not_connected}</Pill> },
@@ -135,7 +134,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
                 onRun: (selected) => {
                   const revokable = selected.filter((row) => row.fields.current !== true && row.status === "active");
                   void Promise.all(revokable.map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() } }, { event: `Session revoked: ${row.title}` })))
-                    .then(() => context.toast(
+                    .then((saved) => saved.every(Boolean) && context.toast(
                       "Revoked",
                       selected.length === revokable.length
                         ? `${revokable.length} ${revokable.length === 1 ? "session" : "sessions"} revoked.`
@@ -173,7 +172,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
                   variant={device.status === "trusted" ? "ghost" : "secondary"}
                   onClick={async () => {
                     const next = device.status === "trusted" ? "untrusted" : "trusted";
-                    await context.mutate.patch(device.id, { status: next, fields: { ...device.fields, trusted: next === "trusted", changedBy: context.actor } }, { event: `Device marked ${next}: ${device.title}`, expectRevision: device.revision });
+                    if (!(await context.mutate.patch(device.id, { status: next, fields: { ...device.fields, trusted: next === "trusted", changedBy: context.actor } }, { event: `Device marked ${next}: ${device.title}`, expectRevision: device.revision }))) return;
                     context.toast(next === "trusted" ? "Device trusted" : "Trust removed", `${device.title} is now ${next}.`);
                   }}
                 >
@@ -241,10 +240,9 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
         { label: "Reply URL", value: <span className="ds-num">not available without a server</span> },
         { label: "Entity id", value: <span className="ds-num">arlovi:{context.org.slug}</span> },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!domainHint}
           onClick={async () => {
@@ -261,8 +259,10 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
           }}
         >
           Save configuration
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -272,9 +272,14 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
   const payload = context.overlayPayload as { id?: string } | undefined;
   const initialId = payload?.id ?? context.selectedId ?? "";
   const active = data.sessions.filter(row => row.status === "active" && row.fields.current !== true);
-  const [scope, setScope] = useState<"single" | "all" | "none">(initialId ? "single" : "none");
-  const [selectedId, setSelectedId] = useState(initialId);
+  const firstId = (active.find(row => row.fields.anomaly) ?? active[0])?.id ?? "";
+  // Defaults are derived, not stored, because the session records may still be loading on first render.
+  const [chosenScope, setScope] = useState<"single" | "all" | "none" | null>(null);
+  const [chosenId, setSelectedId] = useState<string | null>(null);
+  const scope = chosenScope ?? (initialId || firstId ? "single" : "none");
+  const selectedId = chosenId ?? (initialId || firstId);
   const [confirmation, setConfirmation] = useState("");
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const target = scope === "all" ? active : scope === "single"
@@ -305,15 +310,23 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
           </Select>
         </Field>
       )}
-      {scope === "all" && <Notice tone="danger" title="Bulk revocation affects every other active session">
-        {active.length} active session record(s) will be marked revoked. The current local session remains unchanged.
-      </Notice>}
-      <Properties rows={[
-        { label: "Affected session records", value: String(target.length) },
-        { label: "Sessions", value: target.map(row => row.title).join("; ") || "None selected" },
-        { label: "Current session", value: "Not included in the revocation" },
-        { label: "Real provider sign-out", value: "Not connected; no remote session termination" },
-      ]} />
+      <OverlaySection title="Who loses a session" hint="Your current session is never included." tone={scope === "all" ? "danger" : "neutral"}><Stack gap={3}>
+        <FactGrid columns={2} dense items={[
+          { label: "Session records", value: String(target.length), mono: true },
+          { label: "People", value: String(new Set(target.map(row => String(row.fields.member))).size), mono: true },
+        ]} />
+        {target.length === 0
+          ? <p className="ds-subtle">Choose a scope above to see exactly which sessions are marked revoked.</p>
+          : <ul className="adm-affected">{target.map(row => <li key={row.id}>
+              <span><strong>{String(row.fields.member)}</strong> <span className="ds-subtle">{String(row.fields.device ?? row.title)}{row.fields.location ? ` · ${String(row.fields.location)}` : ""}</span></span>
+              {row.fields.anomaly ? <Pill tone="warning">{String(row.fields.anomaly)}</Pill> : row.fields.trusted === true ? <Pill tone="success">Trusted</Pill> : <Pill>Untrusted</Pill>}
+            </li>)}</ul>}
+      </Stack></OverlaySection>
+      {target.length > 0 && (
+        <Field label="Reason" hint="Saved in the audit trail with who revoked and when.">
+          <TextArea value={reason} rows={1} maxLength={300} disabled={busy} onChange={event => setReason(event.target.value)} />
+        </Field>
+      )}
       {target.length > 0 && (
         <Field label="Type REVOKE to confirm" required>
           <TextInput aria-label="Type REVOKE to confirm" value={confirmation}
@@ -323,36 +336,37 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
       )}
       {error && <Notice tone="danger" title="Revocation could not be recorded">{error}</Notice>}
       <ModalActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button variant="danger" busy={busy} disabled={!canSubmit}
-          onClick={async () => {
-            if (!canSubmit) return;
-            setBusy(true);
-            setError("");
-            try {
-              const editor = { actor: context.actor, now: clockIso() };
-              const records = target.map(row => revisedRecord(row, {
-                status: "revoked", fields: { ...row.fields,
-                  revokedBy: context.actor, revokedAt: editor.now },
-              }, editor));
-              await context.mutate.putMany(
-                records,
-                target.map(row => `Session revocation recorded for ${row.title} by ${context.actor}`),
-                Object.fromEntries(target.map(row => [row.id, row.revision])),
-                target.map(() => "update"),
-              );
-              context.toast("Session records marked revoked",
-                `${target.length} session record(s) updated locally. No remote identity provider was contacted.`);
-              close();
-            } catch (cause) {
-              const message = cause instanceof Error ? cause.message : "The sessions may have changed. Reload before retrying.";
-              setError(message);
-              context.toast("Revocation not recorded", message, "failed");
-            } finally { setBusy(false); }
-          }}>
-          Record revocation{target.length > 0 ? ` (${target.length})` : ""}
-        </Button>
+        <OverlayActions
+          primary={<Button variant="danger" busy={busy} disabled={!canSubmit}
+            onClick={async () => {
+              if (!canSubmit) return;
+              setBusy(true);
+              setError("");
+              try {
+                const editor = { actor: context.actor, now: clockIso() };
+                const records = target.map(row => revisedRecord(row, {
+                  status: "revoked", fields: { ...row.fields,
+                    revokedBy: context.actor, revokedAt: editor.now, ...(reason.trim() ? { revokedReason: reason.trim() } : {}) },
+                }, editor));
+                await context.mutate.putMany(
+                  records,
+                  target.map(row => `Session revocation recorded for ${row.title} by ${context.actor}${reason.trim() ? `: ${reason.trim()}` : ""}`),
+                  Object.fromEntries(target.map(row => [row.id, row.revision])),
+                  target.map(() => "update"),
+                );
+                context.toast("Session records marked revoked",
+                  `${target.length} session record(s) updated locally. No remote identity provider was contacted.`);
+                close();
+              } catch (cause) {
+                const message = cause instanceof Error ? cause.message : "The sessions may have changed. Reload before retrying.";
+                setError(message);
+                context.toast("Revocation not recorded", message, "failed");
+              } finally { setBusy(false); }
+            }}>
+            Record revocation{target.length > 0 ? ` (${target.length})` : ""}
+          </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </ModalActions>
     </Stack>
   );
@@ -381,7 +395,7 @@ export function SecurityReview({ context, close }: { context: ScreenContext; clo
       onConfirm={async () => {
         setBusy(true);
         try {
-          await context.mutate.patch(policy.id, { fields: { ...policy.fields, [setting]: !current, changedBy: context.actor } }, { event: `${label[setting] ?? setting} ${current ? "disabled" : "enabled"}`, expectRevision: policy.revision });
+          if (!(await context.mutate.patch(policy.id, { fields: { ...policy.fields, [setting]: !current, changedBy: context.actor } }, { event: `${label[setting] ?? setting} ${current ? "disabled" : "enabled"}`, expectRevision: policy.revision }))) return;
           context.toast("Policy changed", "The sign-in policy record carries the change, and the audit trail names you.");
           close();
         } finally { setBusy(false); }
@@ -554,10 +568,9 @@ export function ExportAuthorization({ context, close }: { context: ScreenContext
         { label: "Format", value: "CSV, written in this browser" },
         { label: "Leaves this device", value: "Only if you choose to share the downloaded file" },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!allowed || !reason.trim()}
@@ -574,8 +587,10 @@ export function ExportAuthorization({ context, close }: { context: ScreenContext
           }}
         >
           Authorise and export
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -863,7 +878,6 @@ export function DataRequestOverlay({ context, close: _close }: { context: Screen
       <DrawerInFlight when={busy} />
       <Properties rows={[
         { label: "Subject", value: subject || "Missing subject identity" },
-        { label: "Request", value: request.title },
         { label: "Kind", value: String(request.fields.type ?? "Not recorded") },
         { label: "Received", value: context.dateTime(request.at) },
         { label: "Due", value: request.dueAt
@@ -902,31 +916,9 @@ export function DataRequestOverlay({ context, close: _close }: { context: Screen
         label="I independently verified the requester's identity and confirmed the collection scope before preparing a copy." />
       {error && <Notice tone="danger" title="Privacy action could not be completed">{error}</Notice>}
       <DrawerActions>
-        <OverlayCancel disabled={busy}>Close review</OverlayCancel>
-        <span className="ds-grow" />
-        <Button variant="secondary" busy={busy} disabled={!canRestrict}
-          title={!context.can("manage_policy") ? "Policy-management permission required" : undefined}
-          onClick={async () => {
-            if (!canRestrict) return;
-            setBusy(true);
-            setError("");
-            try {
-              const saved = await context.mutate.patch(request.id, {
-                status: "restricted",
-                fields: { ...request.fields, restrictedBy: context.actor,
-                  restrictedAt: context.now.toISOString() },
-              }, { event: `Local processing restriction flag recorded for ${subject}`,
-                expectRevision: request.revision });
-              if (!saved) { setError("The request changed. Reopen the latest version before trying again."); return; }
-              context.toast("Local restriction recorded",
-                "The request was marked restricted here. External processors and other systems were not automatically restricted.");
-            } catch (cause) {
-              setError(cause instanceof Error ? cause.message : "Review the request before retrying.");
-            } finally { setBusy(false); }
-          }}>
-          Mark locally restricted
-        </Button>
-        <Button variant="primary" busy={busy} disabled={!canExport}
+        <OverlayActions
+          busy={busy}
+          primary={<Button variant="primary" busy={busy} disabled={!canExport}
           title={!context.can("export_data") ? "Export permission required" : !ready ? "Identify the subject and finish counting records first" : undefined}
           onClick={async () => {
             if (!canExport) return;
@@ -954,12 +946,35 @@ export function DataRequestOverlay({ context, close: _close }: { context: Screen
             } finally { setBusy(false); }
           }}>
           Export scoped CSV
-        </Button>
-        <Button variant="outline-danger" disabled={!canDelete}
+        </Button>}
+          secondary={<Button variant="secondary" busy={busy} disabled={!canRestrict}
+          title={!context.can("manage_policy") ? "Policy-management permission required" : undefined}
+          onClick={async () => {
+            if (!canRestrict) return;
+            setBusy(true);
+            setError("");
+            try {
+              const saved = await context.mutate.patch(request.id, {
+                status: "restricted",
+                fields: { ...request.fields, restrictedBy: context.actor,
+                  restrictedAt: context.now.toISOString() },
+              }, { event: `Local processing restriction flag recorded for ${subject}`,
+                expectRevision: request.revision });
+              if (!saved) { setError("The request changed. Reopen the latest version before trying again."); return; }
+              context.toast("Local restriction recorded",
+                "The request was marked restricted here. External processors and other systems were not automatically restricted.");
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "Review the request before retrying.");
+            } finally { setBusy(false); }
+          }}>
+          Mark locally restricted
+        </Button>}
+          end={<><OverlayCancel disabled={busy}>Close review</OverlayCancel><Button variant="outline-danger" disabled={!canDelete}
           title={hold ? "Legal hold recorded" : !context.can("delete_records") ? "Deletion permission required" : !ready ? "Finish counting the records and verify the subject" : undefined}
           onClick={() => context.openOverlay("deletion impact", { id: request.id })}>
           Review deletion impact…
-        </Button>
+        </Button></>}
+        />
       </DrawerActions>
     </Stack>
   );
@@ -1194,7 +1209,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
               label: "Mark paid locally",
               onRun: (selected) => {
                 void Promise.all(selected.filter((row) => row.status !== "paid_locally").map((row) => context.mutate.patch(row.id, { status: "paid_locally", fields: { ...row.fields, paidAt: clockIso(), paidBy: context.actor } }, { event: `Subscription invoice marked paid locally: ${row.title}` })))
-                  .then(() => context.toast("Marked paid locally", "The record says paid locally, which is not the same as a processor confirming a payment.", "info"));
+                  .then((saved) => saved.every(Boolean) && context.toast("Marked paid locally", "The record says paid locally, which is not the same as a processor confirming a payment.", "info"));
               },
               disabled: (selected) => selected.every((row) => row.status === "paid_locally"),
             },
@@ -1285,26 +1300,27 @@ export function CheckoutOverlay({ context, close }: { context: ScreenContext; cl
         { label: "Yearly total", value: context.money(seats * perSeat * 12) },
         { label: "Charged now", value: "Nothing" },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!subscription || seats < used}
           onClick={async () => {
             if (!subscription) return;
-            await context.mutate.patch(subscription.id, {
+            if (!(await context.mutate.patch(subscription.id, {
               summary: `${String(subscription.fields.plan)} plan, ${seats} seats, ${String(subscription.fields.term)}. Nothing is charged from this browser.`,
               amountMinor: seats * perSeat,
               fields: { ...subscription.fields, seatsIncluded: seats, changedBy: context.actor },
-            }, { event: `Subscription seats set to ${seats}`, expectRevision: subscription.revision });
+            }, { event: `Subscription seats set to ${seats}`, expectRevision: subscription.revision }))) return;
             context.toast("Plan record updated", `${seats} seats on the subscription record. No payment was taken.`, "info");
             close();
           }}
         >
           Save the plan record
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1323,7 +1339,7 @@ export function CancellationOverlay({ context, close }: { context: ScreenContext
         if (!subscription) return;
         setBusy(true);
         try {
-          await context.mutate.patch(subscription.id, { status: "cancelled", fields: { ...subscription.fields, cancelledBy: context.actor, cancelledAt: clockIso() } }, { event: "Subscription cancellation recorded", expectRevision: subscription.revision });
+          if (!(await context.mutate.patch(subscription.id, { status: "cancelled", fields: { ...subscription.fields, cancelledBy: context.actor, cancelledAt: clockIso() } }, { event: "Subscription cancellation recorded", expectRevision: subscription.revision }))) return;
           context.toast("Cancellation recorded", "The subscription record says cancelled. Your records stay in this browser and can be exported.", "info");
           close();
         } finally { setBusy(false); }
@@ -1354,10 +1370,9 @@ export function BillingSupport({ context, close }: { context: ScreenContext; clo
         The question is saved as a document in this workspace with the subscription details attached. Nothing is sent until a mail
         provider is connected.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!subject.trim() || !body.trim()}
           onClick={async () => {
@@ -1374,8 +1389,10 @@ export function BillingSupport({ context, close }: { context: ScreenContext; clo
           }}
         >
           Save the question
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1503,10 +1520,9 @@ export function RetentionCheck({ context, close }: { context: ScreenContext; clo
       <Notice tone="warning" title="A snapshot in the browser is not a backup">
         It lives in the same storage as the records themselves, so clearing site data removes both. Use Export for a copy you keep.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
@@ -1528,8 +1544,10 @@ export function RetentionCheck({ context, close }: { context: ScreenContext; clo
           }}
         >
           Take the snapshot
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1573,8 +1591,9 @@ export function RestoreImpact({ context, close }: { context: ScreenContext; clos
             checked={planApproved}
             onChange={(event) => setPlanApproved(event.target.checked)}
           />
-          <Row gap={2} wrap>
-            <Button
+          <ModalActions>
+            <OverlayActions
+              primary={<Button
               variant="primary"
               busy={busy}
               onClick={async () => {
@@ -1606,9 +1625,10 @@ export function RestoreImpact({ context, close }: { context: ScreenContext; clos
               }}
             >
               Rehearse the restore
-            </Button>
-            <Button variant="ghost" onClick={close}>Cancel</Button>
-          </Row>
+            </Button>}
+              end={<OverlayCancel>Cancel</OverlayCancel>}
+            />
+          </ModalActions>
           <Notice tone="info" title="A real restore needs a server">
             This build rehearses and records. Writing a whole snapshot back over live records is exactly the operation that should not
             be a single button in a browser.
@@ -1691,7 +1711,7 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
                 tone: "danger",
                 onRun: (selected) => {
                   void Promise.all(selected.filter((row) => row.status === "active").map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() } }, { event: `API key revoked: ${row.title}` })))
-                    .then(() => context.toast("Revoked", "The key records say revoked. With no server, nothing was calling them anyway."));
+                    .then((saved) => saved.every(Boolean) && context.toast("Revoked", "The key records say revoked. With no server, nothing was calling them anyway."));
                 },
                 disabled: (selected) => selected.every((row) => row.status !== "active"),
               },
@@ -1844,10 +1864,9 @@ export function KeyCreation({ context, close }: { context: ScreenContext; close:
           Consider a sandbox key, or read-only, unless something genuinely has to change records without a person.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!name.trim() || scopes.length === 0}
@@ -1872,8 +1891,10 @@ export function KeyCreation({ context, close }: { context: ScreenContext; close:
           }}
         >
           Issue the key
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1906,7 +1927,7 @@ export function ScopeLimits({ context }: { context: ScreenContext }) {
   );
 }
 
-export function CallbackTester({ context, close }: { context: ScreenContext; close: () => void }) {
+export function CallbackTester({ context, close: _close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const hook = data.webhooks.find((row) => row.id === (payload?.id ?? context.selectedId)) ?? data.webhooks[0];
@@ -1934,20 +1955,21 @@ export function CallbackTester({ context, close }: { context: ScreenContext; clo
         A browser cannot sign and post this without exposing the secret, and there is no server to do it from. The payload shape is
         shown so an endpoint can be written against it.
       </Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(hook.id, { fields: { ...hook.fields, lastTestAt: clockIso(), lastTestBy: context.actor } }, { event: `Webhook payload inspected: ${hook.title}` });
+            if (!(await context.mutate.patch(hook.id, { fields: { ...hook.fields, lastTestAt: clockIso(), lastTestBy: context.actor } }, { event: `Webhook payload inspected: ${hook.title}` }))) return;
             await context.mutate.log(`Webhook test on ${hook.title}: payload shown, nothing delivered.`, { entityId: hook.id, type: "developer.webhook_test", capability: "not_connected" });
             setResult("Recorded as inspected. No delivery was attempted, so there is no response code to show.");
           }}
         >
           Record the test
-        </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </ModalActions>
       {result && <Notice tone="info" title="Result">{result}</Notice>}
     </Stack>
   );
@@ -1977,10 +1999,9 @@ export function WebhookForm({ context, close }: { context: ScreenContext; close:
       <Notice tone="warning" title="It will be saved disabled">
         There is nothing to deliver from, so the endpoint is recorded with no attempts and the state stays disabled.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!valid || events.length === 0}
           onClick={async () => {
@@ -1996,8 +2017,10 @@ export function WebhookForm({ context, close }: { context: ScreenContext; close:
           }}
         >
           Save endpoint
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

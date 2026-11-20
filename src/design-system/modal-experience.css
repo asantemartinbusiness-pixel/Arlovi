@@ -1,8 +1,8 @@
 /* Shared transactional overlay refinements. Applies to modal dialogs in all native
    applications; keeps the existing brand tokens and 80% visual baseline. */
 .ds-modal {
-  width: min(var(--modal-w, 560px), calc(100vw - 32px));
-  max-width: min(100vw, calc(var(--modal-w, 560px) + 1px));
+  width: min(var(--modal-w, 520px), calc(100vw - 32px));
+  max-width: min(100vw, calc(var(--modal-w, 520px) + 1px));
   max-height: min(90dvh, 880px);
   min-width: 0;
   min-height: 0;
@@ -12,8 +12,8 @@
   flex: 0 0 auto;
   align-items: center;
   gap: var(--space-3);
-  min-height: calc(64px * var(--interface-scale, 1));
-  padding: var(--space-4) var(--space-6);
+  min-height: calc(52px * var(--interface-scale, 1));
+  padding: var(--space-3) var(--space-5);
   background: var(--bg-surface);
 }
 .ds-modal .ds-overlay-head h2 {
@@ -36,13 +36,13 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  padding: var(--space-6);
+  padding: var(--space-5);
 }
 .ds-modal-foot {
   flex: 0 0 auto;
   width: 100%;
-  min-height: calc(60px * var(--interface-scale, 1));
-  padding: var(--space-3) var(--space-6);
+  min-height: calc(52px * var(--interface-scale, 1));
+  padding: var(--space-3) var(--space-5);
   background: var(--bg-surface);
   box-shadow: 0 -8px 24px rgb(0 0 0 / 2%);
   flex-wrap: wrap;
@@ -64,12 +64,20 @@
   outline-offset: 3px;
 }
 .ds-discard-overlay { z-index: 110; }
-.ds-discard-modal { z-index: 111; width: min(440px, calc(100vw - 32px)); }
+.ds-discard-modal { z-index: 111; width: min(400px, calc(100vw - 32px)); }
 
-/* Compact transient menu/popover grammar; prevent long menu items overflowing. */
-.ds-popover { max-height: min(70dvh, 560px); overflow: auto; overscroll-behavior: contain; }
-.ds-menu-item { min-height: max(36px, var(--control-h-sm)); line-height: 1.4; }
-.ds-menu-item > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+/* Menu / popover grammar: 34px rows, internal scroll, collision-safe. */
+.ds-popover { max-height: min(var(--radix-popper-available-height, 70dvh), 560px); overflow: auto; overscroll-behavior: contain; transform-origin: var(--radix-popper-transform-origin); }
+.ds-menu-item { min-height: 34px; line-height: 1.35; }
+.ds-menu-icon { flex: none; display: inline-flex; color: var(--fg-muted); }
+.ds-menu-icon > svg { width: 16px; height: 16px; }
+.ds-menu-text { min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.ds-menu-item[data-has-description="true"] { padding-block: var(--space-2); }
+.ds-menu-desc { font-size: var(--text-2xs); color: var(--fg-subtle); line-height: 1.35; }
+.ds-menu-item .ds-kbd { flex: none; margin-inline-start: var(--space-3); }
+.ds-menu-item[data-tone="danger"] .ds-menu-icon { color: currentColor; }
+.ds-popover[data-state="closed"] { animation: ds-pop-out 90ms var(--ease-out) forwards; }
+@keyframes ds-pop-out { to { opacity: 0; } }
 @media (max-width: 599px) {
   .ds-modal {
     inset: auto 0 0 0;
@@ -79,7 +87,7 @@
     max-height: min(96dvh, 100dvh);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
-  .ds-modal .ds-overlay-head { min-height: 60px; padding: var(--space-4); }
+  .ds-modal .ds-overlay-head { min-height: 52px; padding: var(--space-3) var(--space-4); }
   .ds-modal .ds-overlay-body { padding: var(--space-4); scrollbar-gutter: auto; }
   .ds-modal-foot {
     padding-inline: var(--space-4);

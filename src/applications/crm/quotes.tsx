@@ -1,5 +1,5 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FileSignature, Plus, Trash2 } from "lucide-react";
 import {
@@ -169,10 +169,18 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useWorkingState(draftScope, "dirty", false);
 
+  // Hydrate once per record revision. While collections are still loading the
+  // `data` object changes identity every render, and every setter here writes a
+  // fresh state entry, so an unguarded effect looped when this editor was opened
+  // from a deep link (`?overlay=`) before the records had arrived.
+  const hydrated = useRef("");
   useEffect(() => {
     // A local in-progress revision takes precedence over record refreshes.
     if (readWorkingField(draftScope, "dirty", false)) return;
     if (quote) {
+      const stamp = `${draftScope}:${quote.id}:${quote.revision}`;
+      if (hydrated.current === stamp) return;
+      hydrated.current = stamp;
       setLines(readLines(quote));
       setStatus(statusFor(quote, contactById(data, String(quote.fields.contactId ?? ""))));
       setNumber(String(quote.fields.number ?? quote.title));
@@ -180,9 +188,11 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
       setDealId(String(quote.fields.dealId ?? quote.parentId ?? ""));
       setDirty(false);
     } else {
-      const numbers = data.quotes.map((item) => Number(/(\d+)/.exec(String(item.fields.number ?? item.title))?.[1] ?? 0));
-      setNumber((current) => current || `Q-${Math.max(100, ...numbers) + 1}`);
-      setLines((current) => (current.length ? current : [blankLine(0)]));
+      if (!readWorkingField(draftScope, "number", "")) {
+        const numbers = data.quotes.map((item) => Number(/(\d+)/.exec(String(item.fields.number ?? item.title))?.[1] ?? 0));
+        setNumber(`Q-${Math.max(100, ...numbers) + 1}`);
+      }
+      if (readWorkingField<InvoiceLine[]>(draftScope, "lines", []).length === 0) setLines([blankLine(0)]);
     }
   }, [quote, data, draftScope, setLines, setStatus, setNumber, setContactId, setDealId, setDirty]);
 
@@ -229,7 +239,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
         <Field label="Deal">
           <Select aria-label="Deal" value={dealId} onChange={(event) => { setDirty(true); setDealId(event.target.value); }} disabled={locked}>
             <option value="">Not linked</option>
-            {data.deals.map((item) => <option key={item.id} value={item.id}>{item.title} · {stageOf(item).label}</option>)}
+            {data.deals.filter((item) => stageOf(item).kind === "open" || item.id === dealId).map((item) => <option key={item.id} value={item.id}>{item.title} · {stageOf(item).label}</option>)}
           </Select>
         </Field>
         <Field label="Recipient">
@@ -248,7 +258,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
 
       <div className="ds-grid-wrap">
         <div className="ds-grid-scroll">
-          <table className="ds-table">
+          <table className="ds-table" style={{ minWidth: 880 }}>
             <caption className="ds-sr-only">Quote lines</caption>
             <thead>
               <tr>
@@ -340,60 +350,63 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
           disabled={locked || !dirty || !number.trim() || lines.some((line) => !line.description.trim())}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              number: number.trim(),
-              netMinor: totals.netMinor,
-              taxMinor: totals.taxMinor,
-              customerTaxStatus: effectiveStatus,
-              taxUnresolved: totals.hasUnknownRate,
-              version: Number(quote?.fields.version ?? 0) + 1,
-            };
-            if (dealId) fields.dealId = dealId;
-            if (contactId) fields.contactId = contactId;
-            if (overPolicy) fields.discountApproval = `Needs owner approval: ${(discountBpMax / 100).toFixed(1)}% exceeds the 10% ceiling.`;
-            if (quote) {
-              const saved = await context.mutate.patch(quote.id, {
-                title: `${number.trim()} ${quote.summary.split(".")[0]}`,
-                status: "draft",
-                amountMinor: totals.grossMinor,
-                dueAt: `${expires}T00:00:00.000Z`,
-                parentId: dealId || undefined,
-                body: { ...(quote.body as object ?? {}), ...writeLines(lines) },
-                fields: freshQuoteVersionFields({ ...quote.fields, ...fields }, lines),
-              }, {
-                replaceFields: true,
-                expectRevision: quote.revision,
-                event: `Quote ${number.trim()} repriced to version ${Number(quote.fields.version ?? 0) + 1}; prior approval and acceptance do not carry forward`,
-              });
-              if (!saved) { setBusy(false); return; }
-              context.toast("Quote saved as a draft", `Version ${Number(quote.fields.version ?? 0) + 1} at ${context.money(totals.grossMinor)} needs its own approval and customer acceptance. Any earlier evidence remains in the audit, not on the new version.`);
-            } else {
-              const created = await context.mutate.create({
-                collection: "quotes",
-                title: `${number.trim()} ${deal?.title ?? "quote"}`,
-                status: "draft",
-                summary: deal ? `Quote for ${deal.title}.` : "Quote drafted in this workspace.",
-                amountMinor: totals.grossMinor,
-                at: now.toISOString(),
-                dueAt: `${expires}T00:00:00.000Z`,
-                parentId: dealId || undefined,
-                fields,
-                body: writeLines(lines),
-              }, `Quote ${number.trim()} created`);
-              if (deal) {
-                await context.mutate.patch(deal.id, {
-                  fields: { ...deal.fields, quoteId: created.id },
-                }, { event: `Quote ${created.title} linked to ${deal.title}` });
+            try {
+              const fields: Record<string, string | number | boolean> = {
+                number: number.trim(),
+                netMinor: totals.netMinor,
+                taxMinor: totals.taxMinor,
+                customerTaxStatus: effectiveStatus,
+                taxUnresolved: totals.hasUnknownRate,
+                version: Number(quote?.fields.version ?? 0) + 1,
+              };
+              if (dealId) fields.dealId = dealId;
+              if (contactId) fields.contactId = contactId;
+              if (overPolicy) fields.discountApproval = `Needs owner approval: ${(discountBpMax / 100).toFixed(1)}% exceeds the 10% ceiling.`;
+              if (quote) {
+                const saved = await context.mutate.patch(quote.id, {
+                  title: `${number.trim()} ${quote.summary.split(".")[0]}`,
+                  status: "draft",
+                  amountMinor: totals.grossMinor,
+                  dueAt: `${expires}T00:00:00.000Z`,
+                  parentId: dealId || undefined,
+                  body: { ...(quote.body as object ?? {}), ...writeLines(lines) },
+                  fields: freshQuoteVersionFields({ ...quote.fields, ...fields }, lines),
+                }, {
+                  replaceFields: true,
+                  expectRevision: quote.revision,
+                  event: `Quote ${number.trim()} repriced to version ${Number(quote.fields.version ?? 0) + 1}; prior approval and acceptance do not carry forward`,
+                });
+                if (!saved) { setBusy(false); return; }
+                context.toast("Quote saved as a draft", `Version ${Number(quote.fields.version ?? 0) + 1} at ${context.money(totals.grossMinor)} needs its own approval and customer acceptance. Any earlier evidence remains in the audit, not on the new version.`);
+              } else {
+                const created = await context.mutate.create({
+                  collection: "quotes",
+                  title: `${number.trim()} ${deal?.title ?? "quote"}`,
+                  status: "draft",
+                  summary: deal ? `Quote for ${deal.title}.` : "Quote drafted in this workspace.",
+                  amountMinor: totals.grossMinor,
+                  at: now.toISOString(),
+                  dueAt: `${expires}T00:00:00.000Z`,
+                  parentId: dealId || undefined,
+                  fields,
+                  body: writeLines(lines),
+                }, `Quote ${number.trim()} created`);
+                if (deal) {
+                  if (!(await context.mutate.patch(deal.id, {
+                    fields: { ...deal.fields, quoteId: created.id },
+                  }, { event: `Quote ${created.title} linked to ${deal.title}` }))) return;
+                }
+                context.toast("Quote created", deal
+                  ? `${created.title} is linked to ${deal.title}, which can now advance past Proposal.`
+                  : `${created.title} is a draft.`);
+                context.select(created.id);
               }
-              context.toast("Quote created", deal
-                ? `${created.title} is linked to ${deal.title}, which can now advance past Proposal.`
-                : `${created.title} is a draft.`);
-              context.select(created.id);
+              clearWorkingDraft(draftScope);
+              setDirty(false);
+              close();
+            } finally {
+              setBusy(false);
             }
-            clearWorkingDraft(draftScope);
-            setDirty(false);
-            setBusy(false);
-            close();
           }}
         >
           {quote ? "Save the quote" : "Create the quote"}
@@ -448,7 +461,7 @@ export function PricingPolicy({ context }: { context: ScreenContext }) {
                     onClick={async () => {
                       const fields: Record<string, string | number | boolean> = { ...quote.fields, approvedBy: context.actor };
                       delete fields.discountApproval;
-                      await context.mutate.patch(quote.id, { status: "review", fields }, { replaceFields: true, expectRevision: quote.revision, event: `Discount approved on ${quote.title}` });
+                      if (!(await context.mutate.patch(quote.id, { status: "review", fields }, { replaceFields: true, expectRevision: quote.revision, event: `Discount approved on ${quote.title}` }))) return;
                       context.toast("Discount approved", `${quote.title} can be sent. ${context.actor} is recorded as the approver.`);
                     }}
                   >
@@ -511,28 +524,32 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
           disabled={Boolean(blocked)}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(quote.id, {
-              status: "sent",
-              body: { ...(quote.body as object ?? {}), sends: [...(((quote.body as { sends?: unknown[] })?.sends) ?? []), { at: clockIso(), by: context.actor, to, body: drafted }] },
-              fields: { ...quote.fields, sentAt: clockIso(), sentBy: context.actor, delivery: "queued_local" },
-            }, { expectRevision: quote.revision, event: `Quote ${quote.title} issued; the message is queued locally and was not delivered` });
-            await context.mutate.create({
-              collection: "activities",
-              title: `Quote ${String(quote.fields.number ?? quote.title)} sent`,
-              status: "draft",
-              summary: `Draft message to ${to}. Delivery is not connected, so it stays in this workspace.`,
-              startAt: clockIso(),
-              at: clockIso(),
-              parentId: String(quote.fields.dealId ?? quote.parentId ?? ""),
-              fields: { kind: "email", dealId: String(quote.fields.dealId ?? ""), contactId: String(quote.fields.contactId ?? ""), delivery: "not_connected", owner: context.actor },
-            }, `Activity logged for quote ${quote.title}`);
-            context.toast("Issued, not delivered", `The quote is issued and the message for ${to} is queued on it. No mail provider is connected, so nothing left this browser.`, "info");
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(quote.id, {
+                status: "sent",
+                body: { ...(quote.body as object ?? {}), sends: [...(((quote.body as { sends?: unknown[] })?.sends) ?? []), { at: clockIso(), by: context.actor, to, body: drafted }] },
+                fields: { ...quote.fields, sentAt: clockIso(), sentBy: context.actor, delivery: "queued_local" },
+              }, { expectRevision: quote.revision, event: `Quote ${quote.title} issued; the message is queued locally and was not delivered` }))) return;
+              await context.mutate.create({
+                collection: "activities",
+                title: `Quote ${String(quote.fields.number ?? quote.title)} sent`,
+                status: "draft",
+                summary: `Draft message to ${to}. Delivery is not connected, so it stays in this workspace.`,
+                startAt: clockIso(),
+                at: clockIso(),
+                parentId: String(quote.fields.dealId ?? quote.parentId ?? ""),
+                fields: { kind: "email", dealId: String(quote.fields.dealId ?? ""), contactId: String(quote.fields.contactId ?? ""), delivery: "not_connected", owner: context.actor },
+              }, `Activity logged for quote ${quote.title}`);
+              context.toast("Issued, not delivered", `The quote is issued and the message for ${to} is queued on it. No mail provider is connected, so nothing left this browser.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Issue and queue the message
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

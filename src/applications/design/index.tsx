@@ -1,25 +1,26 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PenTool, Square, Circle, Type as TypeIcon, Frame as FrameIcon, Minus, Hexagon,
   MousePointer2, Hand, Grid3x3, Magnet, Link2, Play, FileCode2, Download, Plus, Component,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill, Properties, Row,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, ModalActions, ModalInFlight, Notice, OVERLAY_WIDTH, OverlayActions, OverlayCancel,
+  OverlaySection, OverlaySummary, Pill, Popover, Properties, Row,
   Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob, downloadText,
-  slug, useStore, type DocHandle,
+  slug, useStore, createStore, NumberBox, type DocHandle,
 } from "@/applications/visual/kit";
 import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useGuardRefresh, useSharedDoc } from "./sharedDoc";
 import { CAPABILITY_LABELS } from "@/platform/capability";
 import { fitRect, rectCenter } from "@/applications/visual/geometry";
 import {
   absoluteRect, activePage, addNode, applyAutoLayout, isEditable, makeNode, childrenOf, contrastRatio, createComponent,
-  detachInstance, findDuplicates, flatten, fontAvailable, FONT_STACK, groupNodes, instancesOf,
+  componentChanges, detachInstance, findDuplicates, flatten, fontAvailable, FONT_STACK, groupNodes, instancesOf,
   instantiate, layoutConflicts, pageBounds, parentOf, patchNode, patchNodes, removeNodes, reorder,
   resizeFrame, selectionBounds, updatePage, wcagGrade,
   type DesignDoc, type SceneNode, type ScenePage,
@@ -144,7 +145,7 @@ function FilesGallery({ context, lens }: { context: ScreenContext; lens: "Recent
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Files" value={docs.filter((item) => item.record.fields.kind !== "template").length} meta={`${docs.length} records in ${context.org.shortName}`} />
+        <Stat label="Files" value={docs.filter((item) => item.record.fields.kind !== "template").length} meta={`${docs.filter((item) => item.record.fields.kind === "template").length} templates alongside`} />
         <Stat label="Layers in total" value={docs.reduce((sum, item) => sum + item.doc.pages.reduce((n, page) => n + Object.keys(page.nodes).length, 0), 0)} meta="Counted from the documents" />
         <Stat label="Published components" value={docs.reduce((sum, item) => sum + item.doc.components.filter((c) => c.published).length, 0)} meta="Across all files" />
         <Stat label="Files with import notes" value={docs.filter((item) => item.doc.unsupported.length > 0).length} meta="Unsupported features disclosed" />
@@ -161,7 +162,7 @@ function FilesGallery({ context, lens }: { context: ScreenContext; lens: "Recent
             <Stack gap={2}>
               <DesignThumb doc={doc} />
               <Row gap={2} wrap>
-                <Pill tone={record.status === "draft" ? "warning" : "info"} dot>{record.status}</Pill>
+                <Pill tone={record.status === "draft" ? "warning" : "info"} dot>{record.status.replace(/_/g, " ")}</Pill>
                 {record.fields.sharedWith && <Pill tone="accent">{String(record.fields.sharedWith).split(",").length} collaborators</Pill>}
                 {record.fields.format && <Pill>{String(record.fields.format)}</Pill>}
                 {doc.unsupported.length > 0 && (
@@ -290,7 +291,7 @@ function ImportSvgOverlay({ context, close }: { context: ScreenContext; close: (
                     activePageId: report.page.id,
                     unsupported: [...new Set([...doc.unsupported, ...report.unsupported, ...report.fontsMissing.map((font) => `substituted font: ${font}`)])],
                   };
-                  await context.mutate.patch(target.id, { body: next }, { event: `Imported ${fileName}` });
+                  if (!(await context.mutate.patch(target.id, { body: next }, { event: `Imported ${fileName}` }))) return;
                   context.toast("Imported", `${report.count} layers added to ${target.title} as a new page.`);
                 } else {
                   const doc = starterDoc(fileName || "Imported SVG");
@@ -344,6 +345,8 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
       context={context}
       actions={actions}
       tabs={[{ id: "Design" }, { id: "Prototype" }, { id: "Inspect" }, { id: "Comments" }]}
+      lean
+      titleLevel={1}
       title={record.title}
       subtitle={<Row gap={2} wrap><SaveState handle={handle} /><span>{page ? `${page.name} · ${Object.keys(page.nodes).length} layers` : ""}</span></Row>}
       backTo={{ label: "Design", to: `/o/${context.org.slug}/design/files` }}
@@ -364,7 +367,9 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
           <Toolbar label="History">
             <Button size="sm" variant="ghost" disabled={!handle.canUndo} onClick={handle.undo}>Undo</Button>
             <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
-            <Button size="sm" variant="ghost" onClick={requestFit}>Fit</Button>
+            <Popover align="end" trigger={<Button size="sm" variant="ghost" aria-label="Keyboard shortcuts">Keys</Button>}>
+              <div className="vx-keys"><ShortcutTable rows={SHORTCUT_ROWS} /></div>
+            </Popover>
           </Toolbar>
         </>
       }
@@ -707,6 +712,8 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
       context={context}
       actions={actions}
       tabs={[{ id: "Pen" }, { id: "Curves" }, { id: "Boolean" }, { id: "Offset" }]}
+      lean
+      titleLevel={1}
       title={`${record.title} — paths`}
       subtitle={<Row gap={2}><SaveState handle={handle} /><span>{paths.length} path layer{paths.length === 1 ? "" : "s"}</span></Row>}
       backTo={{ label: record.title, to: context.path("/o/:org/design/files/:id", context.params.id) }}
@@ -720,6 +727,9 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
           <Toolbar label="History">
             <Button size="sm" variant="ghost" disabled={!handle.canUndo} onClick={handle.undo}>Undo</Button>
             <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
+            <Popover align="end" trigger={<Button size="sm" variant="ghost" aria-label="What the path operations do">Operations</Button>}>
+              <div className="vx-keys"><PathOperationsHelp /></div>
+            </Popover>
           </Toolbar>
         </>
       }
@@ -749,7 +759,7 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
         </Stack>
       }
       leftLabel="Paths"
-      right={<PathInspector handle={handle} context={context} tab={context.tab} />}
+      right={<PathRight handle={handle} context={context} tab={context.tab} />}
       rightLabel={context.tab === "Boolean" ? "Combine" : context.tab === "Offset" ? "Offset" : "Point"}
       status={
         <>
@@ -761,6 +771,21 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
     >
       <PathCanvas handle={handle} nodeId={active?.id} onConvert={convert} />
     </EditorFrame>
+  );
+}
+
+function PathRight({ handle, context, tab }: { handle: DocHandle<DesignDoc>; context: ScreenContext; tab: string }) {
+  const focus = useStore(pathFocus);
+  return (
+    <Stack gap={3}>
+      {focus.help && (
+        <Notice tone="info" title="Path operations" actions={<Button size="sm" variant="ghost" onClick={() => pathFocus.set((c) => ({ ...c, help: false }))}>Dismiss</Button>}>
+          <PathOperationsHelp />
+        </Notice>
+      )}
+      <PathInspector handle={handle} context={context} tab={tab} />
+      <StrokeControls handle={handle} />
+    </Stack>
   );
 }
 
@@ -1231,7 +1256,10 @@ function ComponentsScreen({ context, lens }: { context: ScreenContext; lens: "Li
               span={4}
               title={component.name}
               subtitle={`${uses.length} instance${uses.length === 1 ? "" : "s"} · v${component.version}`}
-              actions={<Pill tone={component.published ? "success" : "warning"}>{component.published ? "published" : "local"}</Pill>}
+              actions={(() => {
+                const pending = componentChanges(doc, component).changes;
+                return <Row gap={1}>{pending.some((change) => change.breaking) && <Pill tone="danger">breaking</Pill>}<Pill tone={component.published ? "success" : "warning"}>{component.published ? "published" : "local"}</Pill></Row>;
+              })()}
             >
               <Stack gap={2}>
                 <p className="ds-subtle">{component.description}</p>
@@ -1247,8 +1275,8 @@ function ComponentsScreen({ context, lens }: { context: ScreenContext; lens: "Li
                   >
                     Place
                   </Button>
-                  {!component.published && (
-                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("library publish", { componentId: component.id })}>Publish</Button>
+                  {(!component.published || componentChanges(doc, component).changes.length > 0) && (
+                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("library publish", { componentId: component.id })}>{component.published ? "Publish changes" : "Publish"}</Button>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => context.openOverlay("breaking-change diff", { componentId: component.id })}>Impact</Button>
                 </Row>
@@ -1483,10 +1511,17 @@ function PrototypeScreen({ context, lens }: { context: ScreenContext; lens: "Flo
     const bounds = pageBounds(page);
     return (
       <Stack gap={4}>
-        <Notice tone="info" title={`${frames.length} frames, ${links.length} connection${links.length === 1 ? "" : "s"}`}>
-          The flow is drawn from the links stored on the layers. Add one on the canvas with the prototype tool, or on the Interactions tab.
-        </Notice>
-        <Card title="Screen flow" flush>
+        <Card
+          title="Screen flow"
+          subtitle={<><span className="ds-num">{frames.length}</span> screen{frames.length === 1 ? "" : "s"} · <span className="ds-num">{links.length}</span> connection{links.length === 1 ? "" : "s"}{links.length === 0 && " · link screens to draw the flow"}</>}
+          actions={frames.length > 1 ? (
+            <Select aria-label="Start screen" value={doc.prototype.startNodeId ?? ""} onChange={(event) => handle.edit((current) => ({ ...current, prototype: { ...current.prototype, startNodeId: event.target.value || undefined } }), "Set start frame")}>
+              <option value="">Start: first screen</option>
+              {frames.map((frame) => <option key={frame.id} value={frame.id}>Start: {frame.name}</option>)}
+            </Select>
+          ) : undefined}
+          flush
+        >
           <svg viewBox={`${bounds.x - 40} ${bounds.y - 40} ${bounds.w + 80} ${bounds.h + 80}`} style={{ width: "100%", height: 420, background: "var(--bg-inset)" }} role="img" aria-label={`Flow of ${frames.length} frames with ${links.length} connections`}>
             {links.map(({ from, to }) => {
               if (!to) return null;
@@ -1512,13 +1547,6 @@ function PrototypeScreen({ context, lens }: { context: ScreenContext; lens: "Flo
             })}
           </svg>
         </Card>
-        <Row gap={2} wrap>
-          {frames.map((frame) => (
-            <Button key={frame.id} size="sm" variant={doc.prototype.startNodeId === frame.id ? "primary" : "secondary"} onClick={() => handle.edit((current) => ({ ...current, prototype: { ...current.prototype, startNodeId: frame.id } }), "Set start frame")}>
-              Start at {frame.name}
-            </Button>
-          ))}
-        </Row>
       </Stack>
     );
   }
@@ -2287,7 +2315,7 @@ function MoveSelection({ context, close }: { context: ScreenContext; close: () =
         close();
       }}
     >
-      <p className="ds-prose">The keyboard equivalent of dragging: move the {ui.selected.length} selected layer{ui.selected.length === 1 ? "" : "s"} by an exact distance. Arrow keys on the canvas nudge by 1px, with Shift by 10px.</p>
+      <p className="vx-mini">Moves the {ui.selected.length} selected layer{ui.selected.length === 1 ? "" : "s"} by an exact distance. Arrow keys nudge 1px, 10px with Shift.</p>
       <Row gap={3} wrap>
         <Field label="Across (px)"><TextInput type="number" value={dx} onChange={(event) => setDx(event.target.value)} autoFocus /></Field>
         <Field label="Down (px)"><TextInput type="number" value={dy} onChange={(event) => setDy(event.target.value)} /></Field>
@@ -2307,11 +2335,15 @@ function SwapInstance({ context, close }: { context: ScreenContext; close: () =>
   const others = doc.components.filter((component) => component.id !== node.componentId);
   return (
     <Stack gap={2}>
-      <Properties rows={[
-        { label: "Instance", value: node.name },
-        { label: "Now", value: doc.components.find((component) => component.id === node.componentId)?.name ?? "missing component" },
-        { label: "Overrides kept", value: Object.keys(node.overrides ?? {}).length },
-      ]} />
+      <FactGrid
+        columns={3}
+        dense
+        items={[
+          { label: "Instance", value: node.name },
+          { label: "Now", value: doc.components.find((component) => component.id === node.componentId)?.name ?? "missing component" },
+          { label: "Overrides kept", value: Object.keys(node.overrides ?? {}).length, mono: true },
+        ]}
+      />
       {others.length === 0 ? <Empty title="No other component to swap to">Create another component first.</Empty> : others.map((component) => {
         const root = component.nodes[component.root];
         return (
@@ -2396,7 +2428,7 @@ function ApplyStyle({ context, close }: { context: ScreenContext; close: () => v
   const doc = handle.doc;
   const page = activePage(doc);
   const nodes = ui.selected.map((id) => page.nodes[id]).filter(Boolean);
-  if (nodes.length === 0) return <Notice tone="info" title="Select a layer">Pick the layers first, then the style.</Notice>;
+  if (nodes.length === 0) return <HandOff context={context} toast={["Select a layer first", "Pick the layers, then apply a style."]} />;
   const texts = nodes.filter((node) => node.kind === "text");
   const shapes = nodes.filter((node) => node.kind !== "text");
   const apply = (change: (node: SceneNode) => Partial<SceneNode>, label: string, ids: string[]) => {
@@ -2501,15 +2533,19 @@ function PublishPrototype({ context, close }: { context: ScreenContext; close: (
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Start screen", value: doc.prototype.startNodeId ? page.nodes[doc.prototype.startNodeId]?.name ?? "missing" : "the first frame" },
-        { label: "Links on this page", value: links },
-        { label: "Device", value: doc.prototype.device },
-        { label: "Hosting", value: <Pill tone="warning">{CAPABILITY_LABELS.not_connected}</Pill> },
-        { label: "Last request", value: doc.prototype.publication ? `${CAPABILITY_LABELS[doc.prototype.publication.state]} by ${doc.prototype.publication.by}, ${context.relative(doc.prototype.publication.at)}` : "none" },
-      ]} />
-      <Notice tone="warning" title="A prototype is not a product">It has no backend: forms submit nothing and data on its screens is drawn, not loaded. Anyone shown it should be told so.</Notice>
-      <Notice tone="info" title="What publishing does here">It records the request against this version of the file as queued locally. No URL is created until a hosting provider is connected.</Notice>
+      <FactGrid
+        dense
+        items={[
+          { label: "Start screen", value: doc.prototype.startNodeId ? page.nodes[doc.prototype.startNodeId]?.name ?? "missing" : "the first frame" },
+          { label: "Links on this page", value: links, mono: true },
+          { label: "Device", value: doc.prototype.device },
+          { label: "Hosting", value: <Pill tone="warning">{CAPABILITY_LABELS.not_connected}</Pill> },
+          { label: "Last request", value: doc.prototype.publication ? `${CAPABILITY_LABELS[doc.prototype.publication.state]} by ${doc.prototype.publication.by}, ${context.relative(doc.prototype.publication.at)}` : "none" },
+        ]}
+      />
+      <Notice tone="warning" title="Recorded locally, not published">
+        Publishing here records the request against this version of the file. No URL exists until a hosting provider is connected, and a prototype has no backend: forms submit nothing and its data is drawn, not loaded.
+      </Notice>
     </form>
   );
 }
@@ -2671,16 +2707,16 @@ registerApp({
           id: "archive", label: "Archive", placement: "overflow", tone: "danger",
           guard: (context) => (context.selectedId ? undefined : "Select a file first"),
           run: async (context) => {
-            await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Design file archived" });
+            if (!(await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Design file archived" }))) return;
             context.toast("Archived", "The record keeps its full document and history; it is out of the Recent tab.");
           },
         },
       ],
       overlays: [
-        { id: "File setup", kind: "modal", title: "New design file", width: 520, render: ({ close, ...context }) => <FileSetupForm context={context} close={close} />, footer: submitFooter("design-file-setup", "Create the file") },
-        { id: "import issues", kind: "modal", title: "Import an SVG", width: 560, render: ({ close, ...context }) => <ImportSvgOverlay context={context} close={close} /> },
+        { id: "File setup", kind: "modal", title: "New design file", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <FileSetupForm context={context} close={close} />, footer: submitFooter("design-file-setup", "Create the file") },
+        { id: "import issues", kind: "modal", title: "Import an SVG", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImportSvgOverlay context={context} close={close} /> },
         {
-          id: "sharing", kind: "drawer", title: "Sharing", width: 420,
+          id: "sharing", kind: "drawer", title: "Sharing", width: OVERLAY_WIDTH.compact, summary: fileSummary,
           render: ({ ...context }) => {
             const payload = context.overlayPayload as { id?: string } | undefined;
             return <SharingPanel context={context} id={payload?.id ?? context.selectedId} />;
@@ -2692,6 +2728,7 @@ registerApp({
     "ARL-DESIGN-002": {
       id: "ARL-DESIGN-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <CanvasScreen context={context} actions={CANVAS_ACTIONS} />,
       tabs: (["Design", "Prototype", "Inspect", "Comments"] as const).map((lens) => ({
         id: lens,
@@ -2699,11 +2736,11 @@ registerApp({
       })),
       actions: CANVAS_ACTIONS,
       overlays: [
-        { id: "Insert tools", kind: "modal", title: "Insert", width: 480, render: ({ close }) => <InsertTools close={close} /> },
-        { id: "fill picker", kind: "drawer", title: "Fill", width: 380, render: ({ ...context }) => <FillPicker context={context} /> },
-        { id: "style inspector", kind: "drawer", title: "Properties", width: 400, render: ({ ...context }) => <InspectorOverlay context={context} /> },
-        { id: "export", kind: "modal", title: "Export this page", width: 560, presentation: { selectedRecord: true, collection: "designs", guidance: "Preview the file, page, output format and safe pixel dimensions before downloading locally." }, render: ({ ...context }) => <ExportOverlay context={context} /> },
-        { id: "move selection", kind: "modal", title: "Drag the selection", width: 440, render: ({ close, ...context }) => <MoveSelection context={context} close={close} />, footer: submitFooter("design-move-selection", "Move") },
+        { id: "Insert tools", kind: "modal", title: "Insert", width: OVERLAY_WIDTH.form, render: ({ close }) => <InsertTools close={close} /> },
+        { id: "fill picker", kind: "drawer", title: "Fill", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <FillPicker context={context} /> },
+        { id: "style inspector", kind: "drawer", title: "Properties", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <InspectorOverlay context={context} /> },
+        { id: "export", kind: "modal", title: "Export this page", width: OVERLAY_WIDTH.modal, presentation: { selectedRecord: true, collection: "designs", guidance: "Preview the file, page, output format and safe pixel dimensions before downloading locally." }, render: ({ ...context }) => <ExportOverlay context={context} /> },
+        { id: "move selection", kind: "modal", title: "Drag the selection", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <MoveSelection context={context} close={close} />, footer: submitFooter("design-move-selection", "Move") },
       ],
     },
 
@@ -2758,15 +2795,16 @@ registerApp({
         { id: "clear selection", label: "Clear the selection", placement: "overflow", run: () => setSelection([]) },
       ],
       overlays: [
-        { id: "Layer context", kind: "modal", title: "Layer", width: 460, render: ({ close, ...context }) => <LayerContext context={context} close={close} /> },
-        { id: "move-to-page", kind: "modal", title: "Move to another page", width: 460, render: ({ close, ...context }) => <MoveToPage context={context} close={close} /> },
-        { id: "component detach", kind: "modal", title: "Detach an instance", tone: "danger", width: 480, render: ({ close, ...context }) => <DetachInstance context={context} close={close} /> },
+        { id: "Layer context", kind: "modal", title: "Layer", width: OVERLAY_WIDTH.compact, summary: layerSummary, render: ({ close, ...context }) => <LayerContext context={context} close={close} /> },
+        { id: "move-to-page", kind: "modal", title: "Move to another page", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <MoveToPage context={context} close={close} /> },
+        { id: "component detach", kind: "modal", title: "Detach an instance", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <DetachInstance context={context} close={close} /> },
       ],
     },
 
     "ARL-DESIGN-004": {
       id: "ARL-DESIGN-004",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <PathScreen context={context} actions={PATH_ACTIONS} />,
       tabs: (["Pen", "Curves", "Boolean", "Offset"] as const).map((lens) => ({
         id: lens,
@@ -2774,21 +2812,9 @@ registerApp({
       })),
       actions: PATH_ACTIONS,
       overlays: [
-        { id: "Point inspector", kind: "drawer", title: "Point", width: 380, render: ({ ...context }) => <PointInspectorOverlay context={context} /> },
-        { id: "path operations", kind: "modal", title: "Path operations", width: 520, render: () => (
-          <Stack gap={3}>
-            <Notice tone="info" title="What each operation does">
-              <ul>
-                <li><strong>Join</strong> closes the contour, merging the two ends when they are within six pixels.</li>
-                <li><strong>Simplify</strong> runs Ramer–Douglas–Peucker over the anchors at a four pixel tolerance and refits smooth tangents.</li>
-                <li><strong>Offset</strong> moves each anchor along the local normal.</li>
-                <li><strong>Combine</strong> adds a second contour and sets the fill rule; it does not compute intersection geometry.</li>
-              </ul>
-            </Notice>
-            <Notice tone="warning" title="Reversible">Every operation goes through the undo stack, so nothing is destructive.</Notice>
-          </Stack>
-        ) },
-        { id: "stroke editing", kind: "drawer", title: "Stroke", width: 360, render: ({ ...context }) => <StrokeOverlay context={context} /> },
+        { id: "Point inspector", kind: "drawer", title: "Point", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <PointInspectorOverlay context={context} /> },
+        { id: "path operations", kind: "modal", title: "Path operations", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <HandOff context={context} then={() => pathFocus.set((c) => ({ ...c, help: true }))} /> },
+        { id: "stroke editing", kind: "drawer", title: "Stroke", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <StrokeOverlay context={context} /> },
       ],
     },
 
@@ -2854,8 +2880,8 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Layout inspector", kind: "drawer", title: "Frame size", width: 380, render: ({ ...context }) => <FrameSizeOverlay context={context} /> },
-        { id: "constraint conflict", kind: "modal", title: "Constraint conflicts", tone: "danger", width: 540, render: ({ ...context }) => <ConflictOverlay context={context} /> },
+        { id: "Layout inspector", kind: "drawer", title: "Frame size", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <FrameSizeOverlay context={context} /> },
+        { id: "constraint conflict", kind: "modal", title: "Constraint conflicts", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ConflictOverlay context={context} /> },
         { id: "breakpoint preview", kind: "modal", title: "Breakpoints side by side", width: 900, render: ({ ...context }) => <BreakpointPreview context={context} /> },
       ],
     },
@@ -2892,10 +2918,10 @@ registerApp({
         { id: "usage tab", label: "Usage across the file", placement: "overflow", run: (context) => context.setTab("Usage") },
       ],
       overlays: [
-        { id: "Variant editor", kind: "modal", title: "Component property", width: 480, render: ({ close, ...context }) => <VariantEditor context={context} close={close} />, footer: submitFooter("variant-editor", "Add the property") },
-        { id: "library publish", kind: "modal", title: "Publish to the library", width: 520, render: ({ close, ...context }) => <PublishComponent context={context} close={close} /> },
-        { id: "breaking-change diff", kind: "drawer", title: "Instances affected", width: 460, render: ({ ...context }) => <BreakingChange context={context} /> },
-        { id: "swap instance", kind: "modal", title: "Swap an instance", width: 480, render: ({ close, ...context }) => <SwapInstance context={context} close={close} /> },
+        { id: "Variant editor", kind: "modal", title: "Component property", width: OVERLAY_WIDTH.compact, summary: componentSummary, render: ({ close, ...context }) => <VariantEditor context={context} close={close} />, footer: submitFooter("variant-editor", "Add the property") },
+        { id: "library publish", kind: "modal", title: "Publish to the library", width: OVERLAY_WIDTH.form, summary: componentSummary, render: ({ close, ...context }) => <PublishComponent context={context} close={close} /> },
+        { id: "breaking-change diff", kind: "drawer", title: "Instances affected", width: OVERLAY_WIDTH.form, summary: componentSummary, render: ({ ...context }) => <BreakingChange context={context} /> },
+        { id: "swap instance", kind: "modal", title: "Swap an instance", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SwapInstance context={context} close={close} /> },
       ],
     },
 
@@ -2919,11 +2945,11 @@ registerApp({
         { id: "inspect contrast", label: "Inspect contrast", placement: "secondary", run: (context) => context.openOverlay("style impact") },
       ],
       overlays: [
-        { id: "Font browser", kind: "drawer", title: "Fonts", width: 420, render: () => <FontBrowser /> },
-        { id: "gradient editor", kind: "modal", title: "Gradient", width: 520, render: ({ ...context }) => <GradientEditor context={context} /> },
-        { id: "style impact", kind: "drawer", title: "Style impact", width: 440, render: ({ ...context }) => <StyleImpact context={context} /> },
-        { id: "token editor", kind: "modal", title: "Edit a colour token", width: 520, render: ({ close, ...context }) => <TokenEditor context={context} close={close} />, footer: submitFooter("design-token-editor", "Save the token") },
-        { id: "apply style", kind: "modal", title: "Apply a style", width: 520, render: ({ close, ...context }) => <ApplyStyle context={context} close={close} /> },
+        { id: "Font browser", kind: "drawer", title: "Fonts", width: OVERLAY_WIDTH.compact, render: () => <FontBrowser /> },
+        { id: "gradient editor", kind: "modal", title: "Gradient", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <GradientEditor context={context} /> },
+        { id: "style impact", kind: "drawer", title: "Style impact", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <StyleImpact context={context} /> },
+        { id: "token editor", kind: "modal", title: "Edit a colour token", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TokenEditor context={context} close={close} />, footer: submitFooter("design-token-editor", "Save the token") },
+        { id: "apply style", kind: "modal", title: "Apply a style", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ApplyStyle context={context} close={close} /> },
       ],
     },
 
@@ -2950,8 +2976,8 @@ registerApp({
         { id: "publish prototype", label: "Publish the prototype…", placement: "overflow", run: (context) => context.openOverlay("publish prototype") },
       ],
       overlays: [
-        { id: "Interaction editor", kind: "drawer", title: "Interaction", width: 420, render: ({ ...context }) => <InteractionOverlay context={context} /> },
-        { id: "transition options", kind: "modal", title: "Transitions", width: 520, render: () => (
+        { id: "Interaction editor", kind: "drawer", title: "Interaction", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <InteractionOverlay context={context} /> },
+        { id: "transition options", kind: "modal", title: "Transitions", width: OVERLAY_WIDTH.form, render: () => (
           <Stack gap={3}>
             <Properties rows={[
               { label: "Instant", value: "No animation; the frame swaps on the next paint." },
@@ -2962,9 +2988,9 @@ registerApp({
             <Notice tone="warning" title="Honest about the preview">The local preview animates opacity. Slide and smart transitions are stored on the link for a future renderer but are not played here.</Notice>
           </Stack>
         ) },
-        { id: "device preview", kind: "modal", title: "Device and publication", width: 560, render: ({ ...context }) => <DevicePreview context={context} /> },
-        { id: "link screens", kind: "modal", title: "Link screens", width: 480, render: ({ close, ...context }) => <LinkScreens context={context} close={close} />, footer: submitFooter("design-link-screens", "Link") },
-        { id: "publish prototype", kind: "modal", title: "Publish the prototype", width: 520, render: ({ close, ...context }) => <PublishPrototype context={context} close={close} />, footer: submitFooter("design-publish-prototype", "Queue for publishing") },
+        { id: "device preview", kind: "modal", title: "Device and publication", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <DevicePreview context={context} /> },
+        { id: "link screens", kind: "modal", title: "Link screens", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <LinkScreens context={context} close={close} />, footer: submitFooter("design-link-screens", "Link") },
+        { id: "publish prototype", kind: "modal", title: "Publish the prototype", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishPrototype context={context} close={close} />, footer: submitFooter("design-publish-prototype", "Queue for publishing") },
       ],
     },
 
@@ -2993,10 +3019,10 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Asset picker", kind: "modal", title: "Add an asset", width: 520, render: ({ close, ...context }) => <AssetPicker context={context} close={close} /> },
-        { id: "export settings", kind: "modal", title: "Export settings", width: 520, render: ({ ...context }) => <ExportOverlay context={context} /> },
-        { id: "license note", kind: "drawer", title: "Licence", width: 400, render: ({ ...context }) => <LicenceNote context={context} /> },
-        { id: "crop asset", kind: "modal", title: "Crop an asset", width: 560, render: ({ close, ...context }) => <CropAsset context={context} close={close} />, footer: submitFooter("design-crop-asset", "Crop") },
+        { id: "Asset picker", kind: "modal", title: "Add an asset", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <AssetPicker context={context} close={close} /> },
+        { id: "export settings", kind: "modal", title: "Export settings", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ExportOverlay context={context} /> },
+        { id: "license note", kind: "drawer", title: "Licence", width: OVERLAY_WIDTH.compact, summary: fileSummary, render: ({ ...context }) => <LicenceNote context={context} /> },
+        { id: "crop asset", kind: "modal", title: "Crop an asset", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CropAsset context={context} close={close} />, footer: submitFooter("design-crop-asset", "Crop") },
       ],
     },
 
@@ -3036,9 +3062,9 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Comment editor", kind: "modal", title: "Comment", width: 480, render: ({ close, ...context }) => <CommentEditor context={context} close={close} /> },
-        { id: "version compare", kind: "modal", title: "Version compare", width: 820, render: ({ ...context }) => <ReviewScreen context={context} lens="Diff" /> },
-        { id: "signoff", kind: "modal", title: "Record a review decision", width: 520, render: ({ close, ...context }) => <SignOff context={context} close={close} />, footer: submitFooter("design-signoff", "Record the decision") },
+        { id: "Comment editor", kind: "modal", title: "Comment", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <CommentEditor context={context} close={close} /> },
+        { id: "version compare", kind: "modal", title: "Version compare", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <ReviewScreen context={context} lens="Diff" /> },
+        { id: "signoff", kind: "modal", title: "Record a review decision", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SignOff context={context} close={close} />, footer: submitFooter("design-signoff", "Record the decision") },
       ],
     },
   },
@@ -3055,44 +3081,55 @@ function SharingPanel({ context, id }: { context: ScreenContext; id?: string }) 
   const current = String(record.fields.sharedWith ?? "").split(",").map((item) => item.trim()).filter(Boolean);
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "File", value: record.title },
-        { label: "Owner", value: record.ownerName },
-        { label: "Collaborators", value: current.length ? current.join(", ") : "none" },
-      ]} />
-      <Field label="Add collaborators" hint="Comma separated. They are recorded on the file; no invitation can be sent.">
-        <TextInput value={people} onChange={(event) => setPeople(event.target.value)} placeholder="Ravi Patel, Sofia Marín" />
-      </Field>
-      <Button
-        variant="primary"
-        disabled={!people.trim()}
-        onClick={async () => {
-          const next = [...new Set([...current, ...people.split(",").map((item) => item.trim()).filter(Boolean)])];
-          await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: next.join(", ") } }, { expectRevision: record.revision, event: `Shared ${record.title} with ${people}` });
-          setPeople("");
-          context.toast("Collaborators recorded", "The file lists them. No mail provider is connected, so no invitation was sent.");
-        }}
-      >
-        Record the collaborators
-      </Button>
-      <Notice tone="warning" title="No invitation leaves this browser">A real product would email a link. Here the names are stored on the record and the file remains local.</Notice>
+      <OverlaySection title="Collaborators" hint={current.length ? `${current.length} recorded` : "Nobody yet"}>
+        {current.length > 0 && <div className="vx-chiprow">{current.map((name) => <Pill key={name}>{name}</Pill>)}</div>}
+        <Field label="Add collaborators" hint="Comma separated. They are recorded on the file; no invitation can be sent.">
+          <TextInput value={people} onChange={(event) => setPeople(event.target.value)} placeholder="Ravi Patel, Sofia Marín" />
+        </Field>
+      </OverlaySection>
+      <Notice tone="warning" title="No invitation leaves this browser">No mail provider is connected, so names are stored on the record and the file stays local.</Notice>
+      <DrawerActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={!people.trim()}
+              onClick={async () => {
+                const next = [...new Set([...current, ...people.split(",").map((item) => item.trim()).filter(Boolean)])];
+                if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: next.join(", ") } }, { expectRevision: record.revision, event: `Shared ${record.title} with ${people}` }))) return;
+                setPeople("");
+                context.toast("Collaborators recorded", "The file lists them. No mail provider is connected, so no invitation was sent.");
+              }}
+            >
+              Record the collaborators
+            </Button>
+          }
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
 
-function InsertTools({ close }: { close: () => void }) {
+function fileSummary(context: ScreenContext) {
+  return <FileSummary context={context} />;
+}
+
+function FileSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const record = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  if (!record) return null;
   return (
-    <Stack gap={3}>
-      <p className="ds-prose">Pick a tool, then drag on the canvas. Each tool has a single-key shortcut.</p>
-      <Grid>
-        {TOOLS.filter((item) => item.tool !== "hand" && item.tool !== "select").map((item) => (
-          <Card key={item.tool} span={4}>
-            <Button variant="secondary" icon={item.icon} onClick={() => { setTool(item.tool); close(); }}>{item.label} ({item.key})</Button>
-          </Card>
-        ))}
-      </Grid>
-      <ShortcutTable
-        rows={[
+    <OverlaySummary
+      eyebrow="Design file"
+      title={record.title}
+      status={<Pill tone={record.status === "archived" ? "warning" : "neutral"}>{record.status}</Pill>}
+      meta={[record.ownerName, `revision ${record.revision}`]}
+    />
+  );
+}
+
+const SHORTCUT_ROWS = [
           { keys: "Drag", does: "Draw the shape; hold Shift for a square or circle" },
           { keys: "V", does: "Back to the select tool" },
           { keys: "Arrows", does: "Nudge the selection 1px, with Shift 10px" },
@@ -3103,8 +3140,19 @@ function InsertTools({ close }: { close: () => void }) {
           { keys: "Tab", does: "Walk the layers" },
           { keys: "0", does: "Zoom to fit" },
           { keys: "Space + drag", does: "Pan the canvas" },
-        ]}
-      />
+        ];
+
+function InsertTools({ close }: { close: () => void }) {
+  return (
+    <Stack gap={3}>
+      <OverlaySection title="Pick a tool" hint="Then drag on the canvas. Each tool has a single-key shortcut.">
+        <div className="vx-toolgrid">
+          {TOOLS.filter((item) => item.tool !== "hand" && item.tool !== "select").map((item) => (
+            <Button key={item.tool} variant="secondary" icon={item.icon} onClick={() => { setTool(item.tool); close(); }}>{item.label} ({item.key})</Button>
+          ))}
+        </div>
+      </OverlaySection>
+      <OverlaySection title="Shortcuts" flush><ShortcutTable rows={SHORTCUT_ROWS} /></OverlaySection>
     </Stack>
   );
 }
@@ -3114,23 +3162,32 @@ function FillPicker({ context }: { context: ScreenContext }) {
   const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
+  const page = activePage(doc);
+  const names = ui.selected.map((id) => page.nodes[id]?.name).filter(Boolean);
   return (
     <Stack gap={3}>
-      {ui.selected.length === 0 ? <Notice tone="info" title="Select a layer">Then pick a token below.</Notice> : (
-        <Grid>
-          {doc.colors.map((token) => (
-            <Card key={token.id} span={4}>
+      <OverlaySection title="Applies to" hint={ui.selected.length === 0 ? "Select a layer on the canvas first." : undefined}>
+        {ui.selected.length > 0 && <p className="vx-mini">{names.slice(0, 3).join(", ")}{names.length > 3 ? ` and ${names.length - 3} more` : ""}</p>}
+      </OverlaySection>
+      <OverlaySection title="Colour tokens" hint={`${doc.colors.length} in this file`}>
+        {doc.colors.length === 0 ? <p className="vx-mini">No colour tokens yet. Add them on the Typography and styles screen.</p> : (
+          <div className="vx-tokengrid">
+            {doc.colors.map((token) => (
               <button
+                key={token.id}
                 type="button"
+                className="vx-token"
                 aria-label={`Apply ${token.name}`}
-                style={{ width: "100%", height: 48, borderRadius: 8, background: token.value, border: "1px solid var(--border-default)" }}
-                onClick={() => handle.edit((current) => updatePage(current, (page) => patchNodes(page, ui.selected, (node) => (node.kind === "text" ? { textStyle: { ...node.textStyle!, color: token.value } } : { fill: { type: "solid", color: token.value } }))), "Apply fill")}
-              />
-              <span className="vx-mini">{token.name}</span>
-            </Card>
-          ))}
-        </Grid>
-      )}
+                disabled={ui.selected.length === 0}
+                onClick={() => handle.edit((current) => updatePage(current, (p) => patchNodes(p, ui.selected, (node) => (node.kind === "text" ? { textStyle: { ...node.textStyle!, color: token.value } } : { fill: { type: "solid", color: token.value } }))), "Apply fill")}
+              >
+                <span className="vx-token-chip" style={{ background: token.value }} />
+                <span className="vx-mini">{token.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </OverlaySection>
     </Stack>
   );
 }
@@ -3227,6 +3284,28 @@ function ExportOverlay({ context }: { context: ScreenContext }) {
   );
 }
 
+function layerSummary(context: ScreenContext) {
+  return <LayerSummary context={context} />;
+}
+
+function LayerSummary({ context }: { context: ScreenContext }) {
+  const { handle } = useDesignDoc(context);
+  const ui = useStore(designUi);
+  if (!handle.doc) return null;
+  const page = activePage(handle.doc);
+  const node = page.nodes[ui.selected[0]];
+  if (!node) return null;
+  const parent = parentOf(page, node.id);
+  return (
+    <OverlaySummary
+      eyebrow="Layer"
+      title={node.name}
+      status={<Row gap={1}>{node.locked && <Pill tone="warning">locked</Pill>}{!node.visible && <Pill tone="warning">hidden</Pill>}{node.componentId && <Pill tone="accent">instance</Pill>}</Row>}
+      meta={[node.kind, parent === page.id ? "page root" : `in ${page.nodes[parent ?? ""]?.name ?? "—"}`, `${(page.children[node.id] ?? []).length} children`]}
+    />
+  );
+}
+
 function LayerContext({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
   const ui = useStore(designUi);
@@ -3234,27 +3313,30 @@ function LayerContext({ context, close }: { context: ScreenContext; close: () =>
   const page = activePage(handle.doc);
   const node = page.nodes[ui.selected[0]];
   if (!node) return <Empty title="Select a layer" />;
+  const patch = (change: Partial<SceneNode>, label: string) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, change)), label);
   return (
     <Stack gap={3}>
       <Field label="Name">
         <TextInput
+          key={node.id}
           defaultValue={node.name}
-          onBlur={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { name: event.target.value })), "Rename layer")}
+          onBlur={(event) => { if (event.target.value !== node.name) patch({ name: event.target.value }, "Rename layer"); }}
         />
       </Field>
-      <Row gap={2} wrap>
-        <Button size="sm" variant="secondary" onClick={() => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { locked: !node.locked })), "Lock layer")}>{node.locked ? "Unlock" : "Lock"}</Button>
-        <Button size="sm" variant="secondary" onClick={() => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { visible: !node.visible })), "Hide layer")}>{node.visible ? "Hide" : "Show"}</Button>
-        <Button size="sm" variant="secondary" disabled={ui.selected.length < 2} onClick={() => handle.edit((current) => updatePage(current, (p) => groupNodes(p, ui.selected).page), "Group selection")}>Group selection</Button>
-        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("move-to-page")}>Move to another page</Button>
-        {node.componentId && <Button size="sm" variant="outline-danger" onClick={() => context.openOverlay("component detach")}>Detach instance</Button>}
-      </Row>
-      <Properties rows={[
-        { label: "Kind", value: node.kind },
-        { label: "Parent", value: parentOf(page, node.id) === page.id ? "page root" : page.nodes[parentOf(page, node.id) ?? ""]?.name ?? "—" },
-        { label: "Children", value: (page.children[node.id] ?? []).length },
-      ]} />
-      <Button variant="ghost" onClick={close}>Close</Button>
+      <OverlaySection title="State">
+        <Row gap={2} wrap>
+          <Button size="sm" variant="secondary" onClick={() => patch({ locked: !node.locked }, "Lock layer")}>{node.locked ? "Unlock" : "Lock"}</Button>
+          <Button size="sm" variant="secondary" onClick={() => patch({ visible: !node.visible }, "Hide layer")}>{node.visible ? "Hide" : "Show"}</Button>
+        </Row>
+      </OverlaySection>
+      <OverlaySection title="Structure">
+        <Row gap={2} wrap>
+          <Button size="sm" variant="secondary" disabled={ui.selected.length < 2} onClick={() => handle.edit((current) => updatePage(current, (p) => groupNodes(p, ui.selected).page), "Group selection")}>Group selection</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.openOverlay("move-to-page")}>Move to another page</Button>
+          {node.componentId && <Button size="sm" variant="outline-danger" onClick={() => context.openOverlay("component detach")}>Detach instance</Button>}
+        </Row>
+      </OverlaySection>
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={close}>Done</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -3268,35 +3350,44 @@ function MoveToPage({ context, close }: { context: ScreenContext; close: () => v
   if (ui.selected.length === 0) return <Empty title="Select a layer first" />;
   return (
     <Stack gap={3}>
-      <p className="ds-prose">Moving {ui.selected.length} layer{ui.selected.length === 1 ? "" : "s"} keeps its geometry and children.</p>
-      {targets.length === 0 ? <Notice tone="warning" title="Only one page">Add a page first.</Notice> : targets.map((page) => (
-        <Button
-          key={page.id}
-          variant="secondary"
-          onClick={() => {
-            handle.edit((current) => {
-              const source = activePage(current);
-              const moving = ui.selected.map((id) => source.nodes[id]).filter(Boolean);
-              let from = source;
-              let to = current.pages.find((item) => item.id === page.id)!;
-              for (const node of moving) {
-                const descendantIds = [node.id, ...Object.keys(source.children).filter((key) => key === node.id).flatMap((key) => source.children[key] ?? [])];
-                for (const id of descendantIds) {
-                  const copy = source.nodes[id];
-                  if (copy) to = { ...to, nodes: { ...to.nodes, [id]: copy }, children: { ...to.children, [to.id]: id === node.id ? [...(to.children[to.id] ?? []), id] : (to.children[to.id] ?? []), ...(source.children[id] ? { [id]: source.children[id] } : {}) } };
-                }
-                from = removeNodes(from, [node.id]);
-              }
-              return { ...current, pages: current.pages.map((item) => (item.id === from.id ? from : item.id === to.id ? to : item)) };
-            }, "Move to another page");
-            setSelection([]);
-            context.toast("Moved", `The layers are on ${page.name}.`);
-            close();
-          }}
-        >
-          Move to {page.name}
-        </Button>
-      ))}
+      <OverlaySection title={`Move ${ui.selected.length} layer${ui.selected.length === 1 ? "" : "s"} to`} hint="Geometry and children come with them." flush>
+        {targets.length === 0 ? <div style={{ padding: "var(--space-3)" }}><Notice tone="warning" title="Only one page">Add a page first.</Notice></div> : (
+          <ul className="vx-uselist">
+            {targets.map((page) => (
+              <li key={page.id} className="vx-use">
+                <span className="ds-grow">{page.name}<span className="vx-mini"> · {Object.keys(page.nodes).length} layers</span></span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    handle.edit((current) => {
+                      const source = activePage(current);
+                      const moving = ui.selected.map((id) => source.nodes[id]).filter(Boolean);
+                      let from = source;
+                      let to = current.pages.find((item) => item.id === page.id)!;
+                      for (const node of moving) {
+                        const descendantIds = [node.id, ...Object.keys(source.children).filter((key) => key === node.id).flatMap((key) => source.children[key] ?? [])];
+                        for (const id of descendantIds) {
+                          const copy = source.nodes[id];
+                          if (copy) to = { ...to, nodes: { ...to.nodes, [id]: copy }, children: { ...to.children, [to.id]: id === node.id ? [...(to.children[to.id] ?? []), id] : (to.children[to.id] ?? []), ...(source.children[id] ? { [id]: source.children[id] } : {}) } };
+                        }
+                        from = removeNodes(from, [node.id]);
+                      }
+                      return { ...current, pages: current.pages.map((item) => (item.id === from.id ? from : item.id === to.id ? to : item)) };
+                    }, "Move to another page");
+                    setSelection([]);
+                    context.toast("Moved", `The layers are on ${page.name}.`);
+                    close();
+                  }}
+                >
+                  Move to {page.name}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </OverlaySection>
+      <ModalActions><OverlayActions end={<OverlayCancel />} /></ModalActions>
     </Stack>
   );
 }
@@ -3305,25 +3396,45 @@ function DetachInstance({ context, close }: { context: ScreenContext; close: () 
   const { record, handle } = useDesignDoc(context);
   const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
-  const page = activePage(handle.doc);
+  const doc = handle.doc;
+  const page = activePage(doc);
   const instances = Object.values(page.nodes).filter((node) => node.kind === "instance");
   const chosen = page.nodes[ui.selected[0]]?.kind === "instance" ? page.nodes[ui.selected[0]] : instances[0];
   if (!chosen) return <Empty title="No instances on this page">Place a component first.</Empty>;
+  const component = doc.components.find((item) => item.id === chosen.componentId);
+  const others = component ? instancesOf(doc, component.id).length - 1 : 0;
   return (
     <Stack gap={3}>
-      <Notice tone="warning" title="Detaching cannot be undone by republishing">
-        {chosen.name} becomes ordinary layers. Later changes to the component will not reach it. Undo in the editor still works.
+      <FactGrid
+        columns={3}
+        dense
+        items={[
+          { label: "Instance", value: chosen.name },
+          { label: "Component", value: component ? `${component.name} · v${component.version}` : "missing", mono: true },
+          { label: "Other instances", value: others, mono: true, hint: "Keep following it" },
+        ]}
+      />
+      <Notice tone="warning" title="It stops following the component">
+        {chosen.name} becomes ordinary layers and later component changes will not reach it. Undo in the editor restores it.
       </Notice>
-      <Button
-        variant="danger"
-        onClick={() => {
-          handle.edit((current) => detachInstance(current, chosen.id), "Detach instance");
-          context.toast("Detached", `${chosen.name} is now ordinary layers.`);
-          close();
-        }}
-      >
-        Detach {chosen.name}
-      </Button>
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          end={<OverlayCancel />}
+          primary={
+            <Button
+              variant="danger"
+              onClick={() => {
+                handle.edit((current) => detachInstance(current, chosen.id), "Detach instance");
+                context.toast("Detached", `${chosen.name} is now ordinary layers.`);
+                close();
+              }}
+            >
+              Detach {chosen.name}
+            </Button>
+          }
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -3334,27 +3445,66 @@ function PointInspectorOverlay({ context }: { context: ScreenContext }) {
   return <PathInspector handle={handle} context={context} tab="Pen" />;
 }
 
-function StrokeOverlay({ context }: { context: ScreenContext }) {
-  const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
-  if (!record || !handle.doc) return <Empty title="Open a file first" />;
-  const page = activePage(handle.doc);
-  const node = page.nodes[ui.pathNodeId ?? ui.selected[0]] ?? Object.values(page.nodes).find((item) => item.kind === "path");
-  if (!node) return <Empty title="Select a layer" />;
+/** Overlays that are really inspector sections: they hand off to the inspector and close, so the canvas is never scrimmed. */
+const pathFocus = createStore<{ stroke: number; help: boolean }>({ stroke: 0, help: false });
+
+function HandOff({ context, then, toast }: { context: ScreenContext; then?: () => void; toast?: [string, string] }) {
+  useEffect(() => {
+    then?.();
+    if (toast) context.toast(toast[0], toast[1], "info");
+    context.closeOverlay();
+  }, []);
+  return null;
+}
+
+function PathOperationsHelp() {
   return (
-    <Stack gap={3}>
-      <Field label="Stroke colour">
-        <input type="color" aria-label="Stroke colour" value={node.stroke?.color ?? "#17223A"} onChange={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: event.target.value, width: node.stroke?.width ?? 1, align: node.stroke?.align ?? "center" } })), "Stroke colour")} />
-      </Field>
-      <Field label="Width"><TextInput type="number" value={node.stroke?.width ?? 0} onChange={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: node.stroke?.color ?? "#17223A", width: Number(event.target.value), align: node.stroke?.align ?? "center" } })), "Stroke width")} /></Field>
-      <Field label="Alignment">
-        <Select value={node.stroke?.align ?? "center"} onChange={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: node.stroke?.color ?? "#17223A", width: node.stroke?.width ?? 1, align: event.target.value as "center" } })), "Stroke alignment")}>
+    <Stack gap={2}>
+      <ul className="vx-help">
+        <li><strong>Join</strong> closes the contour, merging the two ends when they are within six pixels.</li>
+        <li><strong>Simplify</strong> runs Ramer–Douglas–Peucker over the anchors at a four pixel tolerance and refits smooth tangents.</li>
+        <li><strong>Offset</strong> moves each anchor along the local normal.</li>
+        <li><strong>Combine</strong> adds a second contour and sets the fill rule; it does not compute intersection geometry.</li>
+      </ul>
+      <p className="vx-mini">Every operation goes through the undo stack, so nothing is destructive.</p>
+    </Stack>
+  );
+}
+
+/** Stroke controls for a path, live on the canvas. */
+function StrokeControls({ handle }: { handle: DocHandle<DesignDoc> }) {
+  const ui = useStore(designUi);
+  const focus = useStore(pathFocus);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus.stroke) ref.current?.querySelector<HTMLElement>("input")?.focus();
+  }, [focus.stroke]);
+  const doc = handle.doc;
+  if (!doc) return null;
+  const page = activePage(doc);
+  const node = page.nodes[ui.pathNodeId ?? ui.selected[0]] ?? Object.values(page.nodes).find((item) => item.kind === "path");
+  if (!node) return null;
+  const stroke = (patch: Partial<NonNullable<SceneNode["stroke"]>>, label: string) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { stroke: { color: node.stroke?.color ?? "#17223A", width: node.stroke?.width ?? 1, align: node.stroke?.align ?? "center", ...patch } })), label);
+  return (
+    <PanelGroup title="Stroke">
+      <div ref={ref} className="vx-fieldrow">
+        <div>
+          <label className="vx-label" htmlFor="path-stroke-colour">Stroke colour</label>
+          <input id="path-stroke-colour" type="color" aria-label="Stroke colour" value={node.stroke?.color ?? "#17223A"} onChange={(event) => stroke({ color: event.target.value }, "Stroke colour")} />
+        </div>
+        <NumberBox label="Width" value={node.stroke?.width ?? 0} min={0} step={0.5} onChange={(value) => stroke({ width: Math.max(0, value) }, "Stroke width")} />
+      </div>
+      <Field label="Alignment" hint="The export renders a centred stroke; inside and outside are recorded on the layer.">
+        <Select value={node.stroke?.align ?? "center"} onChange={(event) => stroke({ align: event.target.value as "center" }, "Stroke alignment")}>
           {["center", "inside", "outside"].map((option) => <option key={option} value={option}>{option}</option>)}
         </Select>
       </Field>
-      <Notice tone="warning" title="Stroke alignment in the export">SVG strokes are centred. Inside and outside alignment is recorded on the layer but the exported file renders a centred stroke; the difference is stated here rather than hidden.</Notice>
-    </Stack>
+    </PanelGroup>
   );
+}
+
+function StrokeOverlay({ context }: { context: ScreenContext }) {
+  return <HandOff context={context} then={() => pathFocus.set((c) => ({ ...c, stroke: c.stroke + 1 }))} toast={["Stroke is in the path inspector", "Edit it on the right; the canvas updates as you change it."]} />;
 }
 
 function FrameSizeOverlay({ context }: { context: ScreenContext }) {
@@ -3362,8 +3512,8 @@ function FrameSizeOverlay({ context }: { context: ScreenContext }) {
   const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const page = activePage(handle.doc);
-  const frame = (ui.selected.map((id) => page.nodes[id]).find((node) => node?.kind === "frame")) ?? Object.values(page.nodes).find((node) => node.kind === "frame");
-  if (!frame) return <Empty title="No frame on this page" />;
+  const frame = ui.selected.map((id) => page.nodes[id]).find((node) => node?.kind === "frame");
+  if (!frame) return <HandOff context={context} toast={["Select a frame first", "Frame size applies to the selected frame."]} />;
   return (
     <Stack gap={3}>
       <Field label="Width"><TextInput type="number" value={Math.round(frame.w)} onChange={(event) => handle.edit((current) => updatePage(current, (p) => resizeFrame(p, frame.id, Math.max(40, Number(event.target.value)), frame.h)), "Set frame width")} /></Field>
@@ -3432,95 +3582,198 @@ function BreakpointPreview({ context }: { context: ScreenContext }) {
   );
 }
 
+/** The component an overlay is about: the card that opened it, else the selection, else the first candidate. */
+function targetComponent(context: ScreenContext, doc: DesignDoc, prefer?: (item: DesignDoc["components"][number]) => boolean) {
+  const payload = (context.overlayPayload as { componentId?: string } | undefined)?.componentId;
+  const selected = designUi.get().selected[0];
+  const page = activePage(doc);
+  return doc.components.find((item) => item.id === payload)
+    ?? doc.components.find((item) => item.id === (page.nodes[selected]?.componentId ?? selected))
+    ?? (prefer ? doc.components.find(prefer) : undefined)
+    ?? doc.components[0];
+}
+
+function componentSummary(context: ScreenContext) {
+  return <ComponentSummary context={context} />;
+}
+
+function ComponentSummary({ context }: { context: ScreenContext }) {
+  const { handle } = useDesignDoc(context);
+  const doc = handle.doc;
+  const component = doc ? targetComponent(context, doc, (item) => !item.published) : undefined;
+  if (!doc || !component) return null;
+  const uses = instancesOf(doc, component.id);
+  return (
+    <OverlaySummary
+      eyebrow="Component"
+      title={component.name}
+      status={<Pill tone={component.published ? "success" : "warning"}>{component.published ? `published v${component.version}` : "local"}</Pill>}
+      meta={[<span key="i"><span className="ds-num">{uses.length}</span> instance{uses.length === 1 ? "" : "s"}</span>, <span key="p"><span className="ds-num">{component.properties.length}</span> propert{component.properties.length === 1 ? "y" : "ies"}</span>]}
+    />
+  );
+}
+
 function VariantEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
   const [name, setName] = useState("state");
   const [values, setValues] = useState("default, hover, disabled");
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0])) ?? doc.components[0];
+  const component = targetComponent(context, doc);
   if (!component) return <Empty title="No components yet">Create one from a frame first.</Empty>;
+  const parsed = values.split(",").map((value) => value.trim()).filter(Boolean);
+  const duplicate = component.properties.some((item) => item.name.toLowerCase() === name.trim().toLowerCase());
   return (
     <form
       id="variant-editor"
-      className="ds-stack ds-gap-4"
+      className="ds-stack ds-gap-3"
       onSubmit={(event) => {
         event.preventDefault();
+        if (duplicate || parsed.length === 0) return;
         handle.edit((current) => ({
           ...current,
           components: current.components.map((item) => (item.id === component.id
-            ? { ...item, properties: [...item.properties, { name, values: values.split(",").map((value) => value.trim()).filter(Boolean) }] }
+            ? { ...item, properties: [...item.properties, { name: name.trim(), values: parsed }] }
             : item)),
         }), "Add component property");
-        context.toast("Property added", `${component.name} now offers ${name} to each instance.`);
+        context.toast("Property added", `${component.name} now offers ${name.trim()} to each instance.`);
         close();
       }}
     >
-      <Properties rows={[{ label: "Component", value: component.name }, { label: "Instances", value: instancesOf(doc, component.id).length }]} />
-      <Field label="Property name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
-      <Field label="Values" hint="Comma separated"><TextInput value={values} onChange={(event) => setValues(event.target.value)} required /></Field>
+      <Field label="Property name" required error={duplicate ? `${component.name} already has a property called ${name.trim()}.` : undefined}><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
+      <Field label="Values" hint="Comma separated. The first is the default.">
+        <TextInput value={values} onChange={(event) => setValues(event.target.value)} required />
+      </Field>
+      {parsed.length > 0 && <div className="vx-chiprow" aria-label="Values">{parsed.map((value, index) => <Pill key={value} tone={index === 0 ? "accent" : undefined}>{value}</Pill>)}</div>}
+      <p className="vx-mini">Adding a property is not a breaking change: {instancesOf(doc, component.id).length} instance{instancesOf(doc, component.id).length === 1 ? "" : "s"} keep their look until a value is chosen.</p>
     </form>
+  );
+}
+
+function ChangeList({ changes }: { changes: ReturnType<typeof componentChanges>["changes"] }) {
+  return (
+    <ul className="vx-changes">
+      {changes.map((change) => (
+        <li key={change.id} className="vx-change" data-breaking={change.breaking || undefined}>
+          <Pill tone={change.breaking ? "danger" : "success"}>{change.breaking ? "breaking" : "safe"}</Pill>
+          <div><strong>{change.what}</strong><div className="vx-mini">{change.detail}</div></div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function PublishComponent({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
+  const [reviewed, setReviewed] = useState(false);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0])) ?? doc.components.find((item) => !item.published) ?? doc.components[0];
+  const component = targetComponent(context, doc, (item) => !item.published);
   if (!component) return <Empty title="Nothing to publish" />;
   const uses = instancesOf(doc, component.id);
+  const { first, changes } = componentChanges(doc, component);
+  const breaking = changes.filter((change) => change.breaking);
+  const nothingNew = !first && changes.length === 0;
+  const next = component.published ? component.version + 1 : component.version;
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Component", value: component.name },
-        { label: "Current version", value: component.version },
-        { label: "Instances in this file", value: uses.length },
-        { label: "Pages affected", value: [...new Set(uses.map((use) => use.pageName))].join(", ") || "none" },
-      ]} />
-      <Notice tone="warning" title="Publishing raises the version">Every instance listed above resolves against the new version. Instances with overrides keep them.</Notice>
-      <Button
-        variant="primary"
-        onClick={() => {
-          handle.edit((current) => ({
-            ...current,
-            components: current.components.map((item) => (item.id === component.id ? { ...item, published: true, version: item.version + 1 } : item)),
-          }), "Publish component");
-          context.toast("Published", `${component.name} is at version ${component.version + 1} in this file's library. A shared team library needs a backend, which is not connected.`);
-          close();
-        }}
+      <FactGrid
+        items={[
+          { label: "Version", value: component.published ? `v${component.version} → v${next}` : `not published → v${next}`, mono: true },
+          { label: "Instances reached", value: uses.length, mono: true, tone: breaking.length > 0 && uses.length > 0 ? "warning" : undefined, hint: uses.length ? `on ${[...new Set(uses.map((use) => use.pageName))].join(", ")}` : undefined },
+        ]}
+      />
+      <OverlaySection
+        title={first ? "First publication" : `Changes since v${component.version}`}
+        tone={breaking.length > 0 ? "danger" : "neutral"}
+        hint={first ? "There is no earlier version to compare against." : nothingNew ? "Nothing differs from the published version." : `${breaking.length} breaking, ${changes.length - breaking.length} safe`}
+        actions={uses.length > 0 ? <Button size="sm" variant="ghost" onClick={() => context.openOverlay("breaking-change diff", { componentId: component.id })}>Affected instances</Button> : undefined}
       >
-        Publish version {component.version + 1}
-      </Button>
+        {changes.length > 0 ? <ChangeList changes={changes} /> : first ? (
+          <p className="vx-mini">{uses.length} instance{uses.length === 1 ? "" : "s"} in {[...new Set(uses.map((use) => use.pageName))].join(", ") || "no page"} will resolve against v{next}. Overrides are kept.</p>
+        ) : null}
+      </OverlaySection>
+      {breaking.length > 0 && (
+        <Checkbox label={`I have reviewed the ${breaking.length} breaking change${breaking.length === 1 ? "" : "s"} and the ${uses.length} instance${uses.length === 1 ? "" : "s"} they reach`} checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} />
+      )}
+      <p className="vx-mini">The version is kept in this file. A shared team library needs a backend, which is not connected.</p>
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={nothingNew || (breaking.length > 0 && !reviewed)}
+              onClick={() => {
+                handle.edit((current) => ({
+                  ...current,
+                  components: current.components.map((item) => (item.id === component.id
+                    ? { ...item, published: true, version: next, publishedSnapshot: { properties: structuredClone(item.properties), nodes: structuredClone(item.nodes), children: structuredClone(item.children) } }
+                    : item)),
+                }), "Publish component");
+                context.toast("Published", `${component.name} is at version ${next} in this file's library${breaking.length ? `; ${breaking.length} breaking change${breaking.length === 1 ? "" : "s"} reached ${uses.length} instance${uses.length === 1 ? "" : "s"}` : ""}.`);
+                close();
+              }}
+            >
+              {nothingNew ? "Nothing to publish" : `Publish version ${next}`}
+            </Button>
+          }
+          end={<OverlayCancel />}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 function BreakingChange({ context }: { context: ScreenContext }) {
   const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0]));
+  const component = targetComponent(context, doc);
   if (!component) return <Empty title="No component selected">Select an instance to see every place its component is used.</Empty>;
   const uses = instancesOf(doc, component.id);
+  const { first, changes } = componentChanges(doc, component);
+  const withOverrides = uses.filter((use) => Object.keys(use.node.overrides ?? {}).length > 0).length;
   return (
     <Stack gap={3}>
-      <Notice tone={uses.length > 0 ? "warning" : "info"} title={`${uses.length} instance${uses.length === 1 ? "" : "s"} would change`}>
-        Each one is listed with the overrides it holds; an override survives the change.
-      </Notice>
-      {uses.length === 0 ? <Empty title="No instances yet" /> : (
-        <Stack gap={2}>
-          {uses.map((use) => (
-            <Row key={use.node.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
-              <span className="ds-grow">{use.pageName} · {use.node.name}</span>
-              <Pill>{Object.keys(use.node.overrides ?? {}).length} overrides</Pill>
-            </Row>
-          ))}
-        </Stack>
+      <FactGrid
+        items={[
+          { label: "Instances", value: uses.length, mono: true, hint: `${withOverrides} with overrides, which survive` },
+          { label: "Pages", value: new Set(uses.map((use) => use.pageId)).size, mono: true },
+        ]}
+      />
+      {!first && changes.length > 0 && (
+        <OverlaySection title={`Pending since v${component.version}`} tone={changes.some((change) => change.breaking) ? "danger" : "neutral"}>
+          <ChangeList changes={changes} />
+        </OverlaySection>
       )}
+      <OverlaySection title="Where it is used" hint="Select a row to open the layer on the canvas" flush>
+        {uses.length === 0 ? <Empty title="No instances yet">Place one from the Library tab.</Empty> : (
+          <ul className="vx-uselist">
+            {uses.map((use) => (
+              <li key={use.node.id}>
+                <button
+                  type="button"
+                  className="vx-use"
+                  onClick={() => {
+                    handle.edit((current) => ({ ...current, activePageId: use.pageId }), "Switch page");
+                    setSelection([use.node.id]);
+                    context.navigate(context.path("/o/:org/design/files/:id", context.params.id));
+                  }}
+                >
+                  <span className="ds-grow">{use.pageName} · {use.node.name}</span>
+                  <span className="vx-mini">{Object.keys(use.node.overrides ?? {}).length} override{Object.keys(use.node.overrides ?? {}).length === 1 ? "" : "s"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </OverlaySection>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.openOverlay("library publish", { componentId: component.id })}>{component.published ? "Review and publish" : "Publish…"}</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -3528,16 +3781,15 @@ function BreakingChange({ context }: { context: ScreenContext }) {
 function FontBrowser() {
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Checked against this browser">Each family below is tested with the font loading API. There is no font service connected, so nothing can be downloaded on demand.</Notice>
-      {FONT_STACK.map((family) => (
-        <div key={family} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-          <Row gap={2}>
-            <strong className="ds-grow">{family}</strong>
-            <Pill tone={fontAvailable(family) ? "success" : "warning"}>{fontAvailable(family) ? "available" : "substituted"}</Pill>
-          </Row>
-          <p style={{ fontFamily: family, fontSize: 20, margin: "6px 0 0" }}>Handgloves 123</p>
-        </div>
-      ))}
+      <p className="vx-mini">Each family is tested with the font loading API. No font service is connected, so nothing downloads on demand.</p>
+      <ul className="vx-uselist">
+        {FONT_STACK.map((family) => (
+          <li key={family} className="vx-fontrow">
+            <div className="ds-row ds-gap-2"><strong className="ds-grow">{family}</strong><Pill tone={fontAvailable(family) ? "success" : "warning"}>{fontAvailable(family) ? "available" : "substituted"}</Pill></div>
+            <p style={{ fontFamily: family, fontSize: "var(--text-lg)", margin: "4px 0 0" }}>Handgloves 123</p>
+          </li>
+        ))}
+      </ul>
     </Stack>
   );
 }
@@ -3550,53 +3802,74 @@ function GradientEditor({ context }: { context: ScreenContext }) {
   const [to, setTo] = useState("#36C5BA");
   const [angle, setAngle] = useState(90);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  const count = ui.selected.length;
   return (
     <Stack gap={3}>
-      <div style={{ height: 96, borderRadius: 8, background: `linear-gradient(${angle}deg, ${from}, ${to})`, border: "1px solid var(--border-default)" }} />
+      <div style={{ height: 80, borderRadius: "var(--radius-md)", background: `linear-gradient(${angle}deg, ${from}, ${to})`, border: "1px solid var(--border-default)" }} aria-hidden="true" />
       <Row gap={3} wrap>
         <Field label="From"><input type="color" aria-label="Gradient start" value={from} onChange={(event) => setFrom(event.target.value)} /></Field>
         <Field label="To"><input type="color" aria-label="Gradient end" value={to} onChange={(event) => setTo(event.target.value)} /></Field>
         <Field label="Angle"><TextInput type="number" value={angle} onChange={(event) => setAngle(Number(event.target.value))} /></Field>
       </Row>
-      <Button
-        variant="primary"
-        disabled={ui.selected.length === 0}
-        onClick={() => {
-          handle.edit((current) => updatePage(current, (page) => patchNodes(page, ui.selected, () => ({ fill: { type: "linear", color: from, to, angle } }))), "Apply gradient");
-          context.toast("Gradient applied", `${ui.selected.length} layer${ui.selected.length === 1 ? "" : "s"} updated. The exported SVG carries the same two stops.`);
-        }}
-      >
-        Apply to {ui.selected.length} selected layer{ui.selected.length === 1 ? "" : "s"}
-      </Button>
-      {ui.selected.length === 0 && <p className="vx-mini">Select a layer on the canvas or the layers screen first.</p>}
+      {count === 0 && <p className="vx-mini">Select a layer on the canvas to apply this.</p>}
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={count === 0}
+              onClick={() => {
+                handle.edit((current) => updatePage(current, (page) => patchNodes(page, ui.selected, () => ({ fill: { type: "linear", color: from, to, angle } }))), "Apply gradient");
+                context.toast("Gradient applied", `${count} layer${count === 1 ? "" : "s"} updated. The exported SVG carries the same two stops.`);
+              }}
+            >
+              Apply to {count} selected layer{count === 1 ? "" : "s"}
+            </Button>
+          }
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 function StyleImpact({ context }: { context: ScreenContext }) {
   const { record, handle } = useDesignDoc(context);
+  const styleId = (context.overlayPayload as { styleId?: string } | undefined)?.styleId;
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
   const page = activePage(doc);
-  const texts = Object.values(page.nodes).filter((node) => node.kind === "text" && node.textStyle);
+  const style = styleId ? doc.textStyles.find((item) => item.id === styleId) : undefined;
+  const texts = Object.values(page.nodes).filter((node) => node.kind === "text" && node.textStyle && (!styleId || node.textStyle.styleId === styleId));
+  const graded = texts.map((node) => {
+    const ratio = contrastRatio(node.textStyle!.color, page.background);
+    return { node, ratio, grade: wcagGrade(ratio, node.textStyle!.size >= 24) };
+  });
+  const failing = graded.filter((item) => item.grade === "fail").length;
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Contrast measured against the page background">Computed with the WCAG relative luminance formula, not estimated.</Notice>
-      {texts.length === 0 ? <Empty title="No text layers on this page" /> : (
-        <Stack gap={2}>
-          {texts.map((node) => {
-            const ratio = contrastRatio(node.textStyle!.color, page.background);
-            const grade = wcagGrade(ratio, node.textStyle!.size >= 24);
-            return (
-              <Row key={node.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+      <FactGrid
+        columns={3}
+        dense
+        items={[
+          { label: style ? "Style" : "Scope", value: style?.name ?? "Every text layer" },
+          { label: "Layers", value: texts.length, mono: true },
+          { label: "Below AA", value: failing, mono: true, tone: failing ? "danger" : undefined },
+        ]}
+      />
+      <OverlaySection title="Contrast on the page" hint="WCAG relative luminance against the page background" flush>
+        {texts.length === 0 ? <div style={{ padding: "var(--space-3)" }}><Empty title={style ? `No layer on this page uses ${style.name}` : "No text layers on this page"} /></div> : (
+          <ul className="vx-uselist">
+            {graded.map(({ node, ratio, grade }) => (
+              <li key={node.id} className="vx-use">
                 <span className="ds-grow">{node.name}</span>
-                <Pill>{node.textStyle!.size}px</Pill>
+                <span className="vx-mini ds-num">{node.textStyle!.size}px</span>
                 <Pill tone={grade === "fail" ? "danger" : grade === "AA" ? "warning" : "success"}>{ratio}:1 {grade}</Pill>
-              </Row>
-            );
-          })}
-        </Stack>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </OverlaySection>
     </Stack>
   );
 }
@@ -3618,13 +3891,15 @@ function DevicePreview({ context }: { context: ScreenContext }) {
           {["Desktop 1440", "Tablet 834", "Phone 390", "No frame"].map((option) => <option key={option}>{option}</option>)}
         </Select>
       </Field>
-      <Notice tone="warning" title="Publishing a prototype link is not connected">
-        A hosted prototype needs a hosting provider. Nothing here can serve a URL. The flow specification can be downloaded from the Share tab, and the preview runs locally.
+      <Notice tone="warning" title="Hosting is not connected">
+        A hosted prototype link needs a hosting provider, so nothing here can serve a URL. The preview runs locally and the flow specification downloads from the Share tab.
       </Notice>
-      <Properties rows={[
-        { label: "Provider", value: "Hosting — not connected" },
-        { label: "Local equivalent", value: "Run the preview on the Preview tab, or download the flow specification." },
-      ]} />
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => { context.closeOverlay(); context.setTab("Preview"); }}>Run the preview</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -3711,20 +3986,17 @@ function LicenceNote({ context }: { context: ScreenContext }) {
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const asset = handle.doc.assets.find((item) => item.id === payload?.id) ?? handle.doc.assets[0];
   if (!asset) return <Empty title="No assets yet" />;
+  const unknown = asset.license.startsWith("Unknown");
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Asset", value: asset.name },
-        { label: "Licence", value: asset.license },
-        { label: "Credit", value: asset.credit },
-        { label: "Pixels", value: `${asset.width} × ${asset.height}` },
-      ]} />
+      <OverlaySummary eyebrow="Asset" title={asset.name} status={<Pill tone={unknown ? "danger" : "success"}>{unknown ? "licence unknown" : "licence recorded"}</Pill>} meta={[`${asset.width} × ${asset.height} px`, asset.credit]} />
       <Field label="Licence">
         <Select value={asset.license} onChange={(event) => handle.edit((current) => ({ ...current, assets: current.assets.map((item) => (item.id === asset.id ? { ...item, license: event.target.value } : item)) }), "Change licence")}>
           {["Company-owned", "Licensed — single use", "Licensed — unlimited", "Creative Commons BY", "Unknown — check before use"].map((option) => <option key={option}>{option}</option>)}
         </Select>
       </Field>
-      {asset.license.startsWith("Unknown") && <Notice tone="danger" title="Do not publish this asset">The licence is unknown. Resolve it before the asset leaves the workspace.</Notice>}
+      {unknown && <Notice tone="danger" title="Do not publish this asset">The licence is unknown. Resolve it before the asset leaves the workspace.</Notice>}
+      <DrawerActions><OverlayActions primary={<OverlayCancel>Done</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -3732,55 +4004,60 @@ function LicenceNote({ context }: { context: ScreenContext }) {
 function CommentEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const [text, setText] = useState("");
+  const [text, setText] = useState<string | null>(null);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const existing = doc.comments.find((item) => item.id === payload?.id) ?? doc.comments[doc.comments.length - 1];
+  const last = doc.comments[doc.comments.length - 1];
+  /* A pin just dropped on the canvas has no text yet; that is the one to fill in. */
+  const existing = doc.comments.find((item) => item.id === payload?.id) ?? (last && !last.text.trim() && !payload?.id ? last : undefined);
+  const value = text ?? existing?.text ?? "";
   return (
     <Stack gap={3}>
-      {existing ? (
-        <>
-          <Properties rows={[{ label: "Pinned at", value: `${Math.round(existing.x)}, ${Math.round(existing.y)}` }, { label: "By", value: existing.author }]} />
-          <Field label="Comment">
-            <TextArea rows={4} value={text || existing.text} onChange={(event) => setText(event.target.value)} />
-          </Field>
-          <Button
-            variant="primary"
-            onClick={() => {
-              handle.edit((current) => ({ ...current, comments: current.comments.map((item) => (item.id === existing.id ? { ...item, text: text || item.text } : item)) }), "Edit comment");
-              context.toast("Comment saved", "It is stored on the page with its position.");
-              close();
-            }}
-          >
-            Save the comment
-          </Button>
-        </>
-      ) : (
-        <>
-          <Field label="Comment"><TextArea rows={4} value={text} onChange={(event) => setText(event.target.value)} /></Field>
-          <Button
-            variant="primary"
-            disabled={!text.trim()}
-            onClick={() => {
-              const page = activePage(doc);
-              const bounds = pageBounds(page);
-              handle.edit((current) => ({
-                ...current,
-                comments: [...current.comments, {
-                  id: `c-${wallMs().toString(36)}`, pageId: current.activePageId,
-                  x: bounds.x + bounds.w / 2, y: bounds.y + 40,
-                  author: context.actor, at: clockIso(), text, resolved: false,
-                }],
-              }), "Add comment");
-              context.toast("Comment added", "Pinned at the top of the page; drag it on the canvas Comments tab.");
-              close();
-            }}
-          >
-            Add the comment
-          </Button>
-          <p className="vx-mini">To pin a comment exactly, open the canvas, choose the Comments tab and click where the issue is.</p>
-        </>
+      {existing && (
+        <FactGrid
+          columns={3}
+          dense
+          items={[
+            { label: "Pinned at", value: `${Math.round(existing.x)}, ${Math.round(existing.y)}`, mono: true },
+            { label: "By", value: existing.author },
+            { label: "State", value: existing.resolved ? "resolved" : existing.taskId ? "assigned" : "open" },
+          ]}
+        />
       )}
+      <Field label="Comment" required><TextArea rows={4} value={value} onChange={(event) => setText(event.target.value)} /></Field>
+      {!existing && <p className="vx-mini">Without a pin it lands at the top of the page. To pin it exactly, open the canvas, choose the Comments tab and click where the issue is.</p>}
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={!value.trim()}
+              onClick={() => {
+                if (existing) {
+                  handle.edit((current) => ({ ...current, comments: current.comments.map((item) => (item.id === existing.id ? { ...item, text: value } : item)) }), "Edit comment");
+                  context.toast("Comment saved", "It is stored on the page with its position.");
+                } else {
+                  const page = activePage(doc);
+                  const bounds = pageBounds(page);
+                  handle.edit((current) => ({
+                    ...current,
+                    comments: [...current.comments, {
+                      id: `c-${wallMs().toString(36)}`, pageId: current.activePageId,
+                      x: bounds.x + bounds.w / 2, y: bounds.y + 40,
+                      author: context.actor, at: clockIso(), text: value, resolved: false,
+                    }],
+                  }), "Add comment");
+                  context.toast("Comment added", "Pinned at the top of the page; drag it on the canvas Comments tab.");
+                }
+                close();
+              }}
+            >
+              {existing ? "Save the comment" : "Add the comment"}
+            </Button>
+          }
+          end={<OverlayCancel />}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -3794,7 +4071,7 @@ function SignOff({ context, close }: { context: ScreenContext; close: () => void
   return (
     <form
       id="design-signoff"
-      className="ds-stack ds-gap-4"
+      className="ds-stack ds-gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         handle.edit((current) => ({
@@ -3806,9 +4083,16 @@ function SignOff({ context, close }: { context: ScreenContext; close: () => void
         close();
       }}
     >
-      <Notice tone="info" title={`This decision binds to version ${designDigest(handle.doc)} (revision ${record.revision})`}>
-        It does not carry forward to future edits. The reviews tab shows when an approval no longer covers the current file.
-      </Notice>
+      <FactGrid
+        columns={3}
+        dense
+        items={[
+          { label: "Binds to version", value: designDigest(handle.doc), mono: true },
+          { label: "Revision", value: record.revision, mono: true },
+          { label: "Reviewer", value: context.actor },
+        ]}
+      />
+      <p className="vx-mini">The decision covers this version only. The reviews tab shows when an approval no longer covers the current file.</p>
       <Field label="Decision">
         <Select value={state} onChange={(event) => setState(event.target.value as "approved")}>
           <option value="approved">Approved</option>

@@ -1,6 +1,7 @@
 import { BarChart3, FileText, LifeBuoy, MessageSquare, Receipt, ShieldCheck, Wand2 } from "lucide-react";
-import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Empty, Notice, OVERLAY_WIDTH, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { gateScreens } from "@/applications/analytics/ready";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
@@ -17,8 +18,8 @@ import {
 import {
   AccessRequest, AccessSetup, AccountRecovery, AttachmentPreview, ClientMessage, ComplaintForm,
   ConversationDetails, DataGrant, DisputeForm, DocumentPreview, DocumentReceipt, ExternalInvite,
-  PaymentProvider, PermissionRequest, PortalBranding, PortalWizard, PublishReview,
-  ScopePreview, SharedItemInspector, SignatureRequest,
+  PaymentProvider, PermissionRequest, PortalBranding, PortalWizard, PublishFooter, PublishReview, PublishSummary,
+  ScopePreview, ScopeSummary, SharedItemInspector, SignatureRequest,
 } from "./overlays";
 
 /* ====================================================================== *
@@ -49,7 +50,8 @@ export const portalApp = registerApp({
       { label: "Access & analytics", screenId: "ARL-PORTAL-007", icon: ShieldCheck },
     ] },
   ],
-  screens: {
+  // A portal names records from many applications; count none from a partial read.
+  screens: gateScreens({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-PORTAL-001": {
       id: "ARL-PORTAL-001",
@@ -68,9 +70,9 @@ export const portalApp = registerApp({
         { id: "access", label: "Access settings", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("access setup", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Portal wizard", kind: "drawer", title: "New portal", width: 640, render: ({ close, ...context }) => <PortalWizard context={context} close={close} />, footer: submitFooter("portal-wizard", "Create portal") },
-        { id: "branding", kind: "modal", title: "Branding", width: 560, render: ({ close, ...context }) => <PortalBranding context={context} close={close} />, footer: submitFooter("portal-branding", "Save branding") },
-        { id: "access setup", kind: "modal", title: "Access", width: 580, presentation: { guidance: "Choose exactly what the external user can see, how long access lasts and which records remain private." }, render: ({ close, ...context }) => <AccessSetup context={context} close={close} />, footer: submitFooter("access-setup", "Save access") },
+        { id: "Portal wizard", kind: "drawer", title: "New portal", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <PortalWizard context={context} close={close} />, footer: submitFooter("portal-wizard", "Create portal") },
+        { id: "branding", kind: "modal", title: "Branding", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PortalBranding context={context} close={close} />, footer: submitFooter("portal-branding", "Save branding") },
+        { id: "access setup", kind: "modal", title: "Access", width: OVERLAY_WIDTH.modal, presentation: { guidance: "Choose exactly what the external user can see, how long access lasts and which records remain private." }, render: ({ close, ...context }) => <AccessSetup context={context} close={close} />, footer: submitFooter("access-setup", "Save access") },
         confirmOverlay,
       ],
     },
@@ -92,10 +94,10 @@ export const portalApp = registerApp({
         { id: "publish", label: "Publish review", placement: "overflow", guard: internalOnly, run: (context) => context.openOverlay("publish review") },
       ],
       overlays: [
-        { id: "Module picker", kind: "drawer", title: "Page modules", width: 600, render: ({ close, ...context }) => <ModuleArranger context={context} close={close} />, footer: submitFooter("module-picker", "Save page") },
-        { id: "data grant", kind: "modal", title: "Share one record", width: 620, render: ({ close, ...context }) => <DataGrant context={context} close={close} />, footer: submitFooter("data-grant", "Share this record") },
-        { id: "publish review", kind: "modal", title: "Publish review", width: 580, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
-        { id: "portal test", kind: "drawer", title: "Access test", width: 560, render: ({ ...context }) => <PortalTestResult context={context} /> },
+        { id: "Module picker", kind: "drawer", title: "Page modules", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ModuleArranger context={context} close={close} />, footer: submitFooter("module-picker", "Save page") },
+        { id: "data grant", kind: "modal", title: "Share one record", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <DataGrant context={context} close={close} />, footer: submitFooter("data-grant", "Share this record") },
+        { id: "publish review", kind: "modal", title: "Publish review", width: OVERLAY_WIDTH.modal, summary: ({ close: _c, ...context }) => <PublishSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} />, footer: ({ close, ...context }) => <PublishFooter context={context} close={close} /> },
+        { id: "portal test", kind: "drawer", title: "Access test", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PortalTestResult context={context} /> },
       ],
     },
 
@@ -122,10 +124,10 @@ export const portalApp = registerApp({
         { id: "message", label: "Message the studio", placement: "overflow", run: (context) => context.openOverlay("client message") },
       ],
       overlays: [
-        { id: "Shared item inspector", kind: "drawer", title: "Shared item", width: 580, render: ({ ...context }) => <SharedItemInspector context={context} /> },
-        { id: "client message", kind: "modal", title: "Message the studio", width: 580, render: ({ close, ...context }) => <ClientMessage context={context} close={close} />, footer: submitFooter("client-message", "Record message") },
-        { id: "access request", kind: "modal", title: "Request a service", width: 580, render: ({ close, ...context }) => <AccessRequest context={context} close={close} />, footer: submitFooter("access-request", "Record request") },
-        { id: "comment", kind: "modal", title: "Comment", width: 560, render: ({ close, ...context }) => <CommentForm context={context} close={close} />, footer: submitFooter("portal-comment", "Record comment") },
+        { id: "Shared item inspector", kind: "drawer", title: "Shared item", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <SharedItemInspector context={context} /> },
+        { id: "client message", kind: "modal", title: "Message the studio", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ClientMessage context={context} close={close} />, footer: submitFooter("client-message", "Record message") },
+        { id: "access request", kind: "modal", title: "Request a service", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AccessRequest context={context} close={close} />, footer: submitFooter("access-request", "Record request") },
+        { id: "comment", kind: "modal", title: "Comment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CommentForm context={context} close={close} />, footer: submitFooter("portal-comment", "Record comment") },
         confirmOverlay,
       ],
     },
@@ -147,10 +149,10 @@ export const portalApp = registerApp({
         { id: "request access", label: "Request access", placement: "overflow", run: (context) => context.openOverlay("permission request") },
       ],
       overlays: [
-        { id: "Document preview", kind: "drawer", title: "Document", width: 640, render: ({ ...context }) => <DocumentPreview context={context} /> },
-        { id: "permission request", kind: "modal", title: "Request access", width: 560, render: ({ close, ...context }) => <PermissionRequest context={context} close={close} />, footer: submitFooter("access-request", "Send request") },
-        { id: "signature", kind: "modal", title: "Accept this version", width: 580, render: ({ close, ...context }) => <SignatureRequest context={context} close={close} />, footer: submitFooter("signature-request", "Record acceptance") },
-        { id: "comment", kind: "modal", title: "Comment", width: 560, render: ({ close, ...context }) => <CommentForm context={context} close={close} />, footer: submitFooter("portal-comment", "Record comment") },
+        { id: "Document preview", kind: "drawer", title: "Document", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <DocumentPreview context={context} /> },
+        { id: "permission request", kind: "modal", title: "Request access", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PermissionRequest context={context} close={close} />, footer: submitFooter("access-request", "Send request") },
+        { id: "signature", kind: "modal", title: "Accept this version", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SignatureRequest context={context} close={close} />, footer: submitFooter("signature-request", "Record acceptance") },
+        { id: "comment", kind: "modal", title: "Comment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CommentForm context={context} close={close} />, footer: submitFooter("portal-comment", "Record comment") },
       ],
     },
 
@@ -171,12 +173,12 @@ export const portalApp = registerApp({
         { id: "attachments", label: "Attachments", placement: "overflow", run: (context) => context.openOverlay("attachment preview") },
       ],
       overlays: [
-        { id: "Conversation details", kind: "drawer", title: "Conversation", width: 600, render: ({ ...context }) => <ConversationDetails context={context} /> },
-        { id: "attachment preview", kind: "drawer", title: "Attachments", width: 600, render: ({ ...context }) => <AttachmentPreview context={context} /> },
-        { id: "complaint", kind: "modal", title: "Raise a complaint", width: 580, render: ({ close, ...context }) => <ComplaintForm context={context} close={close} />, footer: submitFooter("complaint-form", "Record complaint") },
-        { id: "client message", kind: "modal", title: "Message", width: 580, render: ({ close, ...context }) => <ClientMessage context={context} close={close} />, footer: submitFooter("client-message", "Record message") },
-        { id: "upload", kind: "modal", title: "Upload an attachment", width: 580, render: ({ close, ...context }) => <UploadAttachment context={context} close={close} />, footer: submitFooter("upload-attachment", "Record attachment") },
-        { id: "book meeting", kind: "modal", title: "Book a meeting", width: 620, render: ({ close, ...context }) => <BookMeeting context={context} close={close} />, footer: submitFooter("book-meeting", "Hold this time") },
+        { id: "Conversation details", kind: "drawer", title: "Conversation", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ConversationDetails context={context} /> },
+        { id: "attachment preview", kind: "drawer", title: "Attachments", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <AttachmentPreview context={context} /> },
+        { id: "complaint", kind: "modal", title: "Raise a complaint", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ComplaintForm context={context} close={close} />, footer: submitFooter("complaint-form", "Record complaint") },
+        { id: "client message", kind: "modal", title: "Message", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ClientMessage context={context} close={close} />, footer: submitFooter("client-message", "Record message") },
+        { id: "upload", kind: "modal", title: "Upload an attachment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <UploadAttachment context={context} close={close} />, footer: submitFooter("upload-attachment", "Record attachment") },
+        { id: "book meeting", kind: "modal", title: "Book a meeting", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <BookMeeting context={context} close={close} />, footer: submitFooter("book-meeting", "Hold this time") },
       ],
     },
 
@@ -196,9 +198,9 @@ export const portalApp = registerApp({
         { id: "dispute", label: "Dispute an invoice", placement: "overflow", tone: "danger", guard: needsSelection, run: (context) => context.openOverlay("dispute form", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Payment provider", kind: "drawer", title: "Paying this invoice", width: 640, render: ({ ...context }) => <PaymentProvider context={context} /> },
-        { id: "dispute form", kind: "modal", title: "Dispute or request", width: 600, render: ({ close, ...context }) => <DisputeForm context={context} close={close} />, footer: submitFooter("dispute-form", "Record it") },
-        { id: "document receipt", kind: "drawer", title: "Invoice", width: 680, render: ({ ...context }) => <DocumentReceipt context={context} /> },
+        { id: "Payment provider", kind: "drawer", title: "Paying this invoice", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <PaymentProvider context={context} /> },
+        { id: "dispute form", kind: "modal", title: "Dispute or request", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DisputeForm context={context} close={close} />, footer: submitFooter("dispute-form", "Record it") },
+        { id: "document receipt", kind: "drawer", title: "Invoice", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <DocumentReceipt context={context} /> },
       ],
     },
 
@@ -206,7 +208,11 @@ export const portalApp = registerApp({
     "ARL-PORTAL-007": {
       id: "ARL-PORTAL-007",
       title: () => "Access and analytics",
-      subtitle: () => "Who can sign in, what they can reach, and what has actually been recorded.",
+      record: (context) => ({
+        title: <PortalHeading context={context} part="title" />,
+        status: <PortalHeading context={context} part="status" />,
+        meta: [<PortalHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: ["Users", "Access", "Analytics", "Audit"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <PortalAdmin context={context} lens={lens} />,
@@ -220,18 +226,28 @@ export const portalApp = registerApp({
         { id: "recovery", label: "Extend or revoke (30 days)", placement: "overflow", guard: internalOnly, run: (context) => context.openOverlay("account recovery") },
       ],
       overlays: [
-        { id: "External invite", kind: "modal", title: "Invite an external user", width: 620, render: ({ close, ...context }) => <ExternalInvite context={context} close={close} />, footer: submitFooter("external-invite", "Record invitation") },
-        { id: "scope preview", kind: "drawer", title: "What this portal reaches", width: 660, render: ({ ...context }) => <ScopePreview context={context} /> },
-        { id: "account recovery", kind: "modal", title: "Extend or revoke access", width: 600, render: ({ close, ...context }) => <AccountRecovery context={context} close={close} />, footer: submitFooter("account-recovery", "Apply") },
-        { id: "set expiry", kind: "modal", title: "Set expiry", width: 560, render: ({ close, ...context }) => <SetExpiry context={context} close={close} />, footer: submitFooter("account-recovery", "Set expiry") },
-        { id: "revoke access", kind: "modal", title: "Revoke access", tone: "danger", width: 560, render: ({ close, ...context }) => <RevokeAccess context={context} close={close} /> },
+        { id: "External invite", kind: "modal", title: "Invite an external user", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ExternalInvite context={context} close={close} />, footer: submitFooter("external-invite", "Record invitation") },
+        { id: "scope preview", kind: "drawer", title: "What they will see", width: OVERLAY_WIDTH.wide, summary: ({ close: _c, ...context }) => <ScopeSummary context={context} />, render: ({ ...context }) => <ScopePreview context={context} /> },
+        { id: "account recovery", kind: "modal", title: "Extend or revoke access", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AccountRecovery context={context} close={close} />, footer: submitFooter("account-recovery", "Apply") },
+        { id: "set expiry", kind: "modal", title: "Set expiry", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SetExpiry context={context} close={close} />, footer: submitFooter("account-recovery", "Set expiry") },
+        { id: "revoke access", kind: "modal", title: "Revoke access", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RevokeAccess context={context} close={close} /> },
         confirmOverlay,
       ],
       inspector: (context) => <PortalFacts context={context} />,
       inspectorTitle: "Portal facts",
     },
-  },
+  }),
 });
+
+function PortalHeading({ context, part }: { context: ScreenContext; part: "title" | "status" | "meta" }) {
+  const { portal } = usePortal(context);
+  if (!portal) return part === "title" ? <>Access and analytics</> : null;
+  const users = bodyOf<PortalBody>(portal, {}).users ?? [];
+  if (part === "title") return <>{portal.title}</>;
+  if (part === "status") return <Pill tone={statusTone(portal.status)} dot>{portal.status}</Pill>;
+  const pending = Number(portal.fields.invitesPending ?? 0);
+  return <span>{[String(portal.fields.audience ?? ""), `${users.length} external ${users.length === 1 ? "user" : "users"}`, pending ? `${pending} pending` : "", `links last ${String(portal.fields.linkExpiryDays ?? 0)} days`].filter(Boolean).join(" · ")}</span>;
+}
 
 function PortalFacts({ context }: { context: ScreenContext }) {
   const data = usePortalData();

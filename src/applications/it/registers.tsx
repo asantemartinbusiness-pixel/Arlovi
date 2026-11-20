@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { ClipboardCheck, GitPullRequest, HardDrive } from "lucide-react";
-import {
-  Button, Card, Checkbox, Empty, Field, Meter, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
-} from "@/design-system";
+import { Button, Card, Checkbox, Empty, Field, KeyValueList, Meter, Notice, Pill, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { clockIso } from "@/platform/clock";
@@ -130,12 +128,12 @@ function ChangeEditor({ context, record }: { context: ScreenContext; record: Rec
   const remote = changeFactors(record).target === "remote";
 
   async function save(extra: Partial<Rec> = {}, event = `Change request ${draft.title} saved`) {
-    await context.mutate.patch(record.id, {
+    if (!(await context.mutate.patch(record.id, {
       title: draft.title.trim() || "Untitled change",
       summary: draft.plan.slice(0, 140),
       ...extra,
       fields: { ...record.fields, ...draft, risk: risk.level, riskScore: risk.score, ...(extra.fields ?? {}) },
-    }, { expectRevision: record.revision, event });
+    }, { expectRevision: record.revision, event }))) return;
   }
 
   return (
@@ -172,7 +170,7 @@ function ChangeEditor({ context, record }: { context: ScreenContext; record: Rec
             </Field>
           </Stack>
         ) : (
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Plan", value: String(record.fields.plan || "—") },
             { label: "Window", value: <span className="ds-num">{String(record.fields.window || "—")}</span> },
             { label: "Applied to", value: remote ? <Pill tone="warning">Remote infrastructure · not connected</Pill> : <Pill tone="info">This workspace</Pill> },
@@ -266,7 +264,7 @@ function LocalEvidence() {
   const nav = typeof navigator !== "undefined" ? navigator : undefined;
   return (
     <Card eyebrow="LOCAL EVIDENCE" prov="posted" title="This browser workspace" subtitle="Observed directly, now">
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Origin", value: <span className="ds-num">{typeof window !== "undefined" ? window.location.origin : "unknown"}</span> },
         { label: "Database", value: typeof indexedDB !== "undefined" ? <Pill tone="success">IndexedDB available</Pill> : <Pill tone="danger">IndexedDB unavailable</Pill> },
         { label: "Language", value: nav?.language ?? "unknown" },
@@ -392,7 +390,7 @@ function AssetEditor({ context, record }: { context: ScreenContext; record: Rec 
             <Notice tone="warning" title="Remote state is not observed">
               No connector reaches this asset, so its real configuration may differ from what is written here. A hand check records that a person looked, when, and what they saw.
             </Notice>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Last hand check", value: age === undefined ? "Never" : `${context.dateTime(String(record.fields.verifiedAt))} by ${String(record.fields.verifiedBy ?? "")}` },
               ...(record.fields.verifiedNote ? [{ label: "What they saw", value: String(record.fields.verifiedNote) }] : []),
             ]} />
@@ -484,9 +482,9 @@ function ReviewDetail({ context, record }: { context: ScreenContext; record: Rec
 
   async function decide(index: number, decision: Decision, note: string) {
     const next = entries.map((entry, at) => (at === index ? { ...entry, decision, note, decidedBy: context.actor, decidedAt: clockIso() } : entry));
-    await context.mutate.patch(record.id, {
+    if (!(await context.mutate.patch(record.id, {
       body: { ...(record.body as Record<string, unknown>), entries: next },
-    }, { expectRevision: record.revision, event: `Access review: ${decision} for ${entries[index].subject}${note ? ` (${note})` : ""}` });
+    }, { expectRevision: record.revision, event: `Access review: ${decision} for ${entries[index].subject}${note ? ` (${note})` : ""}` }))) return;
   }
 
   return (
@@ -494,7 +492,7 @@ function ReviewDetail({ context, record }: { context: ScreenContext; record: Rec
       subtitle={`Reviewer ${String(record.fields.reviewer ?? record.ownerName)} · due ${record.dueAt ?? "—"}`}
       actions={<Pill tone={progress.complete ? "success" : "info"}>{progress.decided}/{progress.total}</Pill>}>
       <Stack gap={3}>
-        <Properties rows={[
+        <KeyValueList items={[
           { label: "Keep", value: <span className="ds-num">{String(progress.keep)}</span> },
           { label: "Modify", value: <span className="ds-num">{String(progress.modify)}</span> },
           { label: "Revoke", value: <span className="ds-num">{String(progress.revoke)}</span> },

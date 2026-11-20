@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { Code2 } from "lucide-react";
 import { Button, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { Rec } from "@/domain/types";
@@ -15,6 +16,7 @@ import {
 import { NoProject, useAppRecord } from "./builder";
 import { saveApp, useBuildUi } from "./state";
 import { wallMs } from "@/platform/clock";
+import { projectSummary } from "./summary";
 
 /* ====================================================================== *
  * BUILD contract actions. Every write goes through saveApp (patch with
@@ -43,9 +45,9 @@ export async function runChecks(context: ScreenContext): Promise<{ fail: number;
   const record = await currentProject(context);
   if (!record) { context.toast("No project", "Create a project first.", "blocked"); return undefined; }
   const totals = issueTotals(validateApp(readApp(record)));
-  await context.mutate.patch(record.id, {
+  if (!(await context.mutate.patch(record.id, {
     fields: { ...record.fields, lastCheckAt: nowIso(context), checkFail: totals.fail, checkWarn: totals.warn, checkPass: totals.pass },
-  }, { expectRevision: record.revision, event: `Checks run on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` });
+  }, { expectRevision: record.revision, event: `Checks run on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` }))) return undefined;
   context.toast("Checks run", `${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing. These read the model; they do not prove the app works.`, totals.fail ? "blocked" : "ok");
   return totals;
 }
@@ -69,6 +71,7 @@ function FailingSummary({ record }: ActInput) {
 
 export const askEngineer = actOverlay({
   id: "ask engineer",
+  summary: projectSummary,
   title: "Ask an engineer",
   collection: "appProjects",
   noun: "project",
@@ -105,6 +108,7 @@ export const askEngineer = actOverlay({
 
 export const addComponent = actOverlay({
   id: "add component",
+  summary: projectSummary,
   title: "Add a component",
   collection: "appProjects",
   noun: "project",
@@ -141,6 +145,7 @@ export const addComponent = actOverlay({
 
 export const editStyles = actOverlay({
   id: "edit styles",
+  summary: projectSummary,
   title: "Edit the component's style",
   collection: "appProjects",
   noun: "project",
@@ -225,6 +230,7 @@ export function EditFileForm({ context, close }: { context: ScreenContext; close
 
 export const commitChange = actOverlay({
   id: "commit",
+  summary: projectSummary,
   title: "Commit a version",
   collection: "appProjects",
   noun: "project",
@@ -254,6 +260,7 @@ export const commitChange = actOverlay({
 
 export const branchProject = actOverlay({
   id: "branch",
+  summary: projectSummary,
   title: "Branch the project",
   collection: "appProjects",
   noun: "project",
@@ -308,6 +315,7 @@ export function SafeCommandPanel({ context }: { context: ScreenContext }) {
 
 export const validatePolicy = actOverlay({
   id: "validate policy",
+  summary: projectSummary,
   title: "Validate the access policy",
   collection: "appProjects",
   noun: "project",
@@ -322,7 +330,7 @@ export const validatePolicy = actOverlay({
     if (!record) return;
     const issues = validateApp(model(record)).filter((issue) => issue.area === "Access");
     const totals = issueTotals(issues);
-    await context.mutate.patch(record.id, { fields: { ...record.fields, policyCheckedAt: nowIso(context), policyWarn: totals.warn, policyFail: totals.fail } }, { expectRevision: record.revision, event: `Access policy validated on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, policyCheckedAt: nowIso(context), policyWarn: totals.warn, policyFail: totals.fail } }, { expectRevision: record.revision, event: `Access policy validated on ${record.title}: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Policies");
     return { body: `${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing.`, tone: totals.fail || totals.warn ? "blocked" : "ok" };
   },
@@ -345,6 +353,7 @@ export function IssueList({ issues, empty }: { issues: ModelIssue[]; empty: stri
 
 export const seedEntity = actOverlay({
   id: "seed",
+  summary: projectSummary,
   title: "Seed an entity",
   collection: "appProjects",
   noun: "project",
@@ -391,6 +400,7 @@ export const seedEntity = actOverlay({
 
 export const testEndpoint = actOverlay({
   id: "test endpoint",
+  summary: projectSummary,
   title: "Test an endpoint",
   collection: "appProjects",
   noun: "project",
@@ -428,7 +438,7 @@ export const testEndpoint = actOverlay({
     } else {
       outcome = endpoint.auth === "none" ? "200 allowed: the endpoint is open to anyone" : "200 allowed by the role grant (no server executed it)";
     }
-    await context.mutate.patch(record.id, { fields: { ...record.fields, lastEndpointTest: `${endpoint.method} ${endpoint.path}: ${outcome}`, lastEndpointTestAt: nowIso(context) } }, { expectRevision: record.revision, event: `Endpoint test ${endpoint.method} ${endpoint.path} as ${role?.name ?? "anonymous"}: ${outcome}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastEndpointTest: `${endpoint.method} ${endpoint.path}: ${outcome}`, lastEndpointTestAt: nowIso(context) } }, { expectRevision: record.revision, event: `Endpoint test ${endpoint.method} ${endpoint.path} as ${role?.name ?? "anonymous"}: ${outcome}` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Runs");
     return { body: `${endpoint.method} ${endpoint.path}: ${outcome}.`, tone: outcome.startsWith("200") ? "ok" : "blocked" };
   },
@@ -436,6 +446,7 @@ export const testEndpoint = actOverlay({
 
 export const deployFunctions = actOverlay({
   id: "deploy functions",
+  summary: projectSummary,
   title: "Deploy the API",
   collection: "appProjects",
   noun: "project",
@@ -510,6 +521,7 @@ export function TraceInspector({ context }: { context: ScreenContext }) {
 
 export const configureProvider = actOverlay({
   id: "configure provider",
+  summary: projectSummary,
   title: "Configure a sign-in provider",
   collection: "appProjects",
   noun: "project",
@@ -523,7 +535,7 @@ export const configureProvider = actOverlay({
   submit: "Record the configuration",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, authProvider: values.method, authDomain: values.domain, authNote: values.note, authProviderState: "configuration_required" } }, { expectRevision: record.revision, event: `Sign-in provider ${values.method} configured on ${record.title}: configuration required` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, authProvider: values.method, authDomain: values.domain, authNote: values.note, authProviderState: "configuration_required" } }, { expectRevision: record.revision, event: `Sign-in provider ${values.method} configured on ${record.title}: configuration required` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`${values.method} recorded for ${record.title}; it needs a server to complete.`, { entityId: record.id, type: "capability", capability: "configuration_required" });
     context.setTab("Providers");
     return { body: `${values.method} is recorded as configuration required.`, tone: "blocked" };
@@ -532,6 +544,7 @@ export const configureProvider = actOverlay({
 
 export const revokeSessions = actOverlay({
   id: "revoke session",
+  summary: projectSummary,
   title: "Revoke sessions",
   tone: "danger",
   collection: "appProjects",
@@ -545,7 +558,7 @@ export const revokeSessions = actOverlay({
   submit: "Record the revocation",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, sessionsRevokedBefore: nowIso(context), sessionsRevokedFor: values.role, sessionRevokeReason: values.reason } }, { expectRevision: record.revision, event: `Sessions for ${values.role} revoked on ${record.title}: ${values.reason}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, sessionsRevokedBefore: nowIso(context), sessionsRevokedFor: values.role, sessionRevokeReason: values.reason } }, { expectRevision: record.revision, event: `Sessions for ${values.role} revoked on ${record.title}: ${values.reason}` }))) throw new Error(CHANGED_ELSEWHERE);
     useBuildUi.getState().setPreviewRole("");
     return `Cut-off recorded for ${values.role}. No live session existed.`;
   },
@@ -595,6 +608,7 @@ export function deterministicFixes(app: AppModel): ProposedFix[] {
 
 export const approveFix = actOverlay({
   id: "AI patch review",
+  summary: projectSummary,
   title: "Approve a fix",
   kind: "drawer",
   width: 600,
@@ -623,6 +637,7 @@ export const approveFix = actOverlay({
 
 export const pauseDeployments = actOverlay({
   id: "pause deployments",
+  summary: projectSummary,
   title: "Pause or resume deployments",
   collection: "appProjects",
   noun: "project",
@@ -635,7 +650,7 @@ export const pauseDeployments = actOverlay({
   apply: async ({ record, values, context }) => {
     if (!record) return;
     const paused = !record.fields.deploysPaused;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, deploysPaused: paused, pauseReason: values.reason, pausedBy: paused ? context.actor : "" } }, { expectRevision: record.revision, event: `Deployments ${paused ? "paused" : "resumed"} on ${record.title} by ${context.actor}: ${values.reason}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, deploysPaused: paused, pauseReason: values.reason, pausedBy: paused ? context.actor : "" } }, { expectRevision: record.revision, event: `Deployments ${paused ? "paused" : "resumed"} on ${record.title} by ${context.actor}: ${values.reason}` }))) throw new Error(CHANGED_ELSEWHERE);
     return `Deployments are ${paused ? "paused" : "resumed"}.`;
   },
 });
@@ -673,6 +688,7 @@ const attached = (record?: Rec) => String(record?.fields.integrations ?? "").spl
 
 export const attachIntegration = actOverlay({
   id: "attach integration",
+  summary: projectSummary,
   title: "Attach an integration",
   collection: "appProjects",
   noun: "project",
@@ -685,7 +701,7 @@ export const attachIntegration = actOverlay({
     if (!record) return;
     const connector = ((watched as Rec[] | undefined) ?? []).find((row) => row.id === values.connector);
     if (!connector) throw new Error("Choose a connector.");
-    await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: [...attached(record), connector.id].join(",") } }, { expectRevision: record.revision, event: `${connector.title} attached to ${record.title}; state ${connector.status}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: [...attached(record), connector.id].join(",") } }, { expectRevision: record.revision, event: `${connector.title} attached to ${record.title}; state ${connector.status}` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Connections");
     return `${connector.title} is attached. It is still not connected.`;
   },
@@ -700,6 +716,7 @@ function AttachedList({ record, watched }: ActInput) {
 
 export const testIntegrations = actOverlay({
   id: "test integrations",
+  summary: projectSummary,
   title: "Test the attached integrations",
   collection: "appProjects",
   noun: "project",
@@ -713,7 +730,7 @@ export const testIntegrations = actOverlay({
     if (!record) return;
     const rows = ((watched as Rec[] | undefined) ?? []).filter((row) => attached(record).includes(row.id));
     const result = `${rows.length} attached; ${rows.length} records found; 0 verified with a provider call`;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, integrationTestAt: nowIso(context), integrationTestResult: result } }, { expectRevision: record.revision, event: `Integration test on ${record.title}: ${result}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, integrationTestAt: nowIso(context), integrationTestResult: result } }, { expectRevision: record.revision, event: `Integration test on ${record.title}: ${result}` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Integration test for ${record.title}: no provider was contacted.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     context.setTab("Health");
     return { body: result, tone: "blocked" };
@@ -722,6 +739,7 @@ export const testIntegrations = actOverlay({
 
 export const rotateSecret = actOverlay({
   id: "rotate secret",
+  summary: projectSummary,
   title: "Rotate a secret",
   collection: "appProjects",
   noun: "project",
@@ -736,7 +754,7 @@ export const rotateSecret = actOverlay({
   apply: async ({ record, values, context, watched }) => {
     if (!record) return;
     const connector = ((watched as Rec[] | undefined) ?? []).find((row) => row.id === values.connector);
-    await context.mutate.patch(record.id, { fields: { ...record.fields, rotationRequestedAt: nowIso(context), rotationRequestedFor: connector?.title ?? values.connector } }, { expectRevision: record.revision, event: `Secret rotation requested for ${connector?.title ?? values.connector} on ${record.title}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, rotationRequestedAt: nowIso(context), rotationRequestedFor: connector?.title ?? values.connector } }, { expectRevision: record.revision, event: `Secret rotation requested for ${connector?.title ?? values.connector} on ${record.title}` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Secret rotation for ${connector?.title ?? "an integration"} requested: no credential exists here, nothing was issued.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     return { title: "Requested, not rotated", body: "No secret is held here. The request is recorded.", tone: "blocked" };
   },
@@ -744,6 +762,7 @@ export const rotateSecret = actOverlay({
 
 export const revokeIntegration = actOverlay({
   id: "revoke integration",
+  summary: projectSummary,
   title: "Revoke an integration",
   tone: "danger",
   collection: "appProjects",
@@ -759,7 +778,7 @@ export const revokeIntegration = actOverlay({
   submit: "Revoke",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: attached(record).filter((id) => id !== values.connector).join(",") } }, { expectRevision: record.revision, event: `Integration ${values.connector} revoked on ${record.title}: ${values.reason}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, integrations: attached(record).filter((id) => id !== values.connector).join(",") } }, { expectRevision: record.revision, event: `Integration ${values.connector} revoked on ${record.title}: ${values.reason}` }))) throw new Error(CHANGED_ELSEWHERE);
     return "Detached and recorded.";
   },
 });
@@ -794,6 +813,7 @@ export function EventInspector({ context }: { context: ScreenContext }) {
 
 export const createIncident = actOverlay({
   id: "create incident",
+  summary: projectSummary,
   title: "Create an incident",
   collection: "appProjects",
   noun: "project",
@@ -820,6 +840,7 @@ export const createIncident = actOverlay({
 
 export const tuneMonitor = actOverlay({
   id: "alert rule",
+  summary: projectSummary,
   title: "Tune the monitor",
   collection: "appProjects",
   noun: "project",
@@ -833,7 +854,7 @@ export const tuneMonitor = actOverlay({
   submit: "Save the rule",
   apply: async ({ record, values, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, alertFailThreshold: Number(values.threshold), alertOnNewFail: Boolean(values.onNew) } }, { expectRevision: record.revision, event: `Monitor on ${record.title} tuned: raise at ${values.threshold} failing checks` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, alertFailThreshold: Number(values.threshold), alertOnNewFail: Boolean(values.onNew) } }, { expectRevision: record.revision, event: `Monitor on ${record.title} tuned: raise at ${values.threshold} failing checks` }))) throw new Error(CHANGED_ELSEWHERE);
     return `Saved. It raises at ${values.threshold} failing checks.`;
   },
 });
@@ -872,6 +893,7 @@ const REPO_ADDRESS = /^(https:\/\/|git@)[a-z0-9.-]+\.[a-z]{2,}[:/][\w.-]+\/[\w.-
 
 export const importRepository = actOverlay({
   id: "Git import",
+  summary: projectSummary,
   title: "Import a repository",
   consequenceTitle: "Nothing is fetched or run",
   consequence: () => "The repository address is recorded as a draft project waiting for its import. Fetching needs a network call this workspace does not make; when it can happen, the manifest is read without running it and every file stays read-only until a person approves it.",

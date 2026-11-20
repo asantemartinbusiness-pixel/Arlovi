@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, Archive, CheckCircle2, Cpu, Server, ShieldAlert, Siren,
 } from "lucide-react";
-import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
-  Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
-} from "@/design-system";
+import { BarChart, Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Meter, Notice, OverlaySection, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { clockIso, daysBetween, freshness } from "@/platform/clock";
@@ -19,16 +16,13 @@ import {
 } from "./diagnostics";
 import { useItUi, watchErrors } from "./state";
 import { IncidentLifecycle, TimelineComposer, timelineKindLabel, useVerified } from "./lifecycle";
-import { STAGE_LABELS, readTimeline, stageOf } from "./register";
+import { SEVERITY_TONE, STAGE_LABELS, readTimeline, stageOf } from "./register";
 import { AccessReviews, AssetRegister, ChangeRequests } from "./registers";
 
 /* ---------------------------------------------------------------- *
  * Shared
  * ---------------------------------------------------------------- */
 
-const SEVERITY_TONE: Record<string, "danger" | "warning" | "neutral"> = {
-  high: "danger", critical: "danger", medium: "warning", low: "neutral",
-};
 
 export function useDiagnostics(context: ScreenContext) {
   const ui = useItUi();
@@ -144,7 +138,7 @@ export function OperationsHome({ context, lens }: { context: ScreenContext; lens
           <Card eyebrow="STORAGE" prov="posted" title="Quota" subtitle="Reported by the browser for this origin">
             <Stack gap={3}>
               <Meter value={storage.usageBytes ?? 0} max={storage.quotaBytes ?? 1} label="Storage used" tone={share > 0.9 ? "danger" : share > 0.7 ? "warning" : "success"} />
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Used", value: <span className="ds-num">{formatBytes(storage.usageBytes)}</span> },
                 { label: "Quota", value: <span className="ds-num">{formatBytes(storage.quotaBytes)}</span> },
                 { label: "Share", value: <span className="ds-num">{`${(share * 100).toFixed(2)}%`}</span> },
@@ -251,7 +245,7 @@ export function OperationsHome({ context, lens }: { context: ScreenContext; lens
         </Card>
 
         <Card span={5} eyebrow="FRESHNESS" prov="posted" title="How current this register is">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Incidents recorded", value: <span className="ds-num">{String(incidents.length)}</span> },
             { label: "Most recent", value: incidents.length ? <span className="ds-num">{context.relative([...incidents].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0].at)}</span> : "None" },
             { label: "Connector records", value: <span className="ds-num">{String(connectors.length)}</span> },
@@ -299,7 +293,7 @@ export function IncidentQueue({ context, lens }: { context: ScreenContext; lens:
             <Card key={record.id} eyebrow="POSTMORTEM" prov="human" title={record.title} subtitle={`Resolved ${context.date(record.endAt ?? record.updatedAt)}`}>
               <Stack gap={3}>
                 <p className="ds-prose">{String(record.fields.postmortem)}</p>
-                <Properties rows={[
+                <KeyValueList items={[
                   { label: "Time to resolve", value: record.at && record.endAt ? <span className="ds-num">{`${Math.max(0, Math.round((new Date(record.endAt).getTime() - new Date(record.at).getTime()) / 3_600_000))} hours`}</span> : "Not recorded" },
                   { label: "Verified by", value: String(record.fields.verifiedBy ?? "Not recorded") },
                 ]} />
@@ -408,7 +402,7 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
           )}
         </Card>
         <Card span={5} eyebrow="RELATED" prov="human" title="What this touches">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Connector", value: connector ? connector.title : "None" },
             { label: "Affected missions", value: <span className="ds-num">{String(missions.filter((mission) => mission.status === "running" || mission.status === "waiting_approval").length)}</span> },
             { label: "Origin", value: <Pill tone={String(record.fields.origin) === "provider" ? "neutral" : "info"}>{String(record.fields.origin ?? "ours")}</Pill> },
@@ -436,9 +430,9 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
             onSubmit={async (event) => {
               event.preventDefault();
               const data = new FormData(event.currentTarget);
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 fields: { ...record.fields, postmortem: String(data.get("text") ?? ""), verifiedBy: context.actor },
-              }, { expectRevision: record.revision, event: `Postmortem written for ${record.title}` });
+              }, { expectRevision: record.revision, event: `Postmortem written for ${record.title}` }))) return;
               context.toast("Postmortem saved", "It is on the incident record and in the postmortems tab.");
             }}
           >
@@ -461,16 +455,14 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
     <Stack gap={4}>
     <IncidentLifecycle context={context} record={record} />
     <Grid>
-      <Card span={7} eyebrow="INCIDENT" prov="human" title={record.title} subtitle={record.summary}
-        actions={<Pill tone={SEVERITY_TONE[String(record.fields.severity ?? "medium")] ?? "warning"} dot>{String(record.fields.severity ?? "medium")}</Pill>}>
-        <Properties rows={[
-          { label: "State", value: <Pill tone={record.status === "resolved" ? "success" : "info"} dot>{record.status.replace(/_/g, " ")}</Pill> },
-          { label: "Started", value: <span className="ds-num">{context.dateTime(record.at)}</span> },
+      <Card span={7} prov="human" title="Details">
+        <KeyValueList columns={2} items={[
+          { label: "Started", value: context.dateTime(record.at), mono: true },
           { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
           { label: "Service", value: incidentService(record, connectors) },
+          { label: "Origin", value: String(record.fields.origin ?? "ours") === "provider" ? "Provider (not repairable by us)" : "Ours" },
           ...(record.fields.latestReport ? [{ label: "Latest report", value: `${String(record.fields.latestReport)} — ${String(record.fields.latestReportBy ?? "")}, ${context.dateTime(String(record.fields.latestReportAt ?? ""))}` }] : []),
-          { label: "Origin", value: String(record.fields.origin ?? "ours") },
-          { label: "Revision", value: <span className="ds-num">{String(record.revision)}</span> },
+          { label: "Revision", value: String(record.revision), mono: true },
         ]} />
       </Card>
       <Card span={5} eyebrow="IMPACT" prov="posted" title="What it affects">
@@ -512,11 +504,16 @@ export function RemediationPanel({ context, record }: { context: ScreenContext; 
           <Notice tone="warning" title="No step raises its own privileges">
             Everything a runbook may do here is read-only or reversible. Nothing patches a running system, because there is no running system to patch.
           </Notice>
+          <Notice tone={context.can("approve_mission") ? "info" : "warning"} title={context.can("approve_mission") ? "You can approve a repair" : "Approving a repair needs approval authority"}>
+            {context.can("approve_mission")
+              ? "Approval is recorded with your name and the plan, and is part of the incident history."
+              : "Your role view can read the plan but not approve it. Ask an owner or finance approver."}
+          </Notice>
         </Stack>
       </Card>
       <Card span={5} eyebrow="VERIFY" prov={verified ? "posted" : "unknown"} title="Before this can be resolved">
         <Stack gap={3}>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Incident opened", value: <span className="ds-num">{context.dateTime(record.at)}</span> },
             { label: "Last diagnostics run", value: ui.ranAt ? <span className="ds-num">{context.dateTime(ui.ranAt)}</span> : "Not in this session" },
             { label: "Verified since opening", value: verified ? <Pill tone="success">yes</Pill> : <Pill tone="warning">no</Pill> },
@@ -527,11 +524,11 @@ export function RemediationPanel({ context, record }: { context: ScreenContext; 
             disabled={!verified || record.status === "resolved"}
             title={!verified ? "Run the workspace diagnostics after the incident was opened first" : undefined}
             onClick={async () => {
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 status: "resolved",
                 endAt: clockIso(),
                 fields: { ...record.fields, verifiedBy: context.actor },
-              }, { expectRevision: record.revision, event: `Incident ${record.title} resolved after a verified check` });
+              }, { expectRevision: record.revision, event: `Incident ${record.title} resolved after a verified check` }))) return;
               context.toast("Resolved", "The record carries the check that verified it.");
             }}
           >
@@ -561,7 +558,7 @@ export function SystemHealth({ context, lens }: { context: ScreenContext; lens: 
         </Notice>
         <Grid>
           <Card span={6} eyebrow="RUNTIME" prov="posted" title="What actually executes">
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Processes", value: <span className="ds-num">1 — this tab</span> },
               { label: "Service worker", value: typeof navigator !== "undefined" && "serviceWorker" in navigator ? <Pill tone="neutral">available, not registered</Pill> : <Pill tone="warning">unavailable</Pill> },
               { label: "Background queue", value: <Pill tone="warning">none</Pill> },
@@ -792,11 +789,16 @@ export function RestoreConfirmation({ context, close }: { context: ScreenContext
   const [typed, setTyped] = useState("");
   const check = ui.restorePreview ? inspectBackup(ui.restorePreview) : undefined;
   if (!check?.ok) {
-    return <Notice tone="danger" title="There is no checked backup to restore">Choose a file on the storage tab first; it is inspected before this dialog will do anything.</Notice>;
+    return (
+      <Stack gap={3}>
+        <Notice tone="danger" title="There is no checked backup to restore">Choose a file on the storage tab first; it is inspected before this dialog will do anything.</Notice>
+        <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/it/health?tab=Storage`); }}>Choose a backup file on the Storage tab</Button>
+      </Stack>
+    );
   }
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Records in the file", value: <span className="ds-num">{String(check.summary?.records)}</span> },
         { label: "Events in the file", value: <span className="ds-num">{String(check.summary?.events)}</span> },
         { label: "Organisations", value: check.summary?.organizations.join(", ") ?? "—" },
@@ -907,7 +909,7 @@ export function LogsAndTracing({ context, lens }: { context: ScreenContext; lens
     return (
       <Grid>
         <Card span={6} eyebrow="SAMPLING" prov="posted" title="Everything is kept" subtitle="There is no sampling to configure">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Events written", value: <Pill tone="success">every consequential action</Pill> },
             { label: "Sample rate", value: <span className="ds-num">100%</span> },
             { label: "Retention", value: "Until the browser clears the origin or a restore replaces it" },
@@ -1084,7 +1086,7 @@ export function Remediation({ context, lens }: { context: ScreenContext; lens: "
             }}>{runbook.allowed ? "Run it" : "Read it"}</Button>}>
             <Stack gap={2}>
               <ol className="ds-prose">{runbook.steps.map((step) => <li key={step}>{step}</li>)}</ol>
-              <Properties rows={[{ label: "Reversible", value: runbook.allowed ? "Yes" : "Not applicable" }]} />
+              <KeyValueList items={[{ label: "Reversible", value: runbook.allowed ? "Yes" : "Not applicable" }]} />
             </Stack>
           </Card>
         ))}
@@ -1222,7 +1224,7 @@ export function SecurityCentre({ context, lens }: { context: ScreenContext; lens
       <AccessReviews context={context} />
       <Grid>
         <Card span={7} eyebrow="SESSIONS" prov="posted" title="What a browser can honestly say" subtitle="No account system exists, so there is no session list">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Signed-in account", value: <Pill tone="warning">none — there is no account system</Pill> },
             { label: "Role view in this tab", value: <span className="ds-num">{role}</span> },
             { label: "Acting as", value: actor },
@@ -1239,7 +1241,7 @@ export function SecurityCentre({ context, lens }: { context: ScreenContext; lens
             <Notice tone="warning" title="Role views shape the interface; they are not account security">
               Changing the role view changes what this interface offers. Everything in the workspace stays readable to anything that can open this browser profile, and no server enforces anything.
             </Notice>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Enforced by", value: "This interface only" },
               { label: "Would be enforced by", value: "A server, once one exists" },
               { label: "Revocation", value: <Pill tone="warning">not possible here</Pill> },
@@ -1259,7 +1261,7 @@ export function SecurityCentre({ context, lens }: { context: ScreenContext; lens
         </Notice>
         <Grid>
           <Card span={6} eyebrow="HELD" prov="posted" title="Credentials in this browser">
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "API keys", value: <span className="ds-num">0</span> },
               { label: "Provider tokens", value: <span className="ds-num">0</span> },
               { label: "Passwords", value: <span className="ds-num">0</span> },
@@ -1293,7 +1295,7 @@ export function SecurityCentre({ context, lens }: { context: ScreenContext; lens
       <Grid>
         <Card span={6} eyebrow="RETENTION" prov="human" title="How long things are kept" subtitle="Measured against, never enforced behind your back">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Records", value: "Kept until deleted or replaced by a restore" },
               { label: "Audit events", value: "Kept with the workspace" },
               { label: "Form submissions", value: "Each form sets its own period; the submissions screen measures against it" },
@@ -1565,16 +1567,18 @@ export function HealthTestOverlay({ context }: { context: ScreenContext }) {
   const { ui, run } = useDiagnostics(context);
   const totals = summarise(ui.results);
   return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "Last run", value: ui.ranAt ? <span className="ds-num">{context.dateTime(ui.ranAt)}</span> : "Not in this session" },
-        { label: "Passed", value: <span className="ds-num">{String(totals.pass)}</span> },
-        { label: "To review", value: <span className="ds-num">{String(totals.warn)}</span> },
-        { label: "Failed", value: <span className="ds-num">{String(totals.fail)}</span> },
-        { label: "Not measurable here", value: <span className="ds-num">{String(totals.unavailable)}</span> },
+    <Stack gap={4}>
+      <FactGrid columns={4} items={[
+        { label: "Passed", value: String(totals.pass), mono: true, tone: "success" },
+        { label: "To review", value: String(totals.warn), mono: true, tone: totals.warn ? "warning" : undefined },
+        { label: "Failed", value: String(totals.fail), mono: true, tone: totals.fail ? "danger" : undefined },
+        { label: "Not measurable", value: String(totals.unavailable), mono: true },
       ]} />
-      <Button variant="primary" busy={ui.running} onClick={() => void run()}>Run the checks now</Button>
-      {ui.results.length > 0 && <div className="t6-checks">{ui.results.slice(0, 6).map((result) => <CheckRow key={result.id} result={result} />)}</div>}
+      <Row gap={3} wrap>
+        <Button variant="primary" busy={ui.running} onClick={() => void run()}>Run the checks now</Button>
+        <span className="ds-subtle">{ui.ranAt ? `Last run ${context.dateTime(ui.ranAt)}` : "Not run in this session"}</span>
+      </Row>
+      {ui.results.length > 0 && <OverlaySection title="Results" flush><div className="t6-checks">{ui.results.slice(0, 6).map((result) => <CheckRow key={result.id} result={result} />)}</div></OverlaySection>}
     </Stack>
   );
 }
@@ -1590,7 +1594,7 @@ export function MonitorRule({ context }: { context: ScreenContext }) {
       <Field label="Warn when storage passes">
         <Select defaultValue="70">{["50", "70", "85", "95"].map((value) => <option key={value} value={value}>{value}% of the quota</option>)}</Select>
       </Field>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Current usage", value: ui.storage?.supported ? <span className="ds-num">{formatBytes(ui.storage.usageBytes)}</span> : "Not measured" },
         { label: "Alerting channel", value: <Pill tone="warning" dot>none connected</Pill> },
       ]} />
@@ -1605,15 +1609,15 @@ export function TraceWaterfall({ context }: { context: ScreenContext }) {
   const event = events.find((item) => item.id === payload?.id) ?? events[0];
   if (!event) return <Empty title="No entry selected" icon={<Activity size={20} />} />;
   return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "When", value: <span className="ds-num">{context.dateTime(event.at)}</span> },
+    <Stack gap={4}>
+      <FactGrid columns={2} items={[
+        { label: "When", value: context.dateTime(event.at), mono: true },
         { label: "Actor", value: event.actor },
         { label: "Kind", value: <Pill tone="neutral">{event.type}</Pill> },
-        { label: "Screen", value: <span className="ds-num">{event.screenId ?? "—"}</span> },
-        { label: "Record", value: <span className="ds-num">{event.entityId ?? "—"}</span> },
+        { label: "Screen", value: event.screenId ?? "—", mono: true },
+        { label: "Record", value: event.entityId ?? "—", mono: true },
       ]} />
-      <p className="ds-prose">{event.message}</p>
+      <OverlaySection title="What was recorded">{event.message}</OverlaySection>
       <Notice tone="info" title="No field values are in this entry">
         An audit entry names what changed and on which record. The values themselves stay on the record, where the screen that owns them decides whether to show them.
       </Notice>
@@ -1665,7 +1669,7 @@ export function ReportBuilder({ context }: { context: ScreenContext }) {
   const { org } = useWorkspace();
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Incidents available", value: <span className="ds-num">{String(incidents.length)}</span> },
         { label: "Check results available", value: <span className="ds-num">{String(ui.results.length)}</span> },
         { label: "Source", value: "Records and measurements in this browser" },

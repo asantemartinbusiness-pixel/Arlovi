@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Avatar, Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Avatar, Button, Checkbox, Empty, FactGrid, Field, OverlayActions, ModalActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -143,7 +143,7 @@ export function joinMeeting(context: ScreenContext): void {
     onPick: async (meeting) => {
       const joined = listOf(meeting.fields.joined);
       if (!joined.includes(context.actor)) {
-        await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, joined: [...joined, context.actor].join(",") } }, { expectRevision: meeting.revision, event: `${context.actor} joined ${meeting.title}` });
+        if (!(await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, joined: [...joined, context.actor].join(",") } }, { expectRevision: meeting.revision, event: `${context.actor} joined ${meeting.title}` }))) return;
       }
       context.toast("Joined the meeting record", `You are marked present on ${meeting.title}. ${NO_CONFERENCING}`);
       context.navigate(`/o/${context.org.slug}/comms/meetings/${meeting.id}`);
@@ -188,7 +188,7 @@ export function NotificationPreferences({ context, close }: { context: ScreenCon
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const fields = { kind: "commsNotifications", person: context.actor, mentions: form.get("mentions") === "on", direct: form.get("direct") === "on", everyMessage: form.get("every") === "on", announcements: form.get("announcements") === "on" };
-        if (mine) await context.mutate.patch(mine.id, { fields }, { expectRevision: mine.revision, event: `Notification preferences changed by ${context.actor}` });
+        if (mine) { if (!(await context.mutate.patch(mine.id, { fields }, { expectRevision: mine.revision, event: `Notification preferences changed by ${context.actor}` }))) return; }
         else await context.mutate.create({ collection: "preferences", title: `${context.actor} · notifications`, status: "active", summary: "Notification preferences.", fields }, `Notification preferences saved by ${context.actor}`);
         context.toast("Notifications saved", "They shape badges in this workspace only.");
         close();
@@ -211,7 +211,7 @@ export async function joinChannel(context: ScreenContext): Promise<void> {
   if (isMember(channel, context.actor)) { context.toast("Already a member", `${context.actor} is already in #${channel.title}.`, "info"); return; }
   if (channel.fields.visibility === "private") { context.toast("Private channel", `#${channel.title} is private. A member has to add you; joining is not offered.`, "blocked"); return; }
   const next = [...membersOf(channel), context.actor];
-  await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { expectRevision: channel.revision, event: `${context.actor} joined ${channel.title}` });
+  if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { expectRevision: channel.revision, event: `${context.actor} joined ${channel.title}` }))) return;
   context.toast("Joined", `${context.actor} is now a member of #${channel.title}.`);
 }
 
@@ -219,7 +219,7 @@ export async function muteChannel(context: ScreenContext): Promise<void> {
   const channel = await selectedOf(context, "channels", "a channel");
   if (!channel) return;
   const { list, on } = toggleIn(channel.fields.mutedBy, context.actor);
-  await context.mutate.patch(channel.id, { fields: { ...channel.fields, mutedBy: list.join(",") } }, { expectRevision: channel.revision, event: `${channel.title} ${on ? "muted" : "unmuted"} by ${context.actor}` });
+  if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, mutedBy: list.join(",") } }, { expectRevision: channel.revision, event: `${channel.title} ${on ? "muted" : "unmuted"} by ${context.actor}` }))) return;
   context.toast(on ? "Muted" : "Unmuted", `#${channel.title} ${on ? "no longer badges" : "badges again"} for ${context.actor}. Other members are unaffected.`);
 }
 
@@ -275,7 +275,7 @@ export async function messageToTask(context: ScreenContext, message: Rec): Promi
     summary: `${message.summary} — raised from a message by ${context.actor}.`,
     fields: { stage: "ready", assignee: context.actor, priority: "normal", estimateHours: 2, loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false, fromChannelId: channelId, sourceMessageId: message.id },
   }, `Task raised from a message by ${context.actor}`);
-  await context.mutate.patch(message.id, { fields: { ...message.fields, taskId: task.id } }, { event: `Message linked to task ${task.title}` });
+  if (!(await context.mutate.patch(message.id, { fields: { ...message.fields, taskId: task.id } }, { event: `Message linked to task ${task.title}` }))) return;
   context.toast("Task created", "It is in Projects with a link back to the message.");
 }
 
@@ -285,7 +285,7 @@ export function createTaskFromMessage(context: ScreenContext): void {
 
 export async function togglePinned(context: ScreenContext, message: Rec): Promise<void> {
   const on = message.fields.pinned !== true;
-  await context.mutate.patch(message.id, { status: on ? "pinned" : "sent", fields: { ...message.fields, pinned: on } }, { expectRevision: message.revision, event: `${message.title} ${on ? "pinned" : "unpinned"} by ${context.actor}` });
+  if (!(await context.mutate.patch(message.id, { status: on ? "pinned" : "sent", fields: { ...message.fields, pinned: on } }, { expectRevision: message.revision, event: `${message.title} ${on ? "pinned" : "unpinned"} by ${context.actor}` }))) return;
   context.toast(on ? "Pinned" : "Unpinned", on ? "It is on the Pinned tab." : "It is off the Pinned tab.");
 }
 
@@ -365,7 +365,7 @@ export function AddMember({ context, close }: { context: ScreenContext; close: (
         const name = String(new FormData(event.currentTarget).get("person") ?? "");
         if (!channel || !name) return;
         const next = [...members, name];
-        await context.mutate.patch(channel.id, { title: channel.title, fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { expectRevision: channel.revision, event: `${name} added to ${channel.title} by ${actor}` });
+        if (!(await context.mutate.patch(channel.id, { title: channel.title, fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { expectRevision: channel.revision, event: `${name} added to ${channel.title} by ${actor}` }))) return;
         context.toast("Member added", `${name} can read ${channel.title} from now on.`);
         close();
       }}
@@ -413,7 +413,7 @@ export function MessageActions({ context }: { context: ScreenContext }) {
                 disabled={String(message.fields.author ?? "") !== actor}
                 title={String(message.fields.author ?? "") !== actor ? "Only the author can delete a message" : undefined}
                 onClick={async () => {
-                  await context.mutate.patch(message.id, { status: "deleted", summary: "This message was deleted by its author.", fields: { ...message.fields, deletedBy: actor } }, { expectRevision: message.revision, event: `Message deleted by ${actor}; the earlier text is kept in its history` });
+                  if (!(await context.mutate.patch(message.id, { status: "deleted", summary: "This message was deleted by its author.", fields: { ...message.fields, deletedBy: actor } }, { expectRevision: message.revision, event: `Message deleted by ${actor}; the earlier text is kept in its history` }))) return;
                   context.toast("Message deleted", "A tombstone keeps the thread's shape; the earlier version is in the record history.");
                 }}
               >
@@ -433,7 +433,7 @@ export function MessageActions({ context }: { context: ScreenContext }) {
 export async function archiveThread(context: ScreenContext): Promise<void> {
   const thread = await selectedOf(context, "emailThreads", "a thread");
   if (!thread) return;
-  await context.mutate.patch(thread.id, { status: "archive", fields: { ...thread.fields, folder: "archive", archivedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} archived by ${context.actor}` });
+  if (!(await context.mutate.patch(thread.id, { status: "archive", fields: { ...thread.fields, folder: "archive", archivedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} archived by ${context.actor}` }))) return;
   context.toast("Archived", `${thread.title} is in Archive.`);
 }
 
@@ -447,7 +447,7 @@ export function LabelThread({ context, close }: { context: ScreenContext; close:
       onSubmit={async (event) => {
         event.preventDefault();
         const labels = listOf(new FormData(event.currentTarget).get("labels")).map((label) => label.toLowerCase());
-        await context.mutate.patch(thread.id, { tags: labels, fields: { ...thread.fields, labels: labels.join(",") } }, { expectRevision: thread.revision, event: `Labels on ${thread.title} set to ${labels.join(", ") || "none"} by ${context.actor}` });
+        if (!(await context.mutate.patch(thread.id, { tags: labels, fields: { ...thread.fields, labels: labels.join(",") } }, { expectRevision: thread.revision, event: `Labels on ${thread.title} set to ${labels.join(", ") || "none"} by ${context.actor}` }))) return;
         context.toast("Labels saved", labels.length ? labels.join(", ") : "The thread has no labels.");
         close();
       }}
@@ -488,6 +488,8 @@ export function ForwardMail({ context }: { context: ScreenContext }) {
   );
 }
 
+const LOCAL_DRAFT_STATEMENT = "No mail service is connected. The message is kept as a local draft and nothing leaves this browser.";
+
 export function SendConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const request = context.overlayPayload as SendRequest | undefined;
   const source = useRecord(request?.sourceId);
@@ -496,11 +498,9 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
   if (!request) {
     return (
       <Stack gap={4}>
-        <Boundary id="email.send" />
-        <Properties rows={[
-          { label: "What happens when you send", value: "A queued draft record with its recipients, subject and body" },
-          { label: "What does not happen", value: "No message is transmitted and no recipient is contacted" },
-        ]} />
+        <Notice tone="warning" title="Nothing is sent from here">{LOCAL_DRAFT_STATEMENT}</Notice>
+        <p className="ds-subtle">Start a forward or a reply from an email thread; the recipients are confirmed here first.</p>
+        <ModalActions><OverlayActions variant="confirm" end={<OverlayCancel>Close</OverlayCancel>} /></ModalActions>
       </Stack>
     );
   }
@@ -512,43 +512,47 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <ModalInFlight when={busy} />
-      <Properties rows={[
-        { label: "To", value: request.to.join(", ") },
+      <Notice tone="warning" title="Kept as a local draft, not sent">{LOCAL_DRAFT_STATEMENT}</Notice>
+      <FactGrid columns={2} items={[
+        { label: "To", value: request.to.join(", "), mono: true },
         { label: "Subject", value: request.subject },
-        { label: "Outside the company", value: external.length ? external.join(", ") : "None" },
-        { label: "Sensitive", value: sensitive ? <Pill tone="warning">Labelled sensitive</Pill> : "No" },
+        { label: "Outside the company", value: external.length ? external.join(", ") : "None", mono: external.length > 0, tone: external.length ? "warning" : undefined },
+        { label: "Sensitive", value: sensitive ? "Labelled sensitive" : "No", tone: sensitive ? "warning" : undefined },
       ]} />
       {needsCheck && <Checkbox label={`I have checked these ${request.to.length} recipients and they should receive this`} checked={checked} onChange={(event) => setChecked(event.target.checked)} />}
-      <Boundary id="email.send" />
       <ModalActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={busy || (needsCheck && !checked)}
-          busy={busy}
-          onClick={async () => {
-            if (busy || (needsCheck && !checked)) return;
-            setBusy(true);
-            try {
-              const from = `${context.actor.split(" ")[0].toLowerCase()}@${domain}`;
-            const draft = await context.mutate.create({
-              collection: "emailThreads", title: request.subject, status: "draft", summary: request.body.slice(0, 160), at: clockIso(), tags: ["draft"],
-              fields: { folder: "drafts", from, to: request.to.join(", "), unread: false, risk: "none", labels: "draft", delivery: "queued_local", messageCount: 1, forwardedFrom: request.sourceId ?? "", recipientsConfirmedBy: needsCheck ? context.actor : "" },
-              body: { messages: [{ from, at: clockIso(), body: request.body, external: false }] },
-            }, `Forward of ${source?.title ?? "a thread"} queued by ${context.actor}`);
-            await logBoundary(context, "email.send", `Forward to ${request.to.join(", ")} queued locally`, draft.id);
-            context.toast("Forward queued locally", boundaryText("email.send"));
-            close();
-            } catch (error) {
-              context.toast("Forward not queued", error instanceof Error ? error.message : "Review the recipients and retry.", "failed");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Queue the forward
-        </Button>
+      <OverlayActions
+        busy={busy}
+        primary={(
+          <Button
+            variant="primary"
+            disabled={busy || (needsCheck && !checked)}
+            busy={busy}
+            onClick={async () => {
+              if (busy || (needsCheck && !checked)) return;
+              setBusy(true);
+              try {
+                const from = `${context.actor.split(" ")[0].toLowerCase()}@${domain}`;
+                const draft = await context.mutate.create({
+                  collection: "emailThreads", title: request.subject, status: "draft", summary: request.body.slice(0, 160), at: clockIso(), tags: ["draft"],
+                  fields: { folder: "drafts", from, to: request.to.join(", "), unread: false, risk: "none", labels: "draft", delivery: "queued_local", messageCount: 1, forwardedFrom: request.sourceId ?? "", recipientsConfirmedBy: needsCheck ? context.actor : "" },
+                  body: { messages: [{ from, at: clockIso(), body: request.body, external: false }] },
+                }, `Forward of ${source?.title ?? "a thread"} kept as a local draft by ${context.actor}`);
+                await logBoundary(context, "email.send", `Forward to ${request.to.join(", ")} kept as a local draft`, draft.id);
+                context.toast("Forward kept as a local draft", "It is in Drafts. No mail service is connected, so nothing was sent.");
+                close();
+              } catch (error) {
+                context.toast("Forward not saved", error instanceof Error ? error.message : "Review the recipients and retry.", "failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Keep as a local draft
+          </Button>
+        )}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
       </ModalActions>
     </Stack>
   );
@@ -571,7 +575,7 @@ export function AddCc({ context, close }: { context: ScreenContext; close: () =>
         event.preventDefault();
         if (invalid) return;
         const next = [...new Set([...current, ...addresses])];
-        await context.mutate.patch(thread.id, { fields: { ...thread.fields, cc: next.join(", ") } }, { expectRevision: thread.revision, event: `CC on ${thread.title} set to ${next.join(", ")} by ${context.actor}` });
+        if (!(await context.mutate.patch(thread.id, { fields: { ...thread.fields, cc: next.join(", ") } }, { expectRevision: thread.revision, event: `CC on ${thread.title} set to ${next.join(", ")} by ${context.actor}` }))) return;
         context.toast("CC added", `${addresses.join(", ")} will be copied on the next reply drafted here.`);
         close();
       }}
@@ -597,7 +601,7 @@ export function AttachToThread({ context, close }: { context: ScreenContext; clo
         const id = String(new FormData(event.currentTarget).get("document") ?? "");
         const document = documents.find((row) => row.id === id);
         if (!document) return;
-        await context.mutate.patch(thread.id, { fields: { ...thread.fields, attachments: [...new Set([...current, document.title])].join(", "), attachmentIds: [...new Set([...listOf(thread.fields.attachmentIds), document.id])].join(",") } }, { expectRevision: thread.revision, event: `${document.title} attached to ${thread.title} by ${context.actor}` });
+        if (!(await context.mutate.patch(thread.id, { fields: { ...thread.fields, attachments: [...new Set([...current, document.title])].join(", "), attachmentIds: [...new Set([...listOf(thread.fields.attachmentIds), document.id])].join(",") } }, { expectRevision: thread.revision, event: `${document.title} attached to ${thread.title} by ${context.actor}` }))) return;
         context.toast("Attached", `${document.title} is attached to the draft reply on this thread.`);
         close();
       }}
@@ -609,7 +613,6 @@ export function AttachToThread({ context, close }: { context: ScreenContext; clo
           {documents.map((row) => <option key={row.id} value={row.id}>{row.title}{row.fields.confidential === true ? " (confidential)" : ""}</option>)}
         </Select>
       </Field>
-      <Boundary id="email.send" />
     </form>
   );
 }
@@ -626,7 +629,7 @@ export async function blockSender(context: ScreenContext): Promise<void> {
     tone: "danger",
     run: async () => {
       await context.mutate.create({ collection: "preferences", title: `Blocked sender: ${sender}`, status: "active", summary: `Threads from ${sender} are filed in Spam.`, fields: { kind: "mailRule", match: sender, label: "blocked", folder: "spam", createdBy: context.actor } }, `${sender} blocked by ${context.actor}`);
-      await context.mutate.patch(thread.id, { status: "spam", fields: { ...thread.fields, folder: "spam", blockedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} moved to Spam after blocking ${sender}` });
+      if (!(await context.mutate.patch(thread.id, { status: "spam", fields: { ...thread.fields, folder: "spam", blockedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} moved to Spam after blocking ${sender}` }))) return;
       context.toast("Sender blocked", `${sender} is on the block rule and this thread is in Spam.`);
     },
   });
@@ -706,7 +709,7 @@ export function InviteToMeeting({ context, close }: { context: ScreenContext; cl
         event.preventDefault();
         const name = String(new FormData(event.currentTarget).get("person") ?? "");
         if (!meeting || !name || everyone) return;
-        await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, attendees: [...attendees, name].join(","), invitedPending: [...listOf(meeting.fields.invitedPending), name].join(",") } }, { expectRevision: meeting.revision, event: `${name} invited to ${meeting.title} by ${context.actor}` });
+        if (!(await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, attendees: [...attendees, name].join(","), invitedPending: [...listOf(meeting.fields.invitedPending), name].join(",") } }, { expectRevision: meeting.revision, event: `${name} invited to ${meeting.title} by ${context.actor}` }))) return;
         await logBoundary(context, "calendar.sync", `Invitation for ${name} to ${meeting.title} kept locally`, meeting.id);
         context.toast("Invited", `${name} is on ${meeting.title} as invited. Their answer is unknown until somebody records it.`);
         close();
@@ -757,11 +760,11 @@ export function RescheduleMeeting({ context, close }: { context: ScreenContext; 
       onSubmit={async (event) => {
         event.preventDefault();
         if (past || unchanged || Number.isNaN(start.getTime())) return;
-        await context.mutate.patch(meeting.id, {
+        if (!(await context.mutate.patch(meeting.id, {
           startAt: start.toISOString(), endAt: end.toISOString(), at: start.toISOString(),
           status: clashes.length ? "tentative" : mode === "reschedule" ? "scheduled" : meeting.status,
           fields: { ...meeting.fields, previousStartAt: meeting.startAt!, accepted: mode === "reschedule" ? 0 : Number(meeting.fields.accepted ?? 0), movedBy: context.actor },
-        }, { expectRevision: meeting.revision, event: `${meeting.title} ${mode === "move" ? "moved" : "rescheduled"} from ${meeting.startAt} to ${start.toISOString()} by ${context.actor}` });
+        }, { expectRevision: meeting.revision, event: `${meeting.title} ${mode === "move" ? "moved" : "rescheduled"} from ${meeting.startAt} to ${start.toISOString()} by ${context.actor}` }))) return;
         if (mode === "reschedule") await logBoundary(context, "calendar.sync", `New time for ${meeting.title} kept locally; attendees must confirm again`, meeting.id);
         context.toast(mode === "move" ? "Moved" : "Rescheduled", `${meeting.title} is at ${context.dateTime(start)}${clashes.length ? ", tentative because of a clash" : ""}.`);
         close();
@@ -804,15 +807,14 @@ export function RecordingConsent({ context, close }: { context: ScreenContext; c
         { label: "Recording possible here", value: <Pill tone="warning">No — no conferencing service</Pill> },
       ]} />
       <Notice tone="info">Even with everyone's consent recorded, nothing is recorded: {NO_CONFERENCING}</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={everyoneMode} onClick={async () => {
-          await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, recordingConsent: consented.join(","), consentComplete: all, consentRecordedBy: context.actor, consentRecordedAt: clockIso() } }, { expectRevision: meeting.revision, event: `Recording consent recorded on ${meeting.title} by ${context.actor}: ${consented.length} of ${attendees.length} agreed` });
+      <OverlayActions
+        primary={<Button variant="primary" disabled={everyoneMode} onClick={async () => {
+          if (!(await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, recordingConsent: consented.join(","), consentComplete: all, consentRecordedBy: context.actor, consentRecordedAt: clockIso() } }, { expectRevision: meeting.revision, event: `Recording consent recorded on ${meeting.title} by ${context.actor}: ${consented.length} of ${attendees.length} agreed` }))) return;
           context.toast("Consent recorded", all ? "Everyone agreed. Recording is still not available in this workspace." : `${consented.length} of ${attendees.length} agreed, so recording would not be allowed.`);
           close();
-        }}>Record the answers</Button>
-      </Row>
+        }}>Record the answers</Button>}
+        end={<Button variant="ghost" onClick={close}>Close</Button>}
+      />
     </Stack>
   );
 }
@@ -826,7 +828,7 @@ export async function endMeeting(context: ScreenContext): Promise<void> {
     body: `${meeting.title} is marked finished at ${context.dateTime(context.now)}, ended by ${context.actor}. Notes and actions stay editable.`,
     confirm: "End the meeting",
     run: async () => {
-      await context.mutate.patch(meeting.id, { status: "finished", fields: { ...meeting.fields, endedBy: context.actor, endedAt: clockIso() } }, { expectRevision: meeting.revision, event: `${meeting.title} ended by ${context.actor}` });
+      if (!(await context.mutate.patch(meeting.id, { status: "finished", fields: { ...meeting.fields, endedBy: context.actor, endedAt: clockIso() } }, { expectRevision: meeting.revision, event: `${meeting.title} ended by ${context.actor}` }))) return;
       context.toast("Meeting ended", "The record is finished; write up what was decided.");
       context.setTab("Notes");
     },
@@ -837,7 +839,7 @@ async function toggleMeetingList(context: ScreenContext, field: "muted" | "hands
   const meeting = await recordOf(context, context.params.id, "meetings");
   if (!meeting) { context.toast("Open a meeting first", "Nothing changed.", "blocked"); return; }
   const { list, on: now } = toggleIn(meeting.fields[field], context.actor);
-  await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, [field]: list.join(",") } }, { expectRevision: meeting.revision, event: `${context.actor} ${now ? on : off} in ${meeting.title}` });
+  if (!(await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, [field]: list.join(",") } }, { expectRevision: meeting.revision, event: `${context.actor} ${now ? on : off} in ${meeting.title}` }))) return;
   context.toast(now ? `${on[0].toUpperCase()}${on.slice(1)}` : `${off[0].toUpperCase()}${off.slice(1)}`, `Shown on the Participants tab. ${NO_CONFERENCING}`);
 }
 
@@ -859,7 +861,7 @@ export function AttachCrm({ context, close }: { context: ScreenContext; close: (
         const form = new FormData(event.currentTarget);
         const contact = contacts.find((row) => row.id === String(form.get("contact") ?? ""));
         if (!contact) return;
-        await context.mutate.patch(call.id, { fields: { ...call.fields, contactId: contact.id, contactName: contact.title, crmNote: String(form.get("note") ?? "") } }, { expectRevision: call.revision, event: `${call.title} attached to ${contact.title} by ${context.actor}` });
+        if (!(await context.mutate.patch(call.id, { fields: { ...call.fields, contactId: contact.id, contactName: contact.title, crmNote: String(form.get("note") ?? "") } }, { expectRevision: call.revision, event: `${call.title} attached to ${contact.title} by ${context.actor}` }))) return;
         context.toast("Attached to the contact", `${call.title} is on ${contact.title}'s record.`);
         close();
       }}
@@ -898,17 +900,16 @@ export function Dialer({ context, close }: { context: ScreenContext; close: () =
         </Select>
       </Field>
       {!contact && <Field label="Number"><TextInput inputMode="tel" value={number} onChange={(event) => setNumber(event.target.value)} /></Field>}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={!target} onClick={async () => {
+      <OverlayActions
+        primary={<Button variant="primary" disabled={!target} onClick={async () => {
           const call = await context.mutate.create({ collection: "calls", title: `${target} — not placed`, status: "not placed", summary: `${original ? "Return call" : "Call"} recorded by ${context.actor}; no telephony service is connected.`, at: clockIso(), fields: { contactId: contact?.id ?? "", direction: "outbound", seconds: 0, outcome: "not placed", voicemail: false, queue: "Direct", returnOf: original?.id ?? "", number: contact ? String(contact.fields.phone ?? "") : number.trim() } }, `${original ? "Return call" : "Call"} to ${target} recorded by ${context.actor}`);
-          if (original) await context.mutate.patch(original.id, { fields: { ...original.fields, returnedBy: context.actor, returnCallId: call.id } }, { expectRevision: original.revision, event: `${original.title} returned by ${context.actor} (not placed: no telephony)` });
+          if (original) { if (!(await context.mutate.patch(original.id, { fields: { ...original.fields, returnedBy: context.actor, returnCallId: call.id } }, { expectRevision: original.revision, event: `${original.title} returned by ${context.actor} (not placed: no telephony)` }))) return; }
           await logBoundary(context, "telephony", `Call to ${target} not placed`, call.id);
           context.toast("Call recorded, not placed", boundaryText("telephony"), "info");
           close();
-        }}>{original ? "Record the return call" : "Record the call"}</Button>
-      </Row>
+        }}>{original ? "Record the return call" : "Record the call"}</Button>}
+        end={<Button variant="ghost" onClick={close}>Close</Button>}
+      />
     </Stack>
   );
 }
@@ -940,15 +941,14 @@ export function Voicemail({ context, close }: { context: ScreenContext; close: (
         { label: "Reviewed", value: call.fields.heardBy ? `By ${String(call.fields.heardBy)}` : "Not yet" },
       ]} />
       <Boundary id="telephony" title="There is no audio to play" />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={Boolean(call.fields.heardBy)} onClick={async () => {
-          await context.mutate.patch(call.id, { fields: { ...call.fields, heardBy: context.actor, heardAt: clockIso() } }, { expectRevision: call.revision, event: `Voicemail note from ${call.title} reviewed by ${context.actor}` });
+      <OverlayActions
+        primary={<Button variant="primary" disabled={Boolean(call.fields.heardBy)} onClick={async () => {
+          if (!(await context.mutate.patch(call.id, { fields: { ...call.fields, heardBy: context.actor, heardAt: clockIso() } }, { expectRevision: call.revision, event: `Voicemail note from ${call.title} reviewed by ${context.actor}` }))) return;
           context.toast("Marked reviewed", "The voicemail note is recorded as dealt with.");
           close();
-        }}>Mark the voicemail reviewed</Button>
-      </Row>
+        }}>Mark the voicemail reviewed</Button>}
+        end={<Button variant="ghost" onClick={close}>Close</Button>}
+      />
     </Stack>
   );
 }
@@ -1000,7 +1000,7 @@ export function WorkingHours({ context, close }: { context: ScreenContext; close
         if (backwards) return;
         const form = new FormData(event.currentTarget);
         const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].filter((day) => form.get(day) === "on");
-        await context.mutate.patch(record.id, { fields: { ...record.fields, workingStart: start, workingEnd: end, workingDays: days.join(","), timezone: org.timezone } }, { expectRevision: record.revision, event: `Working schedule set by ${actor}: ${days.join(" ")} ${start}–${end}` });
+        if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, workingStart: start, workingEnd: end, workingDays: days.join(","), timezone: org.timezone } }, { expectRevision: record.revision, event: `Working schedule set by ${actor}: ${days.join(" ")} ${start}–${end}` }))) return;
         context.toast("Schedule saved", `${days.join(", ")} ${start}–${end} in ${org.timezone}.`);
         close();
       }}

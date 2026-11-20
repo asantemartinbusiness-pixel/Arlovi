@@ -168,6 +168,13 @@ export function useGuardRefresh(context: ScreenContext): void {
     const last = LAST_SIGNATURE.get(key);
     if (last === signature) return;
     LAST_SIGNATURE.set(key, signature);
-    if (last !== undefined && def?.chrome !== "full") context.setTab(context.tab);
+    if (last === undefined || def?.chrome === "full") return;
+    /* The re-render is requested by re-selecting the current tab. If the person
+       has already moved to another tab since this component rendered, that
+       value is stale: re-selecting it would pull them back. Their navigation
+       re-renders the host anyway, so there is nothing to request. */
+    const urlTab = new URLSearchParams(window.location.search).get("tab");
+    if (urlTab !== null && urlTab !== context.tab) return;
+    context.setTab(context.tab);
   });
 }

@@ -48,16 +48,8 @@ export function SiteLibrary({ context, scope }: { context: ScreenContext; scope:
 
   const base = `/o/${context.org.slug}/web/sites`;
   return <div className="web-library">
-    <section className="web-library-overview" aria-label="Website library overview">
-      <div className="web-library-overview-head">
-        <div>
-          <span className="web-library-eyebrow">WEBSITES / SITE LIBRARY</span>
-          <h2>Build, manage and prepare your websites.</h2>
-          <p>Work on pages, content, forms and quality from one place. Exported files are not the same as a deployed website.</p>
-        </div>
-        <Button size="sm" variant="primary" onClick={() => context.openOverlay("Site setup")}>New website</Button>
-      </div>
-      <div className="web-library-metrics" aria-label="Website summary">
+    <section className="web-library-overview" data-compact aria-label="Website library overview">
+      <div className="web-library-metrics" role="group" aria-label="Website summary">
         <div><span>Active sites</span><strong>{active.length}</strong></div>
         <div><span>Working drafts</span><strong>{active.length - exported}</strong></div>
         <div><span>Local exports</span><strong>{exported}</strong></div>
@@ -119,7 +111,10 @@ export function SiteLibrary({ context, scope }: { context: ScreenContext; scope:
             </div>
             <div className="web-library-card-copy">
               <h3><Link to={url}>{record.title}</Link></h3>
-              <p>{record.summary || "Website project in this workspace."}</p>
+              <ul className="web-library-routes" aria-label={`Routes of ${record.title}`}>
+                {site.pages.slice(0, 4).map(page => <li key={page.id}>{page.path}</li>)}
+                {site.pages.length > 4 && <li className="web-library-routes-more">+{site.pages.length - 4}</li>}
+              </ul>
               <span className="web-library-domain">{domain
                 ? `${domain.host}${domain.verified ? "" : " · unverified"}`
                 : "No domain connected"}</span>
@@ -167,6 +162,6 @@ export function SiteLibrary({ context, scope }: { context: ScreenContext; scope:
         summary={<span>Publication is verified only when supported by real hosting evidence. Site exports remain local.</span>}
       />
     )}
-    <p className="web-library-boundary">All site records, edits and exports currently use this browser-local company workspace. External hosting, DNS and traffic analytics are not connected.</p>
+    <p className="web-library-boundary">Sites and exports live in this browser. Hosting, DNS and traffic analytics are not connected.</p>
   </div>;
 }

@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel,
-  Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput, KeyValueList, OverlaySummary, OverlaySection, FactGrid, OverlayActions,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -21,6 +21,7 @@ import { intervalsOverlap, validShiftInterval } from "@/domain/scheduling";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
 import { dailyCoverage, employeeOnLeave, localDayKey, rosterDateLabel, rosterShiftsForDay, rosterWeekDays, shiftDays } from "./rosterView";
 import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
+import { PeopleHeader } from "./kit";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 
 /* ------------------------------------------------------------------ *
@@ -30,7 +31,7 @@ import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export function useHrData() {
   return useCollections([
     "employees", "members", "departments", "applicants", "positions", "leaveRequests",
-    "shifts", "payrollRuns", "reviews", "policies", "courses", "tasks",
+    "shifts", "payrollRuns", "reviews", "policies", "courses", "tasks", "emailThreads",
   ]);
 }
 
@@ -93,11 +94,10 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
       mine.some((employee) => employee.id === task.fields.employeeId));
     return (
       <Stack gap={4}>
-        <OpsHeader
+        <PeopleHeader
           eyebrow="People / Overview / My team"
           title="Your team, person by person."
           description="Reporting lines, leave and onboarding progress in one place. Only staff explicitly assigned to you appear here."
-          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees?tab=People`)}>Open directory</Button>}
           note={`Showing direct reports whose manager field matches ${actor}.`}
         />
         <OpsMetrics label="My team status">
@@ -165,11 +165,10 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
     const filtered = taskFilter === "all" ? rows : rows.filter((row) => row.kind === taskFilter);
     return (
       <Stack gap={4}>
-        <OpsHeader
+        <PeopleHeader
           eyebrow="People / Overview / HR tasks"
           title="People decisions, in one queue."
           description="Review leave, onboarding, performance and hiring tasks without losing sight of their owning workflow."
-          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Exceptions`)}>Scheduling exceptions</Button>}
           note="A row opens its native workflow; no decision is taken automatically."
         />
         <OpsMetrics label="People task overview">
@@ -223,11 +222,10 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
     });
     return (
       <Stack gap={4}>
-        <OpsHeader
+        <PeopleHeader
           eyebrow="People / Overview / Trends"
           title="Understand the shape of the team."
           description="Department composition, employment mix and approved absence over time, grounded in the records in this workspace."
-          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees?tab=Teams`)}>Browse departments</Button>}
           note="This is a local record analysis, not an anonymised public report."
         />
         <OpsMetrics label="Workforce trends overview">
@@ -278,14 +276,10 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
 
   return (
     <Stack gap={5}>
-      <OpsHeader
+      <PeopleHeader
         eyebrow="People / Overview"
         title="A clearer view of the people behind the work."
         description="Understand your team, the decisions waiting for attention and the work happening across hiring, onboarding, leave and scheduling."
-        actions={<>
-          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Explore directory</Button>
-          <Button variant="primary" onClick={() => context.setTab("HR tasks")}>Review people work</Button>
-        </>}
         note={`${dueCount} recorded people work items · Local workspace records only`}
       />
       <StatRow>
@@ -390,7 +384,7 @@ export function StaffingSummary({ context }: { context: ScreenContext }) {
     <Stack gap={3}>
       {days.map((row) => (
         <Row key={row.key} gap={3}>
-          <span style={{ width: 95 }} className="ds-subtle">{rosterDateLabel(row.key)}</span>
+          <span style={{ width: 95 }} className="ds-subtle ds-num">{rosterDateLabel(row.key)}</span>
           <div className="ds-grow">
             <Meter value={row.onShift} max={Math.max(1, employees.length)}
               label={`Rostered people on ${rosterDateLabel(row.key)}`}
@@ -402,8 +396,7 @@ export function StaffingSummary({ context }: { context: ScreenContext }) {
         </Row>
       ))}
       <p className="ds-subtle">
-        Counts use {org.timezone} calendar days, including overnight shifts, and distinguish employees from individual shifts.
-        No minimum staffing requirement is recorded here, so an unassigned or lightly rostered day is not automatically labelled unsafe.
+        Counts are people per {org.timezone} calendar day. No minimum staffing is recorded, so a lightly rostered day is not called unsafe.
       </p>
       {days.some((row) => row.conflicts > 0) && (
         <Notice tone="warning" title="Roster and approved leave overlap">
@@ -442,13 +435,7 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
         ? "Review contractors as separate workforce records. Recorded engagements are not assumed to be active contracts."
         : "Preserve former colleagues' historical records without representing them as current staff.";
   const header = (
-    <OpsHeader eyebrow={`People / Employee Directory / ${lens}`} title={title} description={description}
-      actions={<>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/overview`)}>People overview</Button>
-        {context.can("edit_people") && <Button variant="primary" onClick={() => context.openOverlay("Invite employee")}>
-          Create employee record
-        </Button>}
-      </>}
+    <PeopleHeader eyebrow={`People / Employee Directory / ${lens}`} title={title} description={description}
       note="Records and access rights shown here are local to this company workspace."
     />
   );
@@ -655,63 +642,27 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   const pendingLeave = leave.filter((request) => request.status === "requested");
   const outstandingReviews = reviews.filter((review) => review.status !== "acknowledged");
   const canEdit = context.can("edit_people");
-  const profileDescriptions: Record<string, string> = {
-    Overview: "An employee-centered workspace: identity, role, contact preferences and the next tasks that need attention.",
-    Job: "The recorded employment relationship, management line, skills and pay information available to your current role view.",
-    Documents: "Only real document records associated with this employee. References never claim a file was uploaded.",
-    Leave: "Recorded leave requests and balances, with unknown allowances clearly distinguished from zero.",
-    Performance: "Recorded performance cycles and named human review decisions; no automated personnel judgement.",
-    Access: "Local access requests and offboarding evidence. External accounts and permissions are not independently verified.",
-  };
-  const profileHeader = (
-    <section className="hr-profile-identity" aria-label={`Employee profile for ${employee.title}`}>
-      <div className="hr-profile-identity-main">
-        <Avatar name={employee.title} size="lg" />
-        <div className="hr-profile-identity-copy">
-          <span className="ops-eyebrow">People / Employee profile / {lens}</span>
-          <h2>{employee.title}</h2>
-          <p>{String(employee.fields.title || "No job title recorded")} · {departmentName(data.departments, employee.fields.departmentId)}</p>
-          <div className="hr-profile-identifiers">
-            <EmploymentPill record={employee} />
-            <span>{String(employee.fields.office || "Location not recorded")}</span>
-            <span>{employee.startAt ? `Started ${context.date(employee.startAt)}` : "Start date not recorded"}</span>
-          </div>
-        </div>
-      </div>
-      <div className="hr-profile-identity-actions">
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
-        {context.can("edit_people") && !terminated && (
-          <>
-            <Button variant="primary" onClick={() => context.openOverlay("profile editor")}>Edit profile</Button>
-            <Button variant="outline-danger" onClick={() => context.openOverlay("offboarding confirmation")}>Offboard</Button>
-          </>
-        )}
-      </div>
-    </section>
-  );
-  const profileMetrics = (
-    <OpsMetrics label={`${employee.title} employee record overview`}>
-      <OpsMetric label="Leave balance" value={balance.known ? `${balance.left} days` : "Not recorded"}
-        detail={balance.known ? `${balance.allowance} annual allowance` : "Verify the allowance"} />
-      <OpsMetric label="Documents on record" value={linkedDocs.length} detail="Linked document records and references" />
-      <OpsMetric label="Onboarding actions" value={openChecklist.length} detail="Incomplete recorded checklist steps" />
-      <OpsMetric label="Pending access requests" value={pendingAccess.length}
-        detail="Local requests, not actual grants" emphasis={pendingAccess.length ? "attention" : "neutral"} />
-    </OpsMetrics>
-  );
+  const doneSteps = onboarding.filter((task) => task.status === "done").length;
+  /* Tiles appear only when they carry something: an empty count is not news. */
+  const profileMetrics = lens === "Overview" && (balance.known || linkedDocs.length > 0 || onboarding.length > 0 || pendingAccess.length > 0) ? (
+    <StatRow>
+      {balance.known && <Stat label="Leave left" value={`${balance.left} days`} meta={`of ${balance.allowance} this year`} onClick={() => context.setTab("Leave")} prov="human" />}
+      {onboarding.length > 0 && <Stat label="Onboarding" value={`${doneSteps} of ${onboarding.length}`} meta={openChecklist.length ? `${openChecklist.length} step${openChecklist.length === 1 ? "" : "s"} open` : "Checklist complete"} onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)} />}
+      {linkedDocs.length > 0 && <Stat label="Documents" value={linkedDocs.length} meta="Linked records and references" onClick={() => context.setTab("Documents")} />}
+      {pendingAccess.length > 0 && <Stat label="Access requests" value={pendingAccess.length} meta="Local requests, not grants" onClick={() => context.setTab("Access")} />}
+    </StatRow>
+  ) : null;
   const withProfileFrame = (body: ReactNode) => (
     <Stack gap={4}>
-      {profileHeader}
-      <p className="hr-profile-section-description">{profileDescriptions[lens] ?? profileDescriptions.Overview}</p>
-      {profileMetrics}
-      {(terminated || pendingLeave.length > 0 || pendingAccess.length > 0 || outstandingReviews.length > 0) && (
+      {(terminated || pendingLeave.length > 0 || outstandingReviews.length > 0 || (lens !== "Overview" && lens !== "Access" && pendingAccess.length > 0)) && (
         <div className="hr-profile-workflow-strip" aria-label="Employee workflow status">
           {terminated && <Pill tone="warning">Former employee · departure recorded locally</Pill>}
-          {pendingLeave.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Leave")}>{pendingLeave.length} pending leave request{pendingLeave.length === 1 ? "" : "s"}</Button>}
-          {outstandingReviews.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Performance")}>{outstandingReviews.length} review{outstandingReviews.length === 1 ? "" : "s"} awaiting acknowledgement</Button>}
-          {pendingAccess.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Access")}>{pendingAccess.length} open local access request{pendingAccess.length === 1 ? "" : "s"}</Button>}
+          {pendingLeave.length > 0 && lens !== "Leave" && <Button size="sm" variant="secondary" onClick={() => context.setTab("Leave")}>{pendingLeave.length} pending leave request{pendingLeave.length === 1 ? "" : "s"}</Button>}
+          {outstandingReviews.length > 0 && lens !== "Performance" && <Button size="sm" variant="secondary" onClick={() => context.setTab("Performance")}>{outstandingReviews.length} review{outstandingReviews.length === 1 ? "" : "s"} awaiting acknowledgement</Button>}
+          {pendingAccess.length > 0 && lens !== "Access" && lens !== "Overview" && <Button size="sm" variant="secondary" onClick={() => context.setTab("Access")}>{pendingAccess.length} open local access request{pendingAccess.length === 1 ? "" : "s"}</Button>}
         </div>
       )}
+      {profileMetrics}
       {body}
     </Stack>
   );
@@ -916,46 +867,51 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
     );
   }
 
+  const nowMs = context.now.getTime();
+  const sortedLeave = [...leave].filter((request) => request.status !== "declined")
+    .sort((x, y) => String(x.startAt ?? "").localeCompare(String(y.startAt ?? "")));
+  const nextLeave = sortedLeave.find((request) => Date.parse(String(request.startAt ?? "")) >= nowMs) ?? sortedLeave[sortedLeave.length - 1];
+  const lastChange = employee.history[0];
+  const glance: { label: string; value: ReactNode; mono?: boolean }[] = [
+    nextLeave ? { label: Date.parse(String(nextLeave.startAt ?? "")) >= nowMs ? "Next leave" : "Latest leave", value: `${String(nextLeave.fields.type ?? "annual")} · ${context.date(nextLeave.startAt)} – ${context.date(nextLeave.endAt)} · ${nextLeave.status}` } : null,
+    outstandingReviews[0] ? { label: "Performance review", value: `${outstandingReviews[0].title} · ${outstandingReviews[0].status}` } : null,
+    onboarding.length > 0 ? { label: "Onboarding", value: `${doneSteps} of ${onboarding.length} steps done` } : null,
+    linkedDocs.length > 0 ? { label: "Documents", value: `${linkedDocs.length} · ${linkedDocs[0].title} (${linkedDocs[0].fields.kind === "peopleFile" ? "reference only" : linkedDocs[0].status.replace("_", " ")})` } : null,
+    pendingAccess.length > 0 ? { label: "Access requests", value: `${pendingAccess.length} pending, local only` } : null,
+    lastChange ? { label: "Last record change", value: `${context.date(lastChange.at)} · ${lastChange.summary || "No summary recorded"}` } : null,
+  ].filter((item): item is NonNullable<typeof item> => item !== null);
+  const noContact = ["email", "phone", "dateOfBirth", "emergencyContact"].every((key) => !employee.fields[key]);
   return withProfileFrame(
     <Grid>
-      <Card span={5} title={<Row gap={3}><Avatar name={employee.title} size="lg" /><span>{employee.title}</span></Row>} subtitle={String(employee.fields.title ?? "")} actions={<EmploymentPill record={employee} />}>
+      <Card span={5} eyebrow="WORK" title="Role and line" prov="human">
         <Stack gap={3}>
-          <p className="ds-subtle">{employee.summary}</p>
-          <Properties rows={[
+          {employee.summary && employee.fields.title && <p className="ds-subtle">{employee.summary}</p>}
+          <KeyValueList items={[
             { label: "Department", value: departmentName(data.departments, employee.fields.departmentId) },
             { label: "Manager", value: String(employee.fields.manager ?? "Unassigned") },
-            { label: "Office", value: String(employee.fields.office ?? "—") },
-            { label: "Pronouns", value: String(employee.fields.pronouns ?? "—") },
-            { label: "Started", value: context.date(employee.startAt) },
-          ]} />
+            employee.fields.office ? { label: "Office", value: String(employee.fields.office) } : null,
+            employee.fields.pronouns ? { label: "Pronouns", value: String(employee.fields.pronouns) } : null,
+            employee.startAt ? { label: "Started", value: context.date(employee.startAt), mono: true } : null,
+          ].filter((item): item is NonNullable<typeof item> => item !== null)} />
         </Stack>
       </Card>
-      <Card span={7} title="Contact" subtitle="Shown according to this person's privacy setting">
+      <Card span={7} eyebrow="AT A GLANCE" title="What is open for this person">
+        {glance.length === 0
+          ? <span className="ds-subtle">Nothing open.</span>
+          : <KeyValueList items={glance} />}
+      </Card>
+      <Card span={12} title="Contact" subtitle="Shown according to this person's privacy setting">
         <Stack gap={3}>
-          <Properties rows={[
-            { label: "Work email", value: String(employee.fields.email ?? "Not recorded") },
-            { label: "Phone", value: <span className="ds-subtle">{String(employee.fields.phone ?? "Not shared")}</span> },
-            { label: "Date of birth", value: context.can("view_payroll") ? String(employee.fields.dateOfBirth ?? "Not recorded") : "Hidden in this role view" },
-            { label: "Emergency contact", value: context.can("view_payroll") ? String(employee.fields.emergencyContact ?? "Not recorded") : "Hidden in this role view" },
-          ]} />
-          {!context.can("view_payroll") && <RoleViewNote what="Date of birth and emergency contact" />}
+          {noContact
+            ? <span className="ds-subtle">No contact details recorded.</span>
+            : <KeyValueList columns={2} items={[
+              { label: "Work email", value: String(employee.fields.email ?? "Not recorded") },
+              { label: "Phone", value: <span className="ds-subtle">{String(employee.fields.phone ?? "Not shared")}</span> },
+              { label: "Date of birth", value: context.can("view_payroll") ? String(employee.fields.dateOfBirth ?? "Not recorded") : "Hidden in this role view" },
+              { label: "Emergency contact", value: context.can("view_payroll") ? String(employee.fields.emergencyContact ?? "Not recorded") : "Hidden in this role view" },
+            ]} />}
+          {!noContact && !context.can("view_payroll") && <RoleViewNote what="Date of birth and emergency contact" />}
         </Stack>
-      </Card>
-      <Card span={4} eyebrow="LEAVE" prov={balance.known ? "human" : "unknown"} title="Leave" subtitle={balance.known ? `${balance.left} of ${balance.allowance} days left` : "No allowance recorded"}>
-        {balance.known ? <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} /> : <Notice tone="warning" title="Allowance unverified">A missing balance is not zero days available.</Notice>}
-        <Button size="sm" variant="ghost" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.setTab("Leave")}>See requests</Button>
-      </Card>
-      <Card span={4} title="Pay" subtitle="Payroll role view">
-        <strong style={{ fontSize: "var(--text-lg)" }}>{salaryText(context, employee)}</strong>
-        <p className="ds-subtle">{context.can("view_payroll") ? "From the employee record, used by the local payroll calculation." : "Switch to the People or Owner role view to see pay."}</p>
-      </Card>
-      <Card span={4} title="Onboarding" subtitle={onboarding.length ? `${onboarding.filter((task) => task.status === "done").length} of ${onboarding.length} steps done` : "No checklist"}>
-        {onboarding.length === 0 ? <span className="ds-subtle">No onboarding checklist was launched for this person.</span> : (
-          <>
-            <Meter value={onboarding.filter((task) => task.status === "done").length} max={onboarding.length} label="Onboarding progress" />
-            <Button size="sm" variant="ghost" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)}>Open the checklist</Button>
-          </>
-        )}
       </Card>
     </Grid>
   );
@@ -983,14 +939,10 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
   const canEdit = context.can("edit_people");
   const intro = (
     <Stack gap={4}>
-      <OpsHeader eyebrow={`People / Recruitment / ${lens}`}
+      <PeopleHeader eyebrow={`People / Recruitment / ${lens}`}
         title={({ Positions: "Roles with a clear owner.", Candidates: "A pipeline for human decisions.",
           Interviews: "Interviews, scheduled and unscheduled.", Offers: "Offers, with evidence attached." } as const)[lens]}
-        description="Review real application records, owners and next actions. No AI candidate ranking, automatic mailing or external calendar booking is implied."
-        actions={<>
-          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)}>Open onboarding</Button>
-          {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Job spec editor")}>Create a role</Button>}
-        </>} note="Applicant stage changes and offers require an accountable human decision." />
+        description="Review real application records, owners and next actions. No AI candidate ranking, automatic mailing or external calendar booking is implied." note="Applicant stage changes and offers require an accountable human decision." />
       <OpsMetrics label="Recruitment workflow">
         <OpsMetric label="Open roles" value={data.positions.filter((row) => row.status === "open").length} detail="Recorded positions" />
         <OpsMetric label="Active candidates" value={live.length} detail="Excludes withdrawn and rejected" />
@@ -1285,15 +1237,32 @@ export function ApplicantProfile({ context, lens }: { context: ScreenContext; le
     );
   }
 
+  const rating = Number(applicant.fields.rating ?? 0);
+  const drafts = data.emailThreads.filter((row) => row.parentId === applicant.id);
+  const interviewAt = String(applicant.fields.interviewAt ?? "");
+  const standing = [
+    { label: "Interview", value: interviewAt ? context.dateTime(interviewAt) : "None scheduled" },
+    { label: "Scorecard", value: rating > 0 ? `${rating} of 5` : "None recorded" },
+    { label: "Last decision", value: applicant.fields.decidedBy ? `${String(applicant.fields.stage ?? applicant.status)} by ${String(applicant.fields.decidedBy)}${applicant.fields.decidedAt ? `, ${context.date(String(applicant.fields.decidedAt))}` : ""}` : "None recorded" },
+    { label: "Messages kept", value: drafts.length ? `${drafts.length} draft${drafts.length === 1 ? "" : "s"}, none sent` : "None" },
+  ];
   return (
     <Grid>
-      <Card span={5} title={<Row gap={3}><Avatar name={applicant.title} size="lg" />{applicant.title}</Row>} subtitle={String(applicant.fields.role ?? "")} actions={<Pill tone="info">{String(applicant.fields.stage ?? applicant.status)}</Pill>}>
-        <Properties rows={[
-          { label: "Applied", value: context.date(applicant.at) },
-          { label: "Source", value: String(applicant.fields.source ?? "") },
-          { label: "Email", value: String(applicant.fields.email ?? "") },
-          { label: "Rating", value: Number(applicant.fields.rating ?? 0) > 0 ? `${String(applicant.fields.rating)} of 5` : "Not scored" },
-        ]} />
+      <Card span={12} eyebrow="WHERE IT STANDS" title="Latest on this application">
+        <KeyValueList columns={2} items={standing} />
+      </Card>
+      <Card span={5} eyebrow="APPLICATION" title="Application record">
+        <Stack gap={3}>
+          <KeyValueList items={[
+            position ? { label: "Position", value: position.title } : null,
+            { label: "Applied", value: context.date(applicant.at ?? applicant.createdAt), mono: true },
+            applicant.fields.source ? { label: "Source", value: String(applicant.fields.source) } : null,
+            applicant.fields.email ? { label: "Email", value: String(applicant.fields.email) } : null,
+            { label: "Rating", value: rating > 0 ? `${rating} of 5` : "Not scored" },
+            { label: "Data held until", value: consentUntil ? context.date(consentUntil) : "No date recorded", mono: Boolean(consentUntil), tone: consentExpired || !consentUntil ? ("warning" as const) : undefined },
+          ].filter((item): item is NonNullable<typeof item> => item !== null)} />
+          {consentExpired && <Notice tone="danger" title="Consent has expired">This record is past its consent date and is listed for the next retention sweep.</Notice>}
+        </Stack>
       </Card>
       <Card span={7} title="Job-relevant summary" subtitle="Assembled from the application only">
         <Stack gap={3}>
@@ -1303,13 +1272,6 @@ export function ApplicantProfile({ context, lens }: { context: ScreenContext; le
             candidate beyond what they wrote, and protected characteristics are not recorded on this screen at all.
           </Notice>
         </Stack>
-      </Card>
-      <Card span={12} title="Consent" subtitle={consentExpired ? "Expired" : `Held until ${consentUntil || "an unrecorded date"}`}>
-        <Notice tone={consentExpired ? "danger" : "success"}>
-          {consentExpired
-            ? "This record is past its consent date and is listed for the next retention sweep."
-            : "The candidate agreed to this record being held for the length of the hiring process."}
-        </Notice>
       </Card>
     </Grid>
   );
@@ -1347,16 +1309,12 @@ export function Onboarding({ context, lens }: { context: ScreenContext; lens: "I
   const canEdit = context.can("edit_people");
   return (
     <Stack gap={4}>
-      <OpsHeader eyebrow={`People / Onboarding / ${lens}`}
+      <PeopleHeader eyebrow={`People / Onboarding / ${lens}`}
         title={({ Incoming: "Give every starter a clear first step.",
           "In progress": "Keep the handoffs moving.",
           Waiting: "Know exactly what is holding things up.",
           Completed: "A record of work actually completed." } as const)[lens]}
         description="An employee-centred checklist across People, managers, IT and Finance. Each step has a recorded state and responsible person."
-        actions={<>
-          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
-          {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Onboarding template")}>Launch a checklist</Button>}
-        </>}
         note="Local checklist completion does not provision identity accounts, send welcome mail or execute payroll."
       />
       <OpsMetrics label="Onboarding handoffs">
@@ -1523,14 +1481,10 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
     && request.startAt.slice(0, 10) <= selectedDay && request.endAt.slice(0, 10) >= selectedDay
     && ["approved", "requested"].includes(request.status)) : [];
   const header = (
-    <OpsHeader eyebrow={`People / Leave & Absence / ${lens}`}
+    <PeopleHeader eyebrow={`People / Leave & Absence / ${lens}`}
       title={({ "My leave": "Time away, clearly recorded.", "Team calendar": "Leave in the context of the team.",
         Approvals: "Leave decisions with an accountable owner.", Policy: "Know what the recorded policy says." } as const)[lens]}
       description="Review actual leave requests, annual balances and available coverage evidence. Requests never automatically reduce a recorded entitlement."
-      actions={<>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Roster`)}>Open roster</Button>
-        <Button variant="primary" onClick={() => context.openOverlay("Leave form")}>Request leave</Button>
-      </>}
       note={`Company calendar: ${org.timezone}. Leave requests are local records, not external calendar bookings.`}
     />
   );
@@ -1795,12 +1749,11 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
     }, 0);
     return (
       <Stack gap={4}>
-        <OpsHeader
+        <PeopleHeader
           eyebrow="People / Scheduling / Timesheets"
           title="Review the work. Trust the hours."
           description="Every time entry stays connected to its employee, project and approval history. Decide what needs attention before it reaches Finance."
           actions={<>
-            <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Exceptions`)}>View exceptions</Button>
             <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/project/time`)}>Log project time</Button>
           </>}
           note="Hours represent recorded time, not payroll or invoices."
@@ -1910,11 +1863,10 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
     }, 0);
     return (
       <Stack gap={4}>
-        <OpsHeader
+        <PeopleHeader
           eyebrow="People / Scheduling / Availability"
           title="See the team behind the schedule."
           description="A people-first weekly view of assigned shifts, approved leave and days without a roster assignment. Review workload before making the next staffing decision."
-          actions={<Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Roster`)}>Open weekly roster</Button>}
           note={`Calendar dates reflect ${org.timezone}. No shift does not guarantee availability.`}
         />
         <OpsMetrics label="Weekly workforce availability">
@@ -2054,11 +2006,10 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
     };
     return (
       <Stack gap={4}>
-        <OpsHeader
+        <PeopleHeader
           eyebrow="People / Scheduling / Exceptions"
           title="Issues with a next action."
           description="A focused review queue for roster collisions, unlinked records and hours that still require a human decision."
-          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Roster`)}>Return to roster</Button>}
           note="One record can appear more than once if it has separate issues."
         />
         <OpsMetrics label="Scheduling exceptions overview">
@@ -2153,14 +2104,10 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
 
   return (
     <Stack gap={4}>
-      <OpsHeader
+      <PeopleHeader
         eyebrow="People / Scheduling / Roster"
         title="The week, completely in view."
         description="A clearer staffing picture with every shift, every person and every overnight assignment. Focus on a day or keep the full week in view."
-        actions={<>
-          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Availability`)}>Team availability</Button>
-          <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Timesheets`)}>Review timesheets</Button>
-        </>}
         note={`Times shown in ${org.timezone}; the saved records retain their UTC timestamps.`}
       />
       <OpsMetrics label="Week staffing summary">
@@ -2350,14 +2297,9 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
     Payslips: "Illustrative pay, not issued payslips.",
   };
   const header = (
-    <OpsHeader eyebrow={`People / Payroll / ${lens}`} title={titles[lens]}
+    <PeopleHeader eyebrow={`People / Payroll / ${lens}`} title={titles[lens]}
       description="Review locally prepared records and pay inputs without presenting simplified deductions as compliant payroll."
-      actions={<>
-        <Button variant="secondary" onClick={() => context.openOverlay("exception report")}>Inspect exceptions</Button>
-        <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/hr/employees`)}>Employee records</Button>
-      </>}
-      note="No connected tax authority, bank or payroll engine. Nothing on this page is filed or paid."
-    />
+      />
   );
   const metrics = (
     <OpsMetrics label="Payroll input and review overview">
@@ -2370,10 +2312,9 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
     </OpsMetrics>
   );
   const warning = (
-    <Notice tone="warning" title="These are estimates, not verified payroll">
-      Deductions use simplified illustrative calculations, not the current rules for {context.org.jurisdiction}.
-      Salary inputs may be missing; totals reflect current employee values, not a run-specific historical payroll snapshot.
-      No tax, pension, bank or external payroll action is performed.
+    <Notice tone="warning" title="Estimates, not verified payroll">
+      Deductions are simplified and not the current {context.org.jurisdiction} rules; totals use today's employee values, not a
+      run snapshot. No tax, pension, bank or payroll action is performed.
     </Notice>
   );
   const search = (title: string) => (
@@ -2504,9 +2445,11 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
       {header}
       {metrics}
       {warning}
-      {search("Payroll run register")}
-      <div className="ops-toolbar" role="group" aria-label="Filter payroll run states">
-        <strong className="ops-toolbar-heading">Run status</strong>
+      <div className="ops-toolbar" role="group" aria-label="Find and filter payroll runs">
+        <div className="hr-directory-search">
+          <TextInput aria-label="Search payroll records" placeholder="Search employees, runs or periods"
+            value={query} onChange={(event) => setQuery(event.target.value)} />
+        </div>
         {(["all", "draft", "approved"] as const).map((option) => <Button key={option}
           size="sm" aria-pressed={state === option} variant={state === option ? "secondary" : "ghost"}
           onClick={() => setState(option)}>{option === "all" ? "All" : option === "draft" ? "Draft" : "Approved"}</Button>)}
@@ -2540,7 +2483,7 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
 
 export function Performance({ context, lens }: { context: ScreenContext; lens: "Cycles" | "My reviews" | "Team" | "Templates" }) {
   const data = useHrData();
-  const { actor, org } = useWorkspace();
+  const { actor } = useWorkspace();
   const [query, setQuery] = useState("");
   const [reviewState, setReviewState] = useState<"all" | "draft" | "submitted" | "outstanding" | "acknowledged">("all");
   const reviews = data.reviews;
@@ -2563,11 +2506,7 @@ export function Performance({ context, lens }: { context: ScreenContext; lens: "
     Templates: "Illustrative review structures for fair, evidence-led conversations. These examples are not automatically published templates.",
   };
   const header = (
-    <OpsHeader eyebrow={`People / Performance / ${lens}`} title={titles[lens]} description={descriptions[lens]}
-      actions={<>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Open employees</Button>
-        {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Review form")}>Create a review</Button>}
-      </>}
+    <PeopleHeader eyebrow={`People / Performance / ${lens}`} title={titles[lens]} description={descriptions[lens]}
       note="Written assessments remain attributable to a human reviewer; AI output does not determine employment outcomes."
     />
   );
@@ -2753,7 +2692,7 @@ export function Performance({ context, lens }: { context: ScreenContext; lens: "
 
 export function Learning({ context, lens }: { context: ScreenContext; lens: "Courses" | "Policies" | "Compliance" | "My learning" }) {
   const data = useHrData();
-  const { org } = useWorkspace();
+  
   const [query, setQuery] = useState("");
   const [requiredOnly, setRequiredOnly] = useState(false);
   const [courseState, setCourseState] = useState<"all" | "draft" | "available">("all");
@@ -2774,11 +2713,10 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
     "My learning": "Your learning record, in context.",
   };
   const header = (
-    <OpsHeader eyebrow={`People / Learning & Policies / ${lens}`}
+    <PeopleHeader eyebrow={`People / Learning & Policies / ${lens}`}
       title={titles[lens]}
       description="Find the recorded courses, required acknowledgements and training obligations without inventing certificates or completed assessments."
       actions={<>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
         {canBuildCourses && <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button>}
       </>}
       note="Local training and policy records are not independently verified legal compliance or externally issued certification."
@@ -3129,15 +3067,12 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
         description="Confirm the applicant, dates, available evidence and your responsibility before recording a decision."
         status={<Pill tone="warning">Decision required</Pill>} />
       <PeopleDialogSection step="01" title="Request identity and dates">
-      <Row gap={3}>
-        <Avatar name={leavePerson(chosen, data.employees)} size="lg" />
-        <div className="ds-grow">
-          <h3>{leavePerson(chosen, data.employees)}</h3>
-          <p className="ds-subtle">{context.date(chosen.startAt)} – {context.date(chosen.endAt)}
-            {" · "}{days(count)} · {String(chosen.fields.type ?? "annual")}</p>
-        </div>
-        <Pill tone="warning">Requested</Pill>
-      </Row>
+      <OverlaySummary
+        avatar={<Avatar name={leavePerson(chosen, data.employees)} size="lg" />}
+        title={leavePerson(chosen, data.employees)}
+        status={<Pill tone="warning">Requested</Pill>}
+        meta={[`${context.date(chosen.startAt)} – ${context.date(chosen.endAt)}`, days(count), String(chosen.fields.type ?? "annual")]}
+      />
       <p>{chosen.summary || "No request note recorded."}</p>
       </PeopleDialogSection>
       <PeopleDialogSection step="02" title="Available balance and decision evidence" description="Check the entitlement and roster before deciding.">
@@ -3204,7 +3139,7 @@ export function PositionEditor({ context, close }: { context: ScreenContext; clo
           salaryHighMinor: Math.round(Number(high) * 100), openings: 1,
         };
         if (existing) {
-          await context.mutate.patch(existing.id, { title, summary, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Job spec updated for ${title}` });
+          if (!(await context.mutate.patch(existing.id, { title, summary, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Job spec updated for ${title}` }))) return;
         } else {
           await context.mutate.create({ collection: "positions", title, status: "open", summary, fields }, `Position opened: ${title}`);
         }
@@ -3234,26 +3169,75 @@ export function PositionEditor({ context, close }: { context: ScreenContext; clo
   );
 }
 
+/** The candidate drawer on the recruitment board: who, where they stand, and the way into the full record. */
 export function CandidateProfileOverlay({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const applicant = useRecord(payload?.id ?? context.selectedId);
-  const [rating, setRating] = useState("3");
-  const [evidence, setEvidence] = useState("");
-  if (!applicant) return <Empty title="Select a candidate" icon={<Users size={20} />} />;
+  const found = useRecord(payload?.id ?? context.selectedId);
+  const applicant = scopedDetailRecord(found, context.org.id, "applicants");
+  if (!applicant) return <Empty title="Select a candidate" icon={<Users size={20} />}>Choose a candidate on the board first. None is substituted.</Empty>;
+  const rating = Number(applicant.fields.rating ?? 0);
+  const stage = String(applicant.fields.stage ?? applicant.status);
   return (
     <Stack gap={4}>
-      <Row gap={3}><Avatar name={applicant.title} size="lg" /><div><h3>{applicant.title}</h3><p className="ds-subtle">{String(applicant.fields.role ?? "")}</p></div></Row>
-      <p>{applicant.summary}</p>
+      <OverlaySummary
+        avatar={<Avatar name={applicant.title} size="lg" />}
+        title={applicant.title}
+        status={<Pill tone="info" dot>{stage}</Pill>}
+        meta={[String(applicant.fields.role ?? "") || null]}
+      />
+      <FactGrid columns={3} dense items={[
+        { label: "Applied", value: context.date(applicant.at ?? applicant.createdAt), mono: true },
+        { label: "Source", value: String(applicant.fields.source ?? "—") },
+        { label: "Rating", value: rating > 0 ? `${rating} of 5` : "Not scored", mono: rating > 0 },
+      ]} />
+      {applicant.summary && <OverlaySection title="Job-relevant summary"><p>{applicant.summary}</p></OverlaySection>}
+      <Notice tone="info" title="Decided by a person">Nothing ranks candidates automatically. Scores and stage moves are saved against the person who made them.</Notice>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/hr/candidates/${applicant.id}`)}>Open the full profile</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
+    </Stack>
+  );
+}
+
+/** The interviewer scorecard: one score against the role, with the evidence behind it. */
+export function ScorecardOverlay({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const found = useRecord(payload?.id ?? context.selectedId);
+  const applicant = scopedDetailRecord(found, context.org.id, "applicants");
+  const [rating, setRating] = useState("3");
+  const [evidence, setEvidence] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!applicant) return <Empty title="Select a candidate" icon={<Users size={20} />}>Open a candidate first. No scorecard is recorded against a guess.</Empty>;
+  const prior = Number(applicant.fields.rating ?? 0);
+  return (
+    <Stack gap={4}>
+      <DrawerUnsavedChanges when={Boolean(evidence.trim()) || rating !== "3"} />
+      <DrawerInFlight when={busy} />
+      <OverlaySummary
+        avatar={<Avatar name={applicant.title} size="lg" />}
+        eyebrow="Scorecard for"
+        title={applicant.title}
+        meta={[String(applicant.fields.role ?? "") || null, prior > 0 ? `Currently ${prior} of 5` : "Not scored yet"]}
+      />
       <form
         id="hr-scorecard"
         className="ds-stack ds-gap-3"
         onSubmit={async (event) => {
           event.preventDefault();
-          await context.mutate.patch(applicant.id, {
-            summary: evidence ? `${applicant.summary} Scorecard: ${evidence}` : applicant.summary,
-            fields: { ...applicant.fields, rating: Number(rating) },
-          }, { expectRevision: applicant.revision, event: `Scorecard recorded for ${applicant.title} by ${context.actor}` });
-          context.toast("Scorecard recorded", `${applicant.title} is scored ${rating} of 5 by ${context.actor}.`);
+          if (busy) return;
+          setBusy(true);
+          try {
+            const saved = await context.mutate.patch(applicant.id, {
+              summary: evidence ? `${applicant.summary} Scorecard: ${evidence}` : applicant.summary,
+              fields: { ...applicant.fields, rating: Number(rating) },
+            }, { expectRevision: applicant.revision, event: `Scorecard recorded for ${applicant.title} by ${context.actor}` });
+            if (!saved) return;
+            context.toast("Scorecard recorded", `${applicant.title} is scored ${rating} of 5 by ${context.actor}.`);
+            context.closeOverlay();
+          } finally { setBusy(false); }
         }}
       >
         <Field label="Overall, against the role requirements">
@@ -3262,13 +3246,18 @@ export function CandidateProfileOverlay({ context }: { context: ScreenContext })
           </Select>
         </Field>
         <Field label="Evidence" hint="What the candidate said or did. Not an impression.">
-          <TextArea value={evidence} onChange={(event) => setEvidence(event.target.value)} rows={3} />
+          <TextArea value={evidence} onChange={(event) => setEvidence(event.target.value)} rows={4} />
         </Field>
-        <Button type="submit" variant="primary">Record scorecard</Button>
       </form>
       <Notice tone="info" title="Scored by a person, attributed to a person">
         The score is saved against {context.actor} on the candidate record. Nothing ranks candidates automatically.
       </Notice>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" type="submit" form="hr-scorecard">Record the scorecard</Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -3318,52 +3307,60 @@ export function PayrollReview({ context }: { context: ScreenContext }) {
   const recordedPeople = run.fields.people;
   const currentDifferent = hasRecordedGross && Number(recordedGross) !== estimatedGross;
 
+  const approved = run.status === "approved";
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Saved run and current payroll estimate are different records">
-        The approved or draft run details below are saved against {run.title}. The employee table is
-        calculated from today's personnel records and must not be treated as that historical run's
-        payslips, deduction schedule or payment instruction.
-      </Notice>
-      <Properties rows={[
-        { label: "Payroll run", value: run.title },
-        { label: "Recorded period", value: String(run.fields.period ?? "Not recorded") },
-        { label: "Recorded status", value: <Pill tone={run.status === "approved" ? "success" : "warning"}>{run.status}</Pill> },
-        { label: "Saved gross amount", value: hasRecordedGross ? context.money(Number(recordedGross)) : "Not recorded" },
-        { label: "Saved run value", value: run.amountMinor === undefined ? "Not recorded" : context.money(run.amountMinor) },
-        { label: "Recorded people", value: recordedPeople === undefined ? "Not recorded" : String(recordedPeople) },
-        { label: "Saved approval", value: run.fields.approvedAt
-          ? `${String(run.fields.approvedBy ?? "Unknown reviewer")} · ${context.dateTime(String(run.fields.approvedAt))}`
-          : "No approval recorded" },
-      ]} />
-      {currentDifferent && <Notice tone="warning" title="Current estimates differ from the saved run">
-        The current gross estimate ({context.money(estimatedGross)}) is different from the
-        saved gross amount ({context.money(Number(recordedGross))}). Check the saved run's
-        preparation evidence before making a payroll decision.
-      </Notice>}
-      <Properties rows={[
-        { label: "Current payroll estimate — people", value: String(lines.length) },
-        { label: "Current payroll estimate — gross", value: context.money(estimatedGross) },
-        { label: "Current payroll estimate — net", value: context.money(estimatedNet) },
-        { label: "Employees missing salary inputs", value: String(missing.length) },
-      ]} />
-      <DataGrid
-        rows={lines}
-        rowId={row => row.employeeId}
-        label="Illustrative current employee salary breakdown"
-        filterable={false}
-        columns={[
-          { key: "name", header: "Person", primary: true, cell: row => row.name },
-          { key: "gross", header: "Current gross estimate", align: "end", cell: row => <span className="ds-num">{context.money(row.grossMinor)}</span> },
-          { key: "net", header: "Current net estimate", align: "end", cell: row => <span className="ds-num">{context.money(row.netMinor)}</span> },
-        ]}
+      <OverlaySummary
+        eyebrow="Payroll run"
+        title={run.title}
+        status={<Pill tone={approved ? "success" : "warning"} dot>{approved ? "Approved locally" : "Draft"}</Pill>}
+        meta={[String(run.fields.period ?? "") ? `Period ${String(run.fields.period)}` : null]}
       />
+      <OverlaySection title="Saved against this run" hint="What was recorded when the run was prepared">
+        <FactGrid columns={3} items={[
+          { label: "Gross", value: hasRecordedGross ? context.money(Number(recordedGross)) : "Not recorded", mono: true },
+          { label: "Run value", value: run.amountMinor === undefined ? "Not recorded" : context.money(run.amountMinor), mono: true },
+          { label: "People", value: recordedPeople === undefined ? "Not recorded" : String(recordedPeople), mono: true },
+          { label: "Local approval", value: run.fields.approvedAt
+            ? `${String(run.fields.approvedBy ?? "Unknown reviewer")}, ${context.dateTime(String(run.fields.approvedAt))}`
+            : "No approval recorded", tone: run.fields.approvedAt ? "success" : undefined },
+        ]} />
+      </OverlaySection>
+      {currentDifferent && <Notice tone="warning" title="Today's estimate differs from the saved run">
+        Estimated gross {context.money(estimatedGross)} against saved {context.money(Number(recordedGross))}. Check the run's
+        preparation evidence before deciding.
+      </Notice>}
+      <OverlaySection title="Today's estimate" hint="Calculated from current personnel records, not this run's payslips">
+        <FactGrid columns={4} dense items={[
+          { label: "People", value: String(lines.length), mono: true },
+          { label: "Gross", value: context.money(estimatedGross), mono: true },
+          { label: "Net", value: context.money(estimatedNet), mono: true },
+          { label: "No salary input", value: String(missing.length), mono: true, tone: missing.length ? "warning" : undefined },
+        ]} />
+        <DataGrid
+          rows={lines}
+          rowId={row => row.employeeId}
+          label="Illustrative current employee salary breakdown"
+          filterable={false}
+          columns={[
+            { key: "name", header: "Person", primary: true, cell: row => row.name },
+            { key: "gross", header: "Gross", align: "end", cell: row => <span className="ds-num">{context.money(row.grossMinor)}</span> },
+            { key: "net", header: "Net", align: "end", cell: row => <span className="ds-num">{context.money(row.netMinor)}</span> },
+          ]}
+        />
+      </OverlaySection>
       <Notice tone="warning" title="Estimates are not payroll certification">
-        Calculations use current salaries and exclude {missing.length} employee(s) with invalid
-        or missing salary inputs. The illustrative deductions do not implement the current
-        payroll rules for {context.org.jurisdiction}. Nothing here files taxes, issues payslips
-        or transfers wages. Verify the saved run and external payroll system separately.
+        Deductions are simplified and exclude {missing.length} {missing.length === 1 ? "person" : "people"} with missing salary inputs;
+        they do not implement current {context.org.jurisdiction} rules. Nothing here files taxes, issues payslips or moves money.
       </Notice>
+      <DrawerActions>
+        <OverlayActions
+          primary={!approved && context.can("view_payroll")
+            ? <Button variant="primary" onClick={() => context.openOverlay("submission signoff", { id: run.id })}>Review sign-off</Button>
+            : <OverlayCancel>Close</OverlayCancel>}
+          secondary={!approved && context.can("view_payroll") ? <OverlayCancel>Close</OverlayCancel> : undefined}
+        />
+      </DrawerActions>
     </Stack>
   );
 }

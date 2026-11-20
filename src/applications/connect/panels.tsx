@@ -3,10 +3,7 @@ import { useLocation } from "react-router-dom";
 import {
   Activity, Plug, RefreshCcw, Search, ShieldAlert, ShieldCheck, Webhook, X,
 } from "lucide-react";
-import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
-  Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
-} from "@/design-system";
+import { Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Notice, OverlaySection, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollectionState, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
@@ -39,7 +36,8 @@ export function openConnector(context: ScreenContext, records: Rec[], entry: Con
 
 export function useConnector(context: ScreenContext): { records: Rec[]; record?: Rec; entry?: ConnectorEntry } {
   const records = useCollection("connectors");
-  const routeId = context.params.id;
+  const payloadId = (context.overlayPayload as { id?: unknown } | undefined)?.id;
+  const routeId = context.params.id ?? (typeof payloadId === "string" ? payloadId : undefined) ?? context.selectedId;
   // An explicit connection URL never substitutes another connector's record.
   const record = routeId ? records.find(item => item.id === routeId) : records[0];
   const entry = useMemo(() => {
@@ -84,9 +82,7 @@ export function Marketplace({ context, lens }: { context: ScreenContext; lens: "
   const marketplaceOverview = <section className="connect-marketplace-overview" aria-label="Integration catalogue overview">
     <div className="connect-marketplace-head">
       <div>
-        <span className="connect-eyebrow">PLATFORM / INTEGRATIONS</span>
-        <h2>Connect the tools your work depends on.</h2>
-        <p>Discover software that fits your business, then review secure connection requirements. Existing local capabilities remain available while providers are set up.</p>
+        <p>Review what each provider would need before anything is connected. Local capabilities keep working meanwhile.</p>
       </div>
       <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>View connections</Button>
     </div>
@@ -210,29 +206,26 @@ export function ConnectorPreview({ context }: { context: ScreenContext }) {
   const entry = entryById(chosen) ?? CONNECTOR_ENTRIES[0];
   const authorisationPath = connectorPath(context.org.slug, records, entry, "connect");
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       <Field label="Connector" htmlFor="preview-connector">
         <Select id="preview-connector" value={entry.capability.id} onChange={(event) => setChosen(event.target.value)}>
           {CONNECTOR_ENTRIES.map((item) => <option key={item.capability.id} value={item.capability.id}>{item.capability.label}</option>)}
         </Select>
       </Field>
-      <Properties rows={[
-        { label: "Capability", value: entry.capability.label },
+      <FactGrid columns={3} items={[
         { label: "Provider", value: entry.capability.provider },
         { label: "State", value: <StateCell entry={entry} /> },
-        { label: "Contract", value: <span className="ds-num">{entry.version}</span> },
+        { label: "Contract", value: entry.version, mono: true },
       ]} />
-      <h4>Scopes it would request</h4>
-      <Stack gap={2}>
-        {entry.scopes.map((scope) => (
-          <Row key={scope.name} gap={2}>
-            <code className="ds-grow">{scope.name}</code>
-            <Pill tone={scope.kind === "write" ? "warning" : "neutral"}>{scope.kind}</Pill>
-          </Row>
-        ))}
-        {entry.scopes.length === 0 && <span className="ds-subtle">No scope model is published for this capability.</span>}
-      </Stack>
-      <Notice tone="warning" title="What happens instead">{entry.capability.localEquivalent}</Notice>
+      <OverlaySection title="Scopes it would request" hint="Read scopes look; write scopes change things at the provider.">
+        {entry.scopes.length === 0 ? <span className="ds-subtle">No scope model is published for this capability.</span> : (
+          <KeyValueList items={entry.scopes.map((scope) => ({
+            label: <code>{scope.name}</code>,
+            value: <Pill tone={scope.kind === "write" ? "warning" : "neutral"}>{scope.kind}</Pill>,
+          }))} />
+        )}
+      </OverlaySection>
+      <OverlaySection title="What happens instead" tone="warning">{entry.capability.localEquivalent}</OverlaySection>
       {authorisationPath ? (
         <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(authorisationPath); }}>
           Open the authorisation flow
@@ -249,22 +242,22 @@ export function ConnectorPreview({ context }: { context: ScreenContext }) {
 export function RiskSummary({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const entry = entryById(payload?.id ?? "") ?? CONNECTOR_ENTRIES[0];
+  const writes = entry.scopes.filter((scope) => scope.kind === "write").length;
   return (
-    <Stack gap={3}>
-      <Properties rows={[
+    <Stack gap={4}>
+      <FactGrid columns={3} items={[
+        { label: "Connector", value: entry.capability.label },
         { label: "Risk", value: <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level}</Pill> },
-        { label: "Write scopes", value: <span className="ds-num">{String(entry.scopes.filter((scope) => scope.kind === "write").length)}</span> },
+        { label: "Write scopes", value: String(writes), mono: true },
       ]} />
       <p className="ds-prose">{entry.risk.note}</p>
-      <h4>Claims this directory does not repeat</h4>
-      {entry.unverified.length === 0 ? <span className="ds-subtle">None recorded.</span> : (
-        <Stack gap={1}>
-          {entry.unverified.map((claim) => <Row key={claim} gap={2}><span className="ds-grow">{claim}</span><Pill tone="warning">unverified</Pill></Row>)}
-        </Stack>
-      )}
-      <Notice tone="info" title="A provider's own claim is not a supported feature">
-        Only the operations listed in the capability contract are described as supported. Marketing claims are shown as claims.
-      </Notice>
+      <OverlaySection title="Claims this directory does not repeat" hint="A provider's own claim is not a supported feature; only the contract's operations are described as supported.">
+        {entry.unverified.length === 0 ? <span className="ds-subtle">None recorded.</span> : (
+          <Stack gap={1}>
+            {entry.unverified.map((claim) => <Row key={claim} gap={2}><span className="ds-grow">{claim}</span><Pill tone="warning">unverified</Pill></Row>)}
+          </Stack>
+        )}
+      </OverlaySection>
     </Stack>
   );
 }
@@ -280,27 +273,19 @@ export function ConnectorDetail({ context, lens }: { context: ScreenContext; len
   if (!entry) return <Empty title="No connector" icon={<Plug size={20} />}>
     This connector does not exist in the catalogue or this company's connection records.
   </Empty>;
+  const reads = entry.scopes.filter(scope => scope.kind === "read").length;
   return <Stack gap={4}>
-    <section className="connect-connector-overview" aria-label="Connector details overview">
-      <div className="connect-connector-head">
-        <div>
-          <span className="connect-eyebrow">INTEGRATIONS / {entry.category.toUpperCase()}</span>
-          <h2>{entry.capability.label}</h2>
-          <p>{entry.capability.provider} · {entry.capability.note}</p>
-        </div>
-        <StateCell entry={entry} />
-      </div>
-      <div className="connect-connector-metrics" aria-label="Connector scope summary">
-        <div><span>Read permissions</span><strong>{entry.scopes.filter(scope => scope.kind === "read").length}</strong></div>
-        <div><span>Proposed write permissions</span><strong>{entry.scopes.filter(scope => scope.kind === "write").length}</strong></div>
-        <div><span>Operations</span><strong>{entry.operations.length}</strong></div>
-        <div><span>External grants</span><strong>0</strong></div>
-      </div>
-      <div className="connect-connector-actions">
-        <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review permissions</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace`)}>All integrations</Button>
-        <Button size="sm" variant="primary" onClick={() => openConnector(context, records, entry, "connect")}>Connection requirements</Button>
-      </div>
+    <section className="connect-band" aria-label="Connector details overview">
+      <ul className="connect-band-counts" aria-label="Connector scope summary">
+        <li><strong>{reads}</strong> read permissions</li>
+        <li><strong>{entry.scopes.length - reads}</strong> proposed write</li>
+        <li><strong>{entry.operations.length}</strong> operations</li>
+        <li><strong>0</strong> external grants</li>
+      </ul>
+      <Row gap={2} wrap>
+        <Button size="sm" variant="ghost" onClick={() => context.setTab("Permissions")}>Review permissions</Button>
+        <Button size="sm" variant="secondary" onClick={() => openConnector(context, records, entry, "connect")}>Connection requirements</Button>
+      </Row>
     </section>
     <ConnectorDetailBody context={context} lens={lens} entry={entry} records={records} />
   </Stack>;
@@ -371,7 +356,7 @@ function ConnectorDetailBody({ context, lens, entry, records }: { context: Scree
   if (lens === "Versions") {
     return (
       <Stack gap={4}>
-        <Properties rows={[
+        <KeyValueList items={[
           { label: "Contract", value: <span className="ds-num">{entry.version}</span> },
           { label: "Operations", value: <span className="ds-num">{String(entry.operations.length)}</span> },
           { label: "State", value: <StateCell entry={entry} /> },
@@ -416,7 +401,7 @@ function ConnectorDetailBody({ context, lens, entry, records }: { context: Scree
         actions={<StateCell entry={entry} />}>
         <Stack gap={3}>
           <p className="ds-prose">{entry.capability.note}</p>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Actions it would perform", value: entry.operations.filter((operation) => operation.direction === "action").map((operation) => operation.name).join(", ") || "None" },
             { label: "Reads it would make", value: entry.operations.filter((operation) => operation.direction === "read").map((operation) => operation.name).join(", ") || "None" },
             { label: "Events it would receive", value: entry.operations.filter((operation) => operation.direction === "webhook").map((operation) => operation.name).join(", ") || "None" },
@@ -451,20 +436,13 @@ export function ConnectionWizard({ context, lens }: { context: ScreenContext; le
   const steps = authorisationSteps(entry);
 
   return (
-    <Stack gap={5}>
-      <section className="connect-connector-overview" aria-label="Connector authorisation overview">
-        <div className="connect-connector-head">
-          <div>
-            <span className="connect-eyebrow">INTEGRATIONS / AUTHORISATION PREVIEW</span>
-            <h2>{entry.capability.label}</h2>
-            <p>Review the account, permission requests and verification requirements. A provider redirect and callback are not available in this browser.</p>
-          </div>
-          <StateCell entry={entry} />
-        </div>
-        <div className="connect-connector-actions">
-          <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review scopes</Button>
-          <Button size="sm" variant="ghost" onClick={() => openConnector(context, records, entry, "marketplace")}>Connector details</Button>
-        </div>
+    <Stack gap={4}>
+      <section className="connect-band" aria-label="Connector authorisation overview">
+        <p className="connect-band-note">A provider redirect and callback are not available in this browser.</p>
+        <Row gap={2} wrap>
+          <Button size="sm" variant="ghost" onClick={() => context.setTab("Permissions")}>Review scopes</Button>
+          <Button size="sm" variant="secondary" onClick={() => openConnector(context, records, entry, "marketplace")}>Connector details</Button>
+        </Row>
       </section>
       <ul className="t6-steps">
         {steps.slice(0, 4).map((step) => (
@@ -478,7 +456,7 @@ export function ConnectionWizard({ context, lens }: { context: ScreenContext; le
         <Grid>
           <Card span={7} eyebrow="STEP 1" prov="human" title="Which provider" subtitle={entry.capability.provider}>
             <Stack gap={3}>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Capability", value: entry.capability.label },
                 { label: "Contract", value: <span className="ds-num">{entry.version}</span> },
                 { label: "State", value: <StateCell entry={entry} /> },
@@ -576,7 +554,7 @@ export function ConnectionWizard({ context, lens }: { context: ScreenContext; le
         <Grid>
           <Card span={7} eyebrow="STEP 4" prov="unknown" title="Nothing to confirm" subtitle="The honest end of this flow">
             <Stack gap={3}>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Grant", value: <Pill tone="danger">none</Pill> },
                 { label: "Token stored", value: <Pill tone="danger">none</Pill> },
                 { label: "State after the attempt", value: <StateCell entry={entry} /> },
@@ -604,16 +582,18 @@ export function ExternalOAuth({ context }: { context: ScreenContext }) {
   const { entry } = useConnector(context);
   if (!entry) return null;
   return (
-    <Stack gap={3}>
-      <Notice tone="danger" title="This workspace will not open a sign-in page">
-        An authorisation sends you to a page the provider controls and expects a callback to an address this workspace does not have. Opening a window that cannot come back would be theatre.
+    <Stack gap={4}>
+      <Notice tone="danger" title="No sign-in page will open">
+        Authorisation hands you to a page the provider controls and expects a callback this workspace cannot receive. A window that cannot come back would be theatre, so none is opened and nothing is marked connected.
       </Notice>
-      <Properties rows={[
-        { label: "Provider", value: entry.capability.provider },
+      <FactGrid columns={3} items={[
         { label: "Redirect address", value: <Pill tone="danger">none exists</Pill> },
         { label: "Callback receiver", value: <Pill tone="danger">none exists</Pill> },
-        { label: "Result", value: "The flow stops here, deliberately" },
+        { label: "Grant", value: <Pill tone="danger">none</Pill> },
       ]} />
+      <OverlaySection title="When this can work" hint="Only with a verified backend.">
+        A connection counts as made when the provider returns a grant through a server that holds the credential, and one real read succeeds. Until then this stays {entry.capability.provider}, not connected.
+      </OverlaySection>
       <Button variant="secondary" onClick={() => { context.closeOverlay(); context.setTab("Test"); }}>See exactly where it stops</Button>
     </Stack>
   );
@@ -622,24 +602,27 @@ export function ExternalOAuth({ context }: { context: ScreenContext }) {
 export function ScopeReview({ context }: { context: ScreenContext }) {
   const { entry } = useConnector(context);
   if (!entry) return null;
+  const reads = entry.scopes.filter((scope) => scope.kind === "read");
+  const writes = entry.scopes.filter((scope) => scope.kind === "write");
+  const row = (scope: (typeof entry.scopes)[number]) => (
+    <Row key={scope.name} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+      <div className="ds-grow">
+        <code>{scope.name}</code>
+        <p className="ds-subtle">{scope.purpose}</p>
+      </div>
+      <Checkbox label={scope.kind === "read" ? "Request" : "Request (write)"} defaultChecked={scope.kind === "read"} />
+    </Row>
+  );
   return (
-    <Stack gap={3}>
-      <p className="ds-prose">Least privilege means asking for the read scopes and adding a write scope only when a mission genuinely performs an action.</p>
-      <Stack gap={2}>
-        {entry.scopes.map((scope) => (
-          <Row key={scope.name} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <div className="ds-grow">
-              <code>{scope.name}</code>
-              <p className="ds-subtle">{scope.purpose}</p>
-            </div>
-            <Pill tone={scope.kind === "write" ? "warning" : "neutral"}>{scope.kind}</Pill>
-            <Checkbox label={scope.kind === "read" ? "Request" : "Request (write)"} defaultChecked={scope.kind === "read"} />
-          </Row>
-        ))}
-        {entry.scopes.length === 0 && <span className="ds-subtle">No scope model is published.</span>}
-      </Stack>
+    <Stack gap={4}>
+      <OverlaySection title={`Read scopes · ${reads.length}`} hint="Enough for most of what a mission needs.">
+        <Stack gap={2}>{reads.map(row)}{reads.length === 0 && <span className="ds-subtle">No read scope is published.</span>}</Stack>
+      </OverlaySection>
+      <OverlaySection title={`Write scopes · ${writes.length}`} tone={writes.length ? "warning" : "neutral"} hint="Add one only when a mission performs an action at the provider.">
+        <Stack gap={2}>{writes.map(row)}{writes.length === 0 && <span className="ds-subtle">This capability proposes no write scope.</span>}</Stack>
+      </OverlaySection>
       <Notice tone="info" title="The choice is recorded, not sent">
-        Nothing is requested, because nothing is reached. The selection is here so the decision can be made before a provider ever exists.
+        Nothing is requested, because no provider is reached. The selection lets the decision be made before one exists.
       </Notice>
     </Stack>
   );
@@ -651,25 +634,24 @@ export function ConsentStatus({ context }: { context: ScreenContext }) {
   if (!entry) return null;
   const attempts = events.filter((event) => event.message.includes(entry.capability.label));
   return (
-    <Stack gap={3}>
-      <Properties rows={[
+    <Stack gap={4}>
+      <FactGrid columns={3} items={[
         { label: "Consent", value: <Pill tone="danger">never given</Pill> },
-        { label: "Attempts recorded", value: <span className="ds-num">{String(attempts.length)}</span> },
-        { label: "Last attempt", value: attempts[0] ? <span className="ds-num">{context.dateTime(attempts[0].at)}</span> : "None" },
+        { label: "Attempts recorded", value: String(attempts.length), mono: true },
+        { label: "Last attempt", value: attempts[0] ? context.dateTime(attempts[0].at) : "None", mono: Boolean(attempts[0]) },
       ]} />
       {attempts.length > 0 && (
-        <Stack gap={2}>
-          {attempts.slice(0, 5).map((event) => (
-            <div key={event.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-              <strong style={{ fontSize: "var(--text-sm)" }}>{event.message}</strong>
-              <div className="ds-subtle ds-num">{context.dateTime(event.at)} · {event.actor}</div>
-            </div>
-          ))}
-        </Stack>
+        <OverlaySection title="Attempts" hint="Failures are kept so no later reader assumes a connection existed.">
+          <Stack gap={2}>
+            {attempts.slice(0, 5).map((event) => (
+              <div key={event.id} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+                <strong style={{ fontSize: "var(--text-sm)" }}>{event.message}</strong>
+                <div className="ds-subtle ds-num">{context.dateTime(event.at)} · {event.actor}</div>
+              </div>
+            ))}
+          </Stack>
+        </OverlaySection>
       )}
-      <Notice tone="info" title="An attempt is kept even though it failed">
-        Keeping the failures is what stops a later reader assuming a connection existed.
-      </Notice>
     </Stack>
   );
 }
@@ -693,21 +675,15 @@ export function Connections({ context, lens }: { context: ScreenContext; lens: "
       entry?.capability.label ?? "", entry?.capability.provider ?? ""]
       .join(" ").toLocaleLowerCase().includes(needle);
   });
-  const overview = <section className="connect-connections-overview" aria-label="Connection management overview">
-    <div className="connect-connections-head">
-      <div>
-        <span className="connect-eyebrow">INTEGRATIONS / CONNECTIONS</span>
-        <h2>Know what is connected — and what isn't.</h2>
-        <p>Manage local connector requests, inspect access requirements and see their recorded state without implying an external grant exists.</p>
-      </div>
-      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/connect/marketplace`)}>Browse integrations</Button>
-    </div>
-    <div className="connect-connections-metrics" aria-label="Connection status summary">
-      <div><span>Connector records</span><strong>{records.length}</strong></div>
-      <div><span>Pending setup</span><strong>{active.length}</strong></div>
-      <div><span>Disabled</span><strong>{records.length - active.length}</strong></div>
-      <div><span>Local verified connections</span><strong>0</strong></div>
-    </div>
+  const overview = <section aria-label="Connection management overview">
+    <section aria-label="Connection status summary">
+      <StatRow>
+        <Stat label="Connector records" value={String(records.length)} meta="Requests recorded in this workspace" />
+        <Stat label="Pending setup" value={String(active.length)} meta="Not yet authorised by a provider" />
+        <Stat label="Disabled" value={String(records.length - active.length)} />
+        <Stat label="Verified connections" value="0" meta="Needs a provider grant and one real read" />
+      </StatRow>
+    </section>
   </section>;
 
   return <Stack gap={4}>
@@ -812,7 +788,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
       <MappingPanel key={record.id} context={context} record={record} capabilityId={capabilityIdOf(record, entry.capability.id)} capabilityState={entry.capability.state} />
       <Grid>
         <Card span={7} eyebrow="SYNC" prov="unknown" title="Ingestion" subtitle="Nothing to ingest">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Cursor", value: <Pill tone="warning">none</Pill> },
             { label: "Last run", value: <Pill tone="warning">never</Pill> },
             { label: "Lag", value: <Pill tone="warning">unavailable</Pill> },
@@ -864,7 +840,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
             <Notice tone="danger" title="This screen does not generate credentials">
               A key generated in a browser would be stored in IndexedDB in plain text and would not be accepted by any provider. Showing a convincing string would be worse than showing none, so there is no generate button.
             </Notice>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Keys held", value: <span className="ds-num">0</span> },
               { label: "Keys generated here", value: <span className="ds-num">0</span> },
               { label: "Where a key belongs", value: "An encrypted store on a server, issued by the provider" },
@@ -873,7 +849,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
         </Card>
         <Card span={6} eyebrow="GRANT" prov="unknown" title="Authorisation" subtitle="What would be held once one existed">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Grant", value: <Pill tone="danger">none</Pill> },
               { label: "Scopes", value: <span className="ds-num">{`0 of ${entry.scopes.length}`}</span> },
               { label: "Rotation", value: "Provider-issued, rotated by the provider" },
@@ -883,7 +859,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
           </Stack>
         </Card>
         <Card span={12} eyebrow="RECORD" prov="human" title="Freshness of this record">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Record updated", value: <span className="ds-num">{context.dateTime(record.updatedAt)}</span> },
             { label: "Age", value: <span className="ds-num">{`${freshness(record.updatedAt, now).days} days`}</span> },
             { label: "Revision", value: <span className="ds-num">{String(record.revision)}</span> },
@@ -895,8 +871,8 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
 
   return (
     <Grid>
-      <Card span={7} eyebrow="CONNECTION" prov="unknown" title={record.title} subtitle={entry.capability.provider} actions={<StateCell entry={entry} />}>
-        <Properties rows={[
+      <Card span={7} prov="unknown" title="Account and authorisation">
+        <KeyValueList items={[
           { label: "Setup state", value: <Row gap={2} wrap><ConnectionStatePill state={connectionState(record, entry.capability.state, entry.capability.id)} /><Button size="sm" variant="ghost" onClick={() => context.setTab("Sync")}>Edit the data mapping</Button></Row> },
           { label: "Account identity", value: <Pill tone="warning">no account linked</Pill> },
           { label: "Capability", value: entry.capability.label },
@@ -911,7 +887,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
           <Notice tone="warning" title="A stale authorisation is never used">
             If a grant existed and had expired, every queued mission step would stop rather than retry with it. With no grant at all, the same rule means nothing is queued.
           </Notice>
-          <Button variant="secondary" onClick={() => context.openOverlay("reconnect dialog")}>Try to reconnect</Button>
+          <Button variant="secondary" onClick={() => context.openOverlay("reconnect dialog")}>Set up the connection</Button>
         </Stack>
       </Card>
     </Grid>
@@ -985,19 +961,20 @@ export function CapabilityInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const entry = entryById(payload?.id ?? "") ?? CONNECTOR_ENTRIES[0];
   return (
-    <Stack gap={3}>
-      <Properties rows={[
+    <Stack gap={4}>
+      <FactGrid columns={3} items={[
         { label: "Capability", value: entry.capability.label },
-        { label: "Contract", value: <span className="ds-num">{entry.version}</span> },
+        { label: "Contract", value: entry.version, mono: true },
         { label: "State", value: <StateCell entry={entry} /> },
       ]} />
-      <h4>Schema</h4>
+      <OverlaySection title="Schema" flush>
       <pre className="t6-code">{JSON.stringify({
         capability: entry.capability.id,
         version: entry.version,
         operations: entry.operations.map((operation) => ({ name: operation.name, kind: operation.direction })),
         scopes: entry.scopes.map((scope) => ({ name: scope.name, kind: scope.kind })),
       }, null, 2)}</pre>
+      </OverlaySection>
       <Notice tone="info" title="A mission chooses by semantics">
         An agent asks for <code>{entry.operations[0]?.name ?? "an operation"}</code> rather than for a provider, so swapping the provider behind it does not rewrite the mission.
       </Notice>
@@ -1023,9 +1000,7 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
   const overview = <section className="connect-sync-overview" aria-label="Synchronisation overview">
     <div className="connect-sync-head">
       <div>
-        <span className="connect-eyebrow">INTEGRATIONS / SYNCHRONISATION</span>
-        <h2>Understand every movement of data.</h2>
-        <p>Review potential sources, conflicts, schedules and field mappings. No provider ingestion or background jobs are running.</p>
+        <p>No provider ingestion or background job is running; mappings and rules are written before a first sync.</p>
       </div>
       <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Connection records</Button>
     </div>
@@ -1094,7 +1069,7 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
         <Grid>
           <Card span={7} eyebrow="SCHEDULES" prov="unknown" title="Nothing is scheduled" subtitle="A schedule without a connected source would only produce empty runs">
             <Stack gap={3}>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Jobs scheduled", value: <span className="ds-num">0</span> },
                 { label: "Next run", value: <Pill tone="warning">none</Pill> },
                 { label: "Cadence", value: "Not configured — depends on provider rate limits" },
@@ -1218,9 +1193,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
   const overview = <section className="connect-health-overview" aria-label="Connector health overview">
     <div className="connect-health-head">
       <div>
-        <span className="connect-eyebrow">INTEGRATIONS / RELIABILITY</span>
-        <h2>Separate local readiness from provider health.</h2>
-        <p>Review checks, incidents, proposed limits and contract versions. External availability cannot be measured without an authorised connection.</p>
+        <p>Two checks run here. Provider availability cannot be measured without an authorised connection.</p>
       </div>
       <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Review connections</Button>
     </div>
@@ -1343,7 +1316,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
         </Card>
         <Card span={5} eyebrow="ORIGIN" prov="human" title="Ours or theirs" subtitle="The distinction a status page would blur">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Our problem", value: "No grant has been obtained" },
               { label: "Their problem", value: <Pill tone="neutral">unknown — not contacted</Pill> },
               { label: "Repairable here", value: <Pill tone="warning">no</Pill> },
@@ -1495,8 +1468,6 @@ export function ActionReceipts({ context, lens }: { context: ScreenContext; lens
       <section className="connect-receipts-overview" aria-label="Action receipt overview">
         <div className="connect-receipts-head">
           <div>
-            <span className="connect-eyebrow">INTEGRATIONS / AUDIT RECEIPTS</span>
-            <h2>Trace every request at the provider boundary.</h2>
             <p>Review which actions were attempted, blocked or confirmed. A local log entry is not proof that an external provider completed an operation.</p>
           </div>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/connect/sync`)}>Synchronisation</Button>
@@ -1567,15 +1538,14 @@ export function ReceiptDetail({ context }: { context: ScreenContext }) {
     : undefined;
   if (!event) return <Empty title="No receipt selected" icon={<Activity size={20} />} />;
   return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "When", value: <span className="ds-num">{context.dateTime(event.at)}</span> },
+    <Stack gap={4}>
+      <FactGrid columns={2} items={[
+        { label: "When", value: context.dateTime(event.at), mono: true },
         { label: "Actor", value: event.actor },
-        { label: "Screen", value: event.screenId ?? "—" },
         { label: "Outcome", value: <Pill tone={CAPABILITY_TONE[event.capability ?? "not_connected"]} dot>{CAPABILITY_LABELS[event.capability ?? "not_connected"]}</Pill> },
         { label: "Provider evidence", value: <Pill tone="danger">none</Pill> },
       ]} />
-      <p className="ds-prose">{event.message}</p>
+      <OverlaySection title="What was recorded" hint={event.screenId ? `From ${event.screenId}` : undefined}>{event.message}</OverlaySection>
       <Notice tone="info" title="What evidence would look like">
         A provider's own identifier for the request, the response status, and a later read that shows the effect. Until all three exist, a receipt stays at the state it reached.
       </Notice>
@@ -1589,7 +1559,7 @@ export function ProviderEvidence() {
       <Notice tone="warning" title="There is no provider evidence to show">
         Evidence is a response from the other side. Nothing has been called, so the panel is empty rather than filled with a plausible identifier.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Provider request id", value: <Pill tone="danger">none</Pill> },
         { label: "Response status", value: <Pill tone="danger">none</Pill> },
         { label: "Confirming read", value: <Pill tone="danger">none</Pill> },
@@ -1646,7 +1616,7 @@ export function ConflictResolver({ context }: { context: ScreenContext }) {
   if (!conflict) return <Empty title="No conflict" icon={<RefreshCcw size={20} />} />;
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Conflict", value: conflict.title },
         { label: "State", value: <Pill tone={conflict.status === "open" ? "warning" : "neutral"}>{conflict.status}</Pill> },
       ]} />
@@ -1654,7 +1624,7 @@ export function ConflictResolver({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="Both sides are kept until someone chooses">
         Nothing is merged automatically. A conflict is resolved by a person picking a side, and the choice is recorded against the record.
       </Notice>
-      <Button variant="secondary" onClick={() => void context.mutate.patch(conflict.id, { status: "resolved" }, { event: `Conflict ${conflict.title} resolved by hand` }).then(() => context.toast("Resolved", "The choice is recorded on the conflict record."))}>
+      <Button variant="secondary" onClick={() => void context.mutate.patch(conflict.id, { status: "resolved" }, { event: `Conflict ${conflict.title} resolved by hand` }).then((saved) => saved && context.toast("Resolved", "The choice is recorded on the conflict record."))}>
         Mark it resolved
       </Button>
     </Stack>
@@ -1664,18 +1634,18 @@ export function ConflictResolver({ context }: { context: ScreenContext }) {
 export function RevokeGrant({ context }: { context: ScreenContext }) {
   const { entry } = useConnector(context);
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       <Notice tone="warning" title="There is no grant to revoke">
         Nothing has been authorised for {entry?.capability.label ?? "this capability"}, so there is no token to invalidate and no cached permission to clear.
       </Notice>
-      <Properties rows={[
-        { label: "Tokens held", value: <span className="ds-num">0</span> },
-        { label: "Cached grants", value: <span className="ds-num">0</span> },
-        { label: "Queued calls", value: <span className="ds-num">0</span> },
+      <FactGrid columns={3} items={[
+        { label: "Tokens held", value: "0", mono: true },
+        { label: "Cached grants", value: "0", mono: true },
+        { label: "Queued calls", value: "0", mono: true },
       ]} />
-      <Notice tone="info" title="What revocation would do">
+      <OverlaySection title="What revocation would do">
         Stop new calls immediately, discard the cached grant, and fail any queued mission step rather than retrying it with a dead token.
-      </Notice>
+      </OverlaySection>
       <Button variant="secondary" onClick={() => void context.mutate.log(`Revocation requested for ${entry?.capability.label ?? "a capability"}: nothing to revoke.`, { type: "capability", capability: "not_connected" }).then(() => context.toast("Recorded", "The request is in the receipts, with nothing to revoke."))}>
         Record the request anyway
       </Button>

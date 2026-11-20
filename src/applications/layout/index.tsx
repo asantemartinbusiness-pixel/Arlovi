@@ -4,8 +4,9 @@ import {
   Image as ImageIcon, Square, Link2, Plus, Undo2, Redo2, ZoomIn, ZoomOut, FileImage,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
-  Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, ModalActions, Notice, OVERLAY_WIDTH, OverlayActions, OverlayCancel,
+  OverlaySection, OverlaySummary, PageSection, Pill, Properties,
+  KeyValueList, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -158,6 +159,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
     ? doc.pages.slice(Math.max(0, activeIndex - (activeIndex % 2 === 0 ? 0 : 1)), Math.max(0, activeIndex - (activeIndex % 2 === 0 ? 0 : 1)) + 2)
     : [doc.pages[activeIndex]].filter(Boolean)) : [];
   const overset = [...compositions.values()].filter((composition) => composition.oversetChars > 0);
+  const oversetChars = overset.reduce((sum, item) => sum + item.oversetChars, 0);
 
   const fitZoom = () => {
     const host = stageRef.current;
@@ -244,8 +246,20 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
       context={context}
       actions={actions}
       tabs={[{ id: "Pages" }, { id: "Layout" }, { id: "Type" }, { id: "Review" }]}
+      lean
+      titleLevel={1}
       title={record.title}
-      subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span><span className="ds-num">{doc.pages.length}</span> pages · {doc.size.name}</span>}</Row>}
+      subtitle={(
+        <Row gap={2} wrap>
+          <SaveState handle={handle} />
+          {doc && <span><span className="ds-num">{doc.pages.length}</span> pages · {doc.size.name}</span>}
+          {oversetChars > 0 && (
+            <button type="button" className="ds-pill lx-overset-chip" data-tone="danger" onClick={() => context.openOverlay("overset warning")}>
+              <span className="ds-num">{oversetChars.toLocaleString("en")}</span> characters overset
+            </button>
+          )}
+        </Row>
+      )}
       backTo={{ label: "Layout", to: `/o/${context.org.slug}/layout/publications` }}
       tools={
         <div className="lx-tools">
@@ -328,11 +342,6 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
             )}
           </PanelGroup>
           <LayersPanel handle={handle} />
-          {overset.length > 0 && (
-            <Notice tone="danger" title={`${overset.reduce((sum, item) => sum + item.oversetChars, 0)} characters of overset text`} actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("overset warning")}>Show it</Button>}>
-              The copy does not fit the frames it is threaded through. It is kept, never dropped.
-            </Notice>
-          )}
         </Stack>
       }
       leftLabel="Pages"
@@ -427,7 +436,6 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
   if (!frame) {
     return (
       <Stack gap={3}>
-        <Notice tone="info" title="Nothing selected">Click a frame on the page, or pick a tool and click to place a new one.</Notice>
         <PanelGroup title="Page">
           <Field label="Master">
             <Select
@@ -445,6 +453,7 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
             { label: "Frames on this page", value: page?.frames.length ?? 0 },
           ]} />
         </PanelGroup>
+        <p className="vx-mini">Click a frame to edit it, or pick a tool and click the page to place one.</p>
       </Stack>
     );
   }
@@ -748,7 +757,18 @@ function MastersScreen({ context, lens }: { context: ScreenContext; lens: "Maste
           )}
         </Stack>
       </Card>
-      <Card span={8} eyebrow="MASTER" prov="human" title={master ? master.name : "No master"} subtitle="Frames here appear on every page the master is applied to">
+      <Card
+        span={8}
+        eyebrow="MASTER"
+        prov="human"
+        title={master ? master.name : "No master"}
+        subtitle={master ? (() => {
+          const usage = masterUsage(doc, master.id);
+          const overridden = usage.reduce((sum, item) => sum + item.overridden, 0);
+          return <>Edits reach <span className="ds-num">{usage.length}</span> of <span className="ds-num">{doc.pages.length}</span> pages{overridden > 0 && <> · <span className="ds-num">{overridden}</span> overridden frame{overridden === 1 ? " keeps" : "s keep"} their own copy</>}</>;
+        })() : undefined}
+        actions={master ? <Button size="sm" variant="ghost" onClick={() => context.openOverlay("master preview")}>Preview the impact</Button> : undefined}
+      >
         {!master ? <Empty title="Create a master to begin" /> : (
           <Stack gap={3}>
             <div style={{ display: "grid", placeContent: "center", background: "var(--bg-sunken)", padding: 16, borderRadius: 8 }}>
@@ -1161,57 +1181,77 @@ function PreflightScreen({ context, lens }: { context: ScreenContext; lens: "Pre
     );
   }
 
+  const checks: { id: string; label: string; match: (issue: PreflightIssue) => boolean; pass: string }[] = [
+    { id: "overset", label: "Overset text", match: (issue) => issue.id.startsWith("overset-"), pass: "Every story is placed" },
+    { id: "missing", label: "Missing images", match: (issue) => issue.id.startsWith("missing-"), pass: "Every image frame is linked" },
+    { id: "ppi", label: "Image resolution", match: (issue) => issue.id.startsWith("ppi-"), pass: "At or above the target ppi" },
+    { id: "bleed", label: "Bleed", match: (issue) => issue.id.startsWith("bleed-") || issue.id === "nobleed", pass: "Edges reach the bleed" },
+    { id: "fonts", label: "Fonts", match: (issue) => issue.id.startsWith("font-"), pass: "Available in this browser" },
+    { id: "type", label: "Type size", match: (issue) => issue.id.startsWith("small-"), pass: `No style below ${8}pt` },
+  ];
+  const errors = byseverityCount(issues, "error");
+  const warnings = byseverityCount(issues, "warning");
+  const findIssueAction = (issue: PreflightIssue) => (
+    <Row gap={1}>
+      {issue.pageIndex !== undefined && (
+        <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => ({ ...current, activePageId: current.pages[issue.pageIndex!]?.id ?? current.activePageId }), "Go to the page"); if (issue.frameId) selectFrame(issue.frameId); context.navigate(context.path("/o/:org/layout/publications/:id", context.params.id)); }}>
+          Page {issue.pageIndex + 1}
+        </Button>
+      )}
+      {issue.fix === "add-bleed" && (
+        <Button size="sm" variant="secondary" onClick={() => handle.edit((current) => ({ ...current, bleed: mm(3) }), "Set a 3mm bleed")}>Set 3mm bleed</Button>
+      )}
+      {issue.fix === "add-page" && (
+        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("overset warning")}>Resolve the overset</Button>
+      )}
+      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Preflight detail", { id: issue.id })}>Detail</Button>
+    </Row>
+  );
   return (
     <Stack gap={4}>
-      <StatRow>
-        <Stat label="Errors" value={byServerity(byseverityCount(issues, "error"))} prov="human" meta="block the press export" />
-        <Stat label="Warnings" value={byServerity(byseverityCount(issues, "warning"))} prov="human" meta="check before sending" />
-        <Stat label="Notes" value={byServerity(byseverityCount(issues, "note"))} prov="human" meta="for information" />
-        <Stat label="Pages" value={doc.pages.length} prov="human" meta={doc.size.name} />
-      </StatRow>
-      {issues.length === 0 ? (
-        <Notice tone="success" title="Preflight is clean">Every frame fits, every image is linked at a usable resolution, and the fonts are available in this browser.</Notice>
-      ) : (
-        <Card eyebrow="PREFLIGHT" prov="human" title="Findings" subtitle={<><span className="ds-num">{byseverityCount(issues, "error")}</span> errors, <span className="ds-num">{byseverityCount(issues, "warning")}</span> warnings</>}>
+      {blocked
+        ? <Notice tone="danger" title={`${errors} error${errors === 1 ? "" : "s"} block the press export`}>{warnings > 0 ? `${warnings} warning${warnings === 1 ? "" : "s"} to check as well. ` : ""}Clear the errors below; the proof stays available.</Notice>
+        : warnings > 0
+          ? <Notice tone="warning" title={`Clear to export with ${warnings} warning${warnings === 1 ? "" : "s"}`}>Nothing blocks the press export. Check the warnings before sending.</Notice>
+          : <Notice tone="success" title="Preflight is clean">Every frame fits, every image is linked at a usable resolution, and the fonts are available in this browser.</Notice>}
+      <Grid>
+        <PageSection title="Checks" hint="Computed from the document" span={7} flush>
+          <ul className="vx-uselist">
+            {checks.map((check) => {
+              const found = issues.filter(check.match);
+              const worst = found.some((issue) => issue.severity === "error") ? "danger" : found.length ? "warning" : "success";
+              return (
+                <li key={check.id} className="vx-use">
+                  <span className="ds-grow"><strong>{check.label}</strong><span className="vx-mini"> · {found.length ? `${found.length} to look at` : check.pass}</span></span>
+                  <Pill tone={worst}>{found.length ? (worst === "danger" ? "error" : "warning") : "pass"}</Pill>
+                </li>
+              );
+            })}
+          </ul>
+        </PageSection>
+        <PageSection title="Print setup" hint="What the proof and export use" span={5}>
+          <KeyValueList
+            items={[
+              { label: "Trim", value: `${Math.round(toMm(doc.size.width))} × ${Math.round(toMm(doc.size.height))} mm`, mono: true },
+              { label: "Bleed", value: `${Math.round(toMm(doc.bleed) * 10) / 10} mm`, mono: true },
+              { label: "Slug", value: `${Math.round(toMm(doc.slug))} mm`, mono: true },
+              { label: "Colour", value: doc.colourMode },
+              { label: "Pages", value: `${doc.pages.length}${doc.facingPages ? " · facing" : ""}`, mono: true },
+            ]}
+          />
+        </PageSection>
+      </Grid>
+      {issues.length > 0 && (
+        <PageSection title="Findings" hint={<><span className="ds-num">{errors}</span> errors, <span className="ds-num">{warnings}</span> warnings</>}>
           <Stack gap={2}>
             {issues.map((issue) => (
-              <Notice
-                key={issue.id}
-                tone={issue.severity === "error" ? "danger" : issue.severity === "warning" ? "warning" : "info"}
-                title={issue.title}
-                actions={
-                  <Row gap={1}>
-                    {issue.pageIndex !== undefined && (
-                      <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => ({ ...current, activePageId: current.pages[issue.pageIndex!]?.id ?? current.activePageId }), "Go to the page"); context.navigate(context.path("/o/:org/layout/publications/:id", context.params.id)); }}>
-                        Page {issue.pageIndex + 1}
-                      </Button>
-                    )}
-                    {issue.fix === "add-bleed" && (
-                      <Button size="sm" variant="secondary" onClick={() => handle.edit((current) => ({ ...current, bleed: mm(3) }), "Set a 3mm bleed")}>Set 3mm bleed</Button>
-                    )}
-                    {issue.fix === "add-page" && (
-                      <Button size="sm" variant="secondary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/typography", context.params.id)}?tab=Flow`)}>Fix the flow</Button>
-                    )}
-                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Preflight detail", { id: issue.id })}>Detail</Button>
-                  </Row>
-                }
-              >
+              <Notice key={issue.id} tone={severityTone(issue.severity)} title={issue.title} actions={findIssueAction(issue)}>
                 {issue.detail}
               </Notice>
             ))}
           </Stack>
-        </Card>
+        </PageSection>
       )}
-      <Card eyebrow="SUMMARY" prov="human" title="What preflight checks" subtitle="Each test is computed from the document, not a template">
-        <Properties rows={[
-          { label: "Overset text", value: "The composer reports characters that did not fit any frame in a thread." },
-          { label: "Image resolution", value: "Natural pixels against the placed size, in pixels per inch." },
-          { label: "Missing images", value: "An image frame with no linked file." },
-          { label: "Bleed", value: "Anything that meets the trim but stops short of the bleed." },
-          { label: "Fonts", value: "Checked against this browser with the font loading API." },
-          { label: "Type size", value: `Styles below ${8}pt.` },
-        ]} />
-      </Card>
     </Stack>
   );
 }
@@ -1220,9 +1260,6 @@ function byseverityCount(issues: PreflightIssue[], severity: PreflightIssue["sev
   return issues.filter((issue) => issue.severity === severity).length;
 }
 
-function byServerity(count: number): string {
-  return String(count);
-}
 
 /* ------------------------------ export helpers ------------------------------ */
 
@@ -1322,7 +1359,7 @@ function PagePreset({ context, close }: { context: ScreenContext; close: () => v
           <option value="template">Template</option>
         </Select>
       </Field>
-      <Notice tone="info" title="Print units are kept">Everything is stored in points and shown in millimetres. Nothing is rounded to pixels on the way in or out.</Notice>
+      <p className="vx-mini">Stored in points, shown in millimetres. Nothing is rounded to pixels on the way in or out.</p>
     </form>
   );
 }
@@ -1332,9 +1369,7 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
   const [name, setName] = useState("");
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Import plain text or Markdown-style headings">
-        A line that starts with # becomes a headline, a line that starts with ## becomes a subhead, and everything else is body copy. The text is poured through a two-page thread.
-      </Notice>
+      <p className="vx-mini"># starts a headline, ## a subhead; everything else is body copy, poured through a two-page thread.</p>
       <Field label="Publication name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} /></Field>
       <Field label="Text">
         <TextArea rows={8} value={text} onChange={(event) => setText(event.target.value)} placeholder={"# Winter collection\nBrushed brass and linen…"} />
@@ -1352,10 +1387,13 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
           }}
         />
       </Field>
-      <Button
-        variant="primary"
-        disabled={!text.trim() || !name.trim()}
-        onClick={async () => {
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={!text.trim() || !name.trim()}
+              onClick={async () => {
           const doc = starterPublication(name);
           const paragraphs = text.split(/\n+/);
           const styleByParagraph: Record<number, string> = {};
@@ -1377,6 +1415,10 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
       >
         Import and pour the copy
       </Button>
+          }
+          end={<OverlayCancel />}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1387,23 +1429,53 @@ function SharePanel({ context }: { context: ScreenContext }) {
   if (!record) return <Empty title="Select a publication first" />;
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Publication", value: record.title },
-        { label: "Owner", value: record.ownerName },
-        { label: "Revision", value: <span className="ds-num">{record.revision}</span> },
-      ]} />
+      <FactGrid
+        dense
+        items={[
+          { label: "Owner", value: record.ownerName },
+          { label: "Revision", value: record.revision, mono: true },
+        ]}
+      />
       <Notice tone="warning" title="There is no sharing service">
-        Nothing can be published to a link from here. What a reader can be given is the HTML export, written in this browser from the Preflight screen.
+        Nothing can be published to a link from here. A reader can be given the HTML export, written in this browser.
       </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/preflight", record.id)}?tab=Export`)}>Open the export</Button>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/preflight", record.id)}?tab=Export`)}>Open the export</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
 
+function recordSummary(context: ScreenContext) {
+  return <RecordSummary context={context} />;
+}
+
+function RecordSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const record = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  if (!record) return null;
+  const size = String(record.fields.size ?? "");
+  return (
+    <OverlaySummary
+      eyebrow="Publication"
+      title={record.title}
+      status={<Pill tone={record.status === "template" ? "accent" : "neutral"}>{record.status}</Pill>}
+      meta={[size, record.fields.pages ? `${String(record.fields.pages)} pages` : ""]}
+    />
+  );
+}
+
+/** The editor's right panel is the frame inspector; this id hands off to it instead of scrimming the page. */
+/** The editor's right panel is the frame inspector; this id hands off to it instead of scrimming the page. */
 function FrameEditorOverlay({ context }: { context: ScreenContext }) {
-  const { record, handle, compositions } = usePublication(context);
-  if (!record || !handle.doc) return <Empty title="Open a publication first" />;
-  return <FramePanel handle={handle} context={context} compositions={compositions} />;
+  useEffect(() => {
+    context.toast("Frame properties are in the panel", "Select a frame and edit it in the Frame panel on the right.", "info");
+    context.closeOverlay();
+  }, []);
+  return null;
 }
 
 function PageSettings({ context }: { context: ScreenContext }) {
@@ -1412,133 +1484,245 @@ function PageSettings({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   return (
     <Stack gap={3}>
-      <Field label="Page size">
-        <Select
-          value={doc.size.id}
-          onChange={(event) => {
-            const size = PAGE_SIZES.find((item) => item.id === event.target.value);
-            if (size) handle.edit((current) => ({ ...current, size }), "Change the page size");
-          }}
-        >
-          {PAGE_SIZES.map((size) => <option key={size.id} value={size.id}>{size.name}</option>)}
-        </Select>
-      </Field>
-      <div className="vx-fieldrow">
-        {(["top", "bottom", "inside", "outside"] as const).map((side) => (
-          <div key={side}>
-            <label className="vx-label" htmlFor={`margin-${side}`}>Margin {side} (mm)</label>
-            <input
-              id={`margin-${side}`}
-              className="vx-num"
-              type="number"
-              value={Math.round(toMm(doc.margins[side]) * 10) / 10}
-              onChange={(event) => handle.edit((current) => ({ ...current, margins: { ...current.margins, [side]: mm(Number(event.target.value)) } }), "Change the margins")}
-            />
+      <OverlaySection title="Page">
+        <Field label="Page size">
+          <Select
+            value={doc.size.id}
+            onChange={(event) => {
+              const size = PAGE_SIZES.find((item) => item.id === event.target.value);
+              if (size) handle.edit((current) => ({ ...current, size }), "Change the page size");
+            }}
+          >
+            {PAGE_SIZES.map((size) => <option key={size.id} value={size.id}>{size.name}</option>)}
+          </Select>
+        </Field>
+        <Checkbox label="Facing pages" checked={doc.facingPages} onChange={(event) => handle.edit((current) => ({ ...current, facingPages: event.target.checked }), "Toggle facing pages")} />
+      </OverlaySection>
+      <OverlaySection title="Margins" hint="Millimetres, measured from the trim">
+        <div className="vx-fieldrow">
+          {(["top", "bottom", "inside", "outside"] as const).map((side) => (
+            <div key={side}>
+              <label className="vx-label" htmlFor={`margin-${side}`}>Margin {side} (mm)</label>
+              <input
+                id={`margin-${side}`}
+                className="vx-num"
+                type="number"
+                value={Math.round(toMm(doc.margins[side]) * 10) / 10}
+                onChange={(event) => handle.edit((current) => ({ ...current, margins: { ...current.margins, [side]: mm(Number(event.target.value)) } }), "Change the margins")}
+              />
+            </div>
+          ))}
+        </div>
+      </OverlaySection>
+      <OverlaySection title="Print setup" hint="Bleed is what preflight checks edges against">
+        <div className="vx-fieldrow">
+          <div>
+            <label className="vx-label" htmlFor="bleed">Bleed (mm)</label>
+            <input id="bleed" className="vx-num" type="number" step={0.5} value={Math.round(toMm(doc.bleed) * 10) / 10} onChange={(event) => handle.edit((current) => ({ ...current, bleed: mm(Number(event.target.value)) }), "Change the bleed")} />
           </div>
-        ))}
-        <div>
-          <label className="vx-label" htmlFor="bleed">Bleed (mm)</label>
-          <input id="bleed" className="vx-num" type="number" step={0.5} value={Math.round(toMm(doc.bleed) * 10) / 10} onChange={(event) => handle.edit((current) => ({ ...current, bleed: mm(Number(event.target.value)) }), "Change the bleed")} />
+          <div>
+            <label className="vx-label" htmlFor="cols">Columns</label>
+            <input id="cols" className="vx-num" type="number" min={1} max={6} value={doc.columns.count} onChange={(event) => handle.edit((current) => ({ ...current, columns: { ...current.columns, count: Math.max(1, Number(event.target.value)) } }), "Change the column count")} />
+          </div>
         </div>
-        <div>
-          <label className="vx-label" htmlFor="cols">Columns</label>
-          <input id="cols" className="vx-num" type="number" min={1} max={6} value={doc.columns.count} onChange={(event) => handle.edit((current) => ({ ...current, columns: { ...current.columns, count: Math.max(1, Number(event.target.value)) } }), "Change the column count")} />
-        </div>
-      </div>
-      <Checkbox label="Facing pages" checked={doc.facingPages} onChange={(event) => handle.edit((current) => ({ ...current, facingPages: event.target.checked }), "Toggle facing pages")} />
-      <Checkbox label="Show column guides" checked={doc.columns.visible} onChange={(event) => handle.edit((current) => ({ ...current, columns: { ...current.columns, visible: event.target.checked } }), "Toggle the column guides")} />
+        <Checkbox label="Show column guides" checked={doc.columns.visible} onChange={(event) => handle.edit((current) => ({ ...current, columns: { ...current.columns, visible: event.target.checked } }), "Toggle the column guides")} />
+      </OverlaySection>
+      <p className="vx-mini">Changes apply as you type and can be undone from the editor.</p>
+      <ModalActions><OverlayActions primary={<OverlayCancel>Done</OverlayCancel>} /></ModalActions>
     </Stack>
+  );
+}
+
+/** Add a page after the one holding `lastFrameId` and thread a copy of that frame onto it, so the copy keeps flowing. */
+function continueOnNewPage(doc: PublicationDoc, lastFrameId: string): PublicationDoc {
+  const found = findFrame(doc, lastFrameId);
+  if (!found) return doc;
+  const { frame, pageIndex } = found;
+  const source = doc.pages[pageIndex];
+  const pageId = `pg-${wallMs().toString(36)}-${doc.pages.length + 1}`;
+  const next: Frame = { ...newTextFrame({ ...frame.box }, frame.storyId ?? ""), columns: frame.columns, gutter: frame.gutter, inset: frame.inset, styleId: frame.styleId, storyId: frame.storyId };
+  const pages = doc.pages.map((page) => (page.id === source.id ? { ...page, frames: page.frames.map((item) => (item.id === frame.id ? { ...item, next: next.id } : item)) } : page));
+  pages.splice(pageIndex + 1, 0, { id: pageId, masterId: source.masterId, frames: [next], overrides: [] });
+  return { ...doc, pages, activePageId: pageId };
+}
+
+function oversetSummary(context: ScreenContext) {
+  return <OversetSummary context={context} />;
+}
+
+function OversetSummary({ context }: { context: ScreenContext }) {
+  const { record, handle, compositions } = usePublication(context);
+  const overset = [...compositions.values()].filter((composition) => composition.oversetChars > 0);
+  if (!record || !handle.doc) return null;
+  const chars = overset.reduce((sum, item) => sum + item.oversetChars, 0);
+  return (
+    <OverlaySummary
+      eyebrow="Overset text"
+      title={chars > 0 ? <><span className="ds-num">{chars.toLocaleString("en")}</span> characters do not fit</> : "Nothing is overset"}
+      status={chars > 0 ? <Pill tone="danger">kept, not placed</Pill> : <Pill tone="success">all placed</Pill>}
+      meta={[record.title, overset.length > 0 ? `${overset.length} stor${overset.length === 1 ? "y" : "ies"} affected` : ""]}
+    />
   );
 }
 
 function OversetWarning({ context }: { context: ScreenContext }) {
   const { record, handle, compositions } = usePublication(context);
   if (!record || !handle.doc) return <Empty title="Open a publication first" />;
+  const doc = handle.doc;
   const overset = [...compositions.entries()].filter(([, composition]) => composition.oversetChars > 0);
-  if (overset.length === 0) return <Notice tone="success" title="Nothing is overset">Every character of every story is placed.</Notice>;
+  const exporting = Boolean((context.overlayPayload as { exporting?: boolean } | undefined)?.exporting);
+  if (overset.length === 0) {
+    return <p className="vx-mini">Every character of every story is placed in a frame.</p>;
+  }
+  const first = overset[0][1];
   return (
     <Stack gap={3}>
-      {overset.map(([storyId, composition]) => (
-        <Notice key={storyId} tone="danger" title={`${composition.oversetChars} characters do not fit`}>
-          <p>The thread ends at <span className="ds-num">{composition.oversetFrom}</span>. The document still holds this text:</p>
-          <blockquote style={{ marginBlockStart: 8, paddingInlineStart: 12, borderInlineStart: "2px solid var(--danger)" }}>
-            {composition.oversetText.slice(0, 600)}{composition.oversetText.length > 600 ? "…" : ""}
-          </blockquote>
-        </Notice>
-      ))}
-      <Row gap={2} wrap>
-        <Button variant="secondary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/typography", context.params.id)}?tab=Flow`)}>Fix the flow</Button>
-        {(context.overlayPayload as { exporting?: boolean } | undefined)?.exporting && handle.doc && (
-          <Button variant="outline-danger" onClick={async () => { context.closeOverlay(); await exportHtml(context, handle.doc!); }}>Export anyway, without the overset text</Button>
-        )}
-      </Row>
+      {overset.map(([storyId, composition]) => {
+        const story = doc.stories.find((item) => item.id === storyId);
+        const last = composition.oversetFrom ? findFrame(doc, composition.oversetFrom) : undefined;
+        return (
+          <OverlaySection key={storyId} title={story?.name ?? storyId} tone="danger" hint={last ? <>Thread ends on page <span className="ds-num">{last.pageIndex + 1}</span></> : undefined}>
+            <FactGrid
+              dense
+              items={[
+                { label: "Characters over", value: composition.oversetChars.toLocaleString("en"), mono: true, tone: "danger" },
+                { label: "Words over", value: composition.oversetText.split(/\s+/).filter(Boolean).length.toLocaleString("en"), mono: true },
+              ]}
+            />
+            <blockquote className="lx-overset-quote">
+              {composition.oversetText.slice(0, 420)}{composition.oversetText.length > 420 ? "…" : ""}
+            </blockquote>
+          </OverlaySection>
+        );
+      })}
+      <p className="vx-mini">The document still holds this text. Adding a page threads a copy of the last frame onto it so the copy keeps flowing; it may take more than one page.</p>
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={!first.oversetFrom}
+              onClick={() => {
+                const target = first.oversetFrom;
+                if (!target) return;
+                handle.edit((current) => continueOnNewPage(current, target), "Add a page and continue the thread");
+                context.toast("Page added", "A new page now receives the copy from the last frame. Check the editor for what is still overset.");
+                context.closeOverlay();
+              }}
+            >
+              Add a page and keep flowing
+            </Button>
+          }
+          secondary={<Button variant="secondary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/typography", context.params.id)}?tab=Flow`)}>Open the flow</Button>}
+          end={exporting
+            ? <><Button variant="outline-danger" onClick={async () => { context.closeOverlay(); await exportHtml(context, doc); }}>Export anyway, without the overset text</Button><OverlayCancel>Close</OverlayCancel></>
+            : <OverlayCancel>Close</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 function MasterEditorOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = usePublication(context);
+  const [masterId, setMasterId] = useState("");
   if (!record || !handle.doc) return <Empty title="Open a publication first" />;
   const doc = handle.doc;
+  const master = doc.masters.find((item) => item.id === (masterId || doc.masters[0]?.id));
+  if (!master) return <Empty title="No masters yet">Create a master first.</Empty>;
+  const onIt = masterUsage(doc, master.id);
+  const changing = doc.pages.map((page, index) => ({ page, index })).filter(({ page }) => page.masterId !== master.id);
+  const keptOverrides = doc.pages.reduce((sum, page) => sum + (page.masterId !== master.id ? page.overrides.length : 0), 0);
   return (
     <Stack gap={3}>
-      <p className="ds-prose">Applying a master changes every page listed. Frames a page has overridden stay as they are.</p>
-      {doc.masters.map((master) => (
-        <Row key={master.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
-          <span className="ds-grow">{master.name}</span>
-          <Pill><span className="ds-num">{masterUsage(doc, master.id).length}</span> pages</Pill>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              handle.edit((current) => ({ ...current, pages: current.pages.map((page) => ({ ...page, masterId: master.id })) }), "Apply a master to every page");
-              context.toast("Applied", `${master.name} is now on all ${doc.pages.length} pages.`);
-              close();
-            }}
-          >
-            Apply to every page
-          </Button>
-        </Row>
-      ))}
+      <Field label="Master">
+        <Select value={master.id} onChange={(event) => setMasterId(event.target.value)}>
+          {doc.masters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </Select>
+      </Field>
+      <OverlaySection title="What changes" tone={changing.length > 0 ? "warning" : "neutral"}>
+        <FactGrid
+          columns={3}
+          dense
+          items={[
+            { label: "Already on it", value: `${onIt.length} of ${doc.pages.length}`, mono: true },
+            { label: "Pages that change", value: changing.length, mono: true, tone: changing.length > 0 ? "warning" : undefined },
+            { label: "Overrides kept", value: keptOverrides, mono: true, hint: "Local frame copies stay" },
+          ]}
+        />
+        {changing.length > 0 && (
+          <p className="vx-mini">Pages {changing.map(({ index }) => index + 1).join(", ")} take {master.name}. Frames a page has overridden keep their own version.</p>
+        )}
+      </OverlaySection>
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={changing.length === 0}
+              onClick={() => {
+                handle.edit((current) => ({ ...current, pages: current.pages.map((page) => ({ ...page, masterId: master.id })) }), "Apply a master to every page");
+                context.toast("Applied", `${master.name} is now on all ${doc.pages.length} pages.`);
+                close();
+              }}
+            >
+              {changing.length === 0 ? "Already on every page" : `Apply to ${changing.length} page${changing.length === 1 ? "" : "s"}`}
+            </Button>
+          }
+          end={<OverlayCancel />}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 function OverrideConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = usePublication(context);
+  const payload = context.overlayPayload as { frameId?: string } | undefined;
   if (!record || !handle.doc) return <Empty title="Open a publication first" />;
   const doc = handle.doc;
   const index = doc.pages.findIndex((page) => page.id === doc.activePageId);
   const page = doc.pages[index];
   const master = doc.masters.find((item) => item.id === page?.masterId);
+  const frames = master?.frames ?? [];
   return (
     <Stack gap={3}>
-      <Notice tone="warning" title="Overriding detaches the frame onto this page">
-        A copy of the master frame is put on page {index + 1} and can be edited there. Later changes to the master will not reach it, and the page records the override.
-      </Notice>
-      <Properties rows={[
-        { label: "Page", value: <span className="ds-num">{index + 1}</span> },
-        { label: "Master", value: master?.name ?? "none" },
-        { label: "Frames already overridden", value: <span className="ds-num">{page?.overrides.length ?? 0}</span> },
-      ]} />
-      {master?.frames.map((frame) => (
-        <Row key={frame.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
-          <span className="ds-grow"><span className="ds-num">{frame.id}</span> · {frame.kind}</span>
-          <Button
-            size="sm"
-            variant={page?.overrides.includes(frame.id) ? "ghost" : "secondary"}
-            disabled={page?.overrides.includes(frame.id)}
-            onClick={() => {
-              handle.edit((current) => overrideMasterFrame(current, current.activePageId, frame.id, index), "Override a master frame");
-              context.toast("Overridden", "The frame is now on the page and can be edited.");
-              close();
-            }}
-          >
-            {page?.overrides.includes(frame.id) ? "Already overridden" : "Override"}
-          </Button>
-        </Row>
-      ))}
-      {(!master || master.frames.length === 0) && <p className="ds-subtle">This page has no master frames to override.</p>}
+      <FactGrid
+        columns={3}
+        dense
+        items={[
+          { label: "Page", value: index + 1, mono: true },
+          { label: "Master", value: master?.name ?? "none" },
+          { label: "Already overridden", value: page?.overrides.length ?? 0, mono: true },
+        ]}
+      />
+      <OverlaySection title="Master frames" tone="warning" hint="Overriding puts a copy on this page. Later changes to the master no longer reach it.">
+        {frames.length === 0 ? <p className="vx-mini">This page has no master frames to override.</p> : (
+          <ul className="vx-uselist">
+            {frames.map((frame) => {
+              const done = page?.overrides.includes(frame.id);
+              return (
+                <li key={frame.id} className="vx-use" data-focus={payload?.frameId === frame.id || undefined}>
+                  <span className="ds-grow"><span className="ds-num">{frame.id}</span> · {frame.kind}</span>
+                  <Button
+                    size="sm"
+                    variant={done ? "ghost" : payload?.frameId === frame.id ? "primary" : "secondary"}
+                    disabled={done}
+                    onClick={() => {
+                      handle.edit((current) => overrideMasterFrame(current, current.activePageId, frame.id, index), "Override a master frame");
+                      context.toast("Overridden", `${frame.id} is now on page ${index + 1} and can be edited there.`);
+                      close();
+                    }}
+                  >
+                    {done ? "Already overridden" : "Override"}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </OverlaySection>
+      <ModalActions><OverlayActions end={<OverlayCancel>Close</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1548,30 +1732,35 @@ function TextStyleOverlay({ context, close }: { context: ScreenContext; close: (
   const ui = useStore(layoutUi);
   if (!record || !handle.doc) return <Empty title="Open a publication first" />;
   const doc = handle.doc;
+  const current = ui.selectedFrameId ? findFrame(doc, ui.selectedFrameId)?.frame : undefined;
   return (
     <Stack gap={3}>
-      <p className="ds-prose">Choose the style the selected text frame uses as its default. Paragraphs that name their own style keep it.</p>
-      {doc.paragraphStyles.map((style) => (
-        <Row key={style.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
-          <span className="ds-grow">{style.name}</span>
-          <span className="ds-num">{style.size}/{style.leading}</span>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={!ui.selectedFrameId}
-            onClick={() => {
-              handle.edit((current) => ({
-                ...current,
-                pages: current.pages.map((page) => ({ ...page, frames: page.frames.map((frame) => (frame.id === ui.selectedFrameId ? { ...frame, styleId: style.id } : frame)) })),
-              }), "Apply a paragraph style");
-              close();
-            }}
-          >
-            Apply
-          </Button>
-        </Row>
-      ))}
-      {!ui.selectedFrameId && <Notice tone="info" title="Select a frame first">Open the editor and click a text frame.</Notice>}
+      {!ui.selectedFrameId && <Notice tone="info" title="Select a text frame first">Open the editor and click a text frame; paragraphs that name their own style keep it.</Notice>}
+      <OverlaySection title="Paragraph styles" hint="The style becomes the frame's default" flush>
+        <ul className="vx-uselist">
+          {doc.paragraphStyles.map((style) => (
+            <li key={style.id} className="vx-use">
+              <span className="ds-grow">{style.name}{current?.styleId === style.id && <> <Pill tone="accent">in use</Pill></>}</span>
+              <span className="ds-num vx-mini">{style.size}/{style.leading}</span>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!ui.selectedFrameId || current?.styleId === style.id}
+                onClick={() => {
+                  handle.edit((c) => ({
+                    ...c,
+                    pages: c.pages.map((page) => ({ ...page, frames: page.frames.map((frame) => (frame.id === ui.selectedFrameId ? { ...frame, styleId: style.id } : frame)) })),
+                  }), "Apply a paragraph style");
+                  close();
+                }}
+              >
+                Apply
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </OverlaySection>
+      <ModalActions><OverlayActions end={<OverlayCancel>Close</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1582,41 +1771,89 @@ function FlowOptions({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Order", value: "Frames are filled in thread order; columns within a frame fill left to right." },
-        { label: "Baseline", value: <>Styles that snap land on a multiple of <span className="ds-num">{doc.baseline.step}pt</span> from <span className="ds-num">{doc.baseline.start}pt</span>.</> },
-        { label: "Hyphenation", value: "Per paragraph style. A word wider than the column is split with a hyphen when the style allows it." },
-        { label: "Overset", value: "Reported with the characters that did not fit. Never discarded." },
-      ]} />
-      <Button variant="secondary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/typography", context.params.id)}?tab=Flow`)}>Open the flow view</Button>
+      <KeyValueList
+        items={[
+          { label: "Order", value: "Frames fill in thread order; columns fill left to right." },
+          { label: "Baseline", value: <>Snaps to <span className="ds-num">{doc.baseline.step}pt</span> from <span className="ds-num">{doc.baseline.start}pt</span></> },
+          { label: "Hyphenation", value: "Per paragraph style; a word wider than the column splits when the style allows." },
+          { label: "Overset", value: "Reported with the characters that did not fit. Never discarded." },
+        ]}
+      />
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/typography", context.params.id)}?tab=Flow`)}>Open the flow view</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
+}
+
+function severityTone(severity: PreflightIssue["severity"]): "danger" | "warning" | "info" {
+  return severity === "error" ? "danger" : severity === "warning" ? "warning" : "info";
 }
 
 function PreflightDetail({ context }: { context: ScreenContext }) {
   const { record, handle, compositions } = usePublication(context);
   const payload = context.overlayPayload as { id?: string } | undefined;
   if (!record || !handle.doc) return <Empty title="Open a publication first" />;
-  const issues = issuesFor(handle.doc, compositions);
+  const doc = handle.doc;
+  const issues = issuesFor(doc, compositions);
   const issue = issues.find((item) => item.id === payload?.id);
+  const goToPage = (pageIndex: number, frameId?: string) => {
+    handle.edit((current) => ({ ...current, activePageId: current.pages[pageIndex]?.id ?? current.activePageId }), "Go to the page");
+    if (frameId) selectFrame(frameId);
+    context.navigate(context.path("/o/:org/layout/publications/:id", context.params.id));
+  };
   if (!issue) {
+    const errors = issues.filter((item) => item.severity === "error").length;
     return (
       <Stack gap={3}>
-        <Notice tone={issues.some((item) => item.severity === "error") ? "danger" : "success"} title={`${issues.length} findings`}>
-          {issues.filter((item) => item.severity === "error").length} of them block a press export.
-        </Notice>
-        {issues.map((item) => <Notice key={item.id} tone={item.severity === "error" ? "danger" : item.severity === "warning" ? "warning" : "info"} title={item.title}>{item.detail}</Notice>)}
+        <OverlaySection title="Findings" tone={errors ? "danger" : "success"} hint={errors ? `${errors} block a press export` : "Nothing blocks a press export"} flush>
+          {issues.length === 0 ? <p className="vx-mini" style={{ padding: "var(--space-3)" }}>Every frame fits, every image is linked and the fonts are available.</p> : (
+            <ul className="vx-uselist">
+              {issues.map((item) => (
+                <li key={item.id}>
+                  <button type="button" className="vx-use" onClick={() => context.openOverlay("Preflight detail", { id: item.id })}>
+                    <Pill tone={severityTone(item.severity)}>{item.severity}</Pill>
+                    <span className="ds-grow">{item.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </OverlaySection>
+        <DrawerActions><OverlayActions end={<OverlayCancel>Close</OverlayCancel>} /></DrawerActions>
       </Stack>
     );
   }
   return (
     <Stack gap={3}>
-      <Notice tone={issue.severity === "error" ? "danger" : "warning"} title={issue.title}>{issue.detail}</Notice>
-      <Properties rows={[
-        { label: "Severity", value: issue.severity },
-        { label: "Page", value: issue.pageIndex !== undefined ? String(issue.pageIndex + 1) : "whole document" },
-        { label: "Frame", value: issue.frameId ?? "—" },
-      ]} />
+      <OverlaySection title={issue.title} tone={severityTone(issue.severity) === "info" ? "info" : severityTone(issue.severity)}>
+        <p className="ds-prose">{issue.detail}</p>
+      </OverlaySection>
+      <FactGrid
+        columns={3}
+        dense
+        items={[
+          { label: "Severity", value: issue.severity },
+          { label: "Page", value: issue.pageIndex !== undefined ? issue.pageIndex + 1 : "whole document", mono: issue.pageIndex !== undefined },
+          { label: "Frame", value: issue.frameId ?? "none", mono: Boolean(issue.frameId) },
+        ]}
+      />
+      <DrawerActions>
+        <OverlayActions
+          primary={issue.pageIndex !== undefined
+            ? <Button variant="primary" onClick={() => goToPage(issue.pageIndex!, issue.frameId)}>Go to page {issue.pageIndex + 1}</Button>
+            : issue.fix === "add-bleed"
+              ? <Button variant="primary" onClick={() => { handle.edit((current) => ({ ...current, bleed: mm(3) }), "Set a 3mm bleed"); context.closeOverlay(); }}>Set a 3mm bleed</Button>
+              : issue.id.startsWith("overset-")
+                ? <Button variant="primary" onClick={() => context.openOverlay("overset warning")}>Resolve the overset</Button>
+                : undefined}
+          secondary={<Button variant="secondary" onClick={() => context.openOverlay("Preflight detail")}>All findings</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1626,21 +1863,20 @@ function MissingAsset({ context }: { context: ScreenContext }) {
   if (!record || !handle.doc) return <Empty title="Open a publication first" />;
   const doc = handle.doc;
   const missing = doc.pages.flatMap((item, index) => item.frames.filter((frame) => frame.kind === "image" && !frame.src).map((frame) => ({ frame, index })));
+  if (missing.length === 0) return <Notice tone="success" title="Every image frame is linked">Nothing is missing from the {doc.pages.length} pages.</Notice>;
   return (
     <Stack gap={3}>
-      {missing.length === 0 ? <Notice tone="success" title="Every image frame is linked" /> : (
-        <>
-          <Notice tone="danger" title={`${missing.length} image frames have no image`}>
-            An empty frame is drawn with its diagonals so it is obvious on the page. It is never filled with a stand-in picture.
-          </Notice>
+      <OverlaySection title={`${missing.length} image frame${missing.length === 1 ? "" : "s"} with no image`} tone="danger" hint="An empty frame is drawn with its diagonals; it is never filled with a stand-in picture." flush>
+        <ul className="vx-uselist">
           {missing.map(({ frame, index }) => (
-            <Row key={frame.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
+            <li key={frame.id} className="vx-use">
               <span className="ds-grow">Page <span className="ds-num">{index + 1}</span> · <span className="ds-num">{frame.id}</span></span>
               <Button size="sm" variant="secondary" onClick={() => { handle.edit((current) => ({ ...current, activePageId: current.pages[index].id }), "Go to the page"); selectFrame(frame.id); context.navigate(context.path("/o/:org/layout/publications/:id", context.params.id)); }}>Open</Button>
-            </Row>
+            </li>
           ))}
-        </>
-      )}
+        </ul>
+      </OverlaySection>
+      <ModalActions><OverlayActions end={<OverlayCancel>Close</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2028,15 +2264,16 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Page preset", kind: "modal", title: "New publication", width: 560, render: ({ close, ...context }) => <PagePreset context={context} close={close} />, footer: ({ close }) => (<><Button variant="ghost" onClick={close}>Cancel</Button><span className="ds-grow" /><Button variant="primary" type="submit" form="layout-page-preset">Create</Button></>) },
-        { id: "import review", kind: "modal", title: "Import copy", width: 600, render: ({ close, ...context }) => <ImportReview context={context} close={close} /> },
-        { id: "share", kind: "drawer", title: "Share", width: 420, render: ({ ...context }) => <SharePanel context={context} /> },
+        { id: "Page preset", kind: "modal", title: "New publication", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PagePreset context={context} close={close} />, footer: ({ close }) => (<><Button variant="ghost" onClick={close}>Cancel</Button><span className="ds-grow" /><Button variant="primary" type="submit" form="layout-page-preset">Create</Button></>) },
+        { id: "import review", kind: "modal", title: "Import copy", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImportReview context={context} close={close} /> },
+        { id: "share", kind: "drawer", title: "Share", width: OVERLAY_WIDTH.compact, summary: recordSummary, render: ({ ...context }) => <SharePanel context={context} /> },
       ],
     },
 
     "ARL-LAYOUT-002": {
       id: "ARL-LAYOUT-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <PublicationEditor context={context} actions={EDITOR_ACTIONS} />,
       tabs: (["Pages", "Layout", "Type", "Review"] as const).map((lens) => ({
         id: lens,
@@ -2044,9 +2281,9 @@ registerApp({
       })),
       actions: EDITOR_ACTIONS,
       overlays: [
-        { id: "Frame editor", kind: "drawer", title: "Frame", width: 400, render: ({ ...context }) => <FrameEditorOverlay context={context} /> },
-        { id: "page settings", kind: "modal", title: "Page settings", width: 520, render: ({ ...context }) => <PageSettings context={context} /> },
-        { id: "overset warning", kind: "modal", title: "Overset text", tone: "danger", width: 600, render: ({ ...context }) => <OversetWarning context={context} /> },
+        { id: "Frame editor", kind: "drawer", title: "Frame", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <FrameEditorOverlay context={context} /> },
+        { id: "page settings", kind: "modal", title: "Page settings", width: OVERLAY_WIDTH.form, summary: recordSummary, render: ({ ...context }) => <PageSettings context={context} /> },
+        { id: "overset warning", kind: "modal", title: "Overset text", tone: "danger", width: OVERLAY_WIDTH.modal, summary: oversetSummary, render: ({ ...context }) => <OversetWarning context={context} /> },
       ],
     },
 
@@ -2069,8 +2306,8 @@ registerApp({
         { id: "preview", label: "Preview the impact", placement: "overflow", guard: needsPublication, run: (context) => context.openOverlay("master preview") },
       ],
       overlays: [
-        { id: "Master editor", kind: "modal", title: "Apply a master", width: 520, render: ({ close, ...context }) => <MasterEditorOverlay context={context} close={close} /> },
-        { id: "override confirmation", kind: "modal", title: "Override a master frame", tone: "danger", width: 560, render: ({ close, ...context }) => <OverrideConfirmation context={context} close={close} /> },
+        { id: "Master editor", kind: "modal", title: "Apply a master", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MasterEditorOverlay context={context} close={close} /> },
+        { id: "override confirmation", kind: "modal", title: "Override a master frame", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <OverrideConfirmation context={context} close={close} /> },
         { id: "master preview", kind: "modal", title: "What a master change reaches", width: 760, render: ({ ...context }) => <MasterPreview context={context} /> },
       ],
     },
@@ -2100,9 +2337,9 @@ registerApp({
         { id: "inspect overset", label: "Inspect overset text", placement: "secondary", run: (context) => context.openOverlay("preflight issue") },
       ],
       overlays: [
-        { id: "Text style", kind: "modal", title: "Apply a paragraph style", width: 520, render: ({ close, ...context }) => <TextStyleOverlay context={context} close={close} /> },
-        { id: "flow options", kind: "drawer", title: "How the flow works", width: 440, render: ({ ...context }) => <FlowOptions context={context} /> },
-        { id: "preflight issue", kind: "modal", title: "Overset text", width: 600, render: ({ ...context }) => <OversetWarning context={context} /> },
+        { id: "Text style", kind: "modal", title: "Apply a paragraph style", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TextStyleOverlay context={context} close={close} /> },
+        { id: "flow options", kind: "drawer", title: "How the flow works", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <FlowOptions context={context} /> },
+        { id: "preflight issue", kind: "modal", title: "Overset text", width: OVERLAY_WIDTH.modal, summary: oversetSummary, render: ({ ...context }) => <OversetWarning context={context} /> },
         { id: "style editor", kind: "modal", title: "Edit a paragraph style", width: 560, render: ({ close, ...context }) => <StyleEditor context={context} close={close} />, footer: layoutFooter("layout-style-editor", "Save the style") },
         { id: "link frames", kind: "modal", title: "Link text frames", width: 520, render: ({ close, ...context }) => <LinkFramesForm context={context} close={close} />, footer: layoutFooter("layout-link-frames", "Link") },
       ],
@@ -2149,9 +2386,9 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Preflight detail", kind: "drawer", title: "Preflight", width: 460, render: ({ ...context }) => <PreflightDetail context={context} /> },
+        { id: "Preflight detail", kind: "drawer", title: "Preflight", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <PreflightDetail context={context} /> },
         { id: "export setup", kind: "modal", title: "Export", width: 560, render: ({ ...context }) => <PreflightScreen context={context} lens="Export" /> },
-        { id: "missing asset", kind: "modal", title: "Missing images", tone: "danger", width: 520, render: ({ ...context }) => <MissingAsset context={context} /> },
+        { id: "missing asset", kind: "modal", title: "Missing images", tone: "danger", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MissingAsset context={context} /> },
       ],
     },
   },

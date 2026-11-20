@@ -1,5 +1,7 @@
 import { Activity, Database, GitMerge, LayoutDashboard, LineChart, Ruler, Send, Sparkles } from "lucide-react";
-import { Button, Notice } from "@/design-system";
+import { Button, Notice, OVERLAY_WIDTH, OverlayActions, OverlaySummary, Pill } from "@/design-system";
+import type { RecordHeaderProps } from "@/design-system";
+import { knownRecord } from "@/platform/repo";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { db } from "@/platform/workspace";
 import {
@@ -11,14 +13,14 @@ import {
   ReportBuilder, ScheduleOverlay, SourceInspection, checkBlocks, readReport,
 } from "./reports";
 import {
-  DataModelling, DatasetCatalogue, DatasetDetails, DocumentDataset, FormulaEditor, GrantReview,
-  ImpactReview, JoinProperties, MetricDefinitions, MetricQA, ModelTest, QualityPanel, TransformEditor,
+  DataModelling, DatasetCatalogue, DatasetDetails, DatasetSummary, DocumentDataset, FormulaEditor, GrantReview,
+  ImpactReview, JoinProperties, MetricDefinitionInspector, MetricDefinitions, MetricQA, ModelTest, QualityPanel, TransformEditor,
 } from "./catalogue";
 import {
   AssumptionInspector, ConfidenceNote, DataFreshness, DelegateInvestigation, ForecastScreen,
   InsightDetail, InsightsOverview, MetricInspector, QuestionComposer, SaveView, ScenarioEditor,
 } from "./overview";
-import { allMeasures, formatMeasure, measureById, runQuery } from "./metrics";
+import { ANALYTICS_COLLECTIONS, allMeasures, dimensionById, formatMeasure, measureById, runQuery, type QueryContext } from "./metrics";
 import { exploreCsvCell } from "./explore";
 import {
   AdjustInputs, CiteFigures, CompareMeasures, CompareScenarios, DeployModel, GrantDataset, RefreshDataset, RefreshModel,
@@ -37,12 +39,18 @@ import "./analytics.css";
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
+
+/** The same query context the screens use, built from the stored records so an export matches what is shown. */
+async function exportQueryContext(context: ScreenContext): Promise<QueryContext> {
+  const all = await db.records.where("organizationId").equals(context.org.id).toArray();
+  const records = all.filter((record) => ANALYTICS_COLLECTIONS.includes(record.collection));
+  return { records, byId: new Map(records.map((record) => [record.id, record])), now: context.now, locale: context.org.locale };
+}
 
 function downloadCsv(name: string, header: string[], rows: (string | number)[][], context: ScreenContext) {
   const escape = exploreCsvCell;
@@ -56,6 +64,24 @@ function downloadCsv(name: string, header: string[], rows: (string | number)[][]
   URL.revokeObjectURL(url);
   context.toast("Exported", `${name} downloaded from this browser. Nothing was uploaded.`);
 }
+
+function recordHead(context: ScreenContext, collection: string, eyebrow: string): RecordHeaderProps | null {
+  const record = knownRecord(context.params.id);
+  if (!record || record.organizationId !== context.org.id || record.collection !== collection) return null;
+  return {
+    eyebrow,
+    title: record.title,
+    status: <Pill tone={record.status === "published" ? "success" : "neutral"} dot>{record.status}</Pill>,
+    meta: [record.ownerName ? `Owner ${record.ownerName}` : undefined, record.fields.shared === true ? "Shared with the workspace" : "Private to its owner"],
+  };
+}
+
+/** Overlay identity for the dashboard or report in the address, so the head names the right kind of record. */
+const recordSummary = (collection: string, eyebrow: string) => (context: ScreenContext) => {
+  const record = knownRecord(context.params.id);
+  if (!record || record.collection !== collection) return null;
+  return <OverlaySummary eyebrow={eyebrow} title={record.title} status={<Pill tone={record.status === "published" ? "success" : "neutral"} dot>{record.status}</Pill>} />;
+};
 
 export const analyticsApp = registerApp({
   code: "ANALYTICS",
@@ -92,7 +118,7 @@ export const analyticsApp = registerApp({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-ANALYTICS-001": {
       id: "ARL-ANALYTICS-001",
-      subtitle: (context) => `Health figures for ${context.org.name}, each one recomputed from records in this browser and showing where it came from.`,
+      subtitle: () => "Each figure is recomputed from records in this browser and shows where it came from.",
       tabs: ["Executive", "Financial", "Customers", "Operations", "AI"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <InsightsOverview context={context} lens={lens} />,
@@ -104,19 +130,19 @@ export const analyticsApp = registerApp({
         { id: "delegate investigation", label: "Delegate an investigation", placement: "overflow", run: (context) => context.openOverlay("delegate investigation") },
       ],
       overlays: [
-        { id: "Metric inspector", kind: "drawer", title: "Where this figure comes from", width: 560, render: ({ ...context }) => <MetricInspector context={context} /> },
-        { id: "insight detail", kind: "drawer", title: "The month behind the observation", width: 540, render: ({ ...context }) => <InsightDetail context={context} /> },
-        { id: "data freshness", kind: "drawer", title: "Data freshness", width: 540, render: ({ ...context }) => <DataFreshness context={context} /> },
-        { id: "save view", kind: "modal", title: "Save this view", width: 460, render: ({ close, ...context }) => <SaveView context={context} close={close} />, footer: submitFooter("analytics-save-view", "Save view") },
-        { id: "delegate investigation", kind: "modal", title: "Delegate an investigation", width: 560, render: ({ close, ...context }) => <DelegateInvestigation context={context} close={close} /> },
-        { id: "ask", kind: "drawer", title: "Ask the workspace", width: 560, render: ({ ...context }) => <QuestionComposer context={context} /> },
+        { id: "Metric inspector", kind: "drawer", title: "Where this figure comes from", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <MetricInspector context={context} /> },
+        { id: "insight detail", kind: "drawer", title: "The month behind the observation", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <InsightDetail context={context} /> },
+        { id: "data freshness", kind: "drawer", title: "Data freshness", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <DataFreshness context={context} /> },
+        { id: "save view", kind: "modal", title: "Save this view", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SaveView context={context} close={close} />, footer: submitFooter("analytics-save-view", "Save view") },
+        { id: "delegate investigation", kind: "modal", title: "Delegate an investigation", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DelegateInvestigation context={context} close={close} /> },
+        { id: "ask", kind: "drawer", title: "Ask the workspace", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <QuestionComposer context={context} /> },
       ],
     },
 
     /* ------------------------------ 002 ------------------------------ */
     "ARL-ANALYTICS-002": {
       id: "ARL-ANALYTICS-002",
-      subtitle: () => "Dashboards are sets of tiles. Each tile names a measure, and every measure names the collection it reads.",
+      subtitle: () => "Each tile names a measure, and each measure names the collection it reads.",
       tabs: ["All", "Mine", "Shared", "Templates"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <DashboardDirectory context={context} tab={tab} />,
@@ -153,10 +179,10 @@ export const analyticsApp = registerApp({
         { id: "dependencies", label: "Source dependencies", placement: "overflow", run: (context) => context.openOverlay("source dependency") },
       ],
       overlays: [
-        { id: "Dashboard setup", kind: "modal", title: "New dashboard", width: 560, render: ({ close, ...context }) => <DashboardSetup context={context} close={close} />, footer: submitFooter("dashboard-setup", "Create dashboard") },
-        { id: "sharing", kind: "modal", title: "Sharing", width: 520, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
-        { id: "source dependency", kind: "drawer", title: "What this dashboard depends on", width: 520, render: ({ ...context }) => <SourceDependencyOverlay context={context} /> },
-        { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
+        { id: "Dashboard setup", kind: "modal", title: "New dashboard", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DashboardSetup context={context} close={close} />, footer: submitFooter("dashboard-setup", "Create dashboard") },
+        { id: "sharing", kind: "modal", title: "Sharing", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
+        { id: "source dependency", kind: "drawer", title: "What this dashboard depends on", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourceDependencyOverlay context={context} /> },
+        { id: "create report", kind: "modal", title: "New report", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
       ],
     },
 
@@ -164,11 +190,11 @@ export const analyticsApp = registerApp({
     "ARL-ANALYTICS-003": {
       id: "ARL-ANALYTICS-003",
       title: () => "Dashboard editor",
-      subtitle: () => "Drag a tile by its grip and resize it by its corner; the arrow buttons and the handle's arrow keys do the same thing without a pointer.",
+      record: (context) => recordHead(context, "dashboards", "Dashboard"),
       tabs: ["Layout", "Data", "Style", "Access"].map((tab) => ({ id: tab, render: () => null })),
       surface: (context) => <DashboardEditor context={context} />,
       actions: [
-        { id: "Drag widget", label: "Place a tile", placement: "primary", run: (context) => context.openOverlay("Widget chooser") },
+        { id: "Drag widget", label: "Add a tile", placement: "primary", run: (context) => context.openOverlay("Widget chooser") },
         { id: "resize", label: "Resize a tile", placement: "secondary", run: (context) => context.openOverlay("resize tile") },
         { id: "set filter", label: "Set a filter", placement: "secondary", run: (context) => context.openOverlay("set filter") },
         {
@@ -181,7 +207,9 @@ export const analyticsApp = registerApp({
             if (missing.length > 0) {
               context.toast("Published with gaps", `${missing.length} tile${missing.length === 1 ? "" : "s"} have no source and will read Unavailable.`, "info");
             }
-            await context.mutate.patch(record.id, { status: "published", fields: { ...record.fields, publishedAt: new Date(context.now).toISOString() } }, { event: "Dashboard published" });
+            if (record.status === "published") { context.toast("Already published", `${record.title} is already marked published.`, "info"); return; }
+            const saved = await context.mutate.patch(record.id, { status: "published", fields: { ...record.fields, publishedAt: new Date(context.now).toISOString() } }, { expectRevision: record.revision, event: "Dashboard published" });
+            if (!saved) return;
             context.toast("Published", `${record.title} is marked published on the record.`);
           },
         },
@@ -191,20 +219,31 @@ export const analyticsApp = registerApp({
             const record = context.params.id ? await db.records.get(context.params.id) : undefined;
             if (!record) return;
             const body = readDashboard(record);
-            const rows = body.tiles.map((tile) => {
+            const queryContext = await exportQueryContext(context);
+            const filters = body.filters.map((filter) => `${dimensionById(filter.dimensionId)?.name ?? filter.dimensionId} ${filter.op} ${filter.value}`).join("; ") || "None";
+            const rows: (string | number)[][] = [];
+            for (const tile of body.tiles) {
               const measure = measureById(tile.measureId);
-              return [tile.title, measure?.name ?? tile.measureId, measure?.collection ?? "", measure?.formula ?? "", measure?.unavailable ? "unavailable" : "computed"];
-            });
-            downloadCsv(`${record.title.replace(/\s+/g, "-").toLowerCase()}-tiles.csv`, ["Tile", "Measure", "Collection", "Formula", "State"], rows, context);
+              const result = runQuery({ measureIds: [tile.measureId], dimensionId: tile.dimensionId, filters: body.filters }, queryContext);
+              const base = [tile.title, measure?.name ?? tile.measureId];
+              const tail = [String(result.recordCount), result.asOf ?? "Unknown", filters, measure?.formula ?? ""];
+              if (!measure || measure.unavailable) { rows.push([...base, "", "Unavailable", ...tail]); continue; }
+              if (tile.dimensionId && tile.viz !== "line") {
+                for (const row of result.rows) rows.push([...base, row.key, formatMeasure(measure, row.values[0] ?? null, context.money), ...tail]);
+              } else {
+                rows.push([...base, "", formatMeasure(measure, result.totals[0] ?? null, context.money), ...tail]);
+              }
+            }
+            downloadCsv(`${record.title.replace(/\s+/g, "-").toLowerCase()}-figures.csv`, ["Tile", "Measure", "Group", "Value", "Records", "Newest record", "Filters", "Formula"], rows, context);
           },
         },
       ],
       overlays: [
-        { id: "Widget chooser", kind: "modal", title: "Add a tile", width: 620, render: ({ close, ...context }) => <WidgetChooser context={context} close={close} /> },
-        { id: "query editor", kind: "drawer", title: "The query behind this tile", width: 540, render: ({ ...context }) => <QueryEditor context={context} /> },
-        { id: "share", kind: "modal", title: "Sharing", width: 520, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
-        { id: "resize tile", kind: "modal", title: "Resize a tile", width: 520, render: ({ close, ...context }) => <ResizeTile context={context} close={close} /> },
-        { id: "set filter", kind: "modal", title: "Dashboard filters", width: 640, render: ({ close, ...context }) => <SetFilter context={context} close={close} /> },
+        { id: "Widget chooser", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "Add a tile", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <WidgetChooser context={context} close={close} /> },
+        { id: "query editor", kind: "drawer", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "The query behind this tile", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <QueryEditor context={context} /> },
+        { id: "share", kind: "modal", title: "Sharing", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
+        { id: "resize tile", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "Resize a tile", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ResizeTile context={context} close={close} /> },
+        { id: "set filter", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("dashboards", "Dashboard")(context), title: "Dashboard filters", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <SetFilter context={context} close={close} /> },
       ],
     },
 
@@ -212,7 +251,7 @@ export const analyticsApp = registerApp({
     "ARL-ANALYTICS-004": {
       id: "ARL-ANALYTICS-004",
       title: () => "Report builder",
-      subtitle: () => "Headings and commentary are written by a person; every figure is recomputed and cited back to the records it came from.",
+      record: (context) => recordHead(context, "reports", "Report"),
       tabs: ["Content", "Data", "Layout", "Distribution"].map((tab) => ({ id: tab, render: () => null })),
       surface: (context) => <ReportBuilder context={context} />,
       actions: [
@@ -239,10 +278,11 @@ export const analyticsApp = registerApp({
               context.openOverlay("source inspection");
               return;
             }
-            await context.mutate.patch(record.id, {
+            const saved = await context.mutate.patch(record.id, {
               status: "published",
               fields: { ...record.fields, publishedAt: new Date(context.now).toISOString(), citedFigures: checks.length },
             }, { expectRevision: record.revision, event: `Report published with ${checks.length} cited figures` });
+            if (!saved) return;
             context.toast("Published", `${record.title} is published with ${checks.length} figures, each citing its records.`);
           },
         },
@@ -255,29 +295,35 @@ export const analyticsApp = registerApp({
               return;
             }
             const body = readReport(record);
-            const rows = body.blocks
-              .filter((block) => block.measureId)
-              .map((block) => {
-                const measure = measureById(block.measureId!);
-                return [block.text ?? measure?.name ?? "", measure?.name ?? "", measure?.collection ?? "", measure?.formula ?? ""];
-              });
-            downloadCsv(`${record.title.replace(/\s+/g, "-").toLowerCase()}-figures.csv`, ["Block", "Measure", "Collection", "Formula"], rows, context);
+            const queryContext = await exportQueryContext(context);
+            const filters = (body.filters ?? []).map((filter) => `${dimensionById(filter.dimensionId)?.name ?? filter.dimensionId} ${filter.op} ${filter.value}`).join("; ") || "None";
+            const rows: (string | number)[][] = [];
+            for (const block of body.blocks.filter((item) => item.measureId)) {
+              const measure = measureById(block.measureId!);
+              const label = block.text ?? measure?.name ?? "";
+              const result = runQuery({ measureIds: [block.measureId!], dimensionId: block.dimensionId, filters: body.filters ?? [] }, queryContext);
+              const tail = [String(result.recordCount), result.asOf ?? "Unknown", filters, measure?.formula ?? ""];
+              if (!measure || measure.unavailable) { rows.push([label, measure?.name ?? "", "", "Unavailable", ...tail]); continue; }
+              if (block.dimensionId) for (const row of result.rows) rows.push([label, measure.name, row.key, formatMeasure(measure, row.values[0] ?? null, context.money), ...tail]);
+              else rows.push([label, measure.name, "", formatMeasure(measure, result.totals[0] ?? null, context.money), ...tail]);
+            }
+            downloadCsv(`${record.title.replace(/\s+/g, "-").toLowerCase()}-figures.csv`, ["Block", "Measure", "Group", "Value", "Records", "Newest record", "Filters", "Formula"], rows, context);
           },
         },
       ],
       overlays: [
-        { id: "Report block", kind: "modal", title: "Add a block", width: 560, render: ({ close, ...context }) => <ReportBlockOverlay context={context} close={close} /> },
-        { id: "schedule", kind: "modal", title: "Schedule", width: 520, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
-        { id: "source inspection", kind: "drawer", title: "Citations", width: 560, render: ({ ...context }) => <SourceInspection context={context} /> },
-        { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
-        { id: "cite figures", kind: "modal", title: "Cite the figures", width: 680, render: ({ close, ...context }) => <CiteFigures context={context} close={close} /> },
+        { id: "Report block", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("reports", "Report")(context), title: "Add a block", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReportBlockOverlay context={context} close={close} /> },
+        { id: "schedule", kind: "modal", title: "Schedule", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
+        { id: "source inspection", kind: "drawer", title: "Citations", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <SourceInspection context={context} /> },
+        { id: "create report", kind: "modal", title: "New report", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
+        { id: "cite figures", kind: "modal", summary: ({ close: _c, ...context }) => recordSummary("reports", "Report")(context), title: "Cite the figures", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <CiteFigures context={context} close={close} /> },
       ],
     },
 
     /* ------------------------------ 005 ------------------------------ */
     "ARL-ANALYTICS-005": {
       id: "ARL-ANALYTICS-005",
-      subtitle: (context) => `Every dataset is a collection of records in ${context.org.name}. Freshness is the age of the newest record, not of an extract.`,
+      subtitle: () => "Freshness is the age of the newest record, not of an extract.",
       tabs: ["All", "Connected", "Native", "Issues"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <DatasetCatalogue context={context} tab={tab} />,
@@ -298,7 +344,8 @@ export const analyticsApp = registerApp({
             const existing = (await db.records.where("organizationId").equals(context.org.id).toArray())
               .find((record) => record.collection === "datasets" && record.fields.collection === collection);
             if (existing) {
-              await context.mutate.patch(existing.id, { status: "retired" }, { event: `Dataset ${collection} retired` });
+              const saved = await context.mutate.patch(existing.id, { status: "retired" }, { expectRevision: existing.revision, event: `Dataset ${collection} retired` });
+              if (!saved) return;
             } else {
               await context.mutate.create({
                 collection: "datasets",
@@ -313,19 +360,21 @@ export const analyticsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Dataset details", kind: "drawer", title: "Dataset", width: 560, render: ({ ...context }) => <DatasetDetails context={context} /> },
-        { id: "grant review", kind: "modal", title: "Access to this dataset", width: 520, render: ({ ...context }) => <GrantReview context={context} /> },
-        { id: "quality", kind: "drawer", title: "Data quality", width: 560, render: ({ ...context }) => <QualityPanel context={context} /> },
-        { id: "document dataset", kind: "modal", title: "Document a dataset", width: 560, render: ({ close, ...context }) => <DocumentDataset context={context} close={close} /> },
-        { id: "grant dataset", kind: "modal", title: "Grant access to a dataset", width: 600, render: ({ close, ...context }) => <GrantDataset context={context} close={close} /> },
-        { id: "refresh dataset", kind: "modal", title: "Refresh a dataset", width: 560, render: ({ close, ...context }) => <RefreshDataset context={context} close={close} /> },
+        { id: "Dataset details", kind: "drawer", title: "Dataset", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <DatasetSummary context={context} />, render: ({ ...context }) => <DatasetDetails context={context} /> },
+        { id: "grant review", kind: "modal", title: "Access to this dataset", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <GrantReview context={context} close={close} /> },
+        { id: "quality", kind: "drawer", title: "Data quality", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <QualityPanel context={context} /> },
+        { id: "document dataset", kind: "modal", title: "Document a dataset", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DocumentDataset context={context} close={close} /> },
+        { id: "grant dataset", kind: "modal", title: "Grant access to a dataset", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <GrantDataset context={context} close={close} /> },
+        { id: "refresh dataset", kind: "modal", title: "Refresh a dataset", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RefreshDataset context={context} close={close} /> },
       ],
     },
 
     /* ------------------------------ 006 ------------------------------ */
     "ARL-ANALYTICS-006": {
       id: "ARL-ANALYTICS-006",
-      subtitle: () => "One canonical definition per figure, with its formula, its owner, its unit and the collection it reads.",
+      subtitle: () => "One definition per figure: its formula, its source and its owner.",
+      inspectorTitle: "Definition",
+      inspector: (context) => <MetricDefinitionInspector context={context} />,
       tabs: ["Metrics", "Dimensions", "Versions", "Validation"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <MetricDefinitions context={context} tab={tab} />,
@@ -333,7 +382,7 @@ export const analyticsApp = registerApp({
       actions: [
         { id: "Define measure", label: "Define a measure", placement: "primary", run: (context) => context.openOverlay("Formula editor") },
         { id: "test", label: "Test a measure", placement: "secondary", run: (context) => context.openOverlay("test measure") },
-        { id: "approve", label: "Approve a version", placement: "secondary", capability: "manage_policy", run: (context) => context.openOverlay("impact review") },
+        { id: "approve", label: "Review and approve a version", placement: "secondary", capability: "manage_policy", run: (context) => context.openOverlay("impact review") },
         { id: "compare", label: "Compare two measures", placement: "overflow", run: (context) => context.openOverlay("compare measures") },
         { id: "lineage", label: "Lineage", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a measure first"), run: (context) => context.openOverlay("metric QA") },
         {
@@ -345,18 +394,18 @@ export const analyticsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Formula editor", kind: "modal", title: "Define a measure", width: 620, render: ({ close, ...context }) => <FormulaEditor context={context} close={close} /> },
-        { id: "impact review", kind: "modal", title: "What changing this definition affects", width: 560, render: ({ ...context }) => <ImpactReview context={context} /> },
-        { id: "metric QA", kind: "drawer", title: "Metric lineage", width: 580, render: ({ ...context }) => <MetricQA context={context} /> },
-        { id: "test measure", kind: "modal", title: "Test a measure", width: 600, render: ({ close, ...context }) => <TestMeasure context={context} close={close} /> },
-        { id: "compare measures", kind: "drawer", title: "Two measures side by side", width: 720, render: ({ ...context }) => <CompareMeasures context={context} /> },
+        { id: "Formula editor", kind: "modal", title: "Define a measure", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <FormulaEditor context={context} close={close} /> },
+        { id: "impact review", kind: "modal", title: "What changing this definition affects", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImpactReview context={context} close={close} /> },
+        { id: "metric QA", kind: "drawer", title: "Metric lineage", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <MetricQA context={context} /> },
+        { id: "test measure", kind: "modal", title: "Test a measure", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TestMeasure context={context} close={close} /> },
+        { id: "compare measures", kind: "drawer", title: "Two measures side by side", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <CompareMeasures context={context} /> },
       ],
     },
 
     /* ------------------------------ 007 ------------------------------ */
     "ARL-ANALYTICS-007": {
       id: "ARL-ANALYTICS-007",
-      subtitle: () => "Relationships between the collections, each one joined against the real records so a fan-out cannot inflate a total unnoticed.",
+      subtitle: () => "Each join is checked against real records so a fan-out cannot inflate a total unnoticed.",
       tabs: ["Schema", "Transformations", "Tests", "Lineage"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <DataModelling context={context} tab={tab} />,
@@ -370,19 +419,19 @@ export const analyticsApp = registerApp({
         { id: "tests", label: "Model tests", placement: "overflow", run: (context) => context.openOverlay("test") },
       ],
       overlays: [
-        { id: "Join properties", kind: "drawer", title: "Join", width: 540, render: ({ ...context }) => <JoinProperties context={context} /> },
-        { id: "transform editor", kind: "modal", title: "Add a relation", width: 560, render: ({ close, ...context }) => <TransformEditor context={context} close={close} /> },
-        { id: "test", kind: "drawer", title: "Model tests", width: 540, render: ({ ...context }) => <ModelTest context={context} /> },
-        { id: "validate model", kind: "modal", title: "Validate the data model", width: 620, render: ({ close, ...context }) => <ValidateModel context={context} close={close} /> },
-        { id: "refresh model", kind: "drawer", title: "Refresh the joins", width: 640, render: ({ close, ...context }) => <RefreshModel context={context} close={close} /> },
-        { id: "deploy model", kind: "modal", title: "Deploy the data model", width: 580, render: ({ close, ...context }) => <DeployModel context={context} close={close} /> },
+        { id: "Join properties", kind: "drawer", title: "Join", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <JoinProperties context={context} /> },
+        { id: "transform editor", kind: "modal", title: "Add a relation", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TransformEditor context={context} close={close} /> },
+        { id: "test", kind: "drawer", title: "Model tests", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ModelTest context={context} /> },
+        { id: "validate model", kind: "modal", title: "Validate the data model", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ValidateModel context={context} close={close} /> },
+        { id: "refresh model", kind: "drawer", title: "Refresh the joins", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RefreshModel context={context} close={close} /> },
+        { id: "deploy model", kind: "modal", title: "Deploy the data model", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DeployModel context={context} close={close} /> },
       ],
     },
 
     /* ------------------------------ 008 ------------------------------ */
     "ARL-ANALYTICS-008": {
       id: "ARL-ANALYTICS-008",
-      subtitle: () => "A straight line fitted to the posted months, with the spread of its own residuals as the band. Actuals and projections never share a series.",
+      subtitle: () => "A straight line through the posted months. Actuals and projections never share a series.",
       tabs: ["Forecast", "Scenarios", "Inputs", "Accuracy"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <ForecastScreen context={context} tab={tab} />,
@@ -406,18 +455,18 @@ export const analyticsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Assumption inspector", kind: "drawer", title: "Assumptions", width: 520, render: ({ ...context }) => <AssumptionInspector context={context} /> },
-        { id: "scenario editor", kind: "modal", title: "Save a scenario", width: 560, render: ({ close, ...context }) => <ScenarioEditor context={context} close={close} /> },
-        { id: "confidence note", kind: "modal", title: "What the band means", width: 520, render: ({ ...context }) => <ConfidenceNote context={context} /> },
-        { id: "adjust inputs", kind: "modal", title: "Adjust a scenario's inputs", width: 600, render: ({ close, ...context }) => <AdjustInputs context={context} close={close} /> },
-        { id: "compare scenarios", kind: "drawer", title: "Scenarios compared", width: 820, render: ({ ...context }) => <CompareScenarios context={context} /> },
+        { id: "Assumption inspector", kind: "drawer", title: "Assumptions", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <AssumptionInspector context={context} /> },
+        { id: "scenario editor", kind: "modal", title: "Save a scenario", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ScenarioEditor context={context} close={close} /> },
+        { id: "confidence note", kind: "modal", title: "What the band means", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ConfidenceNote context={context} /> },
+        { id: "adjust inputs", kind: "modal", title: "Adjust a scenario's inputs", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AdjustInputs context={context} close={close} /> },
+        { id: "compare scenarios", kind: "drawer", title: "Scenarios compared", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <CompareScenarios context={context} /> },
       ],
     },
 
     /* ------------------------------ 009 ------------------------------ */
     "ARL-ANALYTICS-009": {
       id: "ARL-ANALYTICS-009",
-      subtitle: () => "Schedules and audiences are records. Delivery stops at the provider boundary, so a prepared delivery is never shown as sent.",
+      subtitle: () => "Delivery stops at the provider boundary, so a prepared delivery is never shown as sent.",
       tabs: ["Schedules", "Audiences", "Deliveries", "Failures"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <Distribution context={context} tab={tab} />,
@@ -432,7 +481,8 @@ export const analyticsApp = registerApp({
             const record = context.selectedId ? await db.records.get(context.selectedId) : undefined;
             if (!record) return;
             const paused = record.fields.schedulePaused === true;
-            await context.mutate.patch(record.id, { fields: { ...record.fields, schedulePaused: !paused } }, { event: paused ? "Report schedule resumed" : "Report schedule paused" });
+            const saved = await context.mutate.patch(record.id, { fields: { ...record.fields, schedulePaused: !paused } }, { expectRevision: record.revision, event: paused ? "Report schedule resumed" : "Report schedule paused" });
+            if (!saved) return;
             context.toast(paused ? "Resumed" : "Paused", paused ? "Its next run is computed again." : "No next run is computed for it.");
           },
         },
@@ -460,11 +510,11 @@ export const analyticsApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Recipient preview", kind: "modal", title: "Prepare a delivery", width: 580, render: ({ close, ...context }) => <RecipientPreview context={context} close={close} /> },
-        { id: "delivery method", kind: "modal", title: "How a report would be delivered", width: 520, render: ({ ...context }) => <DeliveryMethod context={context} /> },
-        { id: "failure detail", kind: "drawer", title: "Why it did not go out", width: 520, render: ({ ...context }) => <FailureDetail context={context} /> },
-        { id: "schedule", kind: "modal", title: "Schedule", width: 520, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
-        { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
+        { id: "Recipient preview", kind: "modal", title: "Prepare a delivery", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RecipientPreview context={context} close={close} /> },
+        { id: "delivery method", kind: "modal", title: "How a report would be delivered", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <DeliveryMethod context={context} /> },
+        { id: "failure detail", kind: "drawer", title: "Why it did not go out", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <FailureDetail context={context} /> },
+        { id: "schedule", kind: "modal", title: "Schedule", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
+        { id: "create report", kind: "modal", title: "New report", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
       ],
     },
   }),

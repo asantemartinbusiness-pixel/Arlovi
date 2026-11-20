@@ -3,7 +3,7 @@ import {
   Boxes, ClipboardCheck, FileText, GitBranch, LayoutTemplate, Play, Receipt, Rocket, Target, Wallet,
 } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalActions, OVERLAY_WIDTH, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, KeyValueList, Meter, Notice, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -17,6 +17,7 @@ import {
 } from "./interpreter";
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/platform/commit";
 
 import { ExecutionStatusCard, MilestoneTimeline, MilestonesCard, MissionBriefCard, ParticipantsPanel } from "./BriefPanels";
 import { TaskSchedule } from "./TaskSchedule";
@@ -34,6 +35,13 @@ interface Criterion { id: string; label: string; verified: boolean; evidenceId?:
 function criteriaOf(mission: Rec | undefined): Criterion[] {
   const body = mission?.body as { criteria?: Criterion[] } | undefined;
   return body?.criteria ?? [];
+}
+
+/** Money committed to a mission, from its commitment cost records (the same figure Overview and Budget show). */
+function commitmentMinor(costs: Rec[], missionId: string): number {
+  return costs
+    .filter((cost) => cost.fields.missionId === missionId && cost.fields.kind === "commitment")
+    .reduce((sum, cost) => sum + (cost.amountMinor ?? 0), 0);
 }
 
 function useMissionData() {
@@ -115,15 +123,18 @@ function MissionLibrary({ context, view }: { context: ScreenContext; view: strin
             { key: "status", header: "Status", cell: (row) => <Pill tone={missionTone(row.status)} dot>{row.status}</Pill> },
             { key: "owner", header: "Owner", cell: (row) => <Row gap={2}><Avatar name={row.ownerName} size="sm" />{row.ownerName}</Row> },
             { key: "budget", header: "Ceiling", align: "end", cell: (row) => context.money(Number(row.fields.budgetMinor ?? 0)), sortValue: (row) => Number(row.fields.budgetMinor ?? 0) },
-            { key: "committed", header: "Committed", align: "end", cell: (row) => context.money(Number(row.fields.committedMinor ?? 0)) },
+            { key: "committed", header: "Committed", align: "end", cell: (row) => context.money(commitmentMinor(data.missionCosts, row.id)) },
             { key: "due", header: "Due", align: "end", cell: (row) => context.date(row.dueAt), sortValue: (row) => row.dueAt ?? "~" },
           ]}
           bulkActions={[
             {
               label: "Tag as priority",
-              onRun: (selected) => selected.forEach((mission) => {
-                void context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, "priority"])] }, { event: `${mission.title} tagged priority` });
-              }),
+              onRun: (selected) => {
+                void (async () => {
+                  const tagged = await tagMissions(context, selected, "priority");
+                  if (tagged > 0) context.toast("Tagged", `${tagged} of ${selected.length} mission${selected.length === 1 ? "" : "s"} tagged priority.`);
+                })();
+              },
             },
           ]}
         />
@@ -147,7 +158,7 @@ function MissionLibrary({ context, view }: { context: ScreenContext; view: strin
                   <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>
                   <Button size="sm" variant="ghost" onClick={() => { context.select(mission.id); context.openOverlay("Mission quick view", { id: mission.id }); }}>Quick view</Button>
                   <span className="ds-grow" />
-                  <span className="ds-subtle ds-num">{context.money(Number(mission.fields.committedMinor ?? 0))} / {context.money(Number(mission.fields.budgetMinor ?? 0))}</span>
+                  <span className="ds-subtle ds-num">{context.money(commitmentMinor(data.missionCosts, mission.id))} / {context.money(Number(mission.fields.budgetMinor ?? 0))}</span>
                 </>}
               >
                 <Stack gap={3}>
@@ -395,14 +406,8 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
 
   return (
     <Stack gap={4}>
-      <Row gap={2} wrap>
-        {WIZARD_STEPS.map((item, index) => {
-          const done = wizardProblems(draft, item).length === 0;
-          return <Pill key={item} tone={item === step ? "accent" : done ? "success" : "neutral"} dot={item === step}>{index + 1}. {item}{done ? " ✓" : ""}</Pill>;
-        })}
-      </Row>
       <Grid>
-        <Card span={8} eyebrow="MISSION BUILDER" title={step} subtitle={`Step ${WIZARD_STEPS.indexOf(step) + 1} of ${WIZARD_STEPS.length}`}>
+        <Card span={8} title={step} subtitle={`Step ${WIZARD_STEPS.indexOf(step) + 1} of ${WIZARD_STEPS.length}`}>
           <Stack gap={4}>
             {body()}
             {problems.length > 0 && (
@@ -418,7 +423,22 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
             </Row>
           </Stack>
         </Card>
-        <Card span={4} eyebrow="DRAFT" prov="human" title="Mission so far">
+        <Card span={4} prov="human" title="Mission so far">
+          <Stack gap={3}>
+          <ol className="mission-builder-steps" aria-label="Step completion">
+            {WIZARD_STEPS.map((item, index) => {
+              const earlier = WIZARD_STEPS.slice(0, index);
+              const done = wizardProblems(draft, item).length === 0 && earlier.every((other) => wizardProblems(draft, other).length === 0);
+              return (
+                <li key={item} data-done={done || undefined} data-current={item === step || undefined}>
+                  <button type="button" onClick={() => context.setTab(item)} aria-current={item === step ? "step" : undefined}>
+                    <span aria-hidden="true">{done ? "✓" : index + 1}</span>
+                    {item}<span className="ds-sr-only">{done ? ", complete" : ", incomplete"}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
           <Properties rows={[
             { label: "Goal", value: draft.goal ? `${draft.goal.slice(0, 48)}…` : "—" },
             { label: "Context", value: String(draft.contextIds.length) },
@@ -426,6 +446,7 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
             { label: "Steps", value: String(draft.steps.length) },
             { label: "Ceiling", value: context.money(draft.budgetMinor) },
           ]} />
+          </Stack>
         </Card>
       </Grid>
     </Stack>
@@ -491,10 +512,9 @@ function MissionOverview({ context, view }: { context: ScreenContext; view: stri
       </Grid>
 
       <Grid>
-        <Card span={7} eyebrow="GOAL" prov="human" title={mission.title} subtitle={mission.summary}>
+        <Card span={7} prov="human" title="Completion criteria" subtitle={criteria.length === 0 ? "None recorded" : `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length} verified`}>
           <Stack gap={4}>
             <Stack gap={2}>
-              <strong>Completion criteria</strong>
               {criteria.length === 0 ? <span className="ds-subtle">No criterion is recorded, so this mission cannot be completed honestly.</span> : criteria.map((criterion) => (
                 <Row key={criterion.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
                   <Pill tone={criterion.verified ? "success" : "warning"}>{criterion.verified ? "verified" : "not verified"}</Pill>
@@ -663,7 +683,7 @@ function PlanDependencies({ context, view }: { context: ScreenContext; view: str
               </marker>
             </defs>
             {nodes.map(({ task, x, y }) => (
-              <g key={task.id} tabIndex={0} role="button" aria-label={`${task.title}, ${String(task.fields.stage)}, owner ${String(task.fields.assignee)}`}
+              <g key={task.id} tabIndex={0} role="button" aria-label={`${task.title}, ${String(task.fields.stage)}, owner ${String(task.fields.assignee ?? task.ownerName)}`}
                 onClick={() => { context.select(task.id); context.openOverlay("Task inspector", { id: task.id }); }}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); context.select(task.id); context.openOverlay("Task inspector", { id: task.id }); } }}
                 style={{ cursor: "pointer" }}>
@@ -713,10 +733,10 @@ function TaskBoard({ context, view }: { context: ScreenContext; view: string }) 
       context.toast("Move blocked", `${unmet.map((id) => tasks.find((item) => item.id === id)?.title).join(", ")} must finish first.`, "blocked");
       return;
     }
-    await context.mutate.patch(task.id, {
+    if (!(await context.mutate.patch(task.id, {
       status: lane === "verified" ? "done" : lane,
       fields: { ...task.fields, stage: lane, movedBy: context.actor },
-    }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` });
+    }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` }))) return;
     setAnnouncement(`${task.title} moved to ${lane}.`);
     context.toast("Moved", `${task.title} is in ${lane}. The record changed; nothing executed.`);
   }
@@ -854,43 +874,53 @@ async function executeStep(context: ScreenContext, step: Rec, mission: Rec, pool
   }
   const result = runStep(step, { records: pool, mission, money, date, now });
   const attempts = Number(step.fields.attempts ?? 0) + 1;
-  await context.mutate.patch(step.id, {
-    status: result.state,
-    fields: { ...step.fields, attempts, lastRunBy: context.actor, lastRunAt: now.toISOString() },
-    body: { ...(step.body as object), output: result.output, reason: result.reason ?? "", inputs: result.read },
-  }, { expectRevision: step.revision, event: `${step.title} run locally: ${result.state}` });
-
-  await context.mutate.create({
-    collection: "missionReceipts",
-    title: `Receipt · ${String(step.fields.operation ?? step.title)}`,
-    status: result.state === "done" ? "recorded" : result.state,
-    parentId: mission.id,
-    at: now.toISOString(),
-    summary: result.state === "done"
-      ? `Ran in this browser. ${result.read.length} records read.`
-      : result.reason ?? "The step did not complete.",
-    fields: {
-      stepId: step.id,
-      state: result.state === "done" ? "ready_local" : result.state === "blocked" ? "not_connected" : result.state,
-      attempt: attempts,
-      actor: context.actor,
-      capability: result.capability ?? "",
+  /* The step's new state, its receipt and any draft it produced are one change: a stale step revision rolls all of it back. */
+  const recorded = await commitTogether(context, [
+    {
+      record: step,
+      patch: {
+        status: result.state,
+        fields: { ...step.fields, attempts, lastRunBy: context.actor, lastRunAt: now.toISOString() },
+        body: { ...(step.body as object), output: result.output, reason: result.reason ?? "", inputs: result.read },
+      },
+      event: `${step.title} run locally: ${result.state}`,
     },
-    body: { request: String(step.fields.operation ?? ""), response: result.output, reason: result.reason ?? "", read: result.read },
-  }, `Receipt written for ${step.title}`);
-
-  if (result.create) {
-    await context.mutate.create({
-      collection: result.create.collection,
-      title: result.create.title,
-      status: "draft",
-      parentId: mission.id,
-      summary: result.create.summary,
-      at: now.toISOString(),
-      fields: { missionId: mission.id, deliverable: true, version: 1, approval: "draft", producedBy: "local interpreter" },
-      body: { text: result.create.text, versions: [{ version: 1, at: now.toISOString(), author: "Local interpreter", summary: "Composed from workspace records." }] },
-    }, `Draft produced by ${step.title}`);
-  }
+    {
+      create: {
+        collection: "missionReceipts",
+        title: `Receipt · ${String(step.fields.operation ?? step.title)}`,
+        status: result.state === "done" ? "recorded" : result.state,
+        parentId: mission.id,
+        at: now.toISOString(),
+        summary: result.state === "done"
+          ? `Ran in this browser. ${result.read.length} records read.`
+          : result.reason ?? "The step did not complete.",
+        fields: {
+          stepId: step.id,
+          state: result.state === "done" ? "ready_local" : result.state === "blocked" ? "not_connected" : result.state,
+          attempt: attempts,
+          actor: context.actor,
+          capability: result.capability ?? "",
+        },
+        body: { request: String(step.fields.operation ?? ""), response: result.output, reason: result.reason ?? "", read: result.read },
+      },
+      event: `Receipt written for ${step.title}`,
+    },
+    ...(result.create ? [{
+      create: {
+        collection: result.create.collection,
+        title: result.create.title,
+        status: "draft",
+        parentId: mission.id,
+        summary: result.create.summary,
+        at: now.toISOString(),
+        fields: { missionId: mission.id, deliverable: true, version: 1, approval: "draft", producedBy: "local interpreter" },
+        body: { text: result.create.text, versions: [{ version: 1, at: now.toISOString(), author: "Local interpreter", summary: "Composed from workspace records." }] },
+      },
+      event: `Draft produced by ${step.title}`,
+    }] : []),
+  ]);
+  if (!recorded) return { state: step.status as StepResult["state"], output: "", reason: "The step changed elsewhere", read: [] };
 
   if (result.state === "done") {
     context.toast("Step ran", `${step.title} read ${result.read.length} records. The output and a receipt are on the record.`);
@@ -911,8 +941,14 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
   /* The interpreter reads across the workspace, so the pool is the whole
      organisation rather than the mission's own collections. */
   const pool = useOrgRecords();
+  const organisation = useRecord(context.org.id);
   if (!mission) return <Empty title="No mission" icon={<Rocket size={20} />} />;
 
+  /* HANDOFF rule 8: no step runs while the organisation or this mission is paused. */
+  const orgPaused = organisation?.fields.executionPaused === true;
+  const missionPaused = mission.status === "paused" || mission.fields.executionPaused === true;
+  const held = orgPaused || missionPaused;
+  const heldReason = orgPaused ? "Automation is paused for the organisation" : "This mission is paused";
   const nextRunnable = steps.find((step) => ["ready", "todo"].includes(step.status));
   const exceptions = steps.filter((step) => ["blocked", "failed", "unknown_side_effect"].includes(step.status));
   const gates = steps.filter((step) => String(step.fields.kind) === "approval");
@@ -955,7 +991,7 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
                 disabled={gate.status === "done" || !context.can("approve_mission")}
                 title={context.can("approve_mission") ? undefined : "This role view does not approve missions"}
                 onClick={async () => {
-                  await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` });
+                  if (!(await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` }))) return;
                   context.toast("Gate passed", `${context.actor} approved it. The next step can be run.`);
                 }}
               >
@@ -999,7 +1035,7 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
                 </Button>
                 {step.status === "unknown_side_effect" && (
                   <Button size="sm" variant="outline-danger" onClick={async () => {
-                    await context.mutate.patch(step.id, { status: "failed", fields: { ...step.fields, reconciledBy: context.actor } }, { expectRevision: step.revision, event: `${step.title} reconciled by ${context.actor}: no effect found` });
+                    if (!(await context.mutate.patch(step.id, { status: "failed", fields: { ...step.fields, reconciledBy: context.actor } }, { expectRevision: step.revision, event: `${step.title} reconciled by ${context.actor}: no effect found` }))) return;
                     context.toast("Reconciled", "You recorded that no external effect happened. The step can now be retried.");
                   }}>Reconcile</Button>
                 )}
@@ -1022,21 +1058,12 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
 
   return (
     <Stack gap={4}>
+      {held && (
+        <Notice tone="warning" title={orgPaused ? "Dispatch is held for the whole organisation" : "This mission is paused"}>
+          {orgPaused ? "An owner resumes it from the Autonomy Centre." : "Resume it from the mission overview."} No step starts while it is held. Actions already accepted elsewhere cannot be confirmed from here.
+        </Notice>
+      )}
       <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          busy={busy === "next"}
-          disabled={!nextRunnable}
-          title={nextRunnable ? undefined : "No step is ready to run"}
-          icon={<Play size={16} />}
-          onClick={async () => {
-            if (!nextRunnable) return;
-            setBusy("next");
-            try { await executeStep(context, nextRunnable, mission, pool, money, date, now); } finally { setBusy(null); }
-          }}
-        >
-          Run the next step
-        </Button>
         <span className="ds-subtle">
           {nextRunnable ? `Next: ${nextRunnable.title} (${String(nextRunnable.fields.kind)})` : "Nothing is ready. Steps wait on gates, exceptions or their order."}
         </span>
@@ -1050,47 +1077,41 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
           const tone = step.status === "done" ? "var(--success)" : ["blocked", "failed", "unknown_side_effect"].includes(step.status) ? "var(--warning)" : step.status === "awaiting_approval" ? "var(--info)" : "var(--border-default)";
           return (
             <li key={step.id}>
-              <Row gap={3} style={{ alignItems: "flex-start" }}>
-                <div style={{ width: 120, flex: "none", paddingBlockStart: 6 }}>
-                  <strong className="ds-num">{String(step.fields.order ?? 0)}. {String(step.fields.kind)}</strong>
-                  <div className="ds-subtle ds-num">{step.fields.lastRunAt ? context.dateTime(String(step.fields.lastRunAt)) : "not run"}</div>
-                </div>
-                <div className="ds-panel ds-grow" style={{ padding: "var(--space-3)", borderLeft: `3px solid ${tone}` }}>
-                  <Row gap={2} wrap>
-                    <strong className="ds-grow">{step.title}</strong>
-                    <Pill tone={step.status === "done" ? "success" : ["blocked", "failed", "unknown_side_effect"].includes(step.status) ? "warning" : step.status === "awaiting_approval" ? "info" : "neutral"} dot>
-                      {step.status.replace(/_/g, " ")}
-                    </Pill>
-                    <span className="ds-subtle ds-num">{String(step.fields.attempts ?? 0)} attempts</span>
-                  </Row>
-                  <p className="ds-subtle" style={{ marginBlockStart: 4 }}>{step.summary}</p>
-                  <Properties rows={[
-                    { label: "Operation", value: <code className="ds-num">{String(step.fields.operation ?? "—")}</code> },
-                    { label: "Inputs", value: (body?.inputs ?? []).length ? `${(body?.inputs ?? []).length} record${(body?.inputs ?? []).length === 1 ? "" : "s"} read` : operation?.note ?? "Nothing read yet" },
-                    { label: "Output", value: body?.output || "—" },
-                    ...(body?.reason ? [{ label: "Why it stopped", value: body.reason }] : []),
-                  ]} />
-                  <Row gap={2} wrap style={{ marginBlockStart: "var(--space-2)" }}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      busy={busy === step.id}
-                      disabled={step.status === "done" || step.status === "unknown_side_effect"}
-                      title={blockedReason(step)}
-                      onClick={async () => {
-                        setBusy(step.id);
-                        try { await executeStep(context, step, mission, pool, money, date, now); } finally { setBusy(null); }
-                      }}
-                    >
-                      {Number(step.fields.attempts ?? 0) > 0 ? "Run again" : "Run this step"}
-                    </Button>
-                    <Button size="sm" variant="ghost" disabled={stepReceipts.length === 0} onClick={() => { context.select(step.id); context.openOverlay("Action receipt", { id: step.id }); }}>
-                      {stepReceipts.length} receipt{stepReceipts.length === 1 ? "" : "s"}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => { context.select(step.id); context.openOverlay("execution trace", { id: step.id }); }}>Trace</Button>
-                  </Row>
-                </div>
-              </Row>
+              <div className="ds-panel" style={{ padding: "var(--space-3)", borderLeft: `3px solid ${tone}` }}>
+                <Row gap={2} wrap>
+                  <span className="ds-num ds-subtle">{String(step.fields.order ?? 0)}</span>
+                  <strong className="ds-grow">{step.title}</strong>
+                  <code className="ds-num ds-subtle">{String(step.fields.operation ?? step.fields.kind ?? "")}</code>
+                  <Pill tone={step.status === "done" ? "success" : ["blocked", "failed", "unknown_side_effect"].includes(step.status) ? "warning" : step.status === "awaiting_approval" ? "info" : "neutral"} dot>
+                    {step.status.replace(/_/g, " ")}
+                  </Pill>
+                </Row>
+                <KeyValueList columns={2} items={[
+                  { label: "Inputs", value: (body?.inputs ?? []).length ? `${(body?.inputs ?? []).length} record${(body?.inputs ?? []).length === 1 ? "" : "s"} read` : operation?.note ?? "Nothing read yet" },
+                  { label: "Last run", value: step.fields.lastRunAt ? `${context.dateTime(String(step.fields.lastRunAt))} · ${String(step.fields.attempts ?? 0)} attempt${Number(step.fields.attempts ?? 0) === 1 ? "" : "s"}` : Number(step.fields.attempts ?? 0) > 0 ? `${String(step.fields.attempts)} attempt${Number(step.fields.attempts) === 1 ? "" : "s"}, time not recorded` : "Not run", mono: Boolean(step.fields.lastRunAt) },
+                  { label: "Output", value: body?.output || "—" },
+                  ...(body?.reason ? [{ label: "Why it stopped", value: body.reason }] : []),
+                ]} />
+                <Row gap={2} wrap style={{ marginBlockStart: "var(--space-2)" }}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    busy={busy === step.id}
+                    disabled={step.status === "done" || step.status === "unknown_side_effect" || held}
+                    title={held ? heldReason : blockedReason(step)}
+                    onClick={async () => {
+                      setBusy(step.id);
+                      try { await executeStep(context, step, mission, pool, money, date, now); } finally { setBusy(null); }
+                    }}
+                  >
+                    {Number(step.fields.attempts ?? 0) > 0 ? "Run again" : "Run this step"}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={stepReceipts.length === 0} onClick={() => { context.select(step.id); context.openOverlay("Action receipt", { id: step.id }); }}>
+                    {stepReceipts.length} receipt{stepReceipts.length === 1 ? "" : "s"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { context.select(step.id); context.openOverlay("execution trace", { id: step.id }); }}>Trace</Button>
+                </Row>
+              </div>
             </li>
           );
         })}
@@ -1242,40 +1263,50 @@ function Deliverables({ context, view }: { context: ScreenContext; view: string 
     return <Empty title={`No ${view.toLowerCase()} deliverable`} icon={<FileText size={20} />}>A deliverable is produced by a draft step or written by a person. Running the plan's draft steps creates one.</Empty>;
   }
 
+  const approvalLabel = (item: Rec) => { const label = String(item.fields.approval ?? item.status).replace(/_/g, " "); return label === "review" ? "in review" : label; };
+  const versionsOf = (item: Rec) => ((item.body as { versions?: unknown[] } | undefined)?.versions ?? []).length || 1;
   return (
-    <Grid>
-      {rows.map((item) => {
-        const body = item.body as { text?: string; versions?: { version: number; at: string; author: string; summary: string }[] } | undefined;
-        const producedByAgent = String(item.fields.producedBy ?? "").includes("interpreter") || item.ownerName.includes("Nia") || item.ownerName.includes("Sable");
-        return (
-          <Card
-            key={item.id}
-            span={6}
-            eyebrow="DELIVERABLE"
-            prov={item.status === "published" ? "posted" : producedByAgent ? "agent" : "human"}
-            title={item.title}
-            subtitle={`v${String(item.fields.version ?? 1)} · ${item.ownerName}`}
-            actions={<Pill tone={item.status === "approved" ? "success" : item.status === "published" ? "info" : "neutral"}>{item.status}</Pill>}
-            footer={<>
-              <Button size="sm" variant="secondary" onClick={() => { context.select(item.id); context.openOverlay("Artifact preview", { id: item.id }); }}>Preview</Button>
-              <Button size="sm" variant="ghost" disabled={item.status === "approved" || item.status === "published"} onClick={() => { context.select(item.id); context.openOverlay("approval", { id: item.id }); }}>Approve</Button>
-              <Button size="sm" variant="ghost" onClick={() => { context.select(item.id); context.openOverlay("version diff", { id: item.id }); }}>Versions</Button>
-              <span className="ds-grow" />
-              <Button size="sm" variant="ghost" onClick={() => { context.select(item.id); context.openOverlay("publish verification", { id: item.id }); }}>Publish</Button>
-            </>}
-          >
-            <Stack gap={2}>
-              <p className="ds-subtle" style={{ whiteSpace: "pre-wrap", maxHeight: 110, overflow: "hidden" }}>{body?.text ?? item.summary}</p>
-              <Properties rows={[
-                { label: "Approval", value: String(item.fields.approval ?? item.status) },
-                { label: "Versions", value: String(body?.versions?.length ?? 1) },
-                { label: "Published outside", value: <Pill tone="warning">Not possible — no hosting connected</Pill> },
-              ]} />
-            </Stack>
-          </Card>
-        );
-      })}
-    </Grid>
+    <Stack gap={3}>
+      <DataGrid
+        rows={rows}
+        rowId={(row) => row.id}
+        label="Deliverables"
+        cardHasActions
+        selectedId={context.selectedId}
+        onSelect={(id) => context.select(id)}
+        onOpen={(id) => { context.select(id); context.openOverlay("Artifact preview", { id }); }}
+        card={(row) => (
+          <Stack gap={2}>
+            <Row gap={2}>
+              <strong className="ds-grow">{row.title}</strong>
+              <Pill tone={row.status === "approved" ? "success" : row.status === "published" ? "info" : row.status === "draft" ? "neutral" : "warning"} dot>{approvalLabel(row)}</Pill>
+            </Row>
+            <span className="ds-subtle ds-num">v{String(row.fields.version ?? 1)} · {versionsOf(row)} saved · {row.ownerName}</span>
+            <Row gap={1} wrap>
+              <Button size="sm" variant="secondary" disabled={row.status === "approved" || row.status === "published"} onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("approval", { id: row.id }); }}>Approve</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("version diff", { id: row.id }); }}>Versions</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("publish verification", { id: row.id }); }}>Publish</Button>
+            </Row>
+          </Stack>
+        )}
+        columns={[
+          { key: "title", header: "Deliverable", primary: true, cell: (row) => row.title, filterValue: (row) => row.title, sortValue: (row) => row.title },
+          { key: "version", header: "Version", align: "end", cell: (row) => <span className="ds-num">v{String(row.fields.version ?? 1)} · {versionsOf(row)} saved</span>, sortValue: (row) => Number(row.fields.version ?? 1) },
+          { key: "owner", header: "Written by", cell: (row) => <Row gap={2}><Avatar name={row.ownerName} size="sm" />{row.ownerName}</Row>, filterValue: (row) => row.ownerName },
+          { key: "approval", header: "Approval", cell: (row) => <Pill tone={row.status === "approved" ? "success" : row.status === "published" ? "info" : row.status === "draft" ? "neutral" : "warning"} dot>{approvalLabel(row)}</Pill>, sortValue: (row) => row.status },
+          { key: "act", header: "", align: "end", cell: (row) => (
+            <Row gap={1}>
+              <Button size="sm" variant="ghost" disabled={row.status === "approved" || row.status === "published"} onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("approval", { id: row.id }); }}>Approve</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("version diff", { id: row.id }); }}>Versions</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("publish verification", { id: row.id }); }}>Publish</Button>
+            </Row>
+          ) },
+        ]}
+      />
+      <Notice tone="info" title="Nothing is published outside this workspace">
+        No hosting is connected, so every deliverable stays here. Publish explains what a verified release would need and changes nothing.
+      </Notice>
+    </Stack>
   );
 }
 
@@ -1564,27 +1595,89 @@ function MissionTemplates({ context, view }: { context: ScreenContext; view: str
  * Overlays
  * ====================================================================== */
 
+/* Identity blocks for the overlay head (OverlayDef.summary): the one place a record is named. */
+function MissionSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const asked = useRecord(payload?.id ?? context.selectedId ?? context.params.id);
+  const mission = asked?.collection === "missions" ? asked : undefined;
+  if (!mission) return null;
+  const held = mission.status === "paused" || mission.fields.executionPaused === true;
+  return (
+    <OverlaySummary
+      eyebrow="Mission"
+      title={mission.title}
+      status={<Pill tone={missionTone(mission.status)} dot>{mission.status.replace(/_/g, " ")}</Pill>}
+      meta={[mission.ownerName, `Ceiling ${context.money(Number(mission.fields.budgetMinor ?? 0))}`, held && mission.status !== "paused" ? "Dispatch held" : ""]}
+    />
+  );
+}
+
+function TaskSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const asked = useRecord(payload?.id ?? context.selectedId);
+  const task = asked?.collection === "missionTasks" ? asked : undefined;
+  if (!task) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Task"
+      title={task.title}
+      status={<Pill tone="neutral" dot>{String(task.fields.stage ?? task.status).replace(/_/g, " ")}</Pill>}
+      meta={[String(task.fields.assignee ?? task.ownerName), task.fields.approvalRequired === true ? "Approval gate" : ""]}
+    />
+  );
+}
+
+function DeliverableSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const asked = useRecord(payload?.id ?? context.selectedId);
+  const item = asked?.collection === "documents" ? asked : undefined;
+  if (!item) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Deliverable"
+      title={item.title}
+      status={<Pill tone={item.status === "approved" ? "success" : item.status === "published" ? "info" : "neutral"} dot>{String(item.fields.approval ?? item.status).replace(/_/g, " ")}</Pill>}
+      meta={[`v${String(item.fields.version ?? 1)}`, item.ownerName]}
+    />
+  );
+}
+
+/** The mission every "This mission" screen is about, named once under the page title. */
+function MissionLine({ context }: { context: ScreenContext }) {
+  const asked = useRecord(context.params.id);
+  const organisation = useRecord(context.org.id);
+  const mission = asked?.collection === "missions" ? asked : undefined;
+  if (!mission) return null;
+  const orgPaused = organisation?.fields.executionPaused === true;
+  const held = mission.status === "paused" || mission.fields.executionPaused === true;
+  return (
+    <Row gap={2} wrap>
+      <strong>{mission.title}</strong>
+      <Pill tone={missionTone(mission.status)} dot>{mission.status.replace(/_/g, " ")}</Pill>
+      {orgPaused && <Pill tone="warning">Organisation paused</Pill>}
+      {held && mission.status !== "paused" && !orgPaused && <Pill tone="warning">Dispatch held</Pill>}
+      <span className="ds-subtle">{mission.ownerName}</span>
+    </Row>
+  );
+}
+
 function MissionQuickView({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const mission = useRecord(payload?.id ?? context.selectedId);
   const tasks = useCollection("missionTasks").filter((task) => task.parentId === mission?.id);
+  const costs = useCollection("missionCosts");
   if (!mission || mission.collection !== "missions") return <Empty title="Choose a mission" />;
   const criteria = criteriaOf(mission);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: <Pill tone={missionTone(mission.status)} dot>{mission.status}</Pill> },
-        { label: "Owner", value: mission.ownerName },
-        { label: "Ceiling", value: context.money(Number(mission.fields.budgetMinor ?? 0)) },
-        { label: "Committed", value: context.money(Number(mission.fields.committedMinor ?? 0)) },
-        { label: "Tasks", value: `${tasks.filter((task) => String(task.fields.stage) === "verified").length} verified of ${tasks.length}` },
-        { label: "Criteria", value: `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length} verified` },
+      <FactGrid items={[
+        { label: "Committed", value: context.money(commitmentMinor(costs, mission.id)), mono: true },
+        { label: "Due", value: mission.dueAt ? context.date(mission.dueAt) : "No date", mono: Boolean(mission.dueAt) },
+        { label: "Tasks verified", value: `${tasks.filter((task) => String(task.fields.stage) === "verified").length} of ${tasks.length}`, mono: true },
+        { label: "Criteria verified", value: `${criteria.filter((criterion) => criterion.verified).length} of ${criteria.length}`, mono: true },
       ]} />
       <p className="ds-prose">{mission.summary}</p>
-      <Row gap={2} wrap>
-        <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>
-        <Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}/execution`)}>Execution</Button>
-      </Row>
+      <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>} secondary={<><Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}/execution`)}>Execution</Button></>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1632,16 +1725,16 @@ function MissionArchive({ context, close }: { context: ScreenContext; close: () 
         {mission.title} will stay readable with its plan, receipts and costs. No step can be run and no budget committed on it afterwards.
       </Notice>
       {open.length > 0 && <Notice tone="danger" title={`${open.length} open task${open.length === 1 ? "" : "s"}`}>{open.map((task) => task.title).join(", ")} will be archived unfinished, and will show as unresolved on the results.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="danger"
         onClick={async () => {
-          await context.mutate.patch(mission.id, { status: "archived", fields: { ...mission.fields, archivedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} archived by ${context.actor}` });
+          if (!(await context.mutate.patch(mission.id, { status: "archived", fields: { ...mission.fields, archivedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} archived by ${context.actor}` }))) return;
           context.toast("Archived", "It stays auditable and cannot be executed.");
           close();
         }}
       >
         Archive the mission
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1742,7 +1835,7 @@ function ApprovalSheet({ context, close }: { context: ScreenContext; close: () =
           A named target, a bounded ceiling, a team and a plan of typed steps. It is created as proposed; approval is a separate decision.
         </Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={problems.length > 0}
         onClick={async () => {
@@ -1798,7 +1891,7 @@ function ApprovalSheet({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Submit for approval
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1837,20 +1930,20 @@ function PauseDialog({ context, close }: { context: ScreenContext; close: () => 
         Steps here run one at a time and finish in this browser immediately. {running.length === 0 ? "Nothing is mid-flight." : `${running.length} step is mid-flight and will finish.`} Pausing prevents the next step being started.
       </Notice>
       <Field label="Why" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!reason.trim()}
         onClick={async () => {
-          await context.mutate.patch(mission.id, {
+          if (!(await context.mutate.patch(mission.id, {
             status: mission.status === "paused" ? "running" : "paused",
             fields: { ...mission.fields, executionPaused: mission.status !== "paused", pauseReason: reason },
-          }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "paused"} by ${context.actor}` });
+          }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "paused"} by ${context.actor}` }))) return;
           context.toast(mission.status === "paused" ? "Resumed" : "Paused", `${mission.title} is ${mission.status === "paused" ? "running" : "paused"}, with your reason on the record.`);
           close();
         }}
       >
         {mission.status === "paused" ? "Resume the mission" : "Pause the mission"}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1901,44 +1994,41 @@ function TaskInspector({ context, close }: { context: ScreenContext; close: () =
   const cycle = dependency ? wouldCycle(tasks, dependency, task.id) : null;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
-        { label: "Stage", value: String(task.fields.stage ?? task.status) },
-        { label: "Estimate", value: task.fields.estimateHours ? `${String(task.fields.estimateHours)} h` : "Not estimated" },
-        { label: "Approval gate", value: task.fields.approvalRequired === true ? "Yes" : "No" },
+      <FactGrid items={[
+        { label: "Estimate", value: task.fields.estimateHours ? `${String(task.fields.estimateHours)} h` : "Not estimated", mono: Boolean(task.fields.estimateHours) },
         { label: "Risk", value: String(task.fields.risk || "None recorded") },
       ]} />
-      <Card eyebrow="DEPENDENCIES" prov="human" title="Runs after" pad="tight">
+      <OverlaySection title="Runs after">
         <Stack gap={2}>
           {deps.map((id) => (
             <Row key={id} gap={2}>
               <span className="ds-grow">{tasks.find((item) => item.id === id)?.title ?? id}</span>
               <Button size="sm" variant="ghost" onClick={async () => {
-                await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: deps.filter((item) => item !== id) } }, { expectRevision: task.revision, event: `Dependency removed from ${task.title}` });
+                if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: deps.filter((item) => item !== id) } }, { expectRevision: task.revision, event: `Dependency removed from ${task.title}` }))) return;
                 context.toast("Dependency removed", "The plan graph and the list both reflect it.");
               }}>Remove</Button>
             </Row>
           ))}
           {deps.length === 0 && <span className="ds-subtle">Nothing. This task can start.</span>}
         </Stack>
-      </Card>
+      </OverlaySection>
       <Field label="Add a dependency" error={cycle ? `That would create a cycle: ${cycle.map((id) => tasks.find((item) => item.id === id)?.title ?? id).join(" → ")}` : undefined}>
         <Select value={dependency} onChange={(event) => setDependency(event.target.value)}>
           <option value="">Choose a task…</option>
           {tasks.filter((item) => item.id !== task.id && !deps.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
       </Field>
-      <Button
+      <DrawerActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!dependency || Boolean(cycle)}
         onClick={async () => {
-          await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: [...deps, dependency] } }, { expectRevision: task.revision, event: `Dependency added to ${task.title}` });
+          if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), dependsOn: [...deps, dependency] } }, { expectRevision: task.revision, event: `Dependency added to ${task.title}` }))) return;
           context.toast("Dependency added", "The task now waits for it. A cycle would have been refused.");
           close();
         }}
       >
         Add dependency
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1957,16 +2047,16 @@ function PlanRevision({ context, close }: { context: ScreenContext; close: () =>
         { label: "Tasks", value: String(tasks.length) },
         { label: "Dependencies", value: String(tasks.reduce((sum, task) => sum + dependenciesOf(task).length, 0)) },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(mission.id, { fields: { ...mission.fields, planVersion: version + 1, revisedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} plan revised to version ${version + 1}` });
+          if (!(await context.mutate.patch(mission.id, { fields: { ...mission.fields, planVersion: version + 1, revisedBy: context.actor } }, { expectRevision: mission.revision, event: `${mission.title} plan revised to version ${version + 1}` }))) return;
           context.toast("Plan revised", `Version ${version + 1} is current. Version ${version} stays on the record with its receipts.`);
           close();
         }}
       >
         Publish version {version + 1}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1985,45 +2075,43 @@ function ScopeChangeApproval({ context }: { context: ScreenContext }) {
         { label: "Ceiling", value: context.money(Number(mission.fields.budgetMinor ?? 0)) },
         { label: "Your role view", value: context.can("approve_mission") ? "Can approve" : "Cannot approve" },
       ]} />
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("amendment request"); }}>Request an amendment</Button>
+      <ModalActions><OverlayActions primary={<Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("amendment request"); }}>Request an amendment</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
 
-function TaskDetail({ context, close }: { context: ScreenContext; close: () => void }) {
+function TaskDetail({ context }: { context: ScreenContext }) {
   const { tasks } = useMission(context);
   const payload = context.overlayPayload as { id?: string } | undefined;
   const task = tasks.find((item) => item.id === (payload?.id ?? context.selectedId));
   const [evidence, setEvidence] = useState("");
+  const orgRecords = useCollections(["documents", "missionTasks"]);
   if (!task) return <Empty title="Choose a task" />;
   const body = task.body as { evidence?: string[] } | undefined;
+  /* Evidence is a real record in this organisation that is not already attached and is not the task itself. */
+  const evidenceOptions = [...orgRecords.documents, ...orgRecords.missionTasks].filter((record) => record.id !== task.id && !(body?.evidence ?? []).includes(record.id));
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
-        { label: "Lane", value: String(task.fields.stage ?? task.status) },
-        { label: "Approval gate", value: task.fields.approvalRequired === true ? "Yes" : "No" },
-        { label: "Evidence attached", value: String((body?.evidence ?? []).length) },
-      ]} />
+      <FactGrid items={[{ label: "Evidence attached", value: String((body?.evidence ?? []).length), mono: true }]} />
       <p className="ds-prose">{task.summary}</p>
-      <Field label="Attach evidence" hint="The id of a record in this workspace that shows the work was done.">
-        <TextInput value={evidence} onChange={(event) => setEvidence(event.target.value)} placeholder="nl-documents-060" />
+      <Field label="Attach evidence" hint="A document or task in this organisation that shows the work was done.">
+        <Select aria-label="Attach evidence" value={evidence} onChange={(event) => setEvidence(event.target.value)}>
+          <option value="">Choose a record…</option>
+          {evidenceOptions.map((record) => <option key={record.id} value={record.id}>{record.title} · {record.collection === "documents" ? "document" : "task"}</option>)}
+        </Select>
       </Field>
-      <Row gap={2}>
-        <Button
+      <DrawerActions><OverlayActions primary={<Button
           variant="primary"
-          disabled={!evidence.trim()}
+          disabled={!evidenceOptions.some((record) => record.id === evidence)}
           onClick={async () => {
-            await context.mutate.patch(task.id, { body: { ...(task.body as object), evidence: [...(body?.evidence ?? []), evidence.trim()] } }, { expectRevision: task.revision, event: `Evidence attached to ${task.title}` });
+            if (!evidenceOptions.some((record) => record.id === evidence)) return;
+            if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object), evidence: [...(body?.evidence ?? []), evidence] } }, { expectRevision: task.revision, event: `Evidence attached to ${task.title}` }))) return;
             context.toast("Evidence attached", "It is on the task and shows on the mission results.");
             setEvidence("");
           }}
         >
           Attach
-        </Button>
-        <Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("reassign", { id: task.id }); }}>Reassign</Button>
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        </Button>} secondary={<><Button variant="secondary" onClick={() => { context.closeOverlay(); context.openOverlay("reassign", { id: task.id }); }}>Reassign</Button></>} end={<OverlayCancel>Close</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2046,17 +2134,17 @@ function ReassignTask({ context, close }: { context: ScreenContext; close: () =>
       <Notice tone="info" title="A paused contract is not offered">
         Only active contracts and people appear here, because a paused contract is excluded from delegation.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const isAgent = data.agents.some((agent) => agent.title === to);
-          await context.mutate.patch(task.id, { ownerName: to, fields: { ...task.fields, assignee: to, kind: isAgent ? "ai" : "human" } }, { expectRevision: task.revision, event: `${task.title} reassigned to ${to}` });
+          if (!(await context.mutate.patch(task.id, { ownerName: to, fields: { ...task.fields, assignee: to, kind: isAgent ? "ai" : "human" } }, { expectRevision: task.revision, event: `${task.title} reassigned to ${to}` }))) return;
           context.toast("Reassigned", `${to} owns ${task.title}.`);
           close();
         }}
       >
         Reassign
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2132,7 +2220,7 @@ function RetryConfirmation({ context, close }: { context: ScreenContext; close: 
         { label: "Retry safe", value: safe ? "Yes — it only reads or writes records here" : "No" },
       ]} />
       {!safe && <Notice tone="danger" title="This step cannot be retried">{blockedReason(step) ?? "The outcome of the last attempt is unknown."}</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!safe}
         onClick={async () => {
@@ -2141,7 +2229,7 @@ function RetryConfirmation({ context, close }: { context: ScreenContext; close: 
         }}
       >
         Retry the step
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2232,16 +2320,16 @@ function HandoffView({ context, close }: { context: ScreenContext; close: () => 
           {data.members.filter((member) => member.fields.kind !== "ai").map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
         </Select>
       </Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(task.id, { fields: { ...task.fields, reviewer, approvalRequired: true } }, { expectRevision: task.revision, event: `Review requested on ${task.title} from ${reviewer}` });
+          if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, reviewer, approvalRequired: true } }, { expectRevision: task.revision, event: `Review requested on ${task.title} from ${reviewer}` }))) return;
           context.toast("Review requested", `${reviewer} is recorded as the reviewer, and the task now has a gate.`);
           close();
         }}
       >
         Request the review
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2284,13 +2372,9 @@ function ArtifactPreviewOverlay({ context }: { context: ScreenContext }) {
   const body = item.body as { text?: string } | undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: item.status },
-        { label: "Version", value: String(item.fields.version ?? 1) },
-        { label: "Produced by", value: String(item.fields.producedBy ?? item.ownerName) },
-      ]} />
+      <FactGrid items={[{ label: "Produced by", value: String(item.fields.producedBy ?? item.ownerName) }]} />
       <article className="ds-panel ds-prose" style={{ padding: "var(--space-4)", whiteSpace: "pre-wrap" }}>{body?.text ?? item.summary}</article>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/documents/${item.id}`)}>Open in Documents</Button>
+      <DrawerActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/documents/${item.id}`)}>Open in Documents</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2306,12 +2390,12 @@ function DeliverableApproval({ context, close }: { context: ScreenContext; close
     <Stack gap={4}>
       {!allowed && <Notice tone="warning" title="This role view does not approve">Your verdict will be recorded as a note instead.</Notice>}
       <Field label="What you checked" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!note.trim()}
         onClick={async () => {
           if (allowed) {
-            await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approval: "approved", approvedBy: context.actor, approvalNote: note } }, { expectRevision: item.revision, event: `${item.title} approved by ${context.actor}` });
+            if (!(await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approval: "approved", approvedBy: context.actor, approvalNote: note } }, { expectRevision: item.revision, event: `${item.title} approved by ${context.actor}` }))) return;
           } else {
             await context.mutate.log(`${context.actor} reviewed ${item.title}: ${note}`, { entityId: item.id, type: "deliverable.note" });
           }
@@ -2320,7 +2404,7 @@ function DeliverableApproval({ context, close }: { context: ScreenContext; close
         }}
       >
         {allowed ? "Approve" : "Record a note"}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2353,7 +2437,7 @@ function PublishVerification({ context }: { context: ScreenContext }) {
   const item = deliverables.find((document) => document.id === (payload?.id ?? context.selectedId));
   return (
     <Stack gap={4}>
-      <CapabilityLine id="site.publish" title="Publishing outside this workspace is not connected" />
+      <CapabilityLine id="document.publish" title="Publishing outside this workspace is not connected" />
       <Properties rows={[
         { label: "Deliverable", value: item?.title ?? "—" },
         { label: "Inside this workspace", value: "Visible to role views that open Missions" },
@@ -2408,12 +2492,12 @@ function LimitIncrease({ context, close }: { context: ScreenContext; close: () =
       </Field>
       <Field label="Why" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
       {!allowed && <Notice tone="warning" title="This role view cannot raise a ceiling">The request will be recorded for an approver.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={amount <= 0 || !reason.trim()}
         onClick={async () => {
           if (allowed) {
-            await context.mutate.patch(mission.id, { fields: { ...mission.fields, budgetMinor: ceiling + amount }, amountMinor: ceiling + amount }, { expectRevision: mission.revision, event: `Ceiling raised to ${context.money(ceiling + amount)} by ${context.actor}: ${reason}` });
+            if (!(await context.mutate.patch(mission.id, { fields: { ...mission.fields, budgetMinor: ceiling + amount }, amountMinor: ceiling + amount }, { expectRevision: mission.revision, event: `Ceiling raised to ${context.money(ceiling + amount)} by ${context.actor}: ${reason}` }))) return;
             context.toast("Ceiling raised", `${context.money(ceiling + amount)} is the new ceiling, recorded with your reason.`);
           } else {
             await context.mutate.create({
@@ -2432,7 +2516,7 @@ function LimitIncrease({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         {allowed ? "Raise the ceiling" : "Record the request"}
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2478,7 +2562,7 @@ function ResultsApproval({ context, close }: { context: ScreenContext; close: ()
         disabled={unverified.length > 0 || !allowed}
         title={allowed ? undefined : "This role view does not approve missions"}
         onClick={async () => {
-          await context.mutate.patch(mission.id, { status: "completed", fields: { ...mission.fields, closedBy: context.actor, closedAt: context.now.toISOString() } }, { expectRevision: mission.revision, event: `${mission.title} closed as complete by ${context.actor}` });
+          if (!(await context.mutate.patch(mission.id, { status: "completed", fields: { ...mission.fields, closedBy: context.actor, closedAt: context.now.toISOString() } }, { expectRevision: mission.revision, event: `${mission.title} closed as complete by ${context.actor}` }))) return;
           context.toast("Mission closed", "Completion is recorded against verified criteria, not agent text.");
           close();
         }}
@@ -2501,28 +2585,32 @@ function ReopenTask({ context, close }: { context: ScreenContext; close: () => v
         The original task keeps its history. The follow-up carries your reason so a reader can see why the work came back.
       </Notice>
       <Field label="Why it is unresolved" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!reason.trim()}
         onClick={async () => {
-          await context.mutate.create({
-            collection: "missionTasks",
-            title: `Follow-up: ${task?.title ?? mission.title}`,
-            status: "todo",
-            parentId: mission.id,
-            summary: reason,
-            fields: { stage: "todo", assignee: context.actor, kind: "human", order: tasks.length + 1, estimateHours: 1, approvalRequired: false, followUpOf: task?.id ?? "" },
-            body: { dependsOn: [], evidence: [] },
-          }, `Follow-up created on ${mission.title}`);
-          if (mission.status === "completed") {
-            await context.mutate.patch(mission.id, { status: "running", fields: { ...mission.fields, reopenedBy: context.actor } }, { event: `${mission.title} reopened by ${context.actor}` });
-          }
+          /* The follow-up and the mission reopening are one change. */
+          if (!(await commitTogether(context, [
+            {
+              create: {
+                collection: "missionTasks",
+                title: `Follow-up: ${task?.title ?? mission.title}`,
+                status: "todo",
+                parentId: mission.id,
+                summary: reason,
+                fields: { stage: "todo", assignee: context.actor, kind: "human", order: tasks.length + 1, estimateHours: 1, approvalRequired: false, followUpOf: task?.id ?? "" },
+                body: { dependsOn: [], evidence: [] },
+              },
+              event: `Follow-up created on ${mission.title}`,
+            },
+            ...(mission.status === "completed" ? [{ record: mission, patch: { status: "running", fields: { ...mission.fields, reopenedBy: context.actor } }, event: `${mission.title} reopened by ${context.actor}` }] : []),
+          ]))) return;
           context.toast("Follow-up created", "It is on the board with your reason.");
           close();
         }}
       >
         Create the follow-up
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2540,7 +2628,7 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         if (template) {
-          await context.mutate.patch(template.id, { title, summary }, { expectRevision: template.revision, event: `Template updated: ${title}` });
+          if (!(await context.mutate.patch(template.id, { title, summary }, { expectRevision: template.revision, event: `Template updated: ${title}` }))) return;
         } else {
           await context.mutate.create({
             collection: "templates",
@@ -2607,7 +2695,7 @@ function ApprovalGrant({ context, close }: { context: ScreenContext; close: () =
         { label: "Tool grants requested", value: (body?.grants ?? []).join(", ") || "None" },
         { label: "Target account", value: "Not carried — you choose one" },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={() => {
           useMissionWizard.getState().set({
@@ -2624,7 +2712,7 @@ function ApprovalGrant({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Create a mission from this template
-      </Button>
+      </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -2688,7 +2776,7 @@ async function approveNextStep(context: ScreenContext): Promise<void> {
     .sort((a, b) => Number(a.fields.order ?? 0) - Number(b.fields.order ?? 0));
   const gate = steps[0];
   if (!gate) { context.toast("No gate is waiting", "Nothing on this mission is held for approval.", "info"); return; }
-  await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: context.now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` });
+  if (!(await context.mutate.patch(gate.id, { status: "done", fields: { ...gate.fields, approvedBy: context.actor, approvedAt: context.now.toISOString() } }, { expectRevision: gate.revision, event: `${gate.title} approved by ${context.actor}` }))) return;
   context.toast("Gate passed", `${gate.title} was approved by ${context.actor}. The next step can be run from the console.`);
 }
 
@@ -2715,10 +2803,10 @@ async function runNextStep(context: ScreenContext): Promise<void> {
 async function stopMission(context: ScreenContext): Promise<void> {
   const mission = await missionRecord(context, context.params.id);
   if (!mission) return;
-  await context.mutate.patch(mission.id, {
+  if (!(await context.mutate.patch(mission.id, {
     status: mission.status === "paused" ? "running" : "paused",
     fields: { ...mission.fields, executionPaused: mission.status !== "paused", pausedBy: context.actor },
-  }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "stopped"} by ${context.actor}` });
+  }, { expectRevision: mission.revision, event: `${mission.title} ${mission.status === "paused" ? "resumed" : "stopped"} by ${context.actor}` }))) return;
   context.toast(mission.status === "paused" ? "Resumed" : "Stopped", mission.status === "paused" ? "The next step can be run again." : "No further step will be started until it is resumed.");
 }
 
@@ -2730,10 +2818,10 @@ async function resumeMission(context: ScreenContext): Promise<void> {
     context.toast("Nothing to resume", `${mission.title} is ${mission.status.replace(/_/g, " ")}, not paused.`, "blocked");
     return;
   }
-  await context.mutate.patch(mission.id, {
+  if (!(await context.mutate.patch(mission.id, {
     status: "running",
     fields: { ...mission.fields, executionPaused: false, resumedBy: context.actor },
-  }, { expectRevision: mission.revision, event: `${mission.title} resumed by ${context.actor}` });
+  }, { expectRevision: mission.revision, event: `${mission.title} resumed by ${context.actor}` }))) return;
   context.toast("Resumed", "The next step can be run again.");
 }
 
@@ -2745,10 +2833,10 @@ async function cancelMission(context: ScreenContext): Promise<boolean> {
     context.toast("Cannot cancel", `${mission.title} is already ${mission.status}.`, "blocked");
     return false;
   }
-  await context.mutate.patch(mission.id, {
+  if (!(await context.mutate.patch(mission.id, {
     status: "cancelled",
     fields: { ...mission.fields, executionPaused: true, cancelledBy: context.actor },
-  }, { expectRevision: mission.revision, event: `${mission.title} cancelled by ${context.actor}` });
+  }, { expectRevision: mission.revision, event: `${mission.title} cancelled by ${context.actor}` }))) return false;
   context.toast("Mission cancelled", "No further step will start. Completed steps and their receipts are kept.");
   return true;
 }
@@ -2809,10 +2897,10 @@ export const missionApp = registerApp({
         { id: "bulk tag", placement: "overflow", run: (context) => context.openOverlay("bulk tag") },
       ],
       overlays: [
-        { id: "Mission quick view", kind: "drawer", title: "Mission", width: 520, render: ({ ...context }) => <MissionQuickView context={context} /> },
-        { id: "create mission", kind: "modal", title: "Create a mission", width: 560, render: ({ ...context }) => <CreateMissionOverlay context={context} /> },
-        { id: "archive confirmation", kind: "modal", title: "Archive this mission", tone: "danger", width: 560, render: ({ close, ...context }) => <MissionArchive context={context} close={close} /> },
-        { id: "bulk tag", kind: "modal", title: "Tag missions", width: 560, render: ({ close, ...context }) => <BulkTagMissions context={context} close={close} /> },
+        { id: "Mission quick view", kind: "drawer", title: "Mission", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MissionQuickView context={context} />, summary: (context) => <MissionSummary context={context} /> },
+        { id: "create mission", kind: "modal", title: "Create a mission", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <CreateMissionOverlay context={context} /> },
+        { id: "archive confirmation", kind: "modal", title: "Archive this mission", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionArchive context={context} close={close} />, summary: (context) => <MissionSummary context={context} /> },
+        { id: "bulk tag", kind: "modal", title: "Tag missions", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BulkTagMissions context={context} close={close} /> },
       ],
     },
 
@@ -2835,19 +2923,20 @@ export const missionApp = registerApp({
         { id: "revise plan", placement: "overflow", run: (context) => context.openOverlay("revise plan") },
       ],
       overlays: [
-        { id: "Source picker", kind: "drawer", title: "Context records", width: 520, render: ({ ...context }) => <SourcePicker context={context} /> },
-        { id: "team selector", kind: "drawer", title: "Who can do what", width: 560, render: ({ ...context }) => <TeamSelector context={context} /> },
-        { id: "risk review", kind: "modal", title: "Risk review", width: 560, render: ({ ...context }) => <RiskReview context={context} /> },
-        { id: "approval sheet", kind: "modal", title: "Submit for approval", width: 620, render: ({ close, ...context }) => <ApprovalSheet context={context} close={close} /> },
-        { id: "describe goal", kind: "modal", title: "Describe the goal", width: 580, render: ({ close, ...context }) => <DescribeGoal context={context} close={close} /> },
-        { id: "attach records", kind: "modal", title: "Attach records", width: 580, render: ({ close, ...context }) => <AttachMissionRecords context={context} close={close} /> },
-        { id: "revise plan", kind: "modal", title: "Revise the plan", width: 640, render: ({ close, ...context }) => <RevisePlan context={context} close={close} /> },
+        { id: "Source picker", kind: "drawer", title: "Context records", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourcePicker context={context} /> },
+        { id: "team selector", kind: "drawer", title: "Who can do what", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <TeamSelector context={context} /> },
+        { id: "risk review", kind: "modal", title: "Risk review", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <RiskReview context={context} /> },
+        { id: "approval sheet", kind: "modal", title: "Submit for approval", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ApprovalSheet context={context} close={close} /> },
+        { id: "describe goal", kind: "modal", title: "Describe the goal", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DescribeGoal context={context} close={close} /> },
+        { id: "attach records", kind: "modal", title: "Attach records", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AttachMissionRecords context={context} close={close} /> },
+        { id: "revise plan", kind: "modal", title: "Revise the plan", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RevisePlan context={context} close={close} /> },
       ],
     },
 
     "ARL-MISSION-003": {
       id: "ARL-MISSION-003",
       title: () => "Mission overview",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Overview", "Plan", "Team", "Deliverables", "Activity", "Results"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionOverview context={context} view={view} />,
@@ -2860,16 +2949,17 @@ export const missionApp = registerApp({
         { id: "cancel", label: "Cancel the mission", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("cancel mission") },
       ],
       overlays: [
-        { id: "Status explanation", kind: "drawer", title: "How this status is computed", width: 520, render: ({ ...context }) => <StatusExplanation context={context} /> },
-        { id: "pause dialog", kind: "modal", title: "Pause execution", width: 560, render: ({ close, ...context }) => <PauseDialog context={context} close={close} /> },
-        { id: "amendment request", kind: "modal", title: "Request an amendment", width: 560, render: ({ close, ...context }) => <AmendmentRequest context={context} close={close} />, footer: submitFooter("amendment", "Record the request") },
-        { id: "cancel mission", kind: "modal", title: "Cancel this mission?", tone: "danger", width: 480, render: ({ close, ...context }) => <CancelMission context={context} close={close} /> },
+        { id: "Status explanation", kind: "drawer", title: "How this status is computed", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <StatusExplanation context={context} />, summary: (context) => <MissionSummary context={context} /> },
+        { id: "pause dialog", kind: "modal", title: "Pause execution", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PauseDialog context={context} close={close} />, summary: (context) => <MissionSummary context={context} /> },
+        { id: "amendment request", kind: "modal", title: "Request an amendment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AmendmentRequest context={context} close={close} />, footer: submitFooter("amendment", "Record the request") },
+        { id: "cancel mission", kind: "modal", title: "Cancel this mission?", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <CancelMission context={context} close={close} /> },
       ],
     },
 
     "ARL-MISSION-004": {
       id: "ARL-MISSION-004",
       title: () => "Plan and dependencies",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Graph", "List", "Timeline", "Risks"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <PlanDependencies context={context} view={view} />,
@@ -2881,16 +2971,16 @@ export const missionApp = registerApp({
         { id: "compare versions", placement: "overflow", run: (context) => context.openOverlay("plan revision") },
       ],
       overlays: [
-        { id: "Task inspector", kind: "drawer", title: "Task", width: 560, render: ({ close, ...context }) => <TaskInspector context={context} close={close} /> },
-        { id: "plan revision", kind: "modal", title: "Revise the plan", width: 560, render: ({ close, ...context }) => <PlanRevision context={context} close={close} /> },
-        { id: "scope change approval", kind: "modal", title: "Scope change", width: 560, render: ({ ...context }) => <ScopeChangeApproval context={context} /> },
+        { id: "Task inspector", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskInspector context={context} close={close} />, summary: (context) => <TaskSummary context={context} /> },
+        { id: "plan revision", kind: "modal", title: "Revise the plan", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PlanRevision context={context} close={close} /> },
+        { id: "scope change approval", kind: "modal", title: "Scope change", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ScopeChangeApproval context={context} /> },
       ],
     },
 
     "ARL-MISSION-005": {
       id: "ARL-MISSION-005",
       title: () => "Task board",
-      subtitle: () => "Drag with a mouse or move with the arrow keys. Neither passes an approval gate or an unfinished dependency.",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Board", "List", "Assignees"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <TaskBoard context={context} view={view} />,
@@ -2902,21 +2992,20 @@ export const missionApp = registerApp({
         { id: "reopen task", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a card first"), run: (context) => void reopenTask(context) },
       ],
       overlays: [
-        { id: "Task detail", kind: "drawer", title: "Task", width: 560, render: ({ close, ...context }) => <TaskDetail context={context} close={close} /> },
-        { id: "reassign", kind: "modal", title: "Reassign", width: 520, render: ({ close, ...context }) => <ReassignTask context={context} close={close} /> },
-        { id: "move impact", kind: "modal", title: "What a move changes", width: 520, render: ({ ...context }) => <MoveImpact context={context} /> },
+        { id: "Task detail", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <TaskDetail context={context} />, summary: (context) => <TaskSummary context={context} /> },
+        { id: "reassign", kind: "modal", title: "Reassign", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReassignTask context={context} close={close} />, summary: (context) => <TaskSummary context={context} /> },
+        { id: "move impact", kind: "modal", title: "What a move changes", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <MoveImpact context={context} />, summary: (context) => <TaskSummary context={context} /> },
       ],
     },
 
     "ARL-MISSION-006": {
       id: "ARL-MISSION-006",
       title: () => "Execution console",
-      subtitle: () => "A local interpreter runs each step against records in this browser. A step that needs an external service stops and records why.",
-      statusStrip: (context) => (
+      subtitle: (context) => <MissionLine context={context} />,
+      statusStrip: () => (
         <Row gap={2} wrap>
           <Pill tone="warning" dot>Providers: none connected</Pill>
           <Pill tone="neutral">Every run writes a receipt</Pill>
-          <span className="ds-subtle">Nothing leaves {context.org.name}.</span>
         </Row>
       ),
       tabs: ["Timeline", "Actions", "Checkpoints", "Exceptions"].map((view) => ({
@@ -2930,15 +3019,16 @@ export const missionApp = registerApp({
         { id: "stop", placement: "overflow", tone: "danger", run: (context) => void stopMission(context) },
       ],
       overlays: [
-        { id: "Action receipt", kind: "drawer", title: "Receipts", width: 560, render: ({ ...context }) => <ActionReceipt context={context} /> },
-        { id: "retry confirmation", kind: "modal", title: "Retry this step", width: 560, render: ({ close, ...context }) => <RetryConfirmation context={context} close={close} /> },
-        { id: "execution trace", kind: "drawer", title: "Trace", width: 560, render: ({ ...context }) => <ExecutionTrace context={context} /> },
+        { id: "Action receipt", kind: "drawer", title: "Receipts", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ActionReceipt context={context} /> },
+        { id: "retry confirmation", kind: "modal", title: "Retry this step", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RetryConfirmation context={context} close={close} /> },
+        { id: "execution trace", kind: "drawer", title: "Trace", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ExecutionTrace context={context} /> },
       ],
     },
 
     "ARL-MISSION-007": {
       id: "ARL-MISSION-007",
       title: () => "Mission team room",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Discussion", "Owners", "Decisions", "Reviews"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionTeamRoom context={context} view={view} />,
@@ -2950,16 +3040,17 @@ export const missionApp = registerApp({
         { id: "accept handoff", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a task first"), run: (context) => void acceptHandoff(context) },
       ],
       overlays: [
-        { id: "Agent selector", kind: "drawer", title: "AI employees on this mission", width: 520, render: ({ ...context }) => <AgentSelectorOverlay context={context} /> },
-        { id: "handoff view", kind: "modal", title: "Request a review", width: 560, render: ({ close, ...context }) => <HandoffView context={context} close={close} /> },
-        { id: "decision record", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <MissionDecisionRecord context={context} close={close} />, footer: submitFooter("mission-decision", "Record decision") },
-        { id: "post message", kind: "modal", title: "Message the room", width: 560, render: ({ close, ...context }) => <PostMissionMessage context={context} close={close} /> },
+        { id: "Agent selector", kind: "drawer", title: "AI employees on this mission", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <AgentSelectorOverlay context={context} /> },
+        { id: "handoff view", kind: "modal", title: "Request a review", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <HandoffView context={context} close={close} /> },
+        { id: "decision record", kind: "modal", title: "Record a decision", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionDecisionRecord context={context} close={close} />, footer: submitFooter("mission-decision", "Record decision") },
+        { id: "post message", kind: "modal", title: "Message the room", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <PostMissionMessage context={context} close={close} /> },
       ],
     },
 
     "ARL-MISSION-008": {
       id: "ARL-MISSION-008",
       title: () => "Deliverables",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["All", "Draft", "Review", "Approved", "Published"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <Deliverables context={context} view={view} />,
@@ -2972,16 +3063,17 @@ export const missionApp = registerApp({
         { id: "share", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a deliverable first"), run: (context) => context.openOverlay("publish verification") },
       ],
       overlays: [
-        { id: "Artifact preview", kind: "drawer", title: "Deliverable", width: 620, render: ({ ...context }) => <ArtifactPreviewOverlay context={context} /> },
-        { id: "approval", kind: "modal", title: "Approve the deliverable", width: 560, render: ({ close, ...context }) => <DeliverableApproval context={context} close={close} /> },
-        { id: "version diff", kind: "modal", title: "Versions", width: 620, render: ({ ...context }) => <VersionDiff context={context} /> },
-        { id: "publish verification", kind: "modal", title: "Publishing outside this workspace", tone: "danger", width: 560, render: ({ ...context }) => <PublishVerification context={context} /> },
+        { id: "Artifact preview", kind: "drawer", title: "Deliverable", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ArtifactPreviewOverlay context={context} />, summary: (context) => <DeliverableSummary context={context} /> },
+        { id: "approval", kind: "modal", title: "Approve the deliverable", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DeliverableApproval context={context} close={close} />, summary: (context) => <DeliverableSummary context={context} /> },
+        { id: "version diff", kind: "modal", title: "Versions", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <VersionDiff context={context} />, summary: (context) => <DeliverableSummary context={context} /> },
+        { id: "publish verification", kind: "modal", title: "Publishing outside this workspace", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <PublishVerification context={context} />, summary: (context) => <DeliverableSummary context={context} /> },
       ],
     },
 
     "ARL-MISSION-009": {
       id: "ARL-MISSION-009",
       title: () => "Mission budget",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Summary", "Ledger", "Policies", "History"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionBudget context={context} view={view} />,
@@ -2994,16 +3086,17 @@ export const missionApp = registerApp({
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => void exportBudget(context) },
       ],
       overlays: [
-        { id: "Budget variance", kind: "drawer", title: "Variance", width: 520, render: ({ ...context }) => <BudgetVariance context={context} /> },
-        { id: "limit increase approval", kind: "modal", title: "Raise the ceiling", width: 560, render: ({ close, ...context }) => <LimitIncrease context={context} close={close} /> },
-        { id: "cost source", kind: "drawer", title: "Where this cost came from", width: 520, render: ({ ...context }) => <CostSource context={context} /> },
-        { id: "set alert", kind: "modal", title: "Set a budget alert", width: 520, render: ({ close, ...context }) => <SetBudgetAlert context={context} close={close} /> },
+        { id: "Budget variance", kind: "drawer", title: "Variance", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <BudgetVariance context={context} /> },
+        { id: "limit increase approval", kind: "modal", title: "Raise the ceiling", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <LimitIncrease context={context} close={close} /> },
+        { id: "cost source", kind: "drawer", title: "Where this cost came from", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <CostSource context={context} /> },
+        { id: "set alert", kind: "modal", title: "Set a budget alert", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SetBudgetAlert context={context} close={close} /> },
       ],
     },
 
     "ARL-MISSION-010": {
       id: "ARL-MISSION-010",
       title: () => "Mission results",
+      subtitle: (context) => <MissionLine context={context} />,
       tabs: ["Outcomes", "Evidence", "ROI", "Follow-up"].map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionResults context={context} view={view} />,
@@ -3015,9 +3108,9 @@ export const missionApp = registerApp({
         { id: "issue report", placement: "overflow", capability: "export_data", run: (context) => void exportResults(context) },
       ],
       overlays: [
-        { id: "Source inspector", kind: "drawer", title: "Evidence", width: 520, render: ({ ...context }) => <ActionReceipt context={context} /> },
-        { id: "results approval", kind: "modal", title: "Close the mission", width: 560, render: ({ close, ...context }) => <ResultsApproval context={context} close={close} /> },
-        { id: "reopen", kind: "modal", title: "Create a follow-up", width: 560, render: ({ close, ...context }) => <ReopenTask context={context} close={close} /> },
+        { id: "Source inspector", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ActionReceipt context={context} /> },
+        { id: "results approval", kind: "modal", title: "Close the mission", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ResultsApproval context={context} close={close} /> },
+        { id: "reopen", kind: "modal", title: "Create a follow-up", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReopenTask context={context} close={close} /> },
       ],
     },
 
@@ -3036,9 +3129,9 @@ export const missionApp = registerApp({
         { id: "publish", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a template first"), run: (context) => void publishTemplate(context) },
       ],
       overlays: [
-        { id: "Template editor", kind: "modal", title: "Template", width: 560, render: ({ close, ...context }) => <TemplateEditor context={context} close={close} />, footer: submitFooter("template-editor", "Save template") },
-        { id: "example data", kind: "drawer", title: "What would happen", width: 520, render: ({ ...context }) => <ExampleData context={context} /> },
-        { id: "approval grant", kind: "modal", title: "Create a mission from this template", width: 560, render: ({ close, ...context }) => <ApprovalGrant context={context} close={close} /> },
+        { id: "Template editor", kind: "modal", title: "Template", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TemplateEditor context={context} close={close} />, footer: submitFooter("template-editor", "Save template") },
+        { id: "example data", kind: "drawer", title: "What would happen", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ExampleData context={context} /> },
+        { id: "approval grant", kind: "modal", title: "Create a mission from this template", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ApprovalGrant context={context} close={close} /> },
       ],
     },
   },
@@ -3048,7 +3141,7 @@ async function reopenTask(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const task = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!task || task.collection !== "missionTasks") { context.toast("Choose a card", "Select the task to reopen.", "info"); return; }
-  await context.mutate.patch(task.id, { status: "ready", fields: { ...task.fields, stage: "ready", reopenedBy: context.actor, reviewedBy: "" } }, { expectRevision: task.revision, event: `${task.title} reopened by ${context.actor}` });
+  if (!(await context.mutate.patch(task.id, { status: "ready", fields: { ...task.fields, stage: "ready", reopenedBy: context.actor, reviewedBy: "" } }, { expectRevision: task.revision, event: `${task.title} reopened by ${context.actor}` }))) return;
   context.toast("Reopened", `${task.title} is back in Ready, and its review is cleared so it must be verified again.`);
 }
 
@@ -3056,7 +3149,7 @@ async function acceptHandoff(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const task = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!task || task.collection !== "missionTasks") { context.toast("Choose a task", "Select the handoff to accept.", "info"); return; }
-  await context.mutate.patch(task.id, { ownerName: context.actor, fields: { ...task.fields, assignee: context.actor, kind: "human", acceptedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} accepted by ${context.actor}` });
+  if (!(await context.mutate.patch(task.id, { ownerName: context.actor, fields: { ...task.fields, assignee: context.actor, kind: "human", acceptedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} accepted by ${context.actor}` }))) return;
   context.toast("Handoff accepted", `${task.title} is yours. The deliverable and its bound are unchanged.`);
 }
 
@@ -3113,7 +3206,7 @@ async function publishTemplate(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const template = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!template || template.collection !== "templates") return;
-  await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, publishedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} published by ${context.actor}` });
+  if (!(await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, publishedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} published by ${context.actor}` }))) return;
   context.toast("Published", "It is offered to anyone creating a mission here. No credential or approval travels with it.");
 }
 
@@ -3122,6 +3215,16 @@ async function publishTemplate(context: ScreenContext): Promise<void> {
  * ====================================================================== */
 
 /** MISSION-001: tags the chosen missions. */
+/** Tags each mission against the revision it was read at; returns how many were saved (a stale one returns null and is not counted). */
+export async function tagMissions(context: Pick<ScreenContext, "mutate">, missions: Rec[], tag: string): Promise<number> {
+  let tagged = 0;
+  for (const mission of missions) {
+    const saved = await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag}` });
+    if (saved) tagged += 1;
+  }
+  return tagged;
+}
+
 function BulkTagMissions({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useMissionData();
   const missions = data.missions.filter((mission) => mission.status !== "archived");
@@ -3137,18 +3240,15 @@ function BulkTagMissions({ context, close }: { context: ScreenContext; close: ()
             onChange={(event) => setChosen((list) => (event.target.checked ? [...list, mission.id] : list.filter((id) => id !== mission.id)))} />
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={chosen.length === 0 || !tag.trim()} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={chosen.length === 0 || !tag.trim()} onClick={async () => {
           setBusy(true);
-          for (const mission of missions.filter((item) => chosen.includes(item.id))) {
-            await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag.trim()])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag.trim()}` });
-          }
-          context.toast("Tagged", `${chosen.length} mission${chosen.length === 1 ? "" : "s"} tagged ${tag.trim()}.`);
-          setBusy(false);
-          close();
-        }}>Tag {chosen.length}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+          try {
+            const tagged = await tagMissions(context, missions.filter((item) => chosen.includes(item.id)), tag.trim());
+            if (tagged === 0) return;
+            context.toast(tagged === chosen.length ? "Tagged" : "Partly tagged", `${tagged} of ${chosen.length} mission${chosen.length === 1 ? "" : "s"} tagged ${tag.trim()}.${tagged < chosen.length ? " The rest changed elsewhere; reopen and try again." : ""}`, tagged === chosen.length ? "ok" : "blocked");
+            close();
+          } finally { setBusy(false); }
+        }}>Tag {chosen.length}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3165,10 +3265,7 @@ function DescribeGoal({ context, close }: { context: ScreenContext; close: () =>
       <Field label="What the mission must achieve" required><TextArea aria-label="What the mission must achieve" value={goal} rows={3} onChange={(event) => setGoal(event.target.value)} /></Field>
       <Field label="Success criteria" required hint="Completion is verified against these, not against an agent saying it is done."><TextArea aria-label="Success criteria" value={criteria} rows={3} onChange={(event) => setCriteria(event.target.value)} /></Field>
       {problems.length > 0 && <Notice tone="warning" title="Not complete yet">{problems.join(" ")}</Notice>}
-      <Row gap={2}>
-        <Button variant="primary" disabled={problems.length > 0} onClick={() => { set({ goal: goal.trim(), successCriteria: criteria.trim() }); context.toast("Goal recorded", "The draft holds the goal and its criteria. Nothing is written until you submit."); close(); }}>Save the goal</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" disabled={problems.length > 0} onClick={() => { set({ goal: goal.trim(), successCriteria: criteria.trim() }); context.toast("Goal recorded", "The draft holds the goal and its criteria. Nothing is written until you submit."); close(); }}>Save the goal</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3189,10 +3286,7 @@ function AttachMissionRecords({ context, close }: { context: ScreenContext; clos
             onChange={(event) => setChosen((list) => (event.target.checked ? [...list, record.id] : list.filter((id) => id !== record.id)))} />
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="primary" onClick={() => { set({ contextIds: chosen }); context.toast("Records attached", `${chosen.length} record${chosen.length === 1 ? " is" : "s are"} in the mission's scope.`); close(); }}>Attach {chosen.length}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={() => { set({ contextIds: chosen }); context.toast("Records attached", `${chosen.length} record${chosen.length === 1 ? " is" : "s are"} in the mission's scope.`); close(); }}>Attach {chosen.length}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3218,10 +3312,7 @@ function RevisePlan({ context, close }: { context: ScreenContext; close: () => v
       ))}
       <Button variant="secondary" onClick={() => setSteps([...steps, { title: "", kind: "read" }])}>Add a step</Button>
       {providerWithoutApproval && <Notice tone="warning" title="A provider step has no approval before it">A step that would reach outside the workspace should follow an approval step. It will stop at the provider boundary either way.</Notice>}
-      <Row gap={2}>
-        <Button variant="primary" disabled={steps.length === 0 || steps.some((step) => !step.title.trim())} onClick={() => { set({ steps: steps.map((step) => ({ ...step, title: step.title.trim() })) }); context.toast("Plan revised", `${steps.length} step${steps.length === 1 ? "" : "s"} in the draft plan.`); close(); }}>Save the plan</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" disabled={steps.length === 0 || steps.some((step) => !step.title.trim())} onClick={() => { set({ steps: steps.map((step) => ({ ...step, title: step.title.trim() })) }); context.toast("Plan revised", `${steps.length} step${steps.length === 1 ? "" : "s"} in the draft plan.`); close(); }}>Save the plan</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3236,8 +3327,7 @@ function PostMissionMessage({ context, close }: { context: ScreenContext; close:
     <Stack gap={4}>
       <Field label={`Message to the ${mission.title} room`} required><TextArea aria-label="Message" value={text} rows={4} onChange={(event) => setText(event.target.value)} /></Field>
       <Notice tone="info" title="A message starts nothing">It is recorded in the room with your name. No AI employee acts on it without a task and its grants.</Notice>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!text.trim()} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={!text.trim()} onClick={async () => {
           setBusy(true);
           await context.mutate.create({
             collection: "messages", title: text.trim().slice(0, 60), status: "posted", summary: text.trim(), parentId: mission.id,
@@ -3247,9 +3337,7 @@ function PostMissionMessage({ context, close }: { context: ScreenContext; close:
           context.setTab("Discussion");
           setBusy(false);
           close();
-        }}>Post the message</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Post the message</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -3275,8 +3363,7 @@ function SetBudgetAlert({ context, close }: { context: ScreenContext; close: () 
         <TextInput aria-label="Alert when usage reaches" type="number" min={1} max={100} value={percent} onChange={(event) => setPercent(event.target.value)} />
       </Field>
       {crossed && <Notice tone="warning" title="Already past this threshold">The alert raises in the inbox as soon as it is saved.</Notice>}
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={ceiling <= 0} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={ceiling <= 0} onClick={async () => {
           setBusy(true);
           const saved = await context.mutate.patch(mission.id, { fields: { ...mission.fields, alertAtPercent: value, alertSetBy: context.actor } }, { expectRevision: mission.revision, event: `Budget alert on ${mission.title} set at ${value}% by ${context.actor}` });
           if (saved && crossed) {
@@ -3285,9 +3372,7 @@ function SetBudgetAlert({ context, close }: { context: ScreenContext; close: () 
           if (saved) context.toast("Alert set", `An alert raises at ${value}% of the ceiling.`);
           setBusy(false);
           close();
-        }}>Save the alert</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Save the alert</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

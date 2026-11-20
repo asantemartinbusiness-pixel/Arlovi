@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Building2, KeyRound, ShieldCheck, Users } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel, Pill,
-  Properties, Row, Select, Stack, Stat, StatRow, Switch, TextInput,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel, Pill, FactGrid, OverlayActions, OverlaySection, OverlaySummary, Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput, ModalActions,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -180,9 +179,9 @@ export function IdentityForm({ context, close }: { context: ScreenContext; close
   async function save() {
     setBusy(true);
     try {
-      await context.mutate.patch(record!.id, {
+      if (!(await context.mutate.patch(record!.id, {
         fields: { ...record!.fields, legalName, tradingName, companyNumber },
-      }, { event: `Organisation profile updated${legalChanged ? " (legal identity changed)" : ""}`, expectRevision: record!.revision });
+      }, { event: `Organisation profile updated${legalChanged ? " (legal identity changed)" : ""}`, expectRevision: record!.revision }))) return;
       context.toast("Profile saved", legalChanged ? "The legal identity change is in the audit trail." : "The organisation record is updated.");
       close();
     } finally {
@@ -210,11 +209,12 @@ export function IdentityForm({ context, close }: { context: ScreenContext; close
           ]} />
         </StepUp>
       ) : (
-        <Row gap={2}>
-          <Button variant="ghost" onClick={close}>Cancel</Button>
-          <span className="ds-grow" />
-          <Button variant="primary" busy={busy} onClick={() => void save()}>Save profile</Button>
-        </Row>
+        <ModalActions>
+          <OverlayActions
+            primary={<Button variant="primary" busy={busy} onClick={() => void save()}>Save profile</Button>}
+            end={<OverlayCancel>Cancel</OverlayCancel>}
+          />
+        </ModalActions>
       )}
     </Stack>
   );
@@ -268,10 +268,9 @@ export function DomainVerify({ context, close }: { context: ScreenContext; close
       {existing.length > 0 && (
         <Properties rows={existing.map((record) => ({ label: record.title, value: <Pill tone="warning">{CAPABILITY_LABELS.configuration_required}</Pill> }))} />
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           disabled={!domain.includes(".")}
           onClick={async () => {
@@ -287,8 +286,10 @@ export function DomainVerify({ context, close }: { context: ScreenContext; close
           }}
         >
           Save the claim
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -310,10 +311,9 @@ export function BusinessHoursForm({ context, close }: { context: ScreenContext; 
         <Field label="Close" required><TextInput type="time" value={shut} onChange={(event) => setShut(event.target.value)} /></Field>
       </Row>
       <Field label="Days"><TextInput value={days} onChange={(event) => setDays(event.target.value)} /></Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           onClick={async () => {
             await context.mutate.create({
@@ -328,8 +328,10 @@ export function BusinessHoursForm({ context, close }: { context: ScreenContext; 
           }}
         >
           Save hours
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -372,7 +374,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
                 tone: "danger",
                 onRun: (rows) => {
                   void Promise.all(rows.map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor } }, { event: `Invitation revoked: ${row.title}` })))
-                    .then(() => context.toast("Revoked", `${rows.length} ${rows.length === 1 ? "invitation" : "invitations"} can no longer be accepted.`));
+                    .then((saved) => saved.every(Boolean) && context.toast("Revoked", `${rows.length} ${rows.length === 1 ? "invitation" : "invitations"} can no longer be accepted.`));
                 },
                 disabled: (rows) => rows.every((row) => row.status === "revoked"),
               },
@@ -430,7 +432,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
           ]}
           bulkActions={[
             {
-              label: "Suspend",
+              label: "Offboard",
               tone: "danger",
               onRun: (selected) => { context.select(selected[0]?.id); context.openOverlay("revoke confirmation", { ids: selected.map((row) => row.id) }); },
               disabled: (selected) => selected.every((row) => row.status === "suspended"),
@@ -549,72 +551,126 @@ export function InviteWizard({ context, close }: { context: ScreenContext; close
   );
 }
 
+export function RoleImpactSummary({ context }: { context: ScreenContext }) {
+  const data = useAdmin();
+  const member = data.members.find((row) => row.id === context.selectedId);
+  if (!member) return null;
+  const isAgent = member.fields.kind === "ai";
+  return (
+    <OverlaySummary
+      eyebrow="Role view change"
+      avatar={<Avatar name={member.title} kind={isAgent ? "ai" : "human"} />}
+      title={member.title}
+      status={<Pill tone={member.status === "active" ? "success" : "warning"}>{member.status}</Pill>}
+      meta={[String(member.fields.title ?? member.summary ?? ""), data.departments.find((department) => department.id === member.fields.departmentId)?.title]}
+    />
+  );
+}
+
 export function RoleImpact({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const member = data.members.find((row) => row.id === context.selectedId);
   const [roleValue, setRole] = useSeeded(String(member?.fields.role ?? "member"));
   const role = roleValue as Role;
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!member) return <Empty title="Select a member" icon={<Users size={20} />}>Choose a person to see what a role change would do.</Empty>;
 
   const current = (member.fields.role as Role) ?? "member";
+  const changed = role !== current;
   const gained = CAPABILITIES.filter((capability) => roleCan(role, capability) && !roleCan(current, capability));
   const lost = CAPABILITIES.filter((capability) => roleCan(current, capability) && !roleCan(role, capability));
+  const appsBefore = appsForRole(current);
+  const appsAfter = appsForRole(role);
+  const appsGained = appsAfter.filter((code) => !appsBefore.includes(code));
+  const appsLost = appsBefore.filter((code) => !appsAfter.includes(code));
+  const widens = gained.length > 0 || appsGained.length > 0;
+  const own = member.title === context.actor;
+  const needsReason = changed && widens;
+  const trimmed = reason.trim();
+  const canApply = changed && context.can("manage_policy") && (!needsReason || trimmed.length >= 8) && !busy;
 
   return (
     <Stack gap={4}>
-      <DrawerUnsavedChanges when={role !== current} />
+      <DrawerUnsavedChanges when={changed || trimmed.length > 0} />
       <DrawerInFlight when={busy} />
-      <Properties rows={[{ label: "Member", value: member.title }, { label: "Current role view", value: ROLE_LABELS[current] }, { label: "Proposed role view", value: ROLE_LABELS[role] }]} />
-      <Field label="Role view">
-        <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
-          {ROLES.map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}</option>)}
-        </Select>
-      </Field>
-      <Grid>
-        <Card eyebrow="GAINS" prov="human" span={6} title="Gains" subtitle={`${gained.length} capabilities`}>
-          {gained.length === 0 ? <span className="ds-subtle">Nothing new.</span> : <Row gap={1} wrap>{gained.map((capability) => <Pill key={capability} tone="success">{capabilityLabel(capability)}</Pill>)}</Row>}
-        </Card>
-        <Card eyebrow="LOSES" prov="human" span={6} title="Loses" subtitle={`${lost.length} capabilities`}>
-          {lost.length === 0 ? <span className="ds-subtle">Nothing is removed.</span> : <Row gap={1} wrap>{lost.map((capability) => <Pill key={capability} tone="warning">{capabilityLabel(capability)}</Pill>)}</Row>}
-        </Card>
-      </Grid>
-      <RoleReach role={role} />
-      <Notice tone="warning" title="Role views are not an account boundary">
-        Changing a view changes what this interface offers. It does not enforce anything on a server, and nobody should treat it as a
-        security control.
-      </Notice>
+      <OverlaySection title="Proposed change"><Stack gap={3}>
+        <Field label="Role view">
+          <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
+            {ROLES.map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}{entry === current ? " (current)" : ""}</option>)}
+          </Select>
+        </Field>
+        <FactGrid columns={3} dense items={[
+          { label: "Current", value: ROLE_LABELS[current] },
+          { label: "Proposed", value: ROLE_LABELS[role], tone: changed ? (widens ? "warning" : "info") : undefined },
+          { label: "Applications offered", value: `${appsBefore.length} → ${appsAfter.length}`, mono: true },
+        ]} />
+      </Stack></OverlaySection>
+      <OverlaySection title="Access change" hint={changed ? `${gained.length} gained, ${lost.length} lost` : "Choose a different view to compare"} tone={widens && changed ? "warning" : "neutral"}>
+        <div className="adm-delta">
+          <div>
+            <h4 className="adm-delta-head">Gains</h4>
+            {gained.length + appsGained.length === 0 ? <span className="ds-subtle">Nothing new.</span> : <Row gap={1} wrap>
+              {gained.map((capability) => <Pill key={capability} tone="success">{capabilityLabel(capability)}</Pill>)}
+              {appsGained.map((code) => <Pill key={code} tone="success">{code} app</Pill>)}
+            </Row>}
+          </div>
+          <div>
+            <h4 className="adm-delta-head">Loses</h4>
+            {lost.length + appsLost.length === 0 ? <span className="ds-subtle">Nothing is removed.</span> : <Row gap={1} wrap>
+              {lost.map((capability) => <Pill key={capability} tone="warning">{capabilityLabel(capability)}</Pill>)}
+              {appsLost.map((code) => <Pill key={code} tone="warning">{code} app</Pill>)}
+            </Row>}
+          </div>
+        </div>
+      </OverlaySection>
+      <OverlaySection title="Request and record" hint={needsReason ? "A reason is required when a view gains access." : "Recorded with the change."}><Stack gap={3}>
+        <FactGrid columns={2} dense items={[
+          { label: "Requested by", value: context.actor },
+          { label: "Reviewer", value: own ? "Your own record: no independent reviewer" : "None. An administrator applies it directly", tone: own ? "warning" : undefined },
+        ]} />
+        <Field label="Reason" required={needsReason} hint="Saved in the audit trail beside the change.">
+          <TextArea value={reason} rows={2} maxLength={300} disabled={busy} onChange={(event) => setReason(event.target.value)} />
+        </Field>
+        {changed && <p className="adm-audit-line" role="status">Audit entry: <strong>{member.title}</strong> {ROLE_LABELS[current]} → {ROLE_LABELS[role]}, by {context.actor}{trimmed ? `, “${trimmed}”` : ""}.</p>}
+      </Stack></OverlaySection>
       {error && <Notice tone="danger" title="Role view could not be saved">{error}</Notice>}
       <DrawerActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
+        <OverlayActions
           busy={busy}
-          disabled={busy || role === current || !context.can("manage_policy")}
-          title={!context.can("manage_policy") ? "Administration permission required" : undefined}
-          onClick={async () => {
-            if (busy || role === current || !context.can("manage_policy")) return;
-            setBusy(true);
-            setError("");
-            try {
-              const saved = await context.mutate.patch(member.id, { fields: { ...member.fields, role } }, { event: `Role view changed from ${current} to ${role} for ${member.title}`, expectRevision: member.revision });
-              if (!saved) {
-                setError("The member record changed elsewhere. Reload it before applying another change.");
-                return;
-              }
-              context.toast("Role view updated", `${member.title} now holds the ${ROLE_LABELS[role]} view in this workspace. This does not change provider-side access.`);
-              close();
-            } catch (cause) {
-              setError(cause instanceof Error ? cause.message : "Review the role and try again.");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Change role view
-        </Button>
+          primary={
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!canApply}
+              title={!context.can("manage_policy") ? "Administration permission required" : needsReason && trimmed.length < 8 ? "Add a reason of at least 8 characters" : undefined}
+              onClick={async () => {
+                if (!canApply) return;
+                setBusy(true);
+                setError("");
+                try {
+                  const saved = await context.mutate.patch(member.id, {
+                    fields: { ...member.fields, role, roleChangedBy: context.actor, roleChangedAt: clockIso(), ...(trimmed ? { roleChangeReason: trimmed } : {}) },
+                  }, { event: `Role view changed from ${current} to ${role} for ${member.title} by ${context.actor}${trimmed ? `: ${trimmed}` : ""}`, expectRevision: member.revision });
+                  if (!saved) {
+                    setError("The member record changed elsewhere. Reload it before applying another change.");
+                    return;
+                  }
+                  context.toast("Role view updated", `${member.title} now holds the ${ROLE_LABELS[role]} view. The change is in the audit trail.`);
+                  close();
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "Review the role and try again.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Change role view
+            </Button>
+          }
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </DrawerActions>
     </Stack>
   );
@@ -804,7 +860,7 @@ export function PolicyEditor({ context, close }: { context: ScreenContext; close
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = ofKind(data.policies, "role").find((row) => row.id === (payload?.id ?? context.selectedId));
   const [title, setTitle] = useSeeded(existing?.title ?? "");
-  const [basedOnValue, setBasedOn] = useSeeded(String(existing?.fields.basedOn ?? "member"));
+  const [basedOnValue, setBasedOn] = useSeeded(String(existing?.fields.basedOn ?? "owner"));
   const basedOn = basedOnValue as Role;
   const [caps, setCaps] = useSeededList(typeof existing?.fields.capabilities === "string" ? existing.fields.capabilities : "");
   const [deny, setDeny] = useSeededList(typeof existing?.fields.deny === "string" ? existing.fields.deny : "");
@@ -823,7 +879,7 @@ export function PolicyEditor({ context, close }: { context: ScreenContext; close
         setError("");
         const fields = { kind: "role", basedOn, capabilities: caps.join(","), deny: deny.join(","), apps: "", holders: Number(existing?.fields.holders ?? 0), author: context.actor };
         if (existing) {
-          await context.mutate.patch(existing.id, { title, summary: `Based on ${ROLE_LABELS[basedOn]}, ${caps.length} capabilities.`, fields: { ...existing.fields, ...fields } }, { event: `Role draft updated: ${title}`, expectRevision: existing.revision });
+          if (!(await context.mutate.patch(existing.id, { title, summary: `Based on ${ROLE_LABELS[basedOn]}, ${caps.length} capabilities.`, fields: { ...existing.fields, ...fields } }, { event: `Role draft updated: ${title}`, expectRevision: existing.revision }))) return;
           context.toast("Role saved", `${title} is a ${existing.status} role.`);
         } else {
           await context.mutate.create({
@@ -846,9 +902,9 @@ export function PolicyEditor({ context, close }: { context: ScreenContext; close
           {ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
         </Select>
       </Field>
-      <Field label="Capabilities" error={widened.length ? error || `Not held by ${ROLE_LABELS[basedOn]}: ${widened.map(capabilityLabel).join(", ")}` : undefined}>
+      <Field label="Capabilities" hint={CAPABILITIES.every((capability) => !roleCan(basedOn, capability)) ? `${ROLE_LABELS[basedOn]} holds no capabilities to keep; choose another base.` : "Tick what this role keeps."} error={widened.length ? error || `Not held by ${ROLE_LABELS[basedOn]}: ${widened.map(capabilityLabel).join(", ")}` : undefined}>
         <Stack gap={2}>
-          {CAPABILITIES.map((capability) => (
+          {CAPABILITIES.filter((capability) => roleCan(basedOn, capability) || caps.includes(capability)).map((capability) => (
             <Checkbox
               key={capability}
               label={`${capabilityLabel(capability)}${roleCan(basedOn, capability) ? "" : " — not in the base view"}`}
@@ -946,15 +1002,21 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
             ]} />
             {widened.length > 0 ? (
               <Notice tone="danger" title="Cannot be published">A custom role may only narrow its base view. Remove the widened capabilities first.</Notice>
-            ) : (
-              <Button
+            ) : null}
+          </Stack>
+        </Card>
+      )}
+      {role && widened.length === 0 && (
+        <ModalActions>
+          <OverlayActions
+            primary={<Button
                 variant="primary"
                 busy={busy}
                 disabled={role.status === "published"}
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    await context.mutate.patch(role.id, { status: "published", fields: { ...role.fields, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `Role published: ${role.title}`, expectRevision: role.revision });
+                    if (!(await context.mutate.patch(role.id, { status: "published", fields: { ...role.fields, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `Role published: ${role.title}`, expectRevision: role.revision }))) return;
                     context.toast("Published", `${role.title} is live in the interface and the change is in the audit trail.`);
                     close();
                   } finally {
@@ -963,10 +1025,10 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
                 }}
               >
                 Publish this role
-              </Button>
-            )}
-          </Stack>
-        </Card>
+              </Button>}
+            end={<OverlayCancel>Close</OverlayCancel>}
+          />
+        </ModalActions>
       )}
     </Stack>
   );
@@ -1102,7 +1164,7 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
               tone: "danger",
               onRun: (selected) => {
                 void Promise.all(selected.map((row) => context.mutate.patch(row.id, { status: "suspended", fields: { ...row.fields, suspendedBy: context.actor } }, { event: `Agent suspended: ${row.title}` })))
-                  .then(() => context.toast("Suspended", `${selected.length} ${selected.length === 1 ? "agent" : "agents"} will take no further step.`));
+                  .then((saved) => saved.every(Boolean) && context.toast("Suspended", `${selected.length} ${selected.length === 1 ? "agent" : "agents"} will take no further step.`));
               },
               disabled: (selected) => selected.every((row) => row.status === "suspended"),
             },
@@ -1203,21 +1265,20 @@ export function GrantEditor({ context, close }: { context: ScreenContext; close:
           still recorded against the mission budget.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
             setBusy(true);
             try {
               if (existing) {
-                await context.mutate.patch(existing.id, {
+                if (!(await context.mutate.patch(existing.id, {
                   summary: `${mode.replace(/_/g, " ")} up to ${context.money(cap)}.`,
                   amountMinor: cap,
                   fields: { ...existing.fields, mode, maxSpendMinor: cap, requiresApproval: requires.join(","), author: context.actor },
-                }, { event: `Autonomy grant updated: ${existing.title}`, expectRevision: existing.revision });
+                }, { event: `Autonomy grant updated: ${existing.title}`, expectRevision: existing.revision }))) return;
                 context.toast("Grant saved", `${existing.title} is now ${mode.replace(/_/g, " ")} with a cap of ${context.money(cap)}.`);
               } else {
                 await context.mutate.create({
@@ -1237,8 +1298,10 @@ export function GrantEditor({ context, close }: { context: ScreenContext; close:
           }}
         >
           Save grant
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1315,7 +1378,7 @@ export function AutonomyRevoke({ context, close }: { context: ScreenContext; clo
           onClick={async () => {
             setBusy(true);
             try {
-              await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: false, pausedBy: context.actor } }, { event: "Automation resumed from the autonomy centre" });
+              if (!(await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: false, pausedBy: context.actor } }, { event: "Automation resumed from the autonomy centre" }))) return;
               context.toast("Resumed", "Agents and missions may take steps again.");
               close();
             } finally { setBusy(false); }
@@ -1332,7 +1395,7 @@ export function AutonomyRevoke({ context, close }: { context: ScreenContext; clo
         onConfirm={async () => {
           setBusy(true);
           try {
-            await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: true, pausedBy: context.actor } }, { event: "Automation paused from the autonomy centre" });
+            if (!(await context.mutate.patch(context.org.id, { fields: { ...(organisation?.fields ?? {}), executionPaused: true, pausedBy: context.actor } }, { event: "Automation paused from the autonomy centre" }))) return;
             context.toast("Paused", "Every agent and mission step is held, and the organisation record carries the pause.", "blocked");
             close();
           } finally { setBusy(false); }
@@ -1355,7 +1418,7 @@ export function AutonomyRevoke({ context, close }: { context: ScreenContext; clo
       onConfirm={async () => {
         setBusy(true);
         try {
-          await context.mutate.patch(grant.id, { status: "revoked", fields: { ...grant.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Autonomy grant revoked: ${grant.title}`, expectRevision: grant.revision });
+          if (!(await context.mutate.patch(grant.id, { status: "revoked", fields: { ...grant.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Autonomy grant revoked: ${grant.title}`, expectRevision: grant.revision }))) return;
           context.toast("Revoked", `${grant.title} no longer applies. Anything it allowed now needs a person.`);
           close();
         } finally { setBusy(false); }
@@ -1538,10 +1601,9 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
         A step reserves its headroom on the budget record first and commits afterwards, so two steps in the same period cannot both
         spend the last of a cap.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={tooLow}
@@ -1549,7 +1611,7 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
             setBusy(true);
             try {
               if (existing) {
-                await context.mutate.patch(existing.id, { amountMinor: cap }, { event: `Quota set to ${context.money(cap)} on ${existing.title}`, expectRevision: existing.revision });
+                if (!(await context.mutate.patch(existing.id, { amountMinor: cap }, { event: `Quota set to ${context.money(cap)} on ${existing.title}`, expectRevision: existing.revision }))) return;
                 context.toast("Quota saved", `${existing.title} is capped at ${context.money(cap)}.`);
               } else {
                 await context.mutate.create({
@@ -1567,8 +1629,10 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
           }}
         >
           Save quota
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1594,10 +1658,9 @@ export function CostAllocation({ context, close }: { context: ScreenContext; clo
         { label: "Existing allocation", value: target ? context.money(Number(target.amountMinor ?? 0)) : "None" },
         { label: "After this change", value: context.money(Number(target?.amountMinor ?? 0) + amount) },
       ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!department || amount <= 0}
@@ -1605,7 +1668,7 @@ export function CostAllocation({ context, close }: { context: ScreenContext; clo
             setBusy(true);
             try {
               if (target) {
-                await context.mutate.patch(target.id, { amountMinor: Number(target.amountMinor ?? 0) + amount }, { event: `Allocated ${context.money(amount)} to ${target.title}`, expectRevision: target.revision });
+                if (!(await context.mutate.patch(target.id, { amountMinor: Number(target.amountMinor ?? 0) + amount }, { event: `Allocated ${context.money(amount)} to ${target.title}`, expectRevision: target.revision }))) return;
               } else {
                 const name = data.departments.find((row) => row.id === department)?.title ?? "Department";
                 await context.mutate.create({
@@ -1623,15 +1686,17 @@ export function CostAllocation({ context, close }: { context: ScreenContext; clo
           }}
         >
           Allocate
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 export function BudgetWarning({ context }: { context: ScreenContext }) {
   const data = useAdmin();
-  const budget = data.budgets.find((row) => row.id === context.selectedId) ?? data.budgets[0];
+  const budget = data.budgets.find((row) => row.id === context.selectedId);
   if (!budget) return <Empty title="No limit selected" icon={<KeyRound size={20} />}>Choose a limit to inspect its headroom.</Empty>;
   const total = Number(budget.amountMinor ?? 0);
   const committed = Number(budget.fields.committedMinor ?? 0);

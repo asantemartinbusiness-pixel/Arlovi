@@ -1,7 +1,7 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput, OverlayActions } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
 import { CAPABILITY_LABELS } from "@/platform/capability";
@@ -12,6 +12,7 @@ import {
   chartData, fillRange, nextId, pasteAt, readWorkbook, setCell, sheetToRows, sortRange, usedBox,
   type Sheet, type Workbook,
 } from "./model";
+import { proposeChange } from "./preview";
 import { activeWorkbookEditor, protectedSet, useWorkbookEditor, type WorkbookEditor } from "./state";
 
 /* ====================================================================== *
@@ -28,12 +29,12 @@ function useWorkbookFor(context: ScreenContext): Rec | undefined {
 
 const editorFor = (context: ScreenContext) => activeWorkbookEditor(context.params.id);
 
-export function formFooter(form: string, label: string, danger = false) {
+export function formFooter(form: string, label: string, danger = false, dismiss = "Cancel") {
   return ({ close }: { close: () => void }) => (
-    <>
-      <Button variant="ghost" onClick={close}>Cancel</Button>
-      <Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>
-    </>
+    <OverlayActions
+      primary={<Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>}
+      end={<Button variant="ghost" onClick={close}>{dismiss}</Button>}
+    />
   );
 }
 
@@ -75,7 +76,9 @@ export const GRID_ACTIONS: ActionDef[] = [
       const direction = box.toRow > box.fromRow ? "down" : "right";
       const blocked = blockedByProtection(editor, selectionAddresses(editor));
       if (blocked) { context.toast("Protected", blocked, "blocked"); return; }
-      editor.commitSheet(fillRange(editor.sheet, box, direction), `Fill ${direction} ${boxLabel(box)}`);
+      if (!proposeChange(editor, fillRange(editor.sheet, box, direction), `Fill ${direction} ${boxLabel(box)}`, context.params.id ?? "")) {
+        context.toast("Review the fill", "It replaces existing values, so the change is shown above the grid.", "info");
+      }
     },
   },
   { id: "sort", label: "Sort…", placement: "toolbar", run: (context) => context.openOverlay("sort range") },
@@ -108,7 +111,10 @@ function pasteInto(context: ScreenContext, editor: WorkbookEditor, text: string)
   for (let r = 0; r < height; r += 1) for (let c = 0; c < width; c += 1) targets.push(cellAddress(col + c, row + r));
   const blocked = blockedByProtection(editor, targets);
   if (blocked) { context.toast("Protected", blocked, "blocked"); return; }
-  editor.commitSheet(pasteAt(editor.sheet, text, col, row), `Paste ${width} × ${height} at ${cellAddress(col, row)}`);
+  if (!proposeChange(editor, pasteAt(editor.sheet, text, col, row), `Paste ${width} × ${height} at ${cellAddress(col, row)}`, context.params.id ?? "")) {
+    context.toast("Review the paste", "It replaces existing values, so the change is shown above the grid. Nothing is written until you apply it.", "info");
+    return;
+  }
   context.toast("Pasted", `${width} × ${height} cells from ${cellAddress(col, row)}. Text is kept as typed: a date or an amount is not reinterpreted.`);
 }
 
@@ -196,7 +202,9 @@ export function SortForm({ context, close }: { context: ScreenContext; close: ()
         event.preventDefault();
         const blocked = blockedByProtection(editor, selectionAddresses({ ...editor, selection: { ...editor.selection, box } }));
         if (blocked) { context.toast("Protected", blocked, "blocked"); return; }
-        editor.commitSheet(sortRange(editor.sheet, box, column, direction, header, editor.values), `Sort ${boxLabel(box)}`);
+        if (!proposeChange(editor, sortRange(editor.sheet, box, column, direction, header, editor.values), `Sort ${boxLabel(box)}`, context.params.id ?? "", true)) {
+          context.toast("Review the sort", "The cells that change are highlighted in the grid and listed above it. Apply writes them.", "info");
+        }
         close();
       }}
     >
@@ -420,9 +428,9 @@ export function SendChartToDeck({ context, close }: { context: ScreenContext; cl
       onSubmit={async (event) => {
         event.preventDefault();
         if (!sheet || !data || !record) return;
-        await context.mutate.patch(deck.id, {
+        if (!(await context.mutate.patch(deck.id, {
           fields: { ...deck.fields, pendingChart: JSON.stringify({ title: chart.title, kind: chart.kind, series: data.series, sourceWorkbookId: record.id, sourceSheetName: sheet.name, sourceRef: chart.ref, capturedAt: context.now.toISOString(), linked: true }) },
-        }, { expectRevision: deck.revision, event: `${chart.title} published to ${deck.title}` });
+        }, { expectRevision: deck.revision, event: `${chart.title} published to ${deck.title}` }))) return;
         editor.commit({ ...editor.workbook, charts: editor.workbook.charts.map((item) => (item.id === chart.id ? { ...item, snapshotAt: context.now.toISOString() } : item)) }, "Publish a chart snapshot");
         context.toast("Published to the deck", `${chart.title} waits in ${deck.title}: insert it from Charts & data. The snapshot time travels with it.`);
         close();
@@ -522,7 +530,7 @@ export function PublishWorkbook({ context, close }: { context: ScreenContext; cl
         setError("");
         try {
         if (scope === "workspace") {
-          await context.mutate.patch(record.id, { status: "published", fields: { ...record.fields, publishedAt: context.now.toISOString(), publishedBy: context.actor } }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
+          if (!(await context.mutate.patch(record.id, { status: "published", fields: { ...record.fields, publishedAt: context.now.toISOString(), publishedBy: context.actor } }, { expectRevision: record.revision, event: `${record.title} published in the workspace` }))) return;
           context.toast("Workspace status updated", "The workbook is marked published in this local workspace. This does not create server-side read-only permissions.");
         } else {
           editor.commit({ ...editor.workbook, io: [{ id: nextId("io"), at: context.now.toISOString(), kind: "export", format: "Publish to the web", note: `${CAPABILITY_LABELS.queued_local}: no hosting is connected, nothing was published.`, warnings: ["Not connected"] }, ...editor.workbook.io] }, "Request web publishing");

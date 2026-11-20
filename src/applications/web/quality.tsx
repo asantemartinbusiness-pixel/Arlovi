@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Activity, CheckCircle2, Globe, ShieldCheck } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
-  Row, Segmented, Stack, Stat, StatRow, TextInput,
+  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, Notice, OverlayActions, OverlayCancel,
+  OverlaySection, OverlaySummary, Pill, Properties, Row, Segmented, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -73,11 +73,10 @@ export function QualityReport({ context, area }: { context: ScreenContext; area:
 
   return (
     <Stack gap={5}>
-      <section className="web-quality-overview" aria-label="Website quality review">
+      <section className="web-quality-overview" data-compact aria-label="Website quality review">
         <div>
-          <span className="web-library-eyebrow">WEBSITES / QUALITY REVIEW</span>
           <h2>{area} checks</h2>
-          <p>{record.title} · Review the evidence, resolve issues and record the audit before preparing an export.</p>
+          <p>{record.title}. Resolve issues, then record the audit before preparing an export.</p>
         </div>
         <div className="web-quality-actions">
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`)}>Open editor</Button>
@@ -143,8 +142,8 @@ export function QualityReport({ context, area }: { context: ScreenContext; area:
                     onClick={async () => {
                       const applied = applyFix(site, issue);
                       if (!applied) { context.toast("No fix applied", "There was nothing in the model to copy the value from.", "blocked"); return; }
-                      await saveSite(context, record, applied.next, applied.label);
-                      await context.mutate.patch(record.id, { fields: { ...record.fields, lastAuditAt: now.toISOString() } }, { event: `Audit fix applied: ${applied.label}` });
+                      if (!(await saveSite(context, record, applied.next, applied.label))) return;
+                      if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastAuditAt: now.toISOString() } }, { event: `Audit fix applied: ${applied.label}` }))) return;
                       context.toast("Fix applied", `${applied.label}. Re-run the audit to see the new figures.`);
                     }}
                   >
@@ -214,8 +213,8 @@ export function CodeDiffPanel({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="The diff is the real export">Both sides are produced by the same generator that writes the HTML file, so what is shown is what would ship.</Notice>
       {applied && (
         <Button variant="primary" onClick={async () => {
-          await saveSite(context, record, applied.next, applied.label);
-          await context.mutate.patch(record.id, { fields: { ...record.fields, lastFixAt: context.now.toISOString() } }, { event: `Proposed fix applied: ${applied.label}` });
+          if (!(await saveSite(context, record, applied.next, applied.label))) return;
+          if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastFixAt: context.now.toISOString() } }, { event: `Proposed fix applied: ${applied.label}` }))) return;
           context.toast("Fix applied", `${applied.label}. Retest to record the new figures; undo is available in the builder.`);
           context.closeOverlay();
         }}>Apply this fix</Button>
@@ -287,7 +286,7 @@ export function DeployConsole({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Domains") {
     return (
       <Stack gap={4}>
-        <Row gap={2}><Button variant="primary" onClick={() => context.openOverlay("domain attach")}>Attach a domain</Button></Row>
+        {site.domains.length > 0 && <Row gap={2}><Button variant="secondary" onClick={() => context.openOverlay("domain attach")}>Attach a domain</Button></Row>}
         {site.domains.length === 0 ? (
           <Empty title="No domain attached" icon={<Globe size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("domain attach")}>Attach a domain</Button>}>
             A domain is recorded here with the DNS records it would need. Verification requires a lookup this browser cannot make.
@@ -348,9 +347,7 @@ export function DeployConsole({ context, lens }: { context: ScreenContext; lens:
             </Card>
           );
         })}
-        <Card span={12} title="Why production cannot be reached from here" subtitle="The boundary, stated once">
-          <BoundaryNotice id="site.publish" action="Promotion to production" />
-        </Card>
+        <div style={{ gridColumn: "1 / -1" }}><BoundaryNotice id="site.publish" action="Promotion to production" /></div>
       </Grid>
     );
   }
@@ -415,6 +412,22 @@ export function DeployConsole({ context, lens }: { context: ScreenContext; lens:
   );
 }
 
+/** Identity block of the publish review: the site, the target and what is actually true of its state. */
+export function PublishSummary({ context }: { context: ScreenContext }) {
+  const { record, site } = useSiteRecord(context);
+  const payload = context.overlayPayload as { environment?: DeployEntry["environment"] } | undefined;
+  if (!record) return null;
+  const state = liveState(record, site);
+  return (
+    <OverlaySummary
+      eyebrow={`Target · ${payload?.environment ?? "production"}`}
+      title={record.title}
+      status={<Pill tone={state.tone} dot>{state.label}</Pill>}
+      meta={[`${site.pages.length} ${site.pages.length === 1 ? "page" : "pages"}`, `${(exportBytes(site) / 1024).toFixed(1)} kB measured`]}
+    />
+  );
+}
+
 export function PublishReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, site, formNames } = useSiteRecord(context);
   const { now } = useWorkspace();
@@ -426,101 +439,108 @@ export function PublishReview({ context, close }: { context: ScreenContext; clos
   const failing = issues.filter((issue) => issue.level === "fail");
   const verified = site.domains.some((domain) => domain.verified);
   const bytes = exportBytes(site);
+  const fileName = (path: string) => (path === "/" ? "index.html" : `${path.replace(/^\//, "").replace(/\//g, "-")}.html`);
 
   return (
     <Stack gap={4}>
-      <ul className="t6-steps">
-        <li className="t6-step" data-state={failing.length === 0 ? "done" : "blocked"}>
-          <span className="t6-step-n">1</span>Quality gate · {failing.length === 0 ? "clear" : `${failing.length} failing`}
-        </li>
-        <li className="t6-step" data-state={verified ? "done" : "blocked"}>
-          <span className="t6-step-n">2</span>Verified domain · {verified ? "yes" : "none"}
-        </li>
-        <li className="t6-step" data-state="blocked">
-          <span className="t6-step-n">3</span>Hosting connection · not connected
-        </li>
-        <li className="t6-step" data-state="current">
-          <span className="t6-step-n">4</span>Export · available
-        </li>
-      </ul>
+      <OverlaySection title="What pressing the button does" tone="warning" hint="No host is connected, so nothing leaves this browser.">
+        <ul className="ds-stack ds-gap-1" style={{ margin: 0, paddingInlineStart: 18, listStyle: "disc" }}>
+          <li>Nothing is uploaded and no address changes.</li>
+          <li>One attempt is written to the deployment history as <strong>blocked</strong>, with the failing checks that were present.</li>
+          <li>The export below stays available to download and host yourself.</li>
+        </ul>
+      </OverlaySection>
 
-      {failing.length > 0 && (
-        <Notice tone="danger" title={`${failing.length} failing ${failing.length === 1 ? "check" : "checks"} would ship`}>
-          <ul style={{ margin: "6px 0 0", paddingInlineStart: 18 }}>
-            {failing.slice(0, 5).map((issue) => <li key={issue.id}>{issue.title}</li>)}
-          </ul>
-        </Notice>
-      )}
+      <OverlaySection title="Gates, in order">
+        <ul className="t6-steps">
+          <li className="t6-step" data-state={failing.length === 0 ? "done" : "blocked"}>
+            <span className="t6-step-n">1</span>Quality gate · {failing.length === 0 ? "clear" : `${failing.length} failing`}
+          </li>
+          <li className="t6-step" data-state={verified ? "done" : "blocked"}>
+            <span className="t6-step-n">2</span>Verified domain · {verified ? "yes" : "none attached or verified"}
+          </li>
+          <li className="t6-step" data-state="blocked">
+            <span className="t6-step-n">3</span>Hosting connection · not connected
+          </li>
+          <li className="t6-step" data-state="current">
+            <span className="t6-step-n">4</span>Export · available
+          </li>
+        </ul>
+        {failing.length > 0 && (
+          <Notice tone="danger" title={`${failing.length} failing ${failing.length === 1 ? "check" : "checks"} would ship`}>
+            <ul style={{ margin: "6px 0 0", paddingInlineStart: 18 }}>
+              {failing.slice(0, 5).map((issue) => <li key={issue.id}>{issue.title}</li>)}
+            </ul>
+          </Notice>
+        )}
+      </OverlaySection>
 
-      <Properties rows={[
-        { label: "Environment", value: environment },
-        { label: "Pages", value: String(site.pages.length) },
-        { label: "Export size", value: `${(bytes / 1024).toFixed(1)} kB measured` },
-        { label: "Hosting", value: <CapabilityState id="site.publish" /> },
-      ]} />
-
-      <BoundaryNotice id="site.publish" action="Publishing" />
-
-      <Card eyebrow="EXPORT" prov="posted" title="What you can take away now" subtitle="Complete, standalone files generated in this browser">
-        <Stack gap={2}>
+      <OverlaySection title="Route tree you can take away" hint={<><CapabilityState id="site.publish" /> hosting</>}>
+        <ul className="web-route-list">
           {site.pages.map((page) => (
-            <Row key={page.id} gap={2}>
+            <li key={page.id}>
               <span className="ds-grow"><strong>{page.name}</strong> <code className="ds-subtle">{page.path}</code></span>
               <span className="ds-subtle ds-num">{(new TextEncoder().encode(pageHtml(site, page)).length / 1024).toFixed(1)} kB</span>
-              <Button size="sm" variant="secondary" onClick={() => {
-                const filename = page.path === "/" ? "index.html" : `${page.path.replace(/^\//, "").replace(/\//g, "-")}.html`;
-                downloadFile(filename, pageHtml(site, page), "text/html");
-                context.toast("Page exported", `${filename} downloaded.`);
+              <Button size="sm" variant="ghost" aria-label={`Download ${page.name} as ${fileName(page.path)}`} onClick={() => {
+                downloadFile(fileName(page.path), pageHtml(site, page), "text/html");
+                context.toast("Page exported", `${fileName(page.path)} downloaded.`);
               }}>Download</Button>
-            </Row>
+            </li>
           ))}
           {site.seo.sitemap && (
-            <Row gap={2}>
+            <li>
               <span className="ds-grow"><strong>Sitemap</strong> <code className="ds-subtle">/sitemap.xml</code></span>
-              <Button size="sm" variant="ghost" onClick={() => {
+              <Button size="sm" variant="ghost" aria-label="Download sitemap.xml" onClick={() => {
                 downloadFile("sitemap.xml", sitemapXml(site, site.domains.find((domain) => domain.primary)?.host ?? ""), "application/xml");
                 context.toast("Sitemap exported", "sitemap.xml downloaded.");
               }}>Download</Button>
-            </Row>
+            </li>
           )}
-        </Stack>
-      </Card>
+        </ul>
+      </OverlaySection>
 
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          busy={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const entry: DeployEntry = {
-                id: `dep-${wallMs().toString(36)}`,
-                at: now.toISOString(),
-                environment,
-                state: "blocked",
-                note: failing.length
-                  ? `Stopped at the hosting boundary with ${failing.length} failing checks.`
-                  : "Stopped at the hosting boundary. The export was produced instead.",
-                pages: site.pages.length,
-                bytes,
-                actor: context.actor,
-              };
-              await saveSite(context, record, { ...site, deployments: [...site.deployments, entry] }, `Publish to ${environment} recorded as blocked at the hosting boundary`);
-              await context.mutate.log(`Publish attempt for ${record.title} stopped: no hosting provider is connected.`, { entityId: record.id, type: "capability", capability: "not_connected" });
-              context.toast("Recorded as not published", "The attempt is in the deployment history as blocked. Download the export above to take the site away.", "blocked");
-              close();
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Record the attempt honestly
-        </Button>
-        <Button variant="secondary" onClick={() => {
-          downloadFile("index.html", pageHtml(site, site.pages[0]), "text/html");
-          context.toast("Export downloaded", "index.html is a complete page you can host anywhere.");
-        }}>Download index.html</Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              busy={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const entry: DeployEntry = {
+                    id: `dep-${wallMs().toString(36)}`,
+                    at: now.toISOString(),
+                    environment,
+                    state: "blocked",
+                    note: failing.length
+                      ? `Stopped at the hosting boundary with ${failing.length} failing checks.`
+                      : "Stopped at the hosting boundary. The export was produced instead.",
+                    pages: site.pages.length,
+                    bytes,
+                    actor: context.actor,
+                  };
+                  if (!(await saveSite(context, record, { ...site, deployments: [...site.deployments, entry] }, `Publish to ${environment} recorded as blocked at the hosting boundary`))) return;
+                  await context.mutate.log(`Publish attempt for ${record.title} stopped: no hosting provider is connected.`, { entityId: record.id, type: "capability", capability: "not_connected" });
+                  context.toast("Recorded as not published", "The attempt is in the deployment history as blocked. Nothing was uploaded; download the export to take the site away.", "blocked");
+                  close();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Record a blocked attempt
+            </Button>
+          }
+          secondary={
+            <Button variant="secondary" onClick={() => {
+              downloadFile("index.html", pageHtml(site, site.pages[0]), "text/html");
+              context.toast("Export downloaded", "index.html is a complete page you can host anywhere.");
+            }}>Download index.html</Button>
+          }
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -549,7 +569,7 @@ export function DomainAttachForm({ context, close }: { context: ScreenContext; c
             { type: "TXT", name: "_arlovi", value: `arlovi-site=${record.id}` },
           ],
         };
-        await saveSite(context, record, { ...site, domains: [...site.domains, domain] }, `Domain ${domain.host} attached as unverified`);
+        if (!(await saveSite(context, record, { ...site, domains: [...site.domains, domain] }, `Domain ${domain.host} attached as unverified`))) return;
         context.toast("Domain recorded", `${domain.host} is attached and unverified. Nothing was looked up.`);
         close();
       }}
@@ -660,10 +680,10 @@ export function DeploymentIssue({ context }: { context: ScreenContext }) {
         <Button
           variant="secondary"
           onClick={async () => {
-            await saveSite(context, record, {
+            if (!(await saveSite(context, record, {
               ...site,
               deployments: site.deployments.map((item) => (item.id === entry.id ? { ...item, state: "rolled_back" as const, note: `Rolled back to the export from ${previous.at}.` } : item)),
-            }, `Deployment ${entry.id} rolled back to the export from ${previous.at}`);
+            }, `Deployment ${entry.id} rolled back to the export from ${previous.at}`))) return;
             context.toast("Rolled back", "The record now shows this attempt as rolled back to the earlier export.");
           }}
         >

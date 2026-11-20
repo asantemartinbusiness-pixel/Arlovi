@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Button, Empty, Field, Notice, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Empty, Field, Notice, Properties, Row, Select, Stack, TextArea, TextInput, ModalActions, OverlayActions } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useOrgRecords, useRecord } from "@/platform/workspace";
+import { internalPeople } from "@/applications/brain/people";
 import type { Rec } from "@/domain/types";
 import { clockIso, wallMs } from "@/platform/clock";
 
@@ -41,8 +42,7 @@ export function AttachToSpecialist({ context, close }: { context: ScreenContext;
         </Field>
       </Row>
       {already && <Notice tone="warning" title="Already attached">This record is already in the conversation.</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!record || already}
@@ -64,11 +64,18 @@ export function AttachToSpecialist({ context, close }: { context: ScreenContext;
           }}
         >
           Attach
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
+}
+
+/** Internal, active people (no clients or external parties) once each, plus active AI employees when asked. */
+export function internalRoster(records: Rec[], withAgents = false): Rec[] {
+  const people = internalPeople(records.filter((record) => record.collection === "members" && record.status === "active"));
+  if (!withAgents) return people;
+  const seen = new Set(people.map((person) => person.title));
+  const agents = records.filter((record) => record.collection === "agents" && record.status === "active" && !seen.has(record.title));
+  return [...people, ...agents.filter((agent, index) => agents.findIndex((other) => other.title === agent.title) === index)];
 }
 
 function participantsOf(room: Rec | undefined, records: Rec[]): Rec[] {
@@ -102,8 +109,7 @@ export function AssignRoomTask({ context, close }: { context: ScreenContext; clo
       {person?.collection === "agents" && (
         <Notice tone="info" title="An AI employee works within its grants">Assigning in a room does not widen what it may do. A step that needs an external tool still stops at its policy.</Notice>
       )}
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!title.trim() || !person}
@@ -133,9 +139,7 @@ export function AssignRoomTask({ context, close }: { context: ScreenContext; clo
           }}
         >
           Assign the task
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -146,7 +150,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
   const tasks = records.filter((record) => record.collection === "missionTasks" && record.parentId === context.params.id);
   const gated = tasks.filter((task) => task.fields.approvalRequired === true);
   const pool = gated.length ? gated : tasks;
-  const people = records.filter((record) => record.collection === "members" && String(record.fields.kind ?? "human") === "human" && record.status === "active");
+  const people = internalRoster(records);
   const [taskIdPicked, setTaskId] = useState<string>();
   const taskId = taskIdPicked ?? (pool[0]?.id ?? "");
   const [reviewer, setReviewer] = useState("");
@@ -172,8 +176,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
         </Select>
       </Field>
       {blocked && reviewer && <Notice tone="warning" title="Cannot assign">{blocked}</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !task}
@@ -189,9 +192,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
           }}
         >
           Assign the reviewer
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -219,8 +220,7 @@ export function CorrectTranscript({ context, close }: { context: ScreenContext; 
       </Field>
       <Field label="Corrected text" required><TextArea aria-label="Corrected text" value={text} rows={3} onChange={(event) => setValue(event.target.value)} /></Field>
       <Notice tone="info" title="The original is kept">The line records what it said before, who corrected it and when. A correction never triggers an action.</Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!line || !text.trim() || text === line.text}
@@ -235,9 +235,7 @@ export function CorrectTranscript({ context, close }: { context: ScreenContext; 
           }}
         >
           Save the correction
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -254,8 +252,7 @@ export function CommentOnArtifact({ context, close }: { context: ScreenContext; 
     <Stack gap={4}>
       <Field label="Comment" required><TextArea aria-label="Comment" value={text} rows={4} onChange={(event) => setText(event.target.value)} /></Field>
       <p className="ds-subtle">{comments.length} comment{comments.length === 1 ? "" : "s"} already on {artifact.title}.</p>
-      <Row gap={2}>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!text.trim()}
@@ -270,9 +267,7 @@ export function CommentOnArtifact({ context, close }: { context: ScreenContext; 
           }}
         >
           Add the comment
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -283,7 +278,7 @@ export function HostReview({ context, close }: { context: ScreenContext; close: 
   const room = useRecord(context.params.id);
   const listed = participantsOf(room, records);
   // A room with no recorded participants can still host a review: offer the active people and AI employees.
-  const people = listed.length ? listed : records.filter((record) => (record.collection === "members" && String(record.fields.kind ?? "human") === "human" && record.status === "active") || (record.collection === "agents" && record.status === "active"));
+  const people = listed.length ? listed : internalRoster(records, true);
   const [topic, setTopic] = useState("");
   const [picked, setPicked] = useState<string[]>();
   const chosen = picked ?? (listed.length ? listed.map((person) => person.id) : []);
@@ -301,8 +296,7 @@ export function HostReview({ context, close }: { context: ScreenContext; close: 
         ))}
       </Stack>
       <Notice tone="info" title="A review is decided by people">AI employees in the review contribute within their grants; a mention in the room never overrides an external tool policy.</Notice>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!topic.trim() || chosen.length === 0} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={!topic.trim() || chosen.length === 0} onClick={async () => {
           setBusy(true);
           const review = await context.mutate.create({
             collection: "meetings", title: `Review: ${topic.trim()}`, status: "scheduled", summary: `Hosted in ${room.title} by ${context.actor}.`,
@@ -317,9 +311,7 @@ export function HostReview({ context, close }: { context: ScreenContext; close: 
           context.toast("Review hosted", `${review.title} is open with ${chosen.length} participant${chosen.length === 1 ? "" : "s"}.`);
           setBusy(false);
           close();
-        }}>Host the review</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Host the review</Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -344,11 +336,10 @@ export function ResolveDisagreement({ context, close }: { context: ScreenContext
       </Field>
       {dispute && <Properties rows={[{ label: "What was said", value: dispute.summary }]} />}
       <Field label="The coordinator's decision" required><TextArea aria-label="The coordinator's decision" value={decision} rows={3} onChange={(event) => setDecision(event.target.value)} /></Field>
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!dispute || !decision.trim()} onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" busy={busy} disabled={!dispute || !decision.trim()} onClick={async () => {
           if (!dispute) return;
           setBusy(true);
-          await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: clockIso(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` });
+          if (!(await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: clockIso(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` }))) return;
           await context.mutate.create({
             collection: "messages", title: `Decision: ${decision.trim().slice(0, 60)}`, status: "posted", summary: decision.trim(), parentId: context.params.id,
             at: clockIso(), fields: { author: context.actor, kind: "human", decision: true, resolves: dispute.id },
@@ -356,9 +347,7 @@ export function ResolveDisagreement({ context, close }: { context: ScreenContext
           context.toast("Resolved", "The decision is in the room and the disagreement is marked resolved.");
           setBusy(false);
           close();
-        }}>Record the decision</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Record the decision</Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }

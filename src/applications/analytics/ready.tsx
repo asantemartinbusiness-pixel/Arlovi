@@ -59,11 +59,12 @@ export function AnalyticsReady({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Wraps every tab and surface of the Analytics screens in the readiness gate. */
+/** Wraps every tab, surface and overlay of a screen set in the readiness gate (Analytics, Portals). */
 export function gateScreens(screens: Record<string, ScreenDef>): Record<string, ScreenDef> {
   return Object.fromEntries(Object.entries(screens).map(([id, screen]) => [id, {
     ...screen,
     surface: screen.surface ? (context: ScreenContext) => <AnalyticsReady>{screen.surface!(context)}</AnalyticsReady> : undefined,
     tabs: screen.tabs?.map((tab) => ({ ...tab, render: (context: ScreenContext) => <AnalyticsReady>{tab.render(context)}</AnalyticsReady> })),
+    overlays: screen.overlays?.map((overlay) => ({ ...overlay, render: (context: Parameters<typeof overlay.render>[0]) => <AnalyticsReady>{overlay.render(context)}</AnalyticsReady> })),
   }]));
 }

@@ -65,6 +65,7 @@ export function ProfileMenu({
           align="end"
           sideOffset={8}
           collisionPadding={12}
+          aria-labelledby={undefined}
           aria-label="Account and preferences"
         >
           <div className="profile-menu__identity">
@@ -122,7 +123,7 @@ export function ProfileMenu({
                 ? <PinOff size={17} aria-hidden="true"/>
                 : <Pin size={17} aria-hidden="true"/>}
               <span className="profile-menu__item-title">
-                {activeApplication.pinned ? "Unpin" : "Pin"} {activeApplication.name} {activeApplication.pinned ? "from" : "to"} favourites
+                {activeApplication.pinned ? "Remove" : "Pin"} {activeApplication.name} {activeApplication.pinned ? "from" : "to"} favourites
               </span>
             </DropdownMenu.Item>
           )}
@@ -204,6 +205,9 @@ export function ProfileMenu({
           <DropdownMenu.Label className="profile-menu__label">Role view (not a security boundary)</DropdownMenu.Label>
           <DropdownMenu.Item className="profile-menu__item"
             aria-expanded={roleExpanded} aria-controls="profile-role-views"
+            // Radix refocuses the menu root when a mouse leaves an item (layout shifts
+            // from expanding the inline roles fire it), stealing focus from the radios.
+            onPointerLeave={event => event.preventDefault()}
             onKeyDown={event => {
               if (event.key === "ArrowRight") { event.preventDefault(); setRoleExpanded(true); }
               if (event.key === "ArrowLeft" && roleExpanded) { event.preventDefault(); setRoleExpanded(false); }
@@ -218,10 +222,14 @@ export function ProfileMenu({
           {roleExpanded && (
             <div id="profile-role-views" className="profile-menu__inline-roles">
               <DropdownMenu.Label className="profile-menu__label">Preview navigation as</DropdownMenu.Label>
-              <DropdownMenu.RadioGroup value={role}
-                onValueChange={value => { setRoleExpanded(false); onRoleViewChange(value as Role); }}>
+              <DropdownMenu.RadioGroup value={role}>
                 {ROLE_VIEWS.map(item => (
-                  <DropdownMenu.RadioItem className="profile-menu__item" key={item} value={item}>
+                  <DropdownMenu.RadioItem className="profile-menu__item" key={item} value={item}
+                    onPointerLeave={event => event.preventDefault()}
+                    // Radix fires onSelect for click, Enter and Space and then closes
+                    // the menu, so the page behind it is exposed again to assistive
+                    // technology. One path: keyboard selection behaves exactly like a click.
+                    onSelect={() => { setRoleExpanded(false); onRoleViewChange(item); }}>
                     <span className="profile-menu__item-title">{ROLE_LABELS[item]}</span>
                     {item === role && <Check size={15} aria-hidden="true" className="profile-menu__selection"/>}
                   </DropdownMenu.RadioItem>

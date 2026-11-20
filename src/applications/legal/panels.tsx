@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Archive, CalendarClock, FileSignature, FileText, Gavel, ShieldAlert } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties, Row, Select,
+  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, Meter, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Properties, Row, Select,
   Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
+import { scopedDetailRecord } from "@/platform/recordScope";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
@@ -39,7 +40,7 @@ export function lifecycleLabel(state: string): string {
   return state.replace(/_/g, " ");
 }
 
-const STATUS_TONE: Record<string, "neutral" | "info" | "success" | "warning" | "danger" | "accent"> = {
+export const STATUS_TONE: Record<string, "neutral" | "info" | "success" | "warning" | "danger" | "accent"> = {
   draft: "neutral", in_review: "info", approved: "accent", awaiting_signature: "warning",
   active: "success", expiring: "warning", expired: "danger", archived: "neutral",
 };
@@ -358,9 +359,9 @@ export function ContractLibrary({ context, lens }: { context: ScreenContext; len
 export function ContractDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useLegalData();
   const record = useRecord(context.params.id);
-  const contract = record ?? data.contracts[0];
+  const contract = record?.organizationId === context.org.id && record.collection === "contracts" ? record : undefined;
   const [compare, setCompare] = useState(1);
-  if (!contract) return <Empty title="No contract" icon={<FileText size={20} />} />;
+  if (!contract) return <Empty title="Contract unavailable" icon={<FileText size={20} />}>This contract was not found in this company. Open one from the contract library.</Empty>;
   const clauses = clausesOf(contract);
   const versions = versionsOf(contract);
   const signatures = signaturesOf(contract);
@@ -471,7 +472,10 @@ export function ContractDetail({ context, lens }: { context: ScreenContext; lens
               A signature recorded here is somebody saying a document was signed. It carries no cryptographic evidence and would
               not stand as one on its own.
             </Notice>
-            <Button variant="secondary" onClick={() => context.openOverlay("sign authorization")}>Prepare a signature request</Button>
+            <Row gap={2}>
+              <Button variant="secondary" onClick={() => context.openOverlay("e-sign request", { id: contract.id })}>Prepare the signature handover</Button>
+              <Button variant="ghost" onClick={() => context.openOverlay("sign authorization", { id: contract.id })}>Record that it was signed</Button>
+            </Row>
           </Stack>
         </Card>
       </Stack>
@@ -518,55 +522,38 @@ export function ContractDetail({ context, lens }: { context: ScreenContext; lens
     );
   }
 
+  const flagged = clauses.filter((clause) => clause.risk !== "standard");
   return (
     <Grid>
-      <Card span={12} eyebrow="LIFECYCLE" prov="human" title={contract.title} subtitle={`${String(contract.fields.counterparty ?? "")} · ${String(contract.fields.type ?? "")}`}>
-        <Stack gap={4}>
-          <Lifecycle status={contract.status} />
-          <p>{contract.summary}</p>
-        </Stack>
+      <Card span={12} eyebrow="LIFECYCLE" prov="human" title="Where the contract stands"
+        subtitle={contract.summary || undefined}>
+        <Lifecycle status={contract.status} />
       </Card>
-      <Card span={6} eyebrow="PARTIES" prov="posted" title="Parties and dates">
-        <Properties rows={[
-          { label: "Counterparty", value: String(contract.fields.counterparty ?? "") },
-          { label: "Owner here", value: String(contract.fields.owner ?? contract.ownerName) },
-          { label: "Runs", value: <span className="ds-num">{context.date(contract.startAt)} – {context.date(contract.endAt)}</span> },
-          { label: "Notice period", value: <span className="ds-num">{String(contract.fields.noticeDays ?? 0)} days</span> },
-          { label: "Value", value: <span className="ds-num">{contract.amountMinor ? context.money(contract.amountMinor) : "Not a fixed value"}</span> },
-          { label: "Signed", value: contract.fields.signedAt ? <span className="ds-num">{context.date(String(contract.fields.signedAt))}</span> : "Not signed" },
-        ]} />
-      </Card>
-      <Card span={6} eyebrow="CLAUSES" prov="human" title="Clause summary" subtitle={`${clauses.length} clauses, ${clauses.filter((clause) => clause.risk !== "standard").length} flagged`}>
+      <KeyDatesCard context={context} contract={contract} />
+      <ObligationsCard context={context} contract={contract} obligations={obligations} />
+      <ReviewCycleCard context={context} contract={contract} />
+      <Card span={6} eyebrow="CLAUSES" prov="human" title="Clause summary" subtitle={`${clauses.length} clauses, ${flagged.length} flagged`}>
         <Stack gap={3}>
-          <Meter value={clauses.filter((clause) => clause.risk === "standard").length} max={Math.max(1, clauses.length)} label="Standard clauses" tone={clauses.some((clause) => clause.risk === "unusual") ? "warning" : "success"} />
+          <Meter value={clauses.length - flagged.length} max={Math.max(1, clauses.length)} label="Standard clauses" tone={clauses.some((clause) => clause.risk === "unusual") ? "warning" : "success"} />
           <Stack gap={2}>
-            {clauses.filter((clause) => clause.risk !== "standard").map((clause) => (
+            {flagged.map((clause) => (
               <Row key={clause.id} gap={2}>
                 <Pill tone={clause.risk === "unusual" ? "danger" : "warning"}>{clause.risk}</Pill>
                 <span className="ds-grow ds-truncate">{clause.title}</span>
               </Row>
             ))}
-            {clauses.every((clause) => clause.risk === "standard") && <span className="ds-subtle">Every clause is in the standard form.</span>}
+            {flagged.length === 0 && <span className="ds-subtle">{clauses.length ? "Every clause is in the standard form." : "No clauses are recorded yet."}</span>}
           </Stack>
           <Button size="sm" variant="secondary" onClick={() => context.setTab("Clauses")}>Read the clauses</Button>
         </Stack>
       </Card>
-      <KeyDatesCard context={context} contract={contract} />
-      <ReviewCycleCard context={context} contract={contract} />
-      <ObligationsCard context={context} contract={contract} obligations={obligations} />
       <LinksCard context={context} contract={contract} />
-      <Card span={12} eyebrow="APPROVALS" prov="human" title="Where this sits">
-        <Stack gap={3}>
-          <Properties rows={[
-            { label: "Status", value: <Pill tone={STATUS_TONE[contract.status] ?? "neutral"} dot>{lifecycleLabel(contract.status)}</Pill> },
-            { label: "Versions stored", value: <span className="ds-num">{String(versions.length)}</span> },
-            { label: "Signatures recorded", value: <span className="ds-num">{String(signatures.length)}</span> },
-          ]} />
-          <Notice tone="info" title="Approving a step is not accepting the contract">
-            A legal step recorded here says a named person reviewed something. Nothing in this workspace accepts a right or an
-            obligation on behalf of {context.org.shortName}, and no signature or filing is made from here.
-          </Notice>
-        </Stack>
+      <Card span={12} title="Approving a step is not accepting the contract">
+        <span className="ds-subtle">
+          A legal step recorded here says a named person reviewed something. Nothing in this workspace accepts a right or an
+          obligation for {context.org.shortName}, and no signature or filing is made from here.
+          {" "}{versions.length} version{versions.length === 1 ? "" : "s"} stored, {signatures.length} signature{signatures.length === 1 ? "" : "s"} recorded.
+        </span>
       </Card>
     </Grid>
   );
@@ -917,11 +904,11 @@ export function Evidence({ context, lens }: { context: ScreenContext; lens: "Pac
     <Empty title="No evidence packs" icon={<Archive size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Evidence detail")}>Assemble a pack</Button>} />
   ) : (
     <Grid>
-      {packs.map((pack) => (
+      {[...packs].sort((a, b) => Number(b.fields.legalHold === true) - Number(a.fields.legalHold === true)).map((pack) => (
         <Card
           key={pack.id}
           span={6}
-          eyebrow="EVIDENCE"
+          eyebrow={pack.fields.legalHold === true ? "LEGAL HOLD" : "EVIDENCE"}
           prov="posted"
           title={pack.title}
           subtitle={`${String(pack.fields.items ?? 0)} items · assembled by ${String(pack.fields.assembledBy ?? pack.ownerName)}`}
@@ -929,6 +916,11 @@ export function Evidence({ context, lens }: { context: ScreenContext; lens: "Pac
           footer={<>
             <Button size="sm" variant="secondary" onClick={() => { context.select(pack.id); context.openOverlay("Evidence detail", { id: pack.id }); }}>Open</Button>
             <Button size="sm" variant="ghost" onClick={() => { context.select(pack.id); context.openOverlay("export permissions", { id: pack.id }); }}>Export rules</Button>
+            {context.can("view_legal") && (
+              <Button size="sm" variant={pack.fields.legalHold === true ? "outline-danger" : "ghost"} onClick={() => { context.select(pack.id); context.openOverlay("legal hold", { id: pack.id }); }}>
+                {pack.fields.legalHold === true ? "Review the hold" : "Place a hold"}
+              </Button>
+            )}
           </>}
         >
           <Stack gap={3}>
@@ -952,36 +944,42 @@ export function ObligationQuickView({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const data = useLegalData();
   const { now } = useWorkspace();
-  const obligation = useRecord(payload?.id ?? context.selectedId) ?? data.obligations[0];
-  if (!obligation) return <Empty title="No obligation" icon={<CalendarClock size={20} />} />;
+  const obligation = scopedDetailRecord(useRecord(payload?.id ?? context.selectedId), context.org.id, "obligations");
+  if (!obligation) return <Empty title="Choose an obligation" icon={<CalendarClock size={20} />}>Open one from the calendar. None is substituted.</Empty>;
   const contract = data.contracts.find((row) => row.id === obligation.fields.contractId);
+  const done = obligation.status === "done";
   const days = daysUntil(obligation.dueAt, now) ?? 0;
   return (
     <Stack gap={4}>
-      <h3>{obligation.title}</h3>
-      <p className="ds-subtle">{obligation.summary}</p>
-      <Properties rows={[
+      <OverlaySummary
+        eyebrow={contract ? `From ${contract.title}` : "Obligation"}
+        title={obligation.title}
+        status={<Pill tone={done ? "success" : days < 0 ? "danger" : "neutral"} dot>{done ? "Done" : days < 0 ? `${Math.abs(days)} days late` : `${days} days away`}</Pill>}
+        meta={[obligation.summary || null]}
+      />
+      <FactGrid columns={2} items={[
+        { label: "Due", value: context.date(obligation.dueAt), mono: true, tone: !done && days < 0 ? "danger" : undefined },
         { label: "Owner", value: String(obligation.fields.owner ?? obligation.ownerName) },
-        { label: "Due", value: <span className="ds-num">{context.date(obligation.dueAt)}</span> },
-        { label: "State", value: <Pill tone={obligation.status === "done" ? "success" : days < 0 ? "danger" : "neutral"} dot>{obligation.status === "done" ? "done" : days < 0 ? `${Math.abs(days)} days late` : `${days} days away`}</Pill> },
-        { label: "Jurisdiction", value: `${String(obligation.fields.jurisdiction ?? "")} · ${String(obligation.fields.timezone ?? "")}` },
+        { label: "Jurisdiction", value: [obligation.fields.jurisdiction, obligation.fields.timezone].filter(Boolean).map(String).join(" · ") || "Not recorded" },
         { label: "Recurrence", value: String(obligation.fields.recurrence ?? "One-off") },
-        { label: "From contract", value: contract?.title ?? "Not from a contract" },
       ]} />
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          disabled={obligation.status === "done"}
-          onClick={async () => {
-            await context.mutate.patch(obligation.id, { status: "done", fields: { ...obligation.fields, completedBy: context.actor, completedAt: clockIso() } }, { expectRevision: obligation.revision, event: `${obligation.title} completed by ${context.actor}` });
-            context.toast("Marked complete", "The record changed, with your name and the date against it.");
-          }}
-        >
-          Mark complete
-        </Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("evidence upload", { id: obligation.id })}>Record evidence</Button>
-      </Row>
       <RecordReview context={context} obligation={obligation} />
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
+            variant="primary"
+            disabled={done}
+            onClick={async () => {
+              if (!(await context.mutate.patch(obligation.id, { status: "done", fields: { ...obligation.fields, completedBy: context.actor, completedAt: clockIso() } }, { expectRevision: obligation.revision, event: `${obligation.title} completed by ${context.actor}` }))) return;
+              context.toast("Marked complete", "The record changed, with your name and the date against it.");
+            }}
+          >
+            Mark complete
+          </Button>}
+          secondary={<Button variant="secondary" onClick={() => context.openOverlay("evidence upload", { id: obligation.id })}>Record evidence</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1009,12 +1007,12 @@ export function DeadlineEditor({ context, close }: { context: ScreenContext; clo
           reminderDays: 14,
         };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: String(form.get("title") ?? existing.title),
             summary: String(form.get("detail") ?? existing.summary),
             dueAt: new Date(`${date}T09:00:00.000Z`).toISOString(),
             fields: { ...existing.fields, ...fields },
-          }, { expectRevision: existing.revision, event: `${existing.title} rescheduled by ${context.actor}` });
+          }, { expectRevision: existing.revision, event: `${existing.title} rescheduled by ${context.actor}` }))) return;
         } else {
           await context.mutate.create({
             collection: "obligations",
@@ -1086,13 +1084,13 @@ export function ScoreRationale({ context, close }: { context: ScreenContext; clo
         const form = new FormData(event.currentTarget);
         const impact = String(form.get("impact") ?? "low");
         const likelihood = String(form.get("likelihood") ?? "low");
-        await context.mutate.patch(risk.id, {
+        if (!(await context.mutate.patch(risk.id, {
           summary: String(form.get("why") ?? risk.summary),
           fields: {
             ...risk.fields, impact, likelihood, score: scoreOf(impact) * scoreOf(likelihood),
             aiSuggested: false, reviewedAt: clockIso().slice(0, 10), scoredBy: context.actor,
           },
-        }, { expectRevision: risk.revision, event: `${risk.title} scored by ${context.actor}` });
+        }, { expectRevision: risk.revision, event: `${risk.title} scored by ${context.actor}` }))) return;
         context.toast("Score recorded", `${risk.title} is scored by ${context.actor}, with the reasoning on the record.`);
         close();
       }}

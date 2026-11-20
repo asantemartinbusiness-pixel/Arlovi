@@ -26,7 +26,7 @@ export const useBuildUi = create<BuildUi>((set) => ({
 }));
 
 export async function saveApp(context: ScreenContext, record: Rec, next: AppModel, label: string): Promise<void> {
-  await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: label });
+  if (!(await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: label }))) return;
 }
 
 /*

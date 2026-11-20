@@ -98,7 +98,7 @@ test.describe("organisation scoping", () => {
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: /Ask Arlovi/ }).first().click();
-    await expect(page.getByText(/Responses are composed from local Harbor Supply records, not from an AI model/)).toBeVisible();
+    await expect(page.getByText(/No language model is connected\. Answers come from records in Harbor Supply, not from an AI model/)).toBeVisible();
   });
 });
 
@@ -111,7 +111,7 @@ test.describe("command palette", () => {
     await expect(dialog).toBeVisible();
     await dialog.getByRole("combobox").fill("INV-");
     // A record result, not a screen result: its detail line names the collection.
-    const record = dialog.getByRole("option").filter({ hasText: /invoices · / }).first();
+    const record = dialog.getByRole("option").filter({ hasText: /Invoice · / }).first();
     await expect(record).toBeVisible();
     await record.click();
     await expect(page).toHaveURL(/\/fin\/invoices\/[^/?]+/);

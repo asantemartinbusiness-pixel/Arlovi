@@ -22,6 +22,24 @@ export function OverlayCancel({
   );
 }
 
+
+/** Initial focus: first body field, else first non-close footer button, else the panel. */
+function focusInitial(event: Event, mode: "body" | "cancel" = "body") {
+  const panel = event.currentTarget as HTMLElement | null;
+  if (!panel) return;
+  event.preventDefault();
+  const enabled = (el: Element | null) => (el instanceof HTMLElement ? el : null);
+  let target: HTMLElement | null = null;
+  if (mode === "cancel") {
+    target = enabled(Array.from(panel.querySelectorAll(".ds-overlay-foot button:not([disabled])"))
+      .find(el => /^cancel$/i.test(el.textContent?.trim() ?? "")) ?? null);
+  }
+  target ??= enabled(panel.querySelector(
+    ".ds-overlay-body :is(input:not([type=hidden]), select, textarea, [contenteditable=true]):not([disabled])"));
+  target ??= enabled(panel.querySelector(".ds-overlay-foot button:not([disabled])"));
+  (target ?? panel).focus({ preventScroll: true });
+}
+
 /** A press on a toast is not an intent to leave the dialog. */
 function fromToast(event: { target: EventTarget | null }): boolean {
   return event.target instanceof Element && Boolean(event.target.closest(".ds-toasts"));
@@ -34,6 +52,9 @@ function fromToast(event: { target: EventTarget | null }): boolean {
 const ModalFooterTarget = createContext<HTMLElement | null>(null);
 const ModalDirtyRegistrar = createContext<((dirty: boolean) => void) | null>(null);
 const ModalBusyRegistrar = createContext<((busy: boolean) => void) | null>(null);
+/** Current in-flight state of the enclosing Modal/Drawer (read by OverlayActions). */
+const OverlayBusyState = createContext(false);
+export function useOverlayInFlight(): boolean { return useContext(OverlayBusyState); }
 
 /** Portal form actions into the modal footer without changing overlay contracts. */
 export function ModalActions({ children }: { children: ReactNode }) {
@@ -67,7 +88,7 @@ export function ModalInFlight({ when }: { when: boolean }) {
  * Escape and focus return. Dismissal of edited forms requires confirmation.
  */
 export function Modal({
-  open, onOpenChange, title, description, children, footer, width = 560, tone, blocking, origin, head, application,
+  open, onOpenChange, title, description, children, footer, width = 560, tone, blocking, origin, head, application, initialFocus = "body",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -81,6 +102,7 @@ export function Modal({
   origin?: ReactNode;
   head?: ReactNode;
   application?: string;
+  initialFocus?: "body" | "cancel";
 }) {
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const [isDirty, setDirty] = useState(false);
@@ -98,14 +120,17 @@ export function Modal({
   return (
     <ModalDirtyRegistrar.Provider value={setDirty}>
       <ModalBusyRegistrar.Provider value={setInFlight}>
+      <OverlayBusyState.Provider value={inFlight}>
       <ModalFooterTarget.Provider value={footerTarget}>
         <Dialog.Root open={open} onOpenChange={requestOpenChange}>
           <Dialog.Portal>
             <Dialog.Overlay className="ds-overlay" />
             <Dialog.Content
               className="ds-modal"
+              {...(description ? {} : { "aria-describedby": undefined })}
               data-native-app={application}
               style={{ ["--modal-w" as string]: `${width}px` }}
+              onOpenAutoFocus={(event) => focusInitial(event, initialFocus)}
               onEscapeKeyDown={(event) => { if (blocking || inFlight) event.preventDefault(); }}
               onInteractOutside={(event) => { if (blocking || inFlight || fromToast(event)) event.preventDefault(); }}
             >
@@ -117,7 +142,7 @@ export function Modal({
                   </Dialog.Title>
                   {description
                     ? <Dialog.Description className="ds-card-sub">{description}</Dialog.Description>
-                    : <Dialog.Description className="ds-overlay-visually-hidden">Review the details and available actions in this dialog.</Dialog.Description>}
+                    : null}
                 </div>
                 {head}
                 <Dialog.Close asChild>
@@ -156,6 +181,7 @@ export function Modal({
           </Dialog.Portal>
         </Dialog.Root>
       </ModalFooterTarget.Provider>
+      </OverlayBusyState.Provider>
       </ModalBusyRegistrar.Provider>
     </ModalDirtyRegistrar.Provider>
   );
@@ -232,14 +258,17 @@ export function Drawer({
   return (
     <DrawerDirtyRegistrar.Provider value={setDirty}>
       <DrawerBusyRegistrar.Provider value={setInFlight}>
+      <OverlayBusyState.Provider value={inFlight}>
       <DrawerFooterTarget.Provider value={footerTarget}>
         <Dialog.Root open={open} onOpenChange={requestOpenChange}>
           <Dialog.Portal>
             <Dialog.Overlay className="ds-overlay ds-drawer-scrim" />
             <Dialog.Content
               className="ds-drawer"
+              {...(subtitle ? {} : { "aria-describedby": undefined })}
               data-native-app={application}
               style={{ ["--drawer-w" as string]: `${width}px` }}
+              onOpenAutoFocus={(event) => focusInitial(event)}
               onEscapeKeyDown={(event) => { if (inFlight) event.preventDefault(); }}
               onInteractOutside={(event) => { if (inFlight || fromToast(event)) event.preventDefault(); }}
             >
@@ -249,7 +278,7 @@ export function Drawer({
                   <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
                   {subtitle
                     ? <Dialog.Description className="ds-card-sub">{subtitle}</Dialog.Description>
-                    : <Dialog.Description className="ds-overlay-visually-hidden">Review details and available actions in this panel.</Dialog.Description>}
+                    : null}
                 </div>
                 {head}
                 <Dialog.Close asChild>
@@ -268,7 +297,7 @@ export function Drawer({
           onOpenChange={setConfirmDiscard}
           title="Discard unsaved changes?"
           description="Your edits in this panel have not been saved."
-          width={440}
+          width={400}
           footer={
             <>
               <Button variant="secondary" onClick={() => setConfirmDiscard(false)}>Keep editing</Button>
@@ -280,6 +309,7 @@ export function Drawer({
           <p className="ds-prose">You can return to this record, but the changes you just made will be lost.</p>
         </Modal>
       </DrawerFooterTarget.Provider>
+      </OverlayBusyState.Provider>
       </DrawerBusyRegistrar.Provider>
     </DrawerDirtyRegistrar.Provider>
   );
@@ -290,7 +320,7 @@ export function Popover({ trigger, children, align = "start" }: { trigger: React
     <PopoverPrimitive.Root>
       <PopoverPrimitive.Trigger asChild>{trigger}</PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content className="ds-popover" sideOffset={6} align={align} collisionPadding={12}>
+        <PopoverPrimitive.Content className="ds-popover" sideOffset={6} align={align} collisionPadding={12} avoidCollisions>
           {children}
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
@@ -306,6 +336,10 @@ export interface MenuEntry {
   separatorBefore?: boolean;
   group?: string;
   shortcut?: string;
+  /** Optional leading icon (rendered at 16px, muted). */
+  icon?: ReactNode;
+  /** Optional one-line secondary text under the label. */
+  description?: string;
 }
 
 export function Menu({ trigger, items, label, align = "end" }: { trigger: ReactNode; items: MenuEntry[]; label: string; align?: "start" | "end" }) {
@@ -314,7 +348,7 @@ export function Menu({ trigger, items, label, align = "end" }: { trigger: ReactN
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="ds-popover" sideOffset={6} align={align} aria-label={label} collisionPadding={12}>
+        <DropdownMenu.Content className="ds-popover ds-menu" sideOffset={6} align={align} aria-label={label} collisionPadding={12} avoidCollisions>
           {items.map((item, index) => {
             const showGroup = item.group && item.group !== lastGroup;
             lastGroup = item.group ?? lastGroup;
@@ -322,8 +356,12 @@ export function Menu({ trigger, items, label, align = "end" }: { trigger: ReactN
               <div key={`${item.label}-${index}`}>
                 {item.separatorBefore && <DropdownMenu.Separator className="ds-menu-sep" />}
                 {showGroup && <DropdownMenu.Label className="ds-menu-label">{item.group}</DropdownMenu.Label>}
-                <DropdownMenu.Item className="ds-menu-item" data-tone={item.tone} disabled={item.disabled} onSelect={() => item.onSelect?.()}>
-                  <span className="ds-grow">{item.label}</span>
+                <DropdownMenu.Item className="ds-menu-item" data-tone={item.tone} data-has-description={item.description ? "true" : undefined} disabled={item.disabled} onSelect={() => item.onSelect?.()}>
+                  {item.icon && <span className="ds-menu-icon" aria-hidden="true">{item.icon}</span>}
+                  <span className="ds-grow ds-menu-text">
+                    <span className="ds-menu-label-text">{item.label}</span>
+                    {item.description && <span className="ds-menu-desc">{item.description}</span>}
+                  </span>
                   {item.shortcut && <span className="ds-kbd">{item.shortcut}</span>}
                 </DropdownMenu.Item>
               </div>
@@ -354,6 +392,7 @@ export function ConfirmModal({
       onOpenChange={onOpenChange}
       title={title}
       width={460}
+      initialFocus="cancel"
       tone={tone === "danger" ? "danger" : undefined}
       blocking={busy}
       footer={

@@ -14,7 +14,7 @@ export function SubtaskEditor({ context, task, checklist }: { context: ScreenCon
   const duplicate = Boolean(label.trim()) && addChecklistItem(checklist, label) === checklist;
 
   async function save(next: ChecklistItem[], event: string) {
-    await context.mutate.patch(task.id, { body: { ...(task.body as object ?? {}), checklist: next } }, { expectRevision: task.revision, event });
+    if (!(await context.mutate.patch(task.id, { body: { ...(task.body as object ?? {}), checklist: next } }, { expectRevision: task.revision, event }))) return;
   }
 
   return (

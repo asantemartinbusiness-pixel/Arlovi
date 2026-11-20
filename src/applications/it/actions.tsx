@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { commitTogether } from "@/platform/commit";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { Siren } from "lucide-react";
-import { Button, Empty, Field, Notice, Pill, Properties, Row, Select, Stack } from "@/design-system";
+import { Button, Empty, FactGrid, Field, KeyValueList, Notice, OverlayActions, Pill, Row, Select, Stack } from "@/design-system";
 import type { Audit, Rec } from "@/domain/types";
 import type { OverlayDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -51,7 +53,7 @@ const useWatchDiagnostics = () => useItUi((state) => `${state.ranAt}|${state.run
 function IncidentFacts({ record }: ActInput) {
   if (!record) return null;
   return (
-    <Properties rows={[
+    <KeyValueList items={[
       { label: "State", value: <Pill tone="info" dot>{record.status.replace(/_/g, " ")}</Pill> },
       { label: "Severity", value: String(record.fields.severity ?? "medium") },
       { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
@@ -65,7 +67,7 @@ function DiagnosticsGate({ record, context }: ActInput) {
   const verified = Boolean(record && ui.ranAt && ui.ranAt > (record.at ?? record.createdAt));
   return (
     <Stack gap={2}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Opened", value: record ? <span className="ds-num">{context.dateTime(record.at ?? record.createdAt)}</span> : "—" },
         { label: "Last diagnostics run", value: ui.ranAt ? <span className="ds-num">{context.dateTime(ui.ranAt)}</span> : "Not in this session" },
         { label: "Verified since opening", value: verified ? <Pill tone="success">yes</Pill> : <Pill tone="warning">no</Pill> },
@@ -160,15 +162,22 @@ export const mergeIncidents = actOverlay({
           : "They are not on the same service within 24 hours of each other. They stay separate.");
     }
     const mergedFrom = [String(record.fields.mergedFrom ?? ""), duplicate.id].filter(Boolean).join(",");
-    const kept = await context.mutate.patch(record.id, {
-      summary: `${record.summary}\n\nMerged from ${duplicate.title}: ${duplicate.summary}`,
-      fields: { ...record.fields, mergedFrom, mergeEvidence: `${values.evidence}: ${values.note}` },
-    }, { expectRevision: record.revision, event: `${duplicate.title} merged into ${record.title} on evidence (${values.evidence}): ${values.note}` });
-    if (!kept) return;
-    await context.mutate.patch(duplicate.id, {
-      status: "merged",
-      fields: { ...duplicate.fields, mergedInto: record.id, mergeEvidence: `${values.evidence}: ${values.note}` },
-    }, { expectRevision: duplicate.revision, event: `${duplicate.title} closed as merged into ${record.title}` });
+    // Kept and merged-away incidents change together or not at all.
+    if (!(await commitTogether(context, [
+      {
+        record,
+        patch: {
+          summary: `${record.summary}\n\nMerged from ${duplicate.title}: ${duplicate.summary}`,
+          fields: { ...record.fields, mergedFrom, mergeEvidence: `${values.evidence}: ${values.note}` },
+        },
+        event: `${duplicate.title} merged into ${record.title} on evidence (${values.evidence}): ${values.note}`,
+      },
+      {
+        record: duplicate,
+        patch: { status: "merged", fields: { ...duplicate.fields, mergedInto: record.id, mergeEvidence: `${values.evidence}: ${values.note}` } },
+        event: `${duplicate.title} closed as merged into ${record.title}`,
+      },
+    ]))) throw new Error(CHANGED_ELSEWHERE);
     return `${duplicate.title} is merged into ${record.title}. Both records are kept.`;
   },
 });
@@ -231,7 +240,7 @@ export const approveRepair = actOverlay({
   Details: ({ record }) => (
     <Stack gap={2}>
       {record?.fields.repairApprovedBy && <Notice tone="success" title="Already approved">{`Approved by ${String(record.fields.repairApprovedBy)}: ${String(record.fields.repairPlan ?? "")}`}</Notice>}
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Re-run the diagnostics", value: <Pill tone="success">allowed</Pill> },
         { label: "Export a backup", value: <Pill tone="success">allowed</Pill> },
         { label: "Re-index a collection", value: <Pill tone="success">allowed</Pill> },
@@ -288,23 +297,18 @@ export function IncidentDetailPanel({ context }: { context: ScreenContext }) {
     return <Empty title="No incident selected" icon={<Siren size={20} />}>Select a row in the queue, then open its detail.</Empty>;
   }
   return (
-    <Stack gap={3}>
-      <strong>{record.title}</strong>
-      <p className="ds-prose">{record.summary}</p>
-      <Properties rows={[
-        { label: "State", value: <Pill tone="info" dot>{record.status.replace(/_/g, " ")}</Pill> },
-        { label: "Severity", value: String(record.fields.severity ?? "medium") },
-        { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
-        { label: "Service", value: String(record.fields.service ?? "Workspace") },
-        { label: "Origin", value: String(record.fields.origin ?? "ours") },
-        { label: "Opened", value: <span className="ds-num">{context.dateTime(record.at ?? record.createdAt)}</span> },
+    <Stack gap={4}>
+      {record.summary && <p className="ds-prose">{record.summary}</p>}
+      <FactGrid columns={2} items={[
+        { label: "Opened", value: context.dateTime(record.at ?? record.createdAt), mono: true },
+        { label: "Origin", value: String(record.fields.origin ?? "ours") === "provider" ? "Provider" : "Ours" },
         { label: "Impact", value: String(record.fields.impact ?? "Not recorded") },
         { label: "Paged", value: record.fields.pageRequestedAt ? "Recorded, not sent (no provider)" : "No" },
       ]} />
-      <Row gap={2} wrap>
-        <Button size="sm" variant="primary" onClick={() => context.openOverlay("assign incident", { id: record.id })}>Assign</Button>
-        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/it/incidents/${record.id}`)}>Open the incident</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/it/incidents/${record.id}`)}>Open the incident</Button>}
+        secondary={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("assign incident", { id: record.id })}>Assign</Button>}
+      />
     </Stack>
   );
 }
@@ -507,7 +511,7 @@ export const executeRunbookOverlay = actOverlay({
   apply: async ({ record, context }) => {
     if (!record) return;
     const outcome = await executeRunbook(context, runbookKey(record));
-    await context.mutate.patch(record.id, { fields: { ...record.fields, lastRunAt: nowIso(context), lastRunBy: context.actor, lastOutcome: outcome } }, { expectRevision: record.revision, event: `Runbook ${record.title} executed by ${context.actor}: ${outcome}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastRunAt: nowIso(context), lastRunBy: context.actor, lastOutcome: outcome } }, { expectRevision: record.revision, event: `Runbook ${record.title} executed by ${context.actor}: ${outcome}` }))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Runs");
     return outcome;
   },
@@ -541,7 +545,7 @@ export const runbookEditor = actOverlay({
   noun: "runbook",
   candidates: (rows) => rows.filter((record) => kind(record) === "runbook"),
   consequence: () => "The title and steps can be edited. Whether a runbook is allowlisted cannot be changed here: a runbook never widens its own privileges.",
-  Details: ({ record }) => <Properties rows={[{ label: "Allowlisted", value: record?.fields.allowed === false ? <Pill tone="warning">no — needs a person</Pill> : <Pill tone="success">yes — reversible and local</Pill> }]} />,
+  Details: ({ record }) => <KeyValueList items={[{ label: "Allowlisted", value: record?.fields.allowed === false ? <Pill tone="warning">no — needs a person</Pill> : <Pill tone="success">yes — reversible and local</Pill> }]} />,
   fields: ({ record }) => [
     { name: "title", label: "Title", required: true, initial: record?.title },
     { name: "summary", label: "Steps", kind: "textarea", required: true, initial: record?.summary },
@@ -700,7 +704,7 @@ export const testRelease = actOverlay({
     if (!record) return;
     const totals = await runDiagnosticsNow(context);
     const result = `${totals.pass} passed, ${totals.warn} to review, ${totals.fail} failed`;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, testedAt: nowIso(context), testedBy: context.actor, testResult: result } }, { expectRevision: record.revision, event: `Release ${record.title} tested: ${result}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, testedAt: nowIso(context), testedBy: context.actor, testResult: result } }, { expectRevision: record.revision, event: `Release ${record.title} tested: ${result}` }))) throw new Error(CHANGED_ELSEWHERE);
     return { body: `${record.title}: ${result}.`, tone: totals.fail ? "blocked" : "ok" };
   },
 });
@@ -732,7 +736,7 @@ export function ReleaseDiff({ context }: { context: ScreenContext }) {
   const previous = record.history[0];
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Release", value: record.title },
         { label: "Revision", value: <span className="ds-num">{String(record.revision)}</span> },
         { label: "Compared with", value: previous ? <span className="ds-num">{context.dateTime(previous.at)}</span> : "No earlier revision" },
@@ -845,7 +849,7 @@ export function ReportBuilderPanel({ context }: { context: ScreenContext }) {
           <option value="all">Everything recorded</option>
         </Select>
       </Field>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Incidents in the period", value: <span className="ds-num">{String(rows.length)}</span> },
         { label: "Resolved", value: <span className="ds-num">{String(resolved.length)}</span> },
         { label: "Mean time to resolve", value: mttr === undefined ? <Pill tone="warning">no resolved incident</Pill> : <span className="ds-num">{`${mttr} hours`}</span> },

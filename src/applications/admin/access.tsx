@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { KeyRound, Search } from "lucide-react";
 import {
-  Button, Card, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput, ModalActions, OverlayActions, OverlayCancel,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -319,16 +319,16 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
       </Stack>}
       {error && decided && <Notice tone="danger" title="Change not saved">{error}</Notice>}
       <DrawerActions>
-        <Button variant="ghost" disabled={busy} onClick={close}>{decided ? "Close" : "Cancel"}</Button>
-        <span className="ds-grow" />
-        {request.status === "approved" && <Button variant="danger" busy={busy} disabled={!canRestore}
-          onClick={() => void restorePreviousRole()}>Restore previous local role</Button>}
-        {!decided && (
-          <>
-            <Button variant="danger" busy={busy} disabled={!canDecide || selfReview || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>
-            <Button variant="primary" busy={busy} disabled={!canApprove} onClick={() => void decide("approved")}>Approve and change role</Button>
-          </>
-        )}
+        <OverlayActions
+          busy={busy}
+          primary={request.status === "approved"
+            ? <Button variant="danger" busy={busy} disabled={!canRestore} onClick={() => void restorePreviousRole()}>Restore previous local role</Button>
+            : !decided ? <Button variant="primary" busy={busy} disabled={!canApprove} onClick={() => void decide("approved")}>Approve and change role</Button> : undefined}
+          end={<>
+            <OverlayCancel disabled={busy}>{decided ? "Close" : "Cancel"}</OverlayCancel>
+            {!decided && <Button variant="outline-danger" busy={busy} disabled={!canDecide || selfReview || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>}
+          </>}
+        />
       </DrawerActions>
     </Stack>
   );
@@ -377,10 +377,9 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
       <Field label="Why" required error={error || undefined}>
         <TextArea rows={3} value={reason} onChange={(event) => { setReason(event.target.value); setError(""); }} placeholder="Covering month-end while Jonah is away" />
       </Field>
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!chosen || !target || target === from || reason.trim().length < 10 || busy || Boolean(pendingRequest)}
@@ -407,8 +406,10 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
           }}
         >
           Send for review
-        </Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

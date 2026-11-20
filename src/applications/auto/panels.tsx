@@ -1,11 +1,11 @@
 import { AlertTriangle, CheckCircle2, CircleSlash, Clock, PauseCircle, XCircle } from "lucide-react";
-import { Button, Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Button, Empty, Notice, OverlaySection, Pill, Properties, Row, Stack } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
 import {
   RUN_STATUS_LABELS, runStatusTone, stepStatusTone,
-  type GraphIssue, type RunResult, type StepResult, type StoredRun,
+  type GraphIssue, type RetryAssessment, type RunResult, type StepResult, type StoredRun,
 } from "./engine";
 
 export function readRun(record: Rec | undefined): StoredRun | undefined {
@@ -197,4 +197,34 @@ export function CapabilityNotice({ id }: { id: string }) {
 
 export function RunStatusPill({ status }: { status: RunResult["status"] }) {
   return <Pill tone={runStatusTone(status)} dot>{RUN_STATUS_LABELS[status]}</Pill>;
+}
+
+/**
+ * What a replay or a retry will and will not do, step by step, before anyone
+ * confirms. Groups follow the interpreter's own classification (assessRetry):
+ * a replay starts a new run from the trigger and reuses nothing from this one.
+ */
+export function ReplayPlan({ assessment }: { assessment: RetryAssessment[] }) {
+  const writes = assessment.filter((item) => item.safety === "unknown");
+  const provider = assessment.filter((item) => item.safety === "safe" && item.step.status === "blocked");
+  const gates = assessment.filter((item) => item.safety === "not_retryable");
+  const reads = assessment.filter((item) => item.safety === "safe" && item.step.status !== "blocked");
+  const list = (items: RetryAssessment[]) => (
+    <ul className="auto-plan">
+      {items.map((item) => (
+        <li key={`${item.step.nodeId}-${item.step.index}`}>
+          <strong>{item.step.index + 1}. {item.step.label}</strong>
+          <span>{item.reason}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <Stack gap={3}>
+      {writes.length > 0 && <OverlaySection tone="warning" title={`Will write again (${writes.length})`} hint="These steps changed a record the first time.">{list(writes)}</OverlaySection>}
+      {gates.length > 0 && <OverlaySection tone="info" title={`Will ask again (${gates.length})`} hint="The earlier decision is not reused.">{list(gates)}</OverlaySection>}
+      {provider.length > 0 && <OverlaySection tone="neutral" title={`Will not run (${provider.length})`} hint="Stopped at a provider boundary, so nothing is sent.">{list(provider)}</OverlaySection>}
+      {reads.length > 0 && <OverlaySection tone="success" title={`Will run again, read only (${reads.length})`} hint="No record changes.">{list(reads)}</OverlaySection>}
+    </Stack>
+  );
 }

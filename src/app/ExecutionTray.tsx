@@ -27,7 +27,7 @@ export function ExecutionTray({ missions }: { missions: Rec[] }) {
         {open ? <ChevronDown size={14} /> : <ChevronUp size={14} />} Detail
       </button>
       {open && (
-        <ul style={{ position: "absolute", insetInlineEnd: "var(--page-pad)", insetBlockEnd: 44, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-3)", padding: "var(--space-2)", minWidth: 300, zIndex: 30 }}>
+        <ul style={{ position: "absolute", insetInlineEnd: "var(--page-pad)", insetBlockEnd: "calc(100% + 4px)", background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-3)", padding: "var(--space-2)", minWidth: 300, zIndex: 30 }}>
           {[...waiting, ...live].slice(0, 6).map((mission) => (
             <li key={mission.id}>
               <Link to={`/o/${org.slug}/mission/missions/${mission.id}`} className="ds-menu-item">

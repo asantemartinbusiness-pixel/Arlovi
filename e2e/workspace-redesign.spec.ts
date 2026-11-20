@@ -2,10 +2,10 @@ import { expect, test } from "@playwright/test";
 
 test("redesigned personal workspace exposes useful routes without horizontal overflow", async ({ page }) => {
   await page.goto("/o/northline/workspace/home");
-  await expect(page.getByRole("heading", { name: /Make room for what matters/i })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Your work at a glance" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /need you today|waiting on you/i })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Waiting on you" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Assigned work" })).toBeVisible();
-  await page.getByRole("link", { name: /Explore your projects/ }).click();
+  await page.getByRole("link", { name: /Assigned to me/ }).click();
   await expect(page).toHaveURL(/\/workspace\/work$/);
   await expect(page.getByRole("heading", { name: "Tasks & assignments" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

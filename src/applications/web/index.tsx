@@ -1,11 +1,14 @@
 import {
   Database, FileCode2, Gauge, Globe, LayoutPanelTop, Link2, ListOrdered, Rocket, Shapes, TrendingUp,
 } from "lucide-react";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import {
+  Button, Checkbox, DrawerActions, Empty, FactGrid, Field, Notice, OverlayActions, OverlayCancel, OverlaySection, Pill, Row, Select, Stack, TextArea, TextInput,
+} from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { siteSummary } from "./summary";
 import { BoundaryNotice, CapabilityCard, closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import { capabilityById } from "@/platform/capability";
-import { readSite, type SiteModel } from "./model";
+import { BLOCK_LABELS, readSite, type SiteModel } from "./model";
 import { PageBuilder } from "./builder";
 import { PageManager } from "./pagesPanel";
 import {
@@ -17,7 +20,7 @@ import {
 import {
   AnalyticsPanel, AttributionNote, AuditReport, CodeDiffPanel, DeployConsole, DeploymentIssue,
   DnsInstructions, DomainAttachForm, DomainCheck, EventSetup, IssueDetail, MetricSource,
-  PublishReview, QualityReport, RunAuditAction,
+  PublishReview, PublishSummary, QualityReport, RunAuditAction,
 } from "./quality";
 import { saveSite } from "./state";
 import {
@@ -62,28 +65,44 @@ function SiteSettingsForm({ context, close }: { context: ScreenContext; close: (
             next.nav = { ...site.nav, header: [...site.nav.header, { id: `n-${wallMs().toString(36)}`, label: pageName, target: path, kind: "page", children: [] }] };
           }
         }
-        await saveSite(context, record, next, pageName ? `Site settings saved and page ${pageName} added` : "Site settings saved");
+        if (!(await saveSite(context, record, next, pageName ? `Site settings saved and page ${pageName} added` : "Site settings saved"))) return;
         context.toast("Settings saved", pageName ? `${pageName} was added to the site and the menu.` : "Applied to every page and the export.");
         close();
       }}
     >
-      <Field label="Site title" required><TextInput name="siteTitle" defaultValue={site.seo.siteTitle} required /></Field>
-      <Field label="Site description" hint="Used where a page has no description of its own."><TextArea name="description" rows={3} defaultValue={site.seo.description} /></Field>
-      <Field label="Robots">
-        <Select name="robots" defaultValue={site.seo.robots}>
-          <option value="index">index — allow listing</option>
-          <option value="noindex">noindex — ask not to be listed</option>
-        </Select>
-      </Field>
-      <Checkbox name="sitemap" label="Generate a sitemap on export" defaultChecked={site.seo.sitemap} />
-      <Field label="Analytics consent state" hint="There is no banner and no counting; this records the decision.">
-        <Select name="consent" defaultValue={site.analytics.consent}>
-          <option value="not_asked">Not asked</option>
-          <option value="granted">Granted</option>
-          <option value="declined">Declined</option>
-        </Select>
-      </Field>
-      <Field label="Add a page" hint="Leave empty to change settings only. A new page is added to the menu as well."><TextInput name="newPage" placeholder="About" /></Field>
+      <OverlaySection title="Identity">
+        <Stack gap={3}>
+        <Field label="Site title" required><TextInput name="siteTitle" defaultValue={site.seo.siteTitle} required /></Field>
+        <Field label="Site description" hint="Used where a page has no description of its own."><TextArea name="description" rows={3} defaultValue={site.seo.description} /></Field>
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="Search engines">
+        <Stack gap={3}>
+        <Field label="Robots">
+          <Select name="robots" defaultValue={site.seo.robots}>
+            <option value="index">index — allow listing</option>
+            <option value="noindex">noindex — ask not to be listed</option>
+          </Select>
+        </Field>
+        <Checkbox name="sitemap" label="Generate a sitemap on export" defaultChecked={site.seo.sitemap} />
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="Analytics consent" hint="No banner and no counting; this records the decision.">
+        <Stack gap={3}>
+        <Field label="Analytics consent state">
+          <Select name="consent" defaultValue={site.analytics.consent}>
+            <option value="not_asked">Not asked</option>
+            <option value="granted">Granted</option>
+            <option value="declined">Declined</option>
+          </Select>
+        </Field>
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="New route" hint="Leave empty to change settings only. A new page is added to the menu as well.">
+        <Stack gap={3}>
+        <Field label="Add a page"><TextInput name="newPage" placeholder="About" /></Field>
+        </Stack>
+      </OverlaySection>
     </form>
   );
 }
@@ -93,16 +112,24 @@ function DeployInspector({ context }: { context: ScreenContext }) {
   if (!record) return <NoSite />;
   const capability = capabilityById("site.publish");
   const last = [...site.deployments].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0];
+  const failing = require0(site, formNames);
   return (
     <Stack gap={4}>
+      <OverlaySection title="State right now" hint="Read from the site model and its recorded attempts.">
+        <FactGrid columns={2} items={[
+          { label: "Last attempt", value: last ? context.dateTime(last.at) : "Never attempted", hint: last ? last.state.replace("_", " ") : undefined, mono: true },
+          { label: "Routes in the model", value: String(site.pages.length), mono: true },
+          { label: "Failing checks", value: String(failing), mono: true, tone: failing > 0 ? "danger" : "success" },
+          { label: "Verified domain", value: site.domains.some((domain) => domain.verified) ? "Yes" : "No", tone: site.domains.some((domain) => domain.verified) ? "success" : "warning" },
+        ]} />
+      </OverlaySection>
       {capability && <CapabilityCard capability={capability} scopes={["sites:write", "domains:verify", "certificates:issue"]} />}
-      <Properties rows={[
-        { label: "Last attempt", value: last ? `${context.dateTime(last.at)} · ${last.state.replace("_", " ")}` : "Never attempted" },
-        { label: "Pages in the model", value: String(site.pages.length) },
-        { label: "Failing checks", value: String(require0(site, formNames)) },
-        { label: "Verified domain", value: site.domains.some((domain) => domain.verified) ? "Yes" : "No" },
-      ]} />
-      <Button variant="secondary" onClick={() => context.openOverlay("Publish review", { environment: "production" })}>Open the publish review</Button>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.openOverlay("Publish review", { environment: "production" })}>Open the publish review</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -117,15 +144,29 @@ const AUDIT = { auditSite: ModelModule.auditSite, issueCounts: ModelModule.issue
 
 
 function AiEditDiff({ context }: { context: ScreenContext }) {
-  const { record } = useSiteRecord(context);
+  const { record, site } = useSiteRecord(context);
+  const ui = STATE.useWebUi();
   if (!record) return <NoSite />;
+  const page = site.pages.find((item) => item.id === ui.pageId) ?? site.pages[0];
+  const block = page?.blocks.find((item) => item.id === ui.selectedBlockId);
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       <BoundaryNotice id="model.inference" action="Generating a block from a description" />
-      <Notice tone="info" title="What this panel would show">
-        A proposed change arrives as a diff of the site model: the blocks added, removed and reordered, with the old and new HTML side by side. Nothing is applied until the diff is accepted, and the current structure stays on the undo stack.
-      </Notice>
-      <Button variant="secondary" onClick={() => context.openOverlay("Element inspector")}>Edit the selected block directly instead</Button>
+      <OverlaySection title="This edit">
+        <FactGrid columns={2} items={[
+          { label: "Proposed by", value: "Nothing: no model is connected", tone: "warning" },
+          { label: "Applied so far", value: "No changes", mono: true },
+          { label: "Target", value: block ? `${block.type} block on ${page.name}` : "No block selected" },
+          { label: "Undo", value: `${STATE.useWebUi.getState().undoDepth(record.id)} builder changes can be undone`, mono: true },
+        ]} />
+      </OverlaySection>
+      <p className="ds-subtle">A proposal would arrive here as a diff of the blocks added, removed and reordered, accepted or rejected as a whole.</p>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={!block} title={block ? undefined : "Select a block on the canvas first"} onClick={() => context.openOverlay("Element inspector")}>Edit the selected block directly</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -141,8 +182,18 @@ function ElementInspectorOverlay({ context }: { context: ScreenContext }) {
     return <Empty title="No block is selected" icon={<LayoutPanelTop size={20} />}>Select a block on the canvas, then open this inspector to edit its content.</Empty>;
   }
   const { BlockInspector } = BUILDER;
+  const position = page.blocks.findIndex((item) => item.id === block.id) + 1;
   return (
+    <Stack gap={3}>
+    <header className="web-insp-head">
+      <div className="ds-grow">
+        <span className="ds-eyebrow">Selected · {position} of {page.blocks.length}</span>
+        <strong className="web-insp-title">{BLOCK_LABELS[block.type]} block</strong>
+      </div>
+      <Pill tone="accent">{page.name}</Pill>
+    </header>
     <BlockInspector
+      bare
       block={block}
       site={site}
       forms={formNames}
@@ -151,6 +202,7 @@ function ElementInspectorOverlay({ context }: { context: ScreenContext }) {
         pages: site.pages.map((item) => (item.id === page.id ? { ...item, blocks: item.blocks.map((inner) => (inner.id === block.id ? { ...inner, props: { ...inner.props, ...patch } } : inner)) } : item)),
       }, `Edited a ${block.type} block on ${page.name}`)}
     />
+    </Stack>
   );
 }
 
@@ -221,7 +273,7 @@ export const webApp = registerApp({
           id: "archive", label: "Archive", placement: "overflow", tone: "danger",
           guard: (context) => (context.selectedId ? undefined : "Select a site first"),
           run: async (context) => {
-            await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Site archived" });
+            if (!(await context.mutate.patch(context.selectedId!, { status: "archived" }, { event: "Site archived" }))) return;
             context.toast("Site archived", "It stays in the Archived tab with its pages intact.");
           },
         },
@@ -261,37 +313,41 @@ export const webApp = registerApp({
         { id: "deploy", label: "Deploy", placement: "overflow", run: (context) => context.openOverlay("Publish review", { environment: "production" }) },
       ],
       overlays: [
-        { id: "Manage pages", kind: "drawer", title: "Pages", width: 560, render: ({ ...context }) => <PageManager context={context} /> },
-        { id: "Deploy inspector", kind: "drawer", title: "Deployment", width: 520, render: ({ ...context }) => <DeployInspector context={context} /> },
-        { id: "domain check", kind: "modal", title: "Domain check", width: 540, render: ({ ...context }) => <DomainCheck context={context} />, footer: closeFooter() },
+        { id: "Manage pages", kind: "drawer", summary: siteSummary, title: "Pages", width: 560, render: ({ ...context }) => <PageManager context={context} /> },
+        { id: "Deploy inspector", kind: "drawer", summary: siteSummary, title: "Deployment", width: 520, render: ({ ...context }) => <DeployInspector context={context} /> },
+        { id: "domain check", kind: "modal", summary: siteSummary, title: "Domain check", width: 540, render: ({ ...context }) => <DomainCheck context={context} />, footer: closeFooter() },
         {
-          id: "site settings", kind: "modal", title: "Site settings", width: 560,
+          id: "site settings", kind: "modal", summary: siteSummary, title: "Site settings", width: 560,
           render: ({ close, ...context }) => <SiteSettingsForm context={context} close={close} />,
           footer: submitFooter("site-settings", "Save settings"),
         },
         {
           id: "Publish review", kind: "modal", title: "Publish review", width: 640,
+          summary: ({ close: _close, ...context }) => <PublishSummary context={context} />,
           render: ({ close, ...context }) => <PublishReview context={context} close={close} />,
         },
-        { id: "site preview", kind: "modal", title: "Preview", width: 1360, render: ({ ...context }) => <SitePreview context={context} />, footer: closeFooter() },
+        { id: "site preview", kind: "modal", summary: siteSummary, title: "Preview", width: 1360, render: ({ ...context }) => <SitePreview context={context} />, footer: closeFooter() },
       ],
     },
 
     "ARL-WEB-003": {
       id: "ARL-WEB-003",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <PageBuilder context={context} />,
       tabs: (["Build", "Style", "Responsive", "Interactions"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <PageBuilder context={context} />,
       })),
       actions: [
-        { id: "Drag component", label: "Place a component (drag or insert)", placement: "primary", run: (context) => context.openOverlay("insert panel") },
+        { id: "Drag component", label: "Insert a block", placement: "primary", run: (context) => context.openOverlay("insert panel") },
         { id: "manage pages", label: "Manage pages", placement: "overflow", run: (context) => context.openOverlay("Manage pages") },
         {
-          id: "edit text", label: "Edit the selection", placement: "secondary",
-          guard: () => (StateModule.useWebUi.getState().selectedBlockId ? undefined : "Select a block on the canvas first"),
-          run: (context) => context.openOverlay("Element inspector"),
+          id: "edit text", label: "Edit block", placement: "secondary",
+          run: (context) => {
+            if (!StateModule.useWebUi.getState().selectedBlockId) { context.toast("Select a block first", "Choose a block on the canvas or in the list, then edit it.", "blocked"); return; }
+            context.openOverlay("Element inspector");
+          },
         },
         {
           id: "resize", label: "Resize the block", placement: "overflow",
@@ -322,10 +378,10 @@ export const webApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Element inspector", kind: "drawer", title: "Element", width: 460, render: ({ ...context }) => <ElementInspectorOverlay context={context} /> },
-        { id: "Manage pages", kind: "drawer", title: "Pages", width: 560, render: ({ ...context }) => <PageManager context={context} /> },
+        { id: "Element inspector", kind: "drawer", summary: siteSummary, title: "Element", width: 460, render: ({ ...context }) => <ElementInspectorOverlay context={context} /> },
+        { id: "Manage pages", kind: "drawer", summary: siteSummary, title: "Pages", width: 560, render: ({ ...context }) => <PageManager context={context} /> },
         insertBlock, resizeBlock, reorderBlock,
-        { id: "AI edit diff", kind: "drawer", title: "Proposed edit", width: 520, render: ({ ...context }) => <AiEditDiff context={context} /> },
+        { id: "AI edit diff", kind: "drawer", summary: siteSummary, title: "Proposed edit", width: 520, render: ({ ...context }) => <AiEditDiff context={context} /> },
       ],
     },
 
@@ -346,12 +402,12 @@ export const webApp = registerApp({
       ],
       overlays: [
         {
-          id: "Component property", kind: "modal", title: "Component", width: 560,
+          id: "Component property", kind: "modal", summary: siteSummary, title: "Component", width: 560,
           render: ({ close, ...context }) => <ComponentPropertyForm context={context} close={close} />,
           footer: submitFooter("component-property", "Save component"),
         },
         updateEverywhere, publishComponent, importComponents,
-        { id: "token update", kind: "drawer", title: "Design tokens", width: 420, render: ({ ...context }) => <TokenUpdatePanel context={context} /> },
+        { id: "token update", kind: "drawer", summary: siteSummary, title: "Design tokens", width: 420, render: ({ ...context }) => <TokenUpdatePanel context={context} /> },
       ],
     },
 
@@ -372,16 +428,16 @@ export const webApp = registerApp({
       ],
       overlays: [
         {
-          id: "Schema editor", kind: "modal", title: "Collection schema", width: 600,
+          id: "Schema editor", kind: "modal", summary: siteSummary, title: "Collection schema", width: 600,
           render: ({ close, ...context }) => <SchemaEditorForm context={context} close={close} />,
           footer: submitFooter("schema-editor", "Save schema"),
         },
         {
-          id: "entry detail", kind: "drawer", title: "Entry", width: 520,
+          id: "entry detail", kind: "drawer", summary: siteSummary, title: "Entry", width: 520,
           render: ({ close, ...context }) => <EntryDetailForm context={context} close={close} />,
           footer: submitFooter("entry-detail", "Save entry"),
         },
-        { id: "migration preview", kind: "modal", title: "Migration check", width: 560, render: ({ ...context }) => <MigrationPreview context={context} />, footer: closeFooter() },
+        { id: "migration preview", kind: "modal", summary: siteSummary, title: "Migration check", width: 560, render: ({ ...context }) => <MigrationPreview context={context} />, footer: closeFooter() },
         bulkPublish, pickEntry,
       ],
     },
@@ -402,17 +458,17 @@ export const webApp = registerApp({
       ],
       overlays: [
         {
-          id: "Link picker", kind: "modal", title: "Menu link", width: 520,
+          id: "Link picker", kind: "modal", summary: siteSummary, title: "Menu link", width: 520,
           render: ({ close, ...context }) => <LinkPickerForm context={context} close={close} />,
           footer: submitFooter("link-picker", "Save link"),
         },
         {
-          id: "redirect rules", kind: "modal", title: "Redirect", width: 520,
+          id: "redirect rules", kind: "modal", summary: siteSummary, title: "Redirect", width: 520,
           render: ({ close, ...context }) => <RedirectForm context={context} close={close} />,
           footer: submitFooter("redirect-form", "Add redirect"),
         },
-        { id: "broken link scan", kind: "drawer", title: "Link scan", width: 520, render: ({ ...context }) => <BrokenLinkScan context={context} /> },
-        { id: "Publish review", kind: "modal", title: "Publish review", width: 640, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
+        { id: "broken link scan", kind: "drawer", summary: siteSummary, title: "Link scan", width: 520, render: ({ ...context }) => <BrokenLinkScan context={context} /> },
+        { id: "Publish review", kind: "modal", title: "Publish review", width: 640, summary: ({ close: _close, ...context }) => <PublishSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
         reorderMenu,
       ],
     },
@@ -434,17 +490,17 @@ export const webApp = registerApp({
       ],
       overlays: [
         {
-          id: "Field editor", kind: "modal", title: "Form field", width: 520,
+          id: "Field editor", kind: "modal", summary: siteSummary, title: "Form field", width: 520,
           render: ({ close, ...context }) => <SiteFieldEditor context={context} close={close} />,
           footer: submitFooter("site-field", "Save field"),
         },
-        { id: "consent inspector", kind: "drawer", title: "Consent", width: 480, render: ({ ...context }) => <ConsentInspector context={context} /> },
+        { id: "consent inspector", kind: "drawer", summary: siteSummary, title: "Consent", width: 480, render: ({ ...context }) => <ConsentInspector context={context} /> },
         {
-          id: "submission routing", kind: "modal", title: "Submission routing", width: 560,
+          id: "submission routing", kind: "modal", summary: siteSummary, title: "Submission routing", width: 560,
           render: ({ close, ...context }) => <RoutingForm context={context} close={close} />,
           footer: submitFooter("site-routing", "Save routing"),
         },
-        { id: "test submission", kind: "drawer", title: "Test a submission", width: 520, render: ({ ...context }) => <TestSubmissionPanel context={context} /> },
+        { id: "test submission", kind: "drawer", summary: siteSummary, title: "Test a submission", width: 520, render: ({ ...context }) => <TestSubmissionPanel context={context} /> },
         publishSiteForm,
       ],
     },
@@ -475,9 +531,9 @@ export const webApp = registerApp({
         { id: "export report", label: "Export the report", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("audit report") },
       ],
       overlays: [
-        { id: "Issue detail", kind: "drawer", title: "Check detail", width: 480, render: ({ ...context }) => <IssueDetail context={context} /> },
-        { id: "code diff", kind: "drawer", title: "Proposed change", width: 620, render: ({ ...context }) => <CodeDiffPanel context={context} /> },
-        { id: "audit report", kind: "modal", title: "Audit report", width: 560, render: ({ ...context }) => <AuditReport context={context} />, footer: closeFooter() },
+        { id: "Issue detail", kind: "drawer", summary: siteSummary, title: "Check detail", width: 480, render: ({ ...context }) => <IssueDetail context={context} /> },
+        { id: "code diff", kind: "drawer", summary: siteSummary, title: "Proposed change", width: 620, render: ({ ...context }) => <CodeDiffPanel context={context} /> },
+        { id: "audit report", kind: "modal", summary: siteSummary, title: "Audit report", width: 560, render: ({ ...context }) => <AuditReport context={context} />, footer: closeFooter() },
       ],
     },
 
@@ -498,12 +554,12 @@ export const webApp = registerApp({
         { id: "dns records", label: "DNS records", placement: "overflow", run: (context) => context.openOverlay("DNS instructions") },
       ],
       overlays: [
-        { id: "Publish review", kind: "modal", title: "Publish review", width: 660, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
-        { id: "DNS instructions", kind: "drawer", title: "DNS records", width: 560, render: ({ ...context }) => <DnsInstructions context={context} /> },
-        { id: "deployment issue", kind: "modal", title: "Deployment", width: 540, render: ({ ...context }) => <DeploymentIssue context={context} />, footer: closeFooter() },
-        { id: "domain check", kind: "modal", title: "Domain check", width: 560, render: ({ ...context }) => <DomainCheck context={context} />, footer: closeFooter() },
+        { id: "Publish review", kind: "modal", title: "Publish review", width: 640, summary: ({ close: _close, ...context }) => <PublishSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
+        { id: "DNS instructions", kind: "drawer", summary: siteSummary, title: "DNS records", width: 560, render: ({ ...context }) => <DnsInstructions context={context} /> },
+        { id: "deployment issue", kind: "modal", summary: siteSummary, title: "Deployment", width: 540, render: ({ ...context }) => <DeploymentIssue context={context} />, footer: closeFooter() },
+        { id: "domain check", kind: "modal", summary: siteSummary, title: "Domain check", width: 560, render: ({ ...context }) => <DomainCheck context={context} />, footer: closeFooter() },
         {
-          id: "domain attach", kind: "modal", title: "Attach a domain", width: 520,
+          id: "domain attach", kind: "modal", summary: siteSummary, title: "Attach a domain", width: 520,
           render: ({ close, ...context }) => <DomainAttachForm context={context} close={close} />,
           footer: submitFooter("domain-attach", "Record the domain"),
         },
@@ -528,11 +584,11 @@ export const webApp = registerApp({
         { id: "event setup", label: "Event setup", placement: "overflow", run: (context) => context.openOverlay("event setup") },
       ],
       overlays: [
-        { id: "Metric source", kind: "drawer", title: "Metric source", width: 520, render: ({ ...context }) => <MetricSource context={context} /> },
-        { id: "event setup", kind: "modal", title: "Event setup", width: 560, render: ({ ...context }) => <EventSetup context={context} />, footer: closeFooter() },
-        { id: "attribution note", kind: "modal", title: "Attribution", width: 520, render: ({ ...context }) => <AttributionNote context={context} />, footer: closeFooter() },
-        { id: "chart builder", kind: "modal", title: "Build a chart", width: 680, render: ({ ...context }) => <ChartBuilder context={context} />, footer: closeFooter() },
-        { id: "compare periods", kind: "modal", title: "Compare periods", width: 560, render: ({ ...context }) => <ComparePeriods context={context} />, footer: closeFooter() },
+        { id: "Metric source", kind: "drawer", summary: siteSummary, title: "Metric source", width: 520, render: ({ ...context }) => <MetricSource context={context} /> },
+        { id: "event setup", kind: "modal", summary: siteSummary, title: "Event setup", width: 560, render: ({ ...context }) => <EventSetup context={context} />, footer: closeFooter() },
+        { id: "attribution note", kind: "modal", summary: siteSummary, title: "Attribution", width: 520, render: ({ ...context }) => <AttributionNote context={context} />, footer: closeFooter() },
+        { id: "chart builder", kind: "modal", summary: siteSummary, title: "Build a chart", width: 680, render: ({ ...context }) => <ChartBuilder context={context} />, footer: closeFooter() },
+        { id: "compare periods", kind: "modal", summary: siteSummary, title: "Compare periods", width: 560, render: ({ ...context }) => <ComparePeriods context={context} />, footer: closeFooter() },
       ],
     },
   },
@@ -567,7 +623,7 @@ function SiteFieldEditor({ context, close }: { context: ScreenContext; close: ()
         if (!label) return;
         const next = { id: field?.id ?? `ff-${wallMs().toString(36)}`, label, type: String(data.get("type") ?? "text"), required: data.get("required") === "on" };
         const fields = field ? form.fields.map((item) => (item.id === field.id ? next : item)) : [...form.fields, next];
-        await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? { ...item, fields } : item)) }, `Field ${label} saved on ${form.name}`);
+        if (!(await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? { ...item, fields } : item)) }, `Field ${label} saved on ${form.name}`))) return;
         context.toast("Field saved", `${label} is ${next.required ? "required" : "optional"} on ${form.name}.`);
         close();
       }}
@@ -589,20 +645,18 @@ function ConsentInspector({ context }: { context: ScreenContext }) {
   if (!record) return <NoSite />;
   const form = site.forms[0];
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       {form ? (
-        <Properties rows={[
-          { label: "Form", value: form.name },
-          { label: "Consent line", value: form.consent },
-          { label: "Stored with the submission", value: "Yes — the wording accepted is copied onto the record" },
-          { label: "Spam control", value: form.honeypot ? "A hidden field is checked" : "None" },
-        ]} />
+        <OverlaySection title={form.name} hint="The wording shown to the person is copied onto each submission, so a later reader sees what was agreed.">
+          <FactGrid columns={2} items={[
+            { label: "Consent line", value: form.consent },
+            { label: "Stored with the submission", value: "Yes, the accepted wording is copied onto the record" },
+            { label: "Spam control", value: form.honeypot ? "A hidden field is checked" : "None" },
+          ]} />
+        </OverlaySection>
       ) : (
         <Notice tone="warning" title="No site form yet">Add a form on the Forms tab to set its consent wording.</Notice>
       )}
-      <Notice tone="info" title="Consent is recorded, not assumed">
-        The exact wording shown to the person is copied onto the submission record, so a later reader can see what was agreed rather than the current wording.
-      </Notice>
       <Row gap={2}><Pill tone="warning">No cookie is set</Pill><Pill tone="warning">No tracker is loaded</Pill></Row>
     </Stack>
   );
@@ -628,7 +682,7 @@ function RoutingForm({ context, close }: { context: ScreenContext; close: () => 
           webhook: String(data.get("webhook") ?? "").trim(),
           honeypot: data.get("honeypot") === "on",
         };
-        await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? next : item)) }, `Routing for ${form.name} saved`);
+        if (!(await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? next : item)) }, `Routing for ${form.name} saved`))) return;
         context.toast("Routing saved", next.route === "record" ? "A submission creates a record straight away." : "Submissions are held for review before a record is created.");
         close();
       }}

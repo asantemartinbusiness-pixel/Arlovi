@@ -166,23 +166,9 @@
 
 
 /* Communications Email 2026 — compact, three-zone, progressive workspace. */
-.cmx-shell{display:grid;grid-template-columns:206px minmax(0,1fr);min-height:540px;max-width:100%;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg);overflow:hidden}
-.cmx-rail{background:var(--bg-inset);border-right:1px solid var(--border-subtle);padding:18px 10px;display:flex;flex-direction:column;min-width:0;gap:6px}
-.cmx-rail nav{display:flex;flex-direction:column;gap:2px}
-.cmx-rail-heading{font-size:10px;letter-spacing:.09em;color:var(--fg-subtle);font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px 8px;min-width:0}
-.cmx-rail-heading .cmx-connection{font-size:9px;letter-spacing:0;font-weight:500}
-.cmx-rail-separator{margin-top:22px;padding-top:16px;border-top:1px solid var(--border-subtle)}
+.cmx-shell{display:grid;grid-template-columns:minmax(0,1fr);min-height:540px;max-width:100%;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg);overflow:hidden}
 .cmx-connection{display:inline-flex;align-items:center;gap:6px;color:var(--fg-subtle);font-size:11px;white-space:nowrap}
 .cmx-status-dot{height:6px;width:6px;background:#d59945;border-radius:50%;flex:none}
-.cmx-rail-link{width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:0;color:var(--fg-default);border-radius:7px;min-height:36px;padding:7px 10px;font:inherit;font-size:12px;text-align:left;cursor:pointer}
-.cmx-rail-link>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmx-rail-link>small{color:var(--fg-subtle);font-size:11px;font-variant-numeric:tabular-nums}
-.cmx-rail-link:hover{background:var(--bg-hover)}
-.cmx-rail-link[data-active="true"]{background:var(--bg-selected);font-weight:650;color:var(--fg-default)}
-.cmx-rail-link:focus-visible,.cmx-filter:focus-visible,.cmx-message:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.cmx-rail-foot{margin-top:auto;border-top:1px solid var(--border-subtle);padding:14px 8px 0;display:flex;flex-direction:column;gap:10px}
-.cmx-rail-foot p{font-size:11px;line-height:1.55;margin:0;color:var(--fg-subtle)}
-.cmx-rail-foot button{justify-content:center}
 .cmx-main{min-width:0;display:flex;flex-direction:column;min-height:540px}
 .cmx-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:23px 25px 20px;border-bottom:1px solid var(--border-subtle)}
 .cmx-header h2{font-size:clamp(23px,2vw,30px);line-height:1.15;letter-spacing:-.035em;font-weight:630;margin:5px 0 7px}
@@ -258,10 +244,10 @@
 .cmx-form{display:grid;gap:12px;max-width:540px;border:1px solid var(--border-default);border-radius:9px;padding:19px}
 .cmx-form h4{margin:0;font-size:14px}.cmx-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600}
 .cmx-draft-banner{padding:10px 18px;border-bottom:1px solid var(--border-subtle)}
-@media(max-width:1100px){.cmx-shell{grid-template-columns:178px minmax(0,1fr)}.cmx-workspace{grid-template-columns:minmax(225px,43%) minmax(0,1fr)}.cmx-rail-heading .cmx-connection{display:none}.cmx-head-actions .cmx-connection{display:none}}
-@media(max-width:800px){.cmx-shell{grid-template-columns:minmax(0,1fr)}.cmx-rail{border-right:0;border-bottom:1px solid var(--border-subtle);padding:12px}.cmx-rail-heading,.cmx-rail-separator,.cmx-rail-foot{display:none}.cmx-rail nav{flex-direction:row;overflow-x:auto;gap:4px}.cmx-rail-link{width:auto;min-width:max-content}.cmx-rail-link>small{display:none}.cmx-header{padding:18px}.cmx-toolbar{padding:10px}.cmx-workspace{grid-template-columns:minmax(200px,40%) minmax(0,1fr)}}
+@media(max-width:1100px){.cmx-workspace{grid-template-columns:minmax(225px,43%) minmax(0,1fr)}.cmx-head-actions .cmx-connection{display:none}}
+@media(max-width:800px){.cmx-shell{grid-template-columns:minmax(0,1fr)}.cmx-header{padding:18px}.cmx-toolbar{padding:10px}.cmx-workspace{grid-template-columns:minmax(200px,40%) minmax(0,1fr)}}
 @media(max-width:620px){.cmx-header{align-items:flex-start}.cmx-header h2{font-size:24px}.cmx-workspace{display:block;position:relative}.cmx-list{min-height:330px;border-right:0}.cmx-reader{display:none}.cmx-reader[data-open="true"]{display:flex;position:relative;background:var(--bg-surface);min-height:350px}.cmx-workspace:has(.cmx-reader[data-open="true"]) .cmx-list{display:none}.cmx-back{display:inline-flex}.cmx-reader-inner{padding:14px}.cmx-empty-steps{grid-template-columns:minmax(0,1fr)}.cmx-toolbar{gap:8px}.cmx-search{max-width:none;flex-basis:100%}.cmx-count{margin-left:0}.cmx-setting-layout{padding:14px}.cmx-settings .cm-mail-identities{margin:14px}.cmx-head-actions .cmx-connection{display:none}}
-@media(prefers-reduced-motion:no-preference){.cmx-rail-link,.cmx-message,.cmx-filter{transition:background-color .15s ease,color .15s ease}}
+@media(prefers-reduced-motion:no-preference){.cmx-message,.cmx-filter{transition:background-color .15s ease,color .15s ease}}
 
 
 /* Compact Arlovi email composer */
@@ -332,3 +318,7 @@
 .cm-compose-reference-list>span{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-default);background:var(--bg-inset);padding:5px 8px;border-radius:6px;font-size:11px;max-width:100%;overflow-wrap:anywhere}
 .cm-compose-reference-list button{border:0;background:transparent;cursor:pointer;color:var(--fg-subtle);display:flex;padding:2px}
 @media(max-width:600px){.cm-compose-tool-entry{flex-wrap:wrap}.cm-compose-suggestions{min-width:0}}
+.cmx-message-tags em.cmx-notdelivered{background:var(--warning-soft);color:var(--warning)}
+/* On a phone the page tab strip already switches every mail area; the rail would be a second tab layer. */
+
+.cmx-filter:focus-visible,.cmx-message:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}

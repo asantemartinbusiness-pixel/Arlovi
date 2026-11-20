@@ -1,0 +1,14 @@
+/* BOOK — time, capacity and the resource. */
+.book-ledger { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.book-ledger li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-3); }
+.book-ledger li + li { border-block-start: 1px solid var(--border-default); }
+.book-ledger-label { color: var(--fg-muted); }
+.book-ledger-detail { text-align: end; color: var(--fg-muted); }
+
+.book-facts { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) 0; }
+.book-facts > * + *::before { content: "\00b7"; margin-inline: var(--space-2); color: var(--fg-subtle); }
+
+/* Day capacity strip above the availability grid. */
+.book-capstrip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); padding: var(--space-2) var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.book-capstrip-meter { flex: 1 1 160px; min-width: 120px; }
+.book-capstrip-stat { display: inline-flex; gap: var(--space-2); align-items: baseline; }

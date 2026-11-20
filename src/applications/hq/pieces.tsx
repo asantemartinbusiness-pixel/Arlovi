@@ -1,6 +1,23 @@
-import { Empty, Notice, Properties, Stack } from "@/design-system";
+import { Empty, FactGrid, Notice, OverlaySummary, Pill, Stack } from "@/design-system";
 import { useCollections } from "@/platform/workspace";
 import type { ScreenContext } from "@/platform/registry";
+
+export function BuildingSummary({ departmentId }: { departmentId?: string }) {
+  const data = useCollections(["departments", "members", "tasks"]);
+  const dept = data.departments.find((item) => item.id === departmentId) ?? data.departments[0];
+  if (!dept) return null;
+  const members = data.members.filter((member) => member.fields.departmentId === dept.id);
+  const work = data.tasks.filter((task) => members.some((member) => member.title === String(task.fields.assignee ?? task.ownerName)) && task.status !== "done");
+  const blocked = members.length > 0 || work.length > 0;
+  return (
+    <OverlaySummary
+      eyebrow="Department"
+      title={dept.title}
+      status={blocked ? <Pill tone="warning" dot>Cannot be removed</Pill> : <Pill tone="success" dot>Safe to change</Pill>}
+      meta={[`Lead ${String(dept.fields.lead ?? "unassigned")}`]}
+    />
+  );
+}
 
 /** Impact of changing a department: what would move, and what blocks removal. */
 export function Building({ departmentId, context }: { departmentId?: string; context: ScreenContext }) {
@@ -12,10 +29,9 @@ export function Building({ departmentId, context }: { departmentId?: string; con
   const blocked = members.length > 0 || work.length > 0;
   return (
     <Stack gap={4}>
-      <h3>{dept.title}</h3>
-      <Properties rows={[
-        { label: "Members", value: String(members.length) },
-        { label: "Open work", value: String(work.length) },
+      <FactGrid columns={3} items={[
+        { label: "Members", value: String(members.length), mono: true },
+        { label: "Open work", value: String(work.length), mono: true, tone: work.length ? "warning" : undefined },
         { label: "Lead", value: String(dept.fields.lead ?? "Unassigned") },
       ]} />
       {blocked ? (

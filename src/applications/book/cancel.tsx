@@ -62,8 +62,6 @@ function CancelBookingForm({ context, close, booking }: { context: ScreenContext
       }}
     >
       <Properties rows={[
-        { label: "Booking", value: booking.title },
-        { label: "Starts", value: <span className="ds-num">{context.dateTime(booking.startAt)}</span> },
         { label: "Notice", value: fee.insideNotice ? <Pill tone="warning">Inside the {noticeHours}h notice period</Pill> : <Pill tone="success">Outside the {noticeHours}h notice period</Pill> },
         { label: "Fee by policy", value: <span className="ds-num">{fee.insideNotice ? `${(feeBp / 100).toFixed(0)}% · ${context.money(fee.feeMinor)}` : "None"}</span> },
         { label: "Deposit", value: DEPOSIT_LABEL[String(booking.fields.depositState ?? "none")] ?? "—" },
@@ -84,7 +82,7 @@ function CancelBookingForm({ context, close, booking }: { context: ScreenContext
           <span>Waive the {context.money(fee.feeMinor)} late-cancellation fee</span>
         </label>
       )}
-      <ProviderBoundary id={depositPaid ? "payment.capture" : "email.send"} title={depositPaid ? "Returning the deposit cannot be done here" : "The customer is not notified automatically"} />
+      <ProviderBoundary kept={depositPaid ? "the cancellation is recorded on the booking; the deposit has to be returned outside this browser." : "the cancellation and reason are recorded on the booking; no message was sent."} id={depositPaid ? "payment.capture" : "email.send"} title={depositPaid ? "Returning the deposit cannot be done here" : "The customer is not notified automatically"} />
     </form>
   );
 }

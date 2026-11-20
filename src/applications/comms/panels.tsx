@@ -4,11 +4,9 @@ import {
 } from "lucide-react";
 import {
   Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select,
-  Stack, Stat, StatRow, TextArea, TextInput,
-} from "@/design-system";
+  Stack, Stat, StatRow, TextArea, TextInput, OverlayActions } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { capabilityById } from "@/platform/capability";
 import { sameDay } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { ChannelList, Conversation } from "./chat";
@@ -19,13 +17,8 @@ export function useCommsData() {
   return useCollections(["channels", "messages", "emailThreads", "meetings", "calls", "announcements", "preferences", "members", "employees", "contacts", "documents"]);
 }
 
-export function MailBoundary({ what = "Sending" }: { what?: string }) {
-  const capability = capabilityById("email.send");
-  return (
-    <Notice tone="warning" title={`${what} stops at the mail provider`}>
-      {capability?.note} {capability?.localEquivalent}
-    </Notice>
-  );
+export function MailBoundary(_props: { what?: string }) {
+  return <Notice tone="warning" title="Kept as a local draft">No mail service is connected, so nothing is sent.</Notice>;
 }
 
 function channelMessages(messages: Rec[], channelId: string): Rec[] {
@@ -247,7 +240,7 @@ export function ChannelConversation({ context, lens }: { context: ScreenContext;
         {pinned.map((message) => (
           <Card key={message.id} title={String(message.fields.author ?? "")} subtitle={context.dateTime(message.at)} actions={<Pill tone="info">Pinned</Pill>}
             footer={<Button size="sm" variant="ghost" onClick={async () => {
-              await context.mutate.patch(message.id, { status: "sent", fields: { ...message.fields, pinned: false } }, { event: `${message.title} unpinned by ${context.actor}` });
+              if (!(await context.mutate.patch(message.id, { status: "sent", fields: { ...message.fields, pinned: false } }, { event: `${message.title} unpinned by ${context.actor}` }))) return;
             }}>Unpin</Button>}>
             <p>{message.summary}</p>
           </Card>
@@ -293,6 +286,7 @@ export function ChannelConversation({ context, lens }: { context: ScreenContext;
           context={context}
           channel={channel}
           messages={messages}
+          showHeader={false}
           onCreateTask={async (message) => {
             await context.mutate.create({
               collection: "tasks",
@@ -563,7 +557,7 @@ export function Announcements({ context, lens }: { context: ScreenContext; lens:
   const staffCount = data.employees.filter((employee) => employee.status !== "alumni").length;
 
   return rows.length === 0 ? (
-    <Empty title={`No ${lens.toLowerCase()} announcements`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("draft announcement")}>Draft one</Button>} />
+    <Empty title={lens === "All" ? "No announcements yet" : `No ${lens.toLowerCase()} announcements`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("draft announcement")}>Draft one</Button>} />
   ) : (
     <Stack gap={3}>
       {rows.map((post) => (
@@ -619,9 +613,9 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
               event.preventDefault();
               const form = new FormData(event.currentTarget);
               if (!record) return;
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 fields: { ...record.fields, workingStart: String(form.get("start") ?? ""), workingEnd: String(form.get("end") ?? ""), presence: String(form.get("presence") ?? "") },
-              }, { expectRevision: record.revision, event: `Working hours changed by ${context.actor}` });
+              }, { expectRevision: record.revision, event: `Working hours changed by ${context.actor}` }))) return;
               context.toast("Saved", "Your hours are on the preference record.");
             }}
           >
@@ -691,9 +685,9 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
             onSubmit={async (event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
-              await context.mutate.patch(record.id, {
+              if (!(await context.mutate.patch(record.id, {
                 fields: { ...record.fields, displayName: String(form.get("display") ?? ""), signature: String(form.get("signature") ?? "") },
-              }, { expectRevision: record.revision, event: `Mail identity updated by ${context.actor}` });
+              }, { expectRevision: record.revision, event: `Mail identity updated by ${context.actor}` }))) return;
               context.toast("Identity saved", "It is on the preference record in this browser.");
             }}
           >
@@ -815,7 +809,7 @@ export function MemberManagement({ context }: { context: ScreenContext }) {
             <span className="ds-grow">{member}</span>
             <Button size="sm" variant="ghost" onClick={async () => {
               const next = members.filter((name) => name !== member);
-              await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${member} removed from ${channel.title}` });
+              if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${member} removed from ${channel.title}` }))) return;
             }}>Remove</Button>
           </Row>
         ))}
@@ -828,7 +822,7 @@ export function MemberManagement({ context }: { context: ScreenContext }) {
               const name = event.target.value;
               if (!name) return;
               const next = [...members, name];
-              await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${name} added to ${channel.title}` });
+              if (!(await context.mutate.patch(channel.id, { fields: { ...channel.fields, members: next.join(","), memberCount: next.length } }, { event: `${name} added to ${channel.title}` }))) return;
               context.toast("Member added", `${name} can see this channel.`);
             }}
           >
@@ -855,15 +849,14 @@ export function PhishingReport({ context, close }: { context: ScreenContext; clo
       <Notice tone="warning" title="What reporting does here">
         It moves the thread to Spam and records the report against your name. There is no provider to notify and no filter to train.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="danger" onClick={async () => {
-          await context.mutate.patch(thread.id, { status: "spam", fields: { ...thread.fields, folder: "spam", risk: "phishing", reportedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} reported as phishing by ${context.actor}` });
+      <OverlayActions variant="confirm"
+        primary={<Button variant="danger" onClick={async () => {
+          if (!(await context.mutate.patch(thread.id, { status: "spam", fields: { ...thread.fields, folder: "spam", risk: "phishing", reportedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} reported as phishing by ${context.actor}` }))) return;
           context.toast("Reported", "The thread is in Spam and the report is on the record.");
           close();
-        }}>Report and move to Spam</Button>
-      </Row>
+        }}>Report and move to Spam</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }

@@ -37,7 +37,7 @@ export function AgentTeamsSection({ context, agents }: { context: ScreenContext;
   const archivedCount = teams.filter((team) => team.status === "archived").length;
 
   async function setStatus(team: AgentTeam, status: "active" | "archived") {
-    await context.mutate.patch(team.id, { status }, { expectRevision: team.record.revision, event: status === "archived" ? `Agent team “${team.name}” archived` : `Agent team “${team.name}” restored` });
+    if (!(await context.mutate.patch(team.id, { status }, { expectRevision: team.record.revision, event: status === "archived" ? `Agent team “${team.name}” archived` : `Agent team “${team.name}” restored` }))) return;
     context.toast(status === "archived" ? "Team archived" : "Team restored", status === "archived" ? `${team.name} is kept on record; its members keep their own contracts.` : `${team.name} is active again.`);
   }
 

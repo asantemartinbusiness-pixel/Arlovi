@@ -614,7 +614,7 @@ export function PortalAdmin({ context, lens }: { context: ScreenContext; lens: s
             { key: "gate", header: "Who can open it", cell: (row) => <Pill tone={row.gate === "any_member" ? "neutral" : "warning"}>{GATE_LABELS[row.gate] ?? row.gate}</Pill> },
             { key: "modules", header: "Shows", cell: (row) => row.modules.map((module) => MODULE_LABELS[module] ?? module).join(", ") },
           ]} />
-        <Card eyebrow="SCOPE" prov="human" title="What this portal can reach" subtitle="Everything else in the workspace is out of scope">
+        <Card eyebrow="SCOPE" prov="human" title="What this portal can reach" subtitle="Everything else in the workspace is out of scope" actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("scope preview")}>Preview what they see</Button>}>
           <Properties rows={[
             { label: "Shared records", value: <span className="ds-num">{String(sharedRecords(portal, data).length)}</span> },
             { label: "Attached documents", value: <span className="ds-num">{String(portalDocuments(portal, data.documents).length)}</span> },
@@ -691,6 +691,7 @@ export function PortalAdmin({ context, lens }: { context: ScreenContext; lens: s
         label="External users"
         filterable={false}
         onSelect={(id) => context.select(id)}
+        onOpen={(id) => context.openOverlay("scope preview", { userId: id })}
         rowTone={(row) => (expiryState(row.expiresAt, now).expired ? "danger" : undefined)}
         columns={[
           { key: "name", header: "Person", primary: true, cell: (row) => row.name },

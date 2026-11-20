@@ -1,5 +1,5 @@
 import { Clapperboard, Cpu, Download, FolderOpen, MousePointerClick, Spline } from "lucide-react";
-import { Button } from "@/design-system";
+import { OVERLAY_WIDTH, OverlayActions, OverlayCancel } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { stagger } from "./anim";
 import { motionUi, parseMotion } from "./model";
@@ -8,7 +8,7 @@ import {
   AssetLibrary, CompositionSetup, ImportComposition, ProjectsTab, PublishTemplate, type ProjectLens,
 } from "./projects";
 import {
-  EditorScreen, KeyboardHelp, KeyframeEditor, LayerInspector, MotionPicker, selectedKeyframe, selectedLayer, setKeyframeHere,
+  EditorScreen, KeyboardHelp, KeyframeEditor, KeyframeSummary, LayerInspector, LayerSummary, MotionPicker, selectedKeyframe, selectedLayer, setKeyframeHere,
 } from "./editor";
 import { CurveEditor, EasingScreen, LoopValidation, TimingPreview, runMotionTest } from "./easing";
 import { loopSeams } from "./anim";
@@ -159,7 +159,7 @@ const EASING_ACTIONS: ActionDef[] = [
     run: (context) => context.openOverlay("Curve editor"),
   },
   {
-    id: "stagger", label: "Stagger", placement: "secondary",
+    id: "stagger", label: "Stagger", placement: "overflow",
     guard: () => (motionUi.get().staggerIds.length >= 2 ? undefined : "Choose two or more layers on the Timing tab"),
     run: (context) => {
       const open = current();
@@ -170,7 +170,7 @@ const EASING_ACTIONS: ActionDef[] = [
     },
   },
   {
-    id: "loop", label: "Loop on or off", placement: "secondary",
+    id: "loop", label: "Loop on or off", placement: "overflow",
     guard: noDoc,
     run: (context) => {
       const open = current();
@@ -267,7 +267,7 @@ const EXPORT_ACTIONS: ActionDef[] = [
 
 /* ---------------------------- registration ---------------------------- */
 
-const closeFooter = ({ close }: ScreenContext & { close: () => void }) => <><span className="ds-grow" /><Button variant="ghost" onClick={close}>Close</Button></>;
+const closeFooter = (_context: ScreenContext & { close: () => void }) => <OverlayActions end={<OverlayCancel>Close</OverlayCancel>} />;
 
 registerApp({
   code: "MOTION",
@@ -290,23 +290,23 @@ registerApp({
   screens: {
     "ARL-MOTION-001": {
       id: "ARL-MOTION-001",
-      subtitle: () => "Compositions, brand motion templates, linked assets and every render made in this browser.",
       tabs: (["Recent", "Shared", "Templates", "Renders"] as ProjectLens[]).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ProjectsTab context={context} lens={lens} />,
       })),
       actions: PROJECT_ACTIONS,
       overlays: [
-        { id: "Composition setup", kind: "modal", title: "New composition", width: 560, render: ({ close, ...context }) => <CompositionSetup context={context} close={close} /> },
-        { id: "asset library", kind: "drawer", title: "Linked assets", width: 460, render: ({ close: _close, ...context }) => <AssetLibrary context={context} /> },
-        { id: "publish", kind: "modal", title: "Publish as a brand template", width: 520, render: ({ close, ...context }) => <PublishTemplate context={context} close={close} /> },
-        { id: "import composition", kind: "modal", title: "Import a composition", width: 560, render: ({ close, ...context }) => <ImportComposition context={context} close={close} /> },
+        { id: "Composition setup", kind: "modal", title: "New composition", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CompositionSetup context={context} close={close} /> },
+        { id: "asset library", kind: "drawer", title: "Linked assets", width: OVERLAY_WIDTH.form, render: ({ close: _close, ...context }) => <AssetLibrary context={context} /> },
+        { id: "publish", kind: "modal", title: "Publish as a brand template", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishTemplate context={context} close={close} /> },
+        { id: "import composition", kind: "modal", title: "Import a composition", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ImportComposition context={context} close={close} /> },
       ],
     },
 
     "ARL-MOTION-002": {
       id: "ARL-MOTION-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <EditorScreen context={context} actions={EDITOR_ACTIONS} />,
       tabs: (["Animate", "Design", "Effects", "Preview"] as const).map((lens) => ({
         id: lens,
@@ -314,16 +314,17 @@ registerApp({
       })),
       actions: EDITOR_ACTIONS,
       overlays: [
-        { id: "Keyframe editor", kind: "modal", title: "Keyframe", width: 560, render: ({ close }) => <KeyframeEditor close={close} /> },
-        { id: "layer inspector", kind: "drawer", title: "Layer", width: 440, render: ({ close }) => <LayerInspector close={close} /> },
-        { id: "motion picker", kind: "modal", title: "Apply a motion preset", width: 640, render: ({ close }) => <MotionPicker close={close} /> },
-        { id: "keyboard", kind: "modal", title: "Keyboard", width: 560, render: () => <KeyboardHelp />, footer: closeFooter },
+        { id: "Keyframe editor", kind: "modal", title: "Keyframe", width: OVERLAY_WIDTH.modal, summary: () => <KeyframeSummary />, render: ({ close }) => <KeyframeEditor close={close} /> },
+        { id: "layer inspector", kind: "drawer", title: "Layer", width: OVERLAY_WIDTH.form, summary: () => <LayerSummary />, render: ({ close }) => <LayerInspector close={close} /> },
+        { id: "motion picker", kind: "modal", title: "Apply a motion preset", width: OVERLAY_WIDTH.wide, render: ({ close }) => <MotionPicker close={close} /> },
+        { id: "keyboard", kind: "modal", title: "Keyboard", width: OVERLAY_WIDTH.form, render: () => <KeyboardHelp />, footer: closeFooter },
       ],
     },
 
     "ARL-MOTION-003": {
       id: "ARL-MOTION-003",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <EasingScreen context={context} actions={EASING_ACTIONS} />,
       tabs: (["Curves", "Timing", "Presets", "Spring"] as const).map((lens) => ({
         id: lens,
@@ -331,15 +332,16 @@ registerApp({
       })),
       actions: EASING_ACTIONS,
       overlays: [
-        { id: "Curve editor", kind: "modal", title: "Curve editor", width: 560, render: ({ close }) => <CurveEditor close={close} /> },
-        { id: "loop validation", kind: "modal", title: "Loop validation", width: 620, render: ({ close }) => <LoopValidation close={close} /> },
-        { id: "timing preview", kind: "modal", title: "Timing preview", width: 560, render: () => <TimingPreview />, footer: closeFooter },
+        { id: "Curve editor", kind: "modal", title: "Curve editor", width: OVERLAY_WIDTH.modal, render: ({ close }) => <CurveEditor close={close} /> },
+        { id: "loop validation", kind: "modal", title: "Loop validation", width: OVERLAY_WIDTH.modal, render: ({ close }) => <LoopValidation close={close} /> },
+        { id: "timing preview", kind: "modal", title: "Timing preview", width: OVERLAY_WIDTH.modal, render: () => <TimingPreview />, footer: closeFooter },
       ],
     },
 
     "ARL-MOTION-004": {
       id: "ARL-MOTION-004",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <InteractiveScreen context={context} actions={INTERACTIVE_ACTIONS} />,
       tabs: (["States", "Triggers", "Preview", "Export"] as const).map((lens) => ({
         id: lens,
@@ -347,17 +349,18 @@ registerApp({
       })),
       actions: INTERACTIVE_ACTIONS,
       overlays: [
-        { id: "State inspector", kind: "drawer", title: "State", width: 480, render: ({ close }) => <StateInspector close={close} /> },
-        { id: "interaction guard", kind: "modal", title: "Interaction guard", width: 600, render: ({ close }) => <InteractionGuard close={close} /> },
-        { id: "device preview", kind: "modal", title: "Device preview", width: 720, render: () => <DevicePreview />, footer: closeFooter },
-        { id: "bind trigger", kind: "modal", title: "Bind a trigger", width: 600, render: ({ close }) => <BindTrigger close={close} /> },
-        { id: "remove trigger", kind: "modal", title: "Remove the trigger", width: 480, tone: "danger", render: ({ close }) => <RemoveTrigger close={close} /> },
+        { id: "State inspector", kind: "drawer", title: "State", width: OVERLAY_WIDTH.form, render: ({ close }) => <StateInspector close={close} /> },
+        { id: "interaction guard", kind: "modal", title: "Interaction guard", width: OVERLAY_WIDTH.modal, render: ({ close }) => <InteractionGuard close={close} /> },
+        { id: "device preview", kind: "modal", title: "Device preview", width: OVERLAY_WIDTH.wide, render: () => <DevicePreview />, footer: closeFooter },
+        { id: "bind trigger", kind: "modal", title: "Bind a trigger", width: OVERLAY_WIDTH.form, render: ({ close }) => <BindTrigger close={close} /> },
+        { id: "remove trigger", kind: "modal", title: "Remove the trigger", width: OVERLAY_WIDTH.compact, tone: "danger", render: ({ close }) => <RemoveTrigger close={close} /> },
       ],
     },
 
     "ARL-MOTION-005": {
       id: "ARL-MOTION-005",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <ExportScreen context={context} actions={EXPORT_ACTIONS} />,
       tabs: (["Formats", "Presets", "Queue", "History"] as const).map((lens) => ({
         id: lens,
@@ -365,10 +368,10 @@ registerApp({
       })),
       actions: EXPORT_ACTIONS,
       overlays: [
-        { id: "Export options", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "render" ? "Render" : "Export"), width: 620, render: ({ close, ...context }) => <ExportOptionsOverlay context={context} close={close} /> },
-        { id: "reduced-motion review", kind: "modal", title: "Reduced-motion review", width: 640, render: ({ close, ...context }) => <ReducedMotionReview context={context} close={close} /> },
-        { id: "compatibility", kind: "modal", title: "Compatibility", width: 760, render: () => <CompatibilityOverlay />, footer: closeFooter },
-        { id: "publish export", kind: "modal", title: "Publish", width: 520, render: ({ close, ...context }) => <PublishExport context={context} close={close} /> },
+        { id: "Export options", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "render" ? "Render" : "Export"), width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ExportOptionsOverlay context={context} close={close} /> },
+        { id: "reduced-motion review", kind: "modal", title: "Reduced-motion review", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReducedMotionReview context={context} close={close} /> },
+        { id: "compatibility", kind: "modal", title: "Compatibility", width: OVERLAY_WIDTH.wide, render: () => <CompatibilityOverlay />, footer: closeFooter },
+        { id: "publish export", kind: "modal", title: "Publish", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishExport context={context} close={close} /> },
       ],
     },
   },

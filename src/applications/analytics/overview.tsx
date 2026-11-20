@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { Activity, Brain, LineChart as LineIcon, Search, Sparkles, TrendingUp } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, Empty, Field, Grid, LineChart, Meter, Notice, Pill,
-  Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  BarChart, Button, Card, DataGrid, Empty, Field, Grid, LineChart, Meter, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions,
 } from "@/design-system";
 import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -661,7 +660,8 @@ export function ScenarioEditor({ context, close }: { context: ScreenContext; clo
           ? `Three months out, this scenario projects ${context.money(Math.round(last.value))}, within a band of ${context.money(Math.round(last.low))} to ${context.money(Math.round(last.high))}.`
           : model.reason}
       </Notice>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={title.trim() === "" || !model.usable}
         onClick={async () => {
@@ -677,7 +677,8 @@ export function ScenarioEditor({ context, close }: { context: ScreenContext; clo
         }}
       >
         Save the scenario
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -726,7 +727,8 @@ export function DelegateInvestigation({ context, close }: { context: ScreenConte
       <Notice tone="warning" title="This creates a task, not an agent run">
         No model is connected, so nothing here investigates on its own. The task is assigned to a person with the figure and its source recorded on it.
       </Notice>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={note.trim() === ""}
         onClick={async () => {
@@ -748,7 +750,8 @@ export function DelegateInvestigation({ context, close }: { context: ScreenConte
         }}
       >
         Create the task
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }

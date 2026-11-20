@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
-import { FileCheck2, Paperclip, Receipt, Upload } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Paperclip, Receipt, Upload } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, DrawerUnsavedChanges, Empty, FactGrid, Field, ModalActions, ModalInFlight, MoneyInput, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
+import { clockIso } from "@/platform/clock";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import type { Rec } from "@/domain/types";
 import { accountCode, accountType, ageBuckets, daysOverdue, periodOf } from "@/domain/fin-ledger";
 import type { JLine } from "@/domain/fin-ledger";
@@ -87,7 +89,8 @@ export function BillsTable({ context, tab }: { context: ScreenContext; tab: stri
               let refused = 0;
               for (const bill of selected) {
                 if (bill.status === "paid" || bill.fields.exception || !bill.fields.supplierId) { refused += 1; continue; }
-                await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { event: `Bill ${bill.title} approved` });
+                const saved2 = await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { event: `Bill ${bill.title} approved` });
+                if (!saved2) return;
                 approved += 1;
               }
               context.toast(approved ? "Bills approved" : "Nothing approved",
@@ -104,28 +107,18 @@ export function BillsTable({ context, tab }: { context: ScreenContext; tab: stri
         summary={<Amount minor={total} context={context} bold />}
       />
 
-      <Grid>
-        <Card prov="human" span={6} title="Payables ageing" subtitle="Unpaid bills by days past due">
-          <Stack gap={2}>
-            {ageBuckets(unpaid, now).map((bucket) => (
-              <Row key={bucket.bucket} gap={3}>
-                <span className="ds-grow">{bucket.bucket}</span>
-                <span className="ds-subtle">{bucket.count}</span>
-                <Amount minor={bucket.amountMinor} context={context} />
-              </Row>
-            ))}
-            <SourceNote>Computed from {unpaid.length} unpaid bill records at {context.date(now)}.</SourceNote>
-          </Stack>
-        </Card>
-        <Card prov="posted" span={6} title="Paying a supplier" subtitle="What this workspace can do">
-          <Stack gap={3}>
-            <Notice tone="warning" title="No bank transfer can be authorised from here">
-              Scheduling a payment records the intent and posts nothing until a person confirms the money left. There is no bank mandate, and no agent can move money.
-            </Notice>
-            <SourceNote>Approval is a local control. It shapes what this interface offers and is not an account security boundary.</SourceNote>
-          </Stack>
-        </Card>
-      </Grid>
+      <Card prov="human" title="Payables ageing" subtitle="Unpaid bills by days past due">
+        <Stack gap={2}>
+          {ageBuckets(unpaid, now).map((bucket) => (
+            <Row key={bucket.bucket} gap={3}>
+              <span className="ds-grow">{bucket.bucket}</span>
+              <span className="ds-subtle ds-num">{bucket.count}</span>
+              <Amount minor={bucket.amountMinor} context={context} />
+            </Row>
+          ))}
+          <SourceNote>Computed from {unpaid.length} unpaid bill records at {context.date(now)}. Approval is a local control, not an account security boundary.</SourceNote>
+        </Stack>
+      </Card>
     </Stack>
   );
 }
@@ -201,17 +194,17 @@ export function BillCapture({ context, close }: { context: ScreenContext; close:
       <Notice tone="info" title="Capture is manual here">
         There is no document-extraction service connected. The fields below are what you type; the file name is recorded so the paper can be found again.
       </Notice>
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="Bill number" required><TextInput aria-label="Bill number" value={number} onChange={(event) => setNumber(event.target.value)} required placeholder="BILL-255" /></Field>
         <Field label="Terms" hint="Days from today"><TextInput aria-label="Terms" align="end" inputMode="numeric" value={String(dueDays)} onChange={(event) => setDueDays(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
-      </Row>
+      </div>
       <Field label="Supplier" hint="A bill with no supplier record is held as an exception rather than guessed.">
         <Select aria-label="Supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
           <option value="">No match</option>
           {data.suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.title} · {String(supplier.fields.terms ?? "")}</option>)}
         </Select>
       </Field>
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="Net amount"><MoneyInput label="Net amount" currency={org.currency} valueMinor={net} onChangeMinor={setNet} /></Field>
         <Field label="Tax category">
           <Select aria-label="Tax category" value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
@@ -223,7 +216,7 @@ export function BillCapture({ context, close }: { context: ScreenContext; close:
             {expenseAccounts.map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
-      </Row>
+      </div>
       <Field label="File name" hint="The document stays wherever you keep it. Nothing is uploaded.">
         <TextInput aria-label="File name" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="bill-255.pdf" />
       </Field>
@@ -248,10 +241,10 @@ export function BillCapture({ context, close }: { context: ScreenContext; close:
         </Notice>
       )}
 
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} icon={<Upload size={15} />} disabled={!number.trim()}>Capture the bill</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button type="submit" variant="primary" busy={busy} icon={<Upload size={15} />} disabled={!number.trim()}>Capture the bill</Button>}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
     </form>
   );
 }
@@ -269,19 +262,58 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
   const similar = data.bills.filter((item) => item.id !== bill.id && Number(item.amountMinor ?? 0) === Number(bill.amountMinor ?? 0));
   const attachment = (bill.body as { attachment?: { filename?: string; capturedAt?: string } } | undefined)?.attachment;
 
+  const needsMatch = !bill.fields.supplierId;
+  const canApprove = context.can("approve_payment") && !bill.fields.exception && !needsMatch && bill.status !== "paid";
+  const run = async (task: () => Promise<void>, failure: string) => {
+    setBusy(true);
+    try { await task(); close(); }
+    catch (error) { context.toast(failure, error instanceof Error ? error.message : "This bill changed. Reopen it and retry.", "failed"); }
+    finally { setBusy(false); }
+  };
+  const saveMatch = (
+    <Button
+      variant={needsMatch ? "primary" : "secondary"}
+      busy={busy}
+      disabled={!supplierId || supplierId === String(bill.fields.supplierId ?? "")}
+      onClick={() => run(async () => {
+        const fields: Record<string, string | number | boolean> = { ...bill.fields, supplierId };
+        if (String(fields.exception ?? "") === "No supplier match") delete fields.exception;
+        const saved3 = await context.mutate.patch(bill.id, {
+          status: fields.exception ? bill.status : "inbox",
+          fields,
+        }, { replaceFields: true, expectRevision: bill.revision, event: `Bill ${bill.title} matched to a supplier` });
+        if (!saved3) return;
+        context.toast("Supplier matched", `${bill.title} now belongs to ${data.suppliers.find((item) => item.id === supplierId)?.title}.`);
+      }, "The match was not saved")}
+    >
+      Save the match
+    </Button>
+  );
+  const approve = (
+    <Button
+      variant={needsMatch ? "secondary" : "primary"}
+      busy={busy}
+      disabled={!canApprove}
+      title={bill.fields.exception ? String(bill.fields.exception) : needsMatch ? "Match a supplier first" : undefined}
+      onClick={() => run(async () => {
+        const saved4 = await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { expectRevision: bill.revision, event: `Bill ${bill.title} approved` });
+        if (!saved4) return;
+        context.toast("Bill approved", `${bill.title} is approved for payment by ${context.actor}. No money has moved.`);
+      }, "The bill was not approved")}
+    >
+      Approve
+    </Button>
+  );
+
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Bill", value: bill.title },
-        { label: "Status", value: <Pill tone={bill.status === "paid" ? "success" : "neutral"} dot>{bill.status}</Pill> },
-        { label: "Supplier", value: supplier?.title ?? "Not matched" },
-        { label: "Net", value: <Amount minor={Number(bill.fields.netMinor ?? 0)} context={context} /> },
-        { label: "Tax", value: <Amount minor={Number(bill.fields.taxMinor ?? 0)} context={context} /> },
-        { label: "Gross", value: <Amount minor={bill.amountMinor} context={context} bold /> },
-        { label: "Due", value: <span className="ds-num">{context.date(bill.dueAt)}</span> },
-        { label: "Attachment", value: attachment?.filename ? `${attachment.filename}, kept locally` : "None recorded" },
-        { label: "Ledger journal", value: journal ? journal.title : "Nothing posted" },
-      ]} />
+      <DrawerUnsavedChanges when={supplierId !== String(bill.fields.supplierId ?? "")} />
+      <OverlaySummary
+        eyebrow="Bill"
+        title={<span className="ds-num">{bill.title}</span>}
+        status={<Pill tone={bill.status === "paid" ? "success" : bill.status === "exception" ? "danger" : "neutral"} dot>{bill.status}</Pill>}
+        meta={[supplier?.title ?? "No supplier matched", `Due ${context.date(bill.dueAt)}`, journal ? `Posted: ${journal.title}` : "Nothing posted to the ledger"]}
+      />
 
       {bill.fields.exception && (
         <Notice tone="danger" title={String(bill.fields.exception)}>
@@ -295,65 +327,42 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
         </Notice>
       )}
 
-      <Field label="Match to a supplier">
-        <Select aria-label="Match to a supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
-          <option value="">No match</option>
-          {data.suppliers.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-        </Select>
-      </Field>
+      <FactGrid columns={3} items={[
+        { label: "Net", value: <Amount minor={Number(bill.fields.netMinor ?? 0)} context={context} />, mono: true },
+        { label: "Tax", value: <Amount minor={Number(bill.fields.taxMinor ?? 0)} context={context} />, mono: true },
+        { label: "Gross", value: <Amount minor={bill.amountMinor} context={context} bold />, mono: true, tone: "accent" },
+      ]} />
 
-      <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!supplierId || supplierId === String(bill.fields.supplierId ?? "")}
-          onClick={async () => {
-            setBusy(true);
-            const fields: Record<string, string | number | boolean> = { ...bill.fields, supplierId };
-            if (String(fields.exception ?? "") === "No supplier match") delete fields.exception;
-            await context.mutate.patch(bill.id, {
-              status: fields.exception ? bill.status : "inbox",
-              fields,
-            }, { replaceFields: true, expectRevision: bill.revision, event: `Bill ${bill.title} matched to a supplier` });
-            context.toast("Supplier matched", `${bill.title} now belongs to ${data.suppliers.find((item) => item.id === supplierId)?.title}.`);
-            setBusy(false);
-            close();
-          }}
-        >
-          Save the match
-        </Button>
-        <Button
-          variant="secondary"
-          busy={busy}
-          disabled={!context.can("approve_payment") || Boolean(bill.fields.exception) || !bill.fields.supplierId || bill.status === "paid"}
-          title={bill.fields.exception ? String(bill.fields.exception) : !bill.fields.supplierId ? "Match a supplier first" : undefined}
-          onClick={async () => {
-            setBusy(true);
-            await context.mutate.patch(bill.id, { status: "approved", fields: { ...bill.fields, approvedBy: context.actor } }, { expectRevision: bill.revision, event: `Bill ${bill.title} approved` });
-            context.toast("Bill approved", `${bill.title} is approved for payment by ${context.actor}. No money has moved.`);
-            setBusy(false);
-            close();
-          }}
-        >
-          Approve
-        </Button>
-        <Button
-          variant="outline-danger"
-          busy={busy}
-          disabled={bill.status === "paid"}
-          onClick={async () => {
-            setBusy(true);
-            await context.mutate.patch(bill.id, { status: "exception", fields: { ...bill.fields, exception: "Held for query" } }, { expectRevision: bill.revision, event: `Bill ${bill.title} held for query` });
-            context.toast("Held for query", `${bill.title} is in exceptions until someone clears it.`, "blocked");
-            setBusy(false);
-            close();
-          }}
-        >
-          Hold for query
-        </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      <OverlaySection title="Supplier match" hint={`Attachment: ${attachment?.filename ? `${attachment.filename}, kept locally` : "none recorded"}`}>
+        <Field label="Match to a supplier">
+          <Select aria-label="Match to a supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+            <option value="">No match</option>
+            {data.suppliers.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </Select>
+        </Field>
+      </OverlaySection>
+
+      <DrawerActions>
+        <OverlayActions
+          primary={needsMatch ? saveMatch : approve}
+          secondary={needsMatch ? approve : saveMatch}
+          end={<>
+            <Button
+              variant="outline-danger"
+              busy={busy}
+              disabled={bill.status === "paid"}
+              onClick={() => run(async () => {
+                const saved5 = await context.mutate.patch(bill.id, { status: "exception", fields: { ...bill.fields, exception: "Held for query" } }, { expectRevision: bill.revision, event: `Bill ${bill.title} held for query` });
+                if (!saved5) return;
+                context.toast("Held for query", `${bill.title} is in exceptions until someone clears it.`, "blocked");
+              }, "The bill was not held")}
+            >
+              Hold for query
+            </Button>
+            <OverlayCancel disabled={busy}>Close</OverlayCancel>
+          </>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -368,33 +377,49 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState("");
   const [busy, setBusy] = useState(false);
+  // Revisions as they were when this dialog opened; a bill changed since then is a conflict.
+  const openedRevisions = useRef<Record<string, number>>({});
+  for (const bill of chosen) if (openedRevisions.current[bill.id] === undefined) openedRevisions.current[bill.id] = bill.revision;
+  const payableNow = (bill: Rec) => ["approved", "scheduled"].includes(bill.status) && Boolean(bill.fields.approvedBy);
+  const payable = chosen.filter(payableNow);
+  const excluded = chosen.filter((bill) => !payableNow(bill));
+  // The bills this run was opened with; if any of them changes, the whole run stops.
+  const openedIds = useRef<string[] | undefined>(undefined);
+  if (!openedIds.current && payable.length > 0) openedIds.current = payable.map((bill) => bill.id);
+  const why = (bill: Rec) => !["approved", "scheduled"].includes(bill.status) ? `${bill.title} is ${bill.status}, not approved` : `${bill.title} has no recorded approver`;
 
   const cash = data.accounts.filter((account) => accountType(account) === "asset" && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
   const ap = data.accounts.find((account) => accountCode(account) === "2000");
-  const total = chosen.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0);
+  const total = payable.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0);
   const blocked = !ap
     ? "The chart of accounts has no 2000 payables account."
-    : chosen.length === 0
-      ? "No approved bill is selected."
+    : payable.length === 0
+      ? "No selected bill is approved with a recorded approver."
       : data.locked.includes(periodOf(date))
         ? `${periodOf(date)} is a closed period.`
         : undefined;
 
   return (
     <Stack gap={4}>
+      <ModalInFlight when={busy} />
       <Notice tone="warning" title="This records a payment, it does not make one">
         No bank mandate exists in this workspace. Confirming below posts the ledger entry for money you have already sent, and marks the bills paid.
       </Notice>
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="Payment date" required><TextInput aria-label="Payment date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></Field>
         <Field label="Paid from" required>
           <Select aria-label="Paid from" value={accountId || cash[0]?.id || ""} onChange={(event) => setAccountId(event.target.value)}>
             {cash.map((account) => <option key={account.id} value={account.id}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
-      </Row>
+      </div>
+      {excluded.length > 0 && (
+        <Notice tone="warning" title={`${excluded.length} bill${excluded.length === 1 ? " is" : "s are"} left out of this run`}>
+          {excluded.map(why).join("; ")}. Approve {excluded.length === 1 ? "it" : "them"} from the bill drawer first.
+        </Notice>
+      )}
       <DataGrid
-        rows={chosen}
+        rows={payable}
         rowId={(row) => row.id}
         label="Bills to pay"
         filterable={false}
@@ -408,47 +433,70 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
         summary={<Amount minor={total} context={context} bold />}
       />
       {blocked && <Notice tone="danger" title="This cannot be posted">{blocked}</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("approve_payment") || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
-            if (!ap) return;
-            setBusy(true);
+            if (!ap || busy) return;
             const from = accountId || cash[0]?.id;
-            if (!from) { setBusy(false); return; }
-            const lines: JLine[] = [
-              { accountId: ap.id, debitMinor: total, creditMinor: 0, memo: `Paid ${chosen.length} bills` },
-              { accountId: from, debitMinor: 0, creditMinor: total, memo: `Paid ${chosen.length} bills` },
-            ];
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Supplier payment run ${date}`,
-              status: "posted",
-              summary: `${chosen.length} bills settled: ${chosen.map((bill) => bill.title).join(", ")}.`,
-              amountMinor: total,
-              at: `${date}T09:00:00.000Z`,
-              tags: ["ledger", "payment"],
-              fields: { date, source: "payment-run" },
-              body: { date, memo: `Supplier payment run`, lines },
-            }, `Supplier payment run posted for ${context.money(total)}`);
-            for (const bill of chosen) {
-              await context.mutate.patch(bill.id, {
+            if (!from) return;
+            setBusy(true);
+            try {
+              // Re-read every bill now: one paid or changed elsewhere stops the whole run.
+              const ids = openedIds.current ?? payable.map((bill) => bill.id);
+              const live = ids.map((id) => data.bills.find((item) => item.id === id));
+              const stale = live.some((bill, index) => !bill || !payableNow(bill) || bill.revision !== openedRevisions.current[ids[index]]);
+              if (stale) {
+                context.toast("Payment run stopped", "A bill in this run changed or was already paid. Nothing was posted; reopen the run to review it.", "blocked");
+                return;
+              }
+              const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+              const lines: JLine[] = [
+                { accountId: ap.id, debitMinor: total, creditMinor: 0, memo: `Paid ${payable.length} bills` },
+                { accountId: from, debitMinor: 0, creditMinor: total, memo: `Paid ${payable.length} bills` },
+              ];
+              const journal = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Supplier payment run ${date}`,
+                status: "posted",
+                summary: `${ids.length} bills settled: ${(live as Rec[]).map((bill) => bill.title).join(", ")}.`,
+                amountMinor: total,
+                at: `${date}T09:00:00.000Z`,
+                tags: ["ledger", "payment"],
+                fields: { date, source: "payment-run" },
+                body: { date, memo: `Supplier payment run`, lines },
+              }, ctx);
+              const paid = (live as Rec[]).map((bill) => revisedRecord(bill, {
                 status: "paid",
                 fields: { ...bill.fields, paymentJournalId: journal.id, paidAt: `${date}T09:00:00.000Z` },
-              }, { event: `Bill ${bill.title} marked paid` });
+              }, ctx));
+              // Journal and every bill commit together, against the revisions this dialog opened with.
+              await context.mutate.putMany(
+                [journal, ...paid],
+                [`Supplier payment run posted for ${context.money(total)}`, ...paid.map((bill) => `Bill ${bill.title} marked paid`)],
+                Object.fromEntries(ids.map((id) => [id, openedRevisions.current[id]])),
+                ["create", ...paid.map(() => "update" as const)],
+              );
+              context.toast("Payment recorded", `${context.money(total)} posted against payables and cash. ${payable.length} bills are marked paid.`);
+              close();
+            } catch (error) {
+              context.toast("Payment not recorded", error instanceof Error ? error.message : "A bill changed. Reopen the run and retry.", "failed");
+            } finally {
+              setBusy(false);
             }
-            context.toast("Payment recorded", `${context.money(total)} posted against payables and cash. ${chosen.length} bills are marked paid.`);
-            setBusy(false);
-            close();
           }}
         >
           Record the payment of {context.money(total)}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -523,7 +571,8 @@ export function ExpensesTable({ context, tab }: { context: ScreenContext; tab: s
               let refused = 0;
               for (const expense of selected) {
                 if (expense.fields.hasReceipt === false) { refused += 1; continue; }
-                await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { event: `Expense ${expense.title} approved` });
+                const saved6 = await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { event: `Expense ${expense.title} approved` });
+                if (!saved6) return;
                 approved += 1;
               }
               context.toast(approved ? "Claims approved" : "Nothing approved", `${approved} approved. ${refused} refused for want of a receipt.`, refused && !approved ? "blocked" : "ok");
@@ -597,11 +646,9 @@ export function ReceiptCapture({ context, close }: { context: ScreenContext; clo
         close();
       }}
     >
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="What it was for" required><TextInput aria-label="What it was for" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
         <Field label="Amount" required><MoneyInput label="Amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} /></Field>
-      </Row>
-      <Row gap={3} wrap>
         <Field label="Category">
           <Select aria-label="Category" value={category} onChange={(event) => setCategory(event.target.value)}>
             {["travel", "materials", "marketing", "entertaining", "delivery", "software", "other"].map((item) => <option key={item}>{item}</option>)}
@@ -617,7 +664,7 @@ export function ReceiptCapture({ context, close }: { context: ScreenContext; clo
             {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
-      </Row>
+      </div>
       <Field label="Receipt file name" hint="The image stays on your device. Only the name and the date are recorded.">
         <TextInput aria-label="Receipt file name" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="rail-16-nov.jpg" />
       </Field>
@@ -627,10 +674,10 @@ export function ReceiptCapture({ context, close }: { context: ScreenContext; clo
           The claim can still be submitted, and it will be flagged so an approver can see why it is blocked.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || amount <= 0}>Submit the claim</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || amount <= 0}>Submit the claim</Button>}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
     </form>
   );
 }
@@ -645,92 +692,104 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
   const receipt = (expense.body as { receipt?: { filename?: string; capturedAt?: string } | null } | undefined)?.receipt;
   const tax = recoverableTax(expense, context.org.jurisdiction, context.now);
   const blocked = expense.fields.hasReceipt === false ? "No receipt is attached." : undefined;
-  const journal = data.journals.find((item) => item.id === String(expense.fields.journalId ?? ""));
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Claim", value: expense.title },
-        { label: "Claimant", value: String(expense.fields.claimant ?? expense.ownerName) },
-        { label: "Date", value: <span className="ds-num">{context.date(expense.at)}</span> },
-        { label: "Amount", value: <Amount minor={expense.amountMinor} context={context} bold /> },
-        { label: "Category", value: String(expense.fields.category ?? "uncategorised") },
-        { label: "Posts to", value: String(expense.fields.accountCode ?? "Not set") },
-        { label: "Recoverable tax", value: <Amount minor={tax} context={context} /> },
-        { label: "Receipt", value: receipt?.filename ? `${receipt.filename}, captured ${context.date(receipt.capturedAt)}` : "None" },
-        { label: "Status", value: <Pill tone={expense.status === "reimbursed" ? "success" : "neutral"} dot>{expense.status}</Pill> },
-        { label: "Posted journal", value: journal ? journal.title : "Nothing posted" },
+      <DrawerUnsavedChanges when={busy} />
+      {blocked && <Notice tone="danger" title="Cannot be approved">{blocked} Ask the claimant to add the receipt name.</Notice>}
+      <FactGrid columns={3} items={[
+        { label: "Amount", value: <Amount minor={expense.amountMinor} context={context} bold />, mono: true, tone: "accent" },
+        { label: "Recoverable tax", value: <Amount minor={tax} context={context} zero="0" />, mono: true },
+        { label: "Posts to", value: String(expense.fields.accountCode ?? "Not set"), mono: true, hint: String(expense.fields.category ?? "uncategorised") },
       ]} />
+      <SourceNote>Receipt: {receipt?.filename ? `${receipt.filename}, captured ${context.date(receipt.capturedAt)}` : "none"}</SourceNote>
       {expense.fields.policyNote && <Notice tone="warning" title="Policy">{String(expense.fields.policyNote)}</Notice>}
       {receipt?.filename && (
         <Notice tone="info" title="The receipt image is not stored here">
           Only the file name and capture date are kept, so nothing personal is held in this browser database beyond what you typed.
         </Notice>
       )}
-      <Row gap={2} wrap>
-        <Button
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("approve_payment") || ["approved", "reimbursed"].includes(expense.status)}
           title={blocked}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} approved` });
+            const saved7 = await context.mutate.patch(expense.id, { status: "approved", fields: { ...expense.fields, approvedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} approved` });
+            if (!saved7) { setBusy(false); return; }
             context.toast("Claim approved", `${expense.title} is approved by ${context.actor}. Reimbursement posts the ledger entry.`);
             setBusy(false);
             close();
           }}
         >
           Approve
-        </Button>
-        <Button
+        </Button>}
+          secondary={<Button
           variant="secondary"
           busy={busy}
           disabled={expense.status !== "approved" || !context.can("post_journal")}
           onClick={async () => {
-            setBusy(true);
             const account = data.accounts.find((item) => accountCode(item) === String(expense.fields.accountCode ?? "6000"));
             const cash = data.accounts.find((item) => accountCode(item) === "1000");
             if (!account || !cash) {
               context.toast("Cannot post", "The expense account or the cash account is missing from the chart of accounts.", "failed");
-              setBusy(false);
               return;
             }
-            const amount = Number(expense.amountMinor ?? 0);
-            const lines: JLine[] = [
-              { accountId: account.id, debitMinor: amount, creditMinor: 0, memo: expense.title },
-              { accountId: cash.id, debitMinor: 0, creditMinor: amount, memo: `Reimbursed ${String(expense.fields.claimant ?? expense.ownerName)}` },
-            ];
-            const journalRecord = await context.mutate.create({
-              collection: "journals",
-              title: `Reimburse ${expense.title}`,
-              status: "posted",
-              summary: `Expense claim reimbursed to ${String(expense.fields.claimant ?? expense.ownerName)}.`,
-              amountMinor: amount,
-              at: context.now.toISOString(),
-              parentId: expense.id,
-              tags: ["ledger", "expense"],
-              fields: { date: context.now.toISOString().slice(0, 10), source: "expense", expenseId: expense.id },
-              body: { date: context.now.toISOString().slice(0, 10), memo: expense.title, lines },
-            }, `Expense ${expense.title} reimbursed`);
-            await context.mutate.patch(expense.id, {
-              status: "reimbursed",
-              fields: { ...expense.fields, journalId: journalRecord.id, reimbursedAt: context.now.toISOString() },
-            }, { event: `Expense ${expense.title} marked reimbursed` });
-            context.toast("Reimbursed", `${context.money(amount)} posted to ${accountCode(account)} and out of cash.`);
-            setBusy(false);
-            close();
+            setBusy(true);
+            try {
+              const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+              const amount = Number(expense.amountMinor ?? 0);
+              const date = context.now.toISOString().slice(0, 10);
+              const lines: JLine[] = [
+                { accountId: account.id, debitMinor: amount, creditMinor: 0, memo: expense.title },
+                { accountId: cash.id, debitMinor: 0, creditMinor: amount, memo: `Reimbursed ${String(expense.fields.claimant ?? expense.ownerName)}` },
+              ];
+              const journalRecord = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Reimburse ${expense.title}`,
+                status: "posted",
+                summary: `Expense claim reimbursed to ${String(expense.fields.claimant ?? expense.ownerName)}.`,
+                amountMinor: amount,
+                at: context.now.toISOString(),
+                parentId: expense.id,
+                tags: ["ledger", "expense"],
+                fields: { date, source: "expense", expenseId: expense.id },
+                body: { date, memo: expense.title, lines },
+              }, ctx);
+              const reimbursed = revisedRecord(expense, {
+                status: "reimbursed",
+                fields: { ...expense.fields, journalId: journalRecord.id, reimbursedAt: context.now.toISOString() },
+              }, ctx);
+              await context.mutate.putMany(
+                [journalRecord, reimbursed],
+                [`Expense ${expense.title} reimbursed`, `Expense ${expense.title} marked reimbursed`],
+                { [expense.id]: expense.revision }, ["create", "update"],
+              );
+              context.toast("Reimbursed", `${context.money(amount)} posted to ${accountCode(account)} and out of cash.`);
+              close();
+            } catch (error) {
+              context.toast("Reimbursement not recorded", error instanceof Error ? error.message : "The claim changed. Reopen it and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Reimburse and post
-        </Button>
+        </Button>}
+          end={<>
         <Button
           variant="outline-danger"
           busy={busy}
           disabled={expense.status === "reimbursed"}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(expense.id, { status: "rejected", fields: { ...expense.fields, rejectedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} rejected` });
+            const saved9 = await context.mutate.patch(expense.id, { status: "rejected", fields: { ...expense.fields, rejectedBy: context.actor } }, { expectRevision: expense.revision, event: `Expense ${expense.title} rejected` });
+            if (!saved9) { setBusy(false); return; }
             context.toast("Claim rejected", `${expense.title} is rejected and stays on the record.`, "blocked");
             setBusy(false);
             close();
@@ -738,9 +797,10 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
         >
           Reject
         </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        <OverlayCancel disabled={busy}>Close</OverlayCancel>
+          </>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -748,10 +808,10 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
 export function ApprovalChain({ context }: { context: ScreenContext }) {
   const data = useFinData();
   const steps = [
-    { label: "Claimant submits with a receipt", who: "Anyone", done: true },
-    { label: "Finance checks the category and the account", who: "Finance", done: true },
-    { label: "Owner approves anything over 200.00 or any entertaining", who: "Owner", done: false },
-    { label: "Reimbursement posts a balanced journal", who: "Finance", done: false },
+    { label: "Claimant submits with a receipt", who: "Anyone" },
+    { label: "Finance checks the category and the account", who: "Finance" },
+    { label: "Owner approves anything over 200.00 or any entertaining", who: "Owner" },
+    { label: "Reimbursement posts a balanced journal", who: "Finance" },
   ];
   const waiting = data.expenses.filter((expense) => expense.status === "review");
 
@@ -763,10 +823,9 @@ export function ApprovalChain({ context }: { context: ScreenContext }) {
       <Stack gap={3}>
         {steps.map((step, index) => (
           <Row key={step.label} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <Pill tone={step.done ? "success" : "neutral"} dot>{index + 1}</Pill>
+            <Pill tone="neutral">{index + 1}</Pill>
             <span className="ds-grow">{step.label}</span>
             <span className="ds-subtle">{step.who}</span>
-            {step.done ? <FileCheck2 size={16} aria-label="Already applied" /> : <span className="ds-subtle">Pending</span>}
           </Row>
         ))}
       </Stack>
@@ -797,13 +856,11 @@ export function PayablesStrip({ context }: { context: ScreenContext }) {
   const unpaid = data.bills.filter((bill) => !["paid", "void"].includes(bill.status));
   const dueSoon = unpaid.filter((bill) => bill.dueAt && new Date(bill.dueAt) <= new Date(now.getTime() + 7 * 86_400_000));
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <Pill tone="neutral">{unpaid.length} unpaid</Pill>
       <span>Due within 7 days <Amount minor={dueSoon.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0)} context={context} bold /></span>
       <span>Total payable <Amount minor={unpaid.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0)} context={context} bold /></span>
-      <span className="ds-grow" />
-      <span className="ds-subtle">No bank mandate exists in this workspace.</span>
-    </Row>
+    </div>
   );
 }
 

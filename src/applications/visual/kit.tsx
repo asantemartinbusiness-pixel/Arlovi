@@ -31,12 +31,21 @@ export interface EditorFrameProps {
   children: ReactNode;
   /** Breadcrumb back to the application index. */
   backTo?: { label: string; to: string };
+  /**
+   * One slim row (title, status, tabs) instead of breadcrumbs + a second action
+   * cluster. The page command bar already carries primary, secondary and overflow
+   * actions, so only `toolbar`-placed actions (which it does not show) stay here.
+   * Additive: omitted, the frame renders exactly as before.
+   */
+  lean?: boolean;
+  /** 1 when the ScreenDef uses `chromeTitle: "surface"`, so this head carries the page h1. */
+  titleLevel?: 1 | 2;
 }
 
 export function EditorFrame({
   context, actions = [], tabs, title, subtitle, tools,
   left, leftLabel = "Layers", right, rightLabel = "Properties",
-  status, children, backTo,
+  status, children, backTo, lean, titleLevel = 2,
 }: EditorFrameProps) {
   const [mobile, setMobile] = useState<"stage" | "left" | "right">("stage");
   const allowed = actions.filter((action) => !action.capability || roleCan(context.role, action.capability));
@@ -46,20 +55,32 @@ export function EditorFrame({
 
   return (
     <div className="vx">
-      <header className="vx-head">
-        <Breadcrumbs
-          items={[
-            { label: context.org.shortName, to: `/o/${context.org.slug}/hq/home` },
-            ...(backTo ? [backTo] : []),
-            { label: title ?? context.screen.title },
-          ]}
-        />
+      <header className="vx-head" data-lean={lean || undefined}>
+        {!lean && (
+          <Breadcrumbs
+            items={[
+              { label: context.org.shortName, to: `/o/${context.org.slug}/hq/home` },
+              ...(backTo ? [backTo] : []),
+              { label: title ?? context.screen.title },
+            ]}
+          />
+        )}
         <div className="vx-titlerow">
-          <div>
-            {/* The page shell owns the level-1 heading; this names the workspace beneath it. */}
-            <h2 className="vx-title">{title ?? context.screen.title}</h2>
+          <div className="vx-titleblock">
+            {/* With `chromeTitle: "surface"` the shell hides its heading and this becomes the page h1. */}
+            {titleLevel === 1
+              ? <h1 className="vx-title">{title ?? context.screen.title}</h1>
+              : <h2 className="vx-title">{title ?? context.screen.title}</h2>}
             {subtitle && <div className="vx-sub">{subtitle}</div>}
           </div>
+          {lean && tabs && tabs.length > 1 && (
+            <Tabs
+              label={`${title ?? context.screen.title} views`}
+              value={context.tab}
+              onChange={context.setTab}
+              items={tabs.map((tab) => ({ id: tab.id, label: tab.label ?? tab.id }))}
+            />
+          )}
           <div className="vx-headactions">
             {left && (
               <Button variant="ghost" size="sm" iconOnly aria-label={`Show ${leftLabel}`} onClick={() => setMobile((m) => (m === "left" ? "stage" : "left"))} className="vx-only-mobile">
@@ -71,9 +92,10 @@ export function EditorFrame({
                 <PanelRight size={16} />
               </Button>
             )}
-            {secondary.map((action) => <FrameAction key={action.id} action={action} context={context} variant="secondary" />)}
-            {primary.map((action) => <FrameAction key={action.id} action={action} context={context} variant="primary" />)}
-            {overflow.length > 0 && (
+            {lean && allowed.filter((action) => action.placement === "toolbar").map((action) => <FrameAction key={action.id} action={action} context={context} variant="secondary" />)}
+            {!lean && secondary.map((action) => <FrameAction key={action.id} action={action} context={context} variant="secondary" />)}
+            {!lean && primary.map((action) => <FrameAction key={action.id} action={action} context={context} variant="primary" />)}
+            {!lean && overflow.length > 0 && (
               <Menu
                 label="More actions"
                 trigger={<Button variant="ghost" size="sm" iconOnly aria-label="More actions"><MoreHorizontal size={16} /></Button>}
@@ -87,7 +109,7 @@ export function EditorFrame({
             )}
           </div>
         </div>
-        {tabs && tabs.length > 1 && (
+        {!lean && tabs && tabs.length > 1 && (
           <Tabs
             label={`${title ?? context.screen.title} views`}
             value={context.tab}

@@ -10,7 +10,7 @@ import { accountCode, accountMovements, budgetVariance, cashBalance, periodLabel
 import type { VarianceRow } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import type { FinData } from "./data";
-import { Amount, BooksLoading, SourceNote, StatementRow } from "./parts";
+import { Amount, BooksLoading, FormFooter, SourceNote, StatementRow } from "./parts";
 import { clockIso, wallMs } from "@/platform/clock";
 import "./variance.css";
 
@@ -78,6 +78,14 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
         rows={rows}
         rowId={(row) => row.id}
         label="Budget against actual"
+        card={(row) => <>
+          <span className="ds-sr-only">Explain </span>
+          <strong>{row.label}</strong>
+          <span className="ds-subtle ds-num">{row.accountCode} · Budget {context.money(row.budgetMinor)} · Actual {row.hasActual ? context.money(row.actualMinor) : "nothing posted"}</span>
+          {row.varianceMinor === 0
+            ? <Pill tone="neutral">On budget</Pill>
+            : <Pill tone={row.favourable ? "success" : "danger"} dot>{row.favourable ? "Favourable" : "Adverse"} {context.money(Math.abs(row.varianceMinor))}</Pill>}
+        </>}
         columns={[
           { key: "code", header: "Code", width: "80px", cell: (row) => <code className="ds-num">{row.accountCode}</code>, sortValue: (row) => row.accountCode },
           { key: "label", header: "Line", primary: true, cell: (row) => row.label, filterValue: (row) => `${row.label} ${row.accountCode}` },
@@ -120,6 +128,12 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
             rowId={(row) => row.accountId}
             label="Actuals with no budget line"
             filterable={false}
+            onOpen={(id) => { const row = unbudgeted.find((item) => item.accountId === id); if (row) context.openOverlay("variance drilldown", { code: row.code, period }); }}
+            card={(row) => <>
+              <span className="ds-sr-only">Explain </span>
+              <strong>{row.name}</strong>
+              <span className="ds-subtle ds-num">{row.code} · Actual {context.money(row.balanceMinor)} · no budget line</span>
+            </>}
             columns={[
               { key: "code", header: "Code", width: "80px", cell: (row) => <code className="ds-num">{row.code}</code> },
               { key: "name", header: "Account", primary: true, cell: (row) => row.name },
@@ -327,7 +341,8 @@ export function BudgetApprovalTab({ context }: { context: ScreenContext }) {
                   title={!context.can("approve_payment") ? "Approving a budget needs the Finance or Owner role view" : undefined}
                   onClick={async () => {
                     setBusy(budget.id);
-                    await context.mutate.patch(budget.id, { status: "approved", fields: { ...budget.fields, approvedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} approved` });
+                    const saved10 = await context.mutate.patch(budget.id, { status: "approved", fields: { ...budget.fields, approvedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} approved` });
+                    if (!saved10) { setBusy(undefined); return; }
                     context.toast("Budget approved", `${budget.title} is now used for variance in ${String(budget.fields.period ?? "its period")}.`);
                     setBusy(undefined);
                   }}
@@ -340,7 +355,8 @@ export function BudgetApprovalTab({ context }: { context: ScreenContext }) {
                   busy={busy === budget.id}
                   onClick={async () => {
                     setBusy(budget.id);
-                    await context.mutate.patch(budget.id, { status: "returned", fields: { ...budget.fields, returnedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} returned` });
+                    const saved11 = await context.mutate.patch(budget.id, { status: "returned", fields: { ...budget.fields, returnedBy: context.actor } }, { expectRevision: budget.revision, event: `Budget ${budget.title} returned` });
+                    if (!saved11) { setBusy(undefined); return; }
                     context.toast("Returned", `${budget.title} goes back to ${String(budget.fields.submittedBy ?? "its author")} unapproved.`, "blocked");
                     setBusy(undefined);
                   }}
@@ -402,27 +418,31 @@ export function ModelAssumptions({ context, close }: { context: ScreenContext; c
           </Row>
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="secondary" onClick={() => setRows([...rows, { id: `a${rows.length + 1}${wallMs().toString(36)}`, label: "", valueMinor: 0, note: "" }])}>Add an assumption</Button>
-        <span className="ds-grow" />
+      <FormFooter drawer end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
           disabled={rows.some((row) => !row.label.trim())}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(record.id, {
-              body: { ...(record.body as object ?? {}), assumptions: rows },
-            }, { expectRevision: record.revision, event: `Assumptions edited on ${record.title}` });
-            context.toast("Assumptions saved", `${record.title} now projects from ${rows.length} named assumptions.`);
-            setBusy(false);
-            close();
+            try {
+              const saved12 = await context.mutate.patch(record.id, {
+                body: { ...(record.body as object ?? {}), assumptions: rows },
+              }, { expectRevision: record.revision, event: `Assumptions edited on ${record.title}` });
+              if (!saved12) return;
+              context.toast("Assumptions saved", `${record.title} now projects from ${rows.length} named assumptions.`);
+              close();
+            } catch (error) {
+              context.toast("Assumptions not saved", error instanceof Error ? error.message : "The model changed. Reopen it and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        <Button variant="secondary" onClick={() => setRows([...rows, { id: `a${rows.length + 1}${wallMs().toString(36)}`, label: "", valueMinor: 0, note: "" }])}>Add an assumption</Button>
+      </FormFooter>
     </Stack>
   );
 }
@@ -545,9 +565,10 @@ export function VarianceDrilldown({ context }: { context: ScreenContext }) {
               setBusy(true);
               try {
                 const value = note.trim();
-                await context.mutate.patch(budget.id, {
+                const saved13 = await context.mutate.patch(budget.id, {
                   fields: { ...budget.fields, varianceNote: value, varianceNoteBy: context.actor, varianceNoteAt: clockIso() },
                 }, { expectRevision: budget.revision, event: `Variance on ${budget.title} explained by ${context.actor}` });
+                if (!saved13) return;
                 setSaved({ budgetId: budget.id, value });
                 setDraft(null);
                 context.toast("Explanation saved", `${budget.title} now carries the explanation. No figure changed.`);
@@ -635,13 +656,14 @@ export function BudgetApprovalOverlay({ context, close }: { context: ScreenConte
       </Row>
       <Field label="Basis"><TextArea aria-label="Basis" value={note} rows={2} onChange={(event) => setNote(event.target.value)} placeholder="Why this figure" /></Field>
       {existing && <Notice tone="warning" title={`${accountCodeValue} already has a ${period} budget`}>{existing.title} is {existing.status} at {context.money(existing.amountMinor)}. Submitting another would double the ceiling in the comparison.</Notice>}
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
           disabled={amount <= 0 || Boolean(existing)}
           onClick={async () => {
             setBusy(true);
+            try {
             const account = data.accounts.find((item) => accountCode(item) === accountCodeValue);
             await context.mutate.create({
               collection: "budgets",
@@ -652,14 +674,17 @@ export function BudgetApprovalOverlay({ context, close }: { context: ScreenConte
               fields: { kind: "budget", accountCode: accountCodeValue, period, submittedBy: context.actor },
             }, `Budget submitted for ${accountCodeValue} ${period}`);
             context.toast("Budget submitted", "It is a draft until someone approves it, so no variance has changed.");
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Budget not submitted", error instanceof Error ? error.message : "Try again.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Submit for approval
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -672,14 +697,14 @@ export function PlanningStrip({ context }: { context: ScreenContext }) {
   const rows: VarianceRow[] = budgetVariance(approved, scoped.rows, data.accounts);
   const adverse = rows.filter((row) => !row.favourable && row.varianceMinor !== 0);
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <Pill tone="neutral">{periodLabel(data.currentPeriod, org.locale)}</Pill>
       <span>Budget <Amount minor={rows.reduce((sum, row) => sum + row.budgetMinor, 0)} context={context} bold /></span>
       <span>Actual <Amount minor={rows.reduce((sum, row) => sum + row.actualMinor, 0)} context={context} bold /></span>
       <Pill tone={adverse.length ? "warning" : "success"} dot>{adverse.length} adverse</Pill>
       <span className="ds-grow" />
       <span className="ds-subtle">Forecast figures are never blended into these actuals.</span>
-    </Row>
+    </div>
   );
 }
 

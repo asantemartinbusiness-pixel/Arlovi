@@ -4,13 +4,14 @@ import {
   AtSign, Bot, FileText, Layers, MessagesSquare, Mic, Microscope, Pin, Rocket, Sparkles, Users, Video,
 } from "lucide-react";
 import {
-  Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
+  Avatar, Button, Card, Checkbox, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, ModalActions, ModalUnsavedChanges, Notice,
+  OVERLAY_WIDTH, OverlayActions, OverlaySection, OverlaySummary, Pill, Properties,
   Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useOrgRecords, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness, wallMs } from "@/platform/clock";
-import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
+import { capabilityById } from "@/platform/capability";
 import { composeAnswer, suggestions } from "@/applications/t2_shared/engine";
 import {
   AttachmentPicker, AttachTool, CapabilityLine, Composer, ScopeChips, TurnList,
@@ -18,7 +19,7 @@ import {
 } from "@/applications/t2_shared/pieces";
 import { useChatState, usePanelFlags, type LocalAttachment } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
-import { AssignReviewer, AssignRoomTask, AttachToSpecialist, CommentOnArtifact, CorrectTranscript, HostReview, ResolveDisagreement } from "./actions";
+import { internalRoster, AssignReviewer, AssignRoomTask, AttachToSpecialist, CommentOnArtifact, CorrectTranscript, HostReview, ResolveDisagreement } from "./actions";
 
 /* ====================================================================== *
  * AI — Companion & Conversations
@@ -195,20 +196,17 @@ function ChiefChat({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={3} eyebrow="THREADS" title="Threads" subtitle={`${conversations.length} in ${org.shortName}`}>
+      <Card span={3} title="Threads" subtitle={`${conversations.length} in ${org.shortName}`}>
         <ThreadList context={context} conversations={conversations} activeId={conversation.id} />
       </Card>
 
       <Card
         span={6}
-        eyebrow="CHIEF OF STAFF"
         prov="agent"
         title={conversation.title}
         subtitle={`${turns.length} turns · ${conversation.fields.shared === true ? "shared with the workspace" : "private to you"}`}
-        actions={<Pill tone="accent" dot>Chief of Staff</Pill>}
       >
         <Stack gap={4}>
-          <CapabilityLine id="model.inference" title="No language model is connected" />
           {turns.length === 0 && (
             <Stack gap={2}>
               <span className="ds-subtle">Questions this workspace can answer:</span>
@@ -254,7 +252,7 @@ function ChiefChat({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={3} eyebrow="ARTIFACT" prov="agent" title="Artifact" subtitle="Produced in this workspace">
+      <Card span={3} prov="agent" title="Artifact">
         <ArtifactPreview context={context} conversation={conversation} />
       </Card>
     </Grid>
@@ -300,7 +298,7 @@ function RelatedMissions({ context }: { context: ScreenContext }) {
   const linked = data.missions.filter((mission) => data.conversations.some((conversation) => conversation.fields.missionId === mission.id));
   if (linked.length === 0) {
     return (
-      <Empty title="No mission came from a thread yet" icon={<Rocket size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("task authorization")}>Authorise a mission</Button>}>
+      <Empty title="No mission came from a thread yet" icon={<Rocket size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("task authorization")}>Propose a mission</Button>}>
         A thread turns into work by authorising a mission with a named target and a spend ceiling.
       </Empty>
     );
@@ -378,20 +376,26 @@ function ConversationLibrary({ context, view }: { context: ScreenContext; view: 
         bulkActions={[
           {
             label: "Archive",
-            onRun: (selected) => selected.forEach((conversation) => {
-              void context.mutate.patch(conversation.id, { status: "archived", fields: { ...conversation.fields, archived: true } }, { event: `${conversation.title} archived` });
-            }),
+            onRun: (selected) => void patchThreads(context, selected, (conversation) => ({ status: "archived", fields: { ...conversation.fields, archived: true } }), "archived", "They are out of the chat surface and still held for the retention schedule."),
           },
           {
             label: "Share with the workspace",
-            onRun: (selected) => selected.forEach((conversation) => {
-              void context.mutate.patch(conversation.id, { fields: { ...conversation.fields, shared: true } }, { event: `${conversation.title} shared` });
-            }),
+            onRun: (selected) => void patchThreads(context, selected, (conversation) => ({ fields: { ...conversation.fields, shared: true } }), "shared with the workspace", "Everyone with a role view that opens Ask Arlovi can read them."),
           },
         ]}
       />
     </Stack>
   );
+}
+
+/** Apply one change to each selected thread and report how many were really saved. */
+async function patchThreads(context: ScreenContext, rows: Rec[], make: (row: Rec) => Partial<Rec>, done: string, detail: string): Promise<void> {
+  let saved = 0;
+  for (const row of rows) {
+    if (await context.mutate.patch(row.id, make(row), { expectRevision: row.revision, event: `${row.title} ${done}` })) saved += 1;
+  }
+  if (saved === 0) return;
+  context.toast(saved === rows.length ? `${saved} thread${saved === 1 ? "" : "s"} ${done}` : `${saved} of ${rows.length} threads ${done}`, saved === rows.length ? detail : "The rest changed elsewhere and were left as they were.");
 }
 
 function TranscriptSearch({ context }: { context: ScreenContext }) {
@@ -430,31 +434,6 @@ const REMIT: Record<string, string> = {
   Procurement: "customers", Analytics: "money", Scheduling: "calendar", Stock: "customers",
   "Chief of Staff": "missions", Quality: "workforce", "Legal review": "knowledge",
 };
-
-function SpecialistHeader({ context, agent }: { context: ScreenContext; agent?: Rec }) {
-  if (!agent) return null;
-  const body = agent.body as { tools?: { label: string; granted: boolean }[]; authority?: string[] } | undefined;
-  const granted = (body?.tools ?? []).filter((tool) => tool.granted).length;
-  return (
-    <Card
-      machine
-      title={<Row gap={3}><Avatar name={agent.title} kind="ai" size="lg" /><span>{agent.title}</span></Row>}
-      subtitle={`${String(agent.fields.role ?? "Specialist")} · reports to ${String(agent.fields.manager ?? "unassigned")}`}
-      actions={<Row gap={2}>
-        <Pill tone={agent.status === "active" ? "success" : "warning"} dot>{agent.status}</Pill>
-        <Pill tone="warning">Model: {CAPABILITY_LABELS.not_connected}</Pill>
-      </Row>}
-      footer={<>
-        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Agent profile drawer", { id: agent.id })}>Profile</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("permission explainer", { id: agent.id })}>Tool scope ({granted} granted)</Button>
-        <span className="ds-grow" />
-        <span className="ds-subtle">Autonomy: {String(agent.fields.autonomy ?? "draft")}</span>
-      </>}
-    >
-      <p className="ds-prose">{agent.summary}</p>
-    </Card>
-  );
-}
 
 function SpecialistChat({ context }: { context: ScreenContext }) {
   const records = useChatRecords();
@@ -506,8 +485,8 @@ function SpecialistChat({ context }: { context: ScreenContext }) {
         </Empty>
       ) : (
         <Stack gap={4}>
-          <CapabilityLine id="model.inference" title={`${agent.title} answers from records only`}>
-            This specialist is bounded to {String(agent.fields.role ?? "its role")} work recorded in this workspace.
+          <CapabilityLine id="model.inference" title={`No model is connected: ${agent.title} answers from records only`}>
+            Bounded to {String(agent.fields.role ?? "its role")} work recorded in this workspace.
           </CapabilityLine>
           <TurnList
             turns={readTurns(conversation)}
@@ -803,7 +782,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
 
   return (
     <Grid>
-      <Card span={8} eyebrow="MISSION ROOM" prov="agent" title={`${mission.title} room`} subtitle="Agent-to-agent requests and the coordinator's decisions">
+      <Card span={8} prov="agent" title="Coordination" subtitle="Requests between agents and the coordinator's decisions">
         <Stack gap={4}>
           {loops.length > 0 && (
             <Notice tone="warning" title="A delegation loop was stopped">
@@ -819,7 +798,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
                   {message.fields.requestTo ? <Pill tone="info">request to {String(message.fields.requestTo)}</Pill> : null}
                   <span className="ds-subtle">{context.dateTime(message.at ?? message.createdAt)}</span>
                   <span className="ds-grow" />
-                  <Button size="sm" variant="ghost" onClick={() => context.openOverlay("evidence inspector", { id: message.id })}>Evidence</Button>
+                  <Button size="sm" variant="ghost" aria-label={`Evidence for ${message.title}`} onClick={() => context.openOverlay("evidence inspector", { id: message.id })}>Evidence</Button>
                 </Row>
                 <p className="ds-prose" style={{ marginBlockStart: "var(--space-2)" }}>{message.title} — {message.summary}</p>
               </div>
@@ -857,7 +836,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
           />
         </Stack>
       </Card>
-      <Card span={4} eyebrow="DEPENDENCIES" prov="human" title="Dependencies" subtitle={`${tasks.length} tasks`}>
+      <Card span={4} prov="human" title="Dependencies" subtitle={`${tasks.length} tasks`}>
         <Stack gap={2}>
           {tasks.map((task) => {
             const body = task.body as { dependsOn?: string[] } | undefined;
@@ -941,7 +920,7 @@ function VoiceLive({ context }: { context: ScreenContext }) {
               if (!text.trim()) return;
               const entry: TranscriptEntry = { id: `tr-${wallMs()}`, at: context.now.toISOString(), speaker, text: text.trim(), source: "typed" };
               const body = (session.body ?? {}) as Record<string, unknown>;
-              await context.mutate.patch(session.id, { body: { ...body, transcript: [...entries, entry] } }, { expectRevision: session.revision, event: "Transcript turn added" });
+              if (!(await context.mutate.patch(session.id, { body: { ...body, transcript: [...entries, entry] } }, { expectRevision: session.revision, event: "Transcript turn added" }))) return;
               setText("");
               context.toast("Turn recorded", "It is in the transcript as typed text, marked as typed rather than heard.");
             }}
@@ -949,7 +928,7 @@ function VoiceLive({ context }: { context: ScreenContext }) {
             <Row gap={3} wrap>
               <Field label="Speaker">
                 <Select value={speaker} onChange={(event) => setSpeaker(event.target.value)}>
-                  {[context.actor, ...members.map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => (
+                  {[context.actor, ...internalRoster(members, true).map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => (
                     <option key={name} value={name}>{name}</option>
                   ))}
                 </Select>
@@ -1010,7 +989,7 @@ function VoiceTranscript({ context }: { context: ScreenContext }) {
                   const next = entries.map((item) => item.id === entry.id
                     ? { ...item, text: value, corrected: { from: item.text, at: context.now.toISOString(), by: context.actor } }
                     : item);
-                  await context.mutate.patch(session.id, { body: { ...body, transcript: next } }, { expectRevision: session.revision, event: `Transcript line corrected by ${context.actor}` });
+                  if (!(await context.mutate.patch(session.id, { body: { ...body, transcript: next } }, { expectRevision: session.revision, event: `Transcript line corrected by ${context.actor}` }))) return;
                   setEditing(null);
                   context.toast("Line corrected", "The previous text is kept on the line as its correction history.");
                 }}>Save correction</Button>
@@ -1140,7 +1119,7 @@ function MeetingRoom({ context, view }: { context: ScreenContext; view: "Meeting
               if (consentBlocked || !line.trim()) return;
               const body = (meeting.body ?? {}) as Record<string, unknown>;
               const entry: TranscriptEntry = { id: `tr-${wallMs()}`, at: context.now.toISOString(), speaker: speaker || context.actor, text: line.trim(), source: "typed" };
-              await context.mutate.patch(meeting.id, { body: { ...body, transcript: [...transcript, entry] } }, { expectRevision: meeting.revision, event: "Meeting transcript line added" });
+              if (!(await context.mutate.patch(meeting.id, { body: { ...body, transcript: [...transcript, entry] } }, { expectRevision: meeting.revision, event: "Meeting transcript line added" }))) return;
               setLine("");
               context.toast("Line added", "It is stored against the meeting as typed text.");
             }}
@@ -1604,9 +1583,9 @@ function ArtifactScreen({ context, view }: { context: ScreenContext; view: "Prev
               event.preventDefault();
               if (!comment.trim()) return;
               const body = (artifact.body ?? {}) as Record<string, unknown>;
-              await context.mutate.patch(artifact.id, {
+              if (!(await context.mutate.patch(artifact.id, {
                 body: { ...body, comments: [...comments, { id: `c-${wallMs()}`, at: context.now.toISOString(), author: context.actor, text: comment.trim() }] },
-              }, { expectRevision: artifact.revision, event: `Comment added to ${artifact.title}` });
+              }, { expectRevision: artifact.revision, event: `Comment added to ${artifact.title}` }))) return;
               setComment("");
               context.toast("Comment saved", "It is stored on the artifact record.");
             }}
@@ -1811,26 +1790,66 @@ function MessageActionMenu({ context, close }: { context: ScreenContext; close: 
   );
 }
 
+function chiefOf(records: Rec[]): Rec | undefined {
+  return records.find((record) => record.collection === "agents" && record.id === "nl-agents-001")
+    ?? records.find((record) => record.collection === "agents" && String(record.fields.role) === "Chief of Staff");
+}
+
+function useAuthorisingAgent() {
+  const records = useOrgRecords();
+  const agent = chiefOf(records);
+  const policy = records.find((record) => record.collection === "policies" && record.fields.kind === "autonomyGrant" && record.fields.agentId === agent?.id);
+  return { records, agent, policy };
+}
+
+function TaskAuthorizationSummary({ context }: { context: ScreenContext }) {
+  const { agent } = useAuthorisingAgent();
+  if (!agent) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Mission proposal"
+      avatar={<Avatar name={agent.title} kind="ai" size="lg" />}
+      title={agent.title}
+      status={<Pill tone="warning">Proposal only</Pill>}
+      meta={[String(agent.fields.role ?? "AI employee"), `Autonomy: ${String(agent.fields.autonomy ?? "draft")}`, `Contract ceiling ${context.money(Number(agent.fields.spendCapMinor ?? 0))}`]}
+    />
+  );
+}
+
+const MISSION_GRANTS = [
+  { id: "workspace.read", label: "Read records in this organisation", available: true },
+  { id: "workspace.draft", label: "Create draft records", available: true },
+  { id: "email.send", label: "Send email", available: false, why: "No mail provider is connected" },
+  { id: "site.publish", label: "Publish a page", available: false, why: "No hosting is connected" },
+];
+
 function TaskAuthorization({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { from?: string } | undefined;
-  const records = useOrgRecords();
-  const candidates = records.filter((record) => ["contacts", "companies", "suppliers"].includes(record.collection));
+  const { records, agent, policy } = useAuthorisingAgent();
+  const candidates = records
+    .filter((record) => ["contacts", "companies", "suppliers"].includes(record.collection))
+    .filter((record, index, all) => all.findIndex((other) => other.collection === record.collection && other.title === record.title) === index);
   const [goal, setGoal] = useState(payload?.from ?? "");
   const [target, setTarget] = useState("");
   const [budget, setBudget] = useState("500");
   const [grants, setGrants] = useState<string[]>(["workspace.read"]);
+  const [touched, setTouched] = useState(false);
   const amountMinor = Math.round(Number(budget) * 100);
   const ambiguous = candidates.filter((candidate) => goal.toLowerCase().includes(candidate.title.toLowerCase().split(" ")[0].toLowerCase()));
   const needsTarget = !target;
-  const invalid = !goal.trim() || needsTarget || !Number.isFinite(amountMinor) || amountMinor <= 0;
+  const invalid = !goal.trim() || needsTarget || !Number.isFinite(amountMinor) || amountMinor <= 0 || !agent;
+  const requiresApproval = String(policy?.fields.requiresApproval ?? "all");
+  const dirty = touched && (goal.trim() !== (payload?.from ?? "").trim() || Boolean(target) || budget !== "500" || grants.length !== 1);
+  const targetRecord = candidates.find((candidate) => candidate.id === target);
 
   return (
     <form
       id="task-authorization"
       className="ds-stack ds-gap-4"
+      onChange={() => setTouched(true)}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (invalid) return;
+        if (invalid || !agent) return;
         const mission = await context.mutate.create({
           collection: "missions",
           title: goal.slice(0, 70),
@@ -1838,7 +1857,7 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
           summary: `Authorised from a conversation by ${context.actor}. Target and ceiling are recorded on the mission contract.`,
           amountMinor,
           fields: {
-            agentId: "nl-agents-001",
+            agentId: agent.id,
             budgetMinor: amountMinor,
             committedMinor: 0,
             spentMinor: 0,
@@ -1848,7 +1867,7 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
             grants: grants.join(","),
           },
           body: { criteria: [{ id: "c1", label: "Outcome verified against a record", verified: false }] },
-        }, `Mission authorised from a conversation: ${goal.slice(0, 50)}`);
+        }, `Mission proposed from a conversation: ${goal.slice(0, 50)}`);
         await context.mutate.create({
           collection: "missionSteps",
           title: "Read the records the goal names",
@@ -1858,49 +1877,80 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
           fields: { order: 1, kind: "read", operation: "collect.sources", attempts: 0 },
           body: { output: "", reason: "", inputs: [] },
         }, "First mission step created");
-        context.toast("Mission authorised", `${mission.title} is proposed with a ${context.money(amountMinor)} ceiling. Nothing runs until a person approves the plan.`);
+        context.toast("Mission proposed", `${mission.title} is proposed with a ${context.money(amountMinor)} ceiling. Nothing runs until a person approves the plan.`);
         close();
         context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`);
       }}
     >
-      <Notice tone="warning" title="An ambiguous target is not authorised">
-        A mission needs one named account and a ceiling before it can be proposed. Without both, nothing can be authorised — and no external action is possible from here in any case.
-      </Notice>
-      <Field label="What the mission must achieve" required>
-        <TextArea value={goal} rows={3} onChange={(event) => setGoal(event.target.value)} required />
-      </Field>
-      <Field
-        label="Target account"
-        required
-        error={needsTarget ? "Choose exactly one account. This mission cannot be authorised against an unknown target." : undefined}
-        hint={ambiguous.length > 1 ? `${ambiguous.length} accounts match the words in the goal: ${ambiguous.map((item) => item.title).join(", ")}.` : undefined}
-      >
-        <Select value={target} onChange={(event) => setTarget(event.target.value)} required>
-          <option value="">Choose an account…</option>
-          {candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title} ({candidate.collection})</option>)}
-        </Select>
-      </Field>
-      <Field label={`Spend ceiling (${context.org.currency})`} required hint="An unbounded mission cannot be authorised.">
-        <TextInput value={budget} inputMode="decimal" align="end" onChange={(event) => setBudget(event.target.value)} invalid={!(amountMinor > 0)} required />
-      </Field>
-      <Stack gap={2}>
-        <span className="ds-field-label">Grants</span>
-        {[
-          { id: "workspace.read", label: "Read records in this organisation", available: true },
-          { id: "workspace.draft", label: "Create draft records", available: true },
-          { id: "email.send", label: "Send email (no provider connected)", available: false },
-          { id: "site.publish", label: "Publish a page (no hosting connected)", available: false },
-        ].map((grant) => (
-          <Checkbox
-            key={grant.id}
-            label={grant.label}
-            disabled={!grant.available}
-            checked={grants.includes(grant.id)}
-            onChange={(event) => setGrants((current) => event.target.checked ? [...current, grant.id] : current.filter((item) => item !== grant.id))}
-          />
-        ))}
-      </Stack>
+      <ModalUnsavedChanges when={dirty} />
+      <OverlaySection title="What it would do">
+        <Stack gap={3}>
+          <Field label="Goal" required>
+            <TextArea value={goal} rows={3} onChange={(event) => setGoal(event.target.value)} required />
+          </Field>
+          <Field
+            label="Target account"
+            required
+            error={needsTarget && goal.trim() ? "Choose exactly one account. A mission cannot be authorised against an unknown target." : undefined}
+            hint={ambiguous.length > 1 ? `${ambiguous.length} accounts match words in the goal: ${ambiguous.map((item) => item.title).join(", ")}.` : undefined}
+          >
+            <Select value={target} onChange={(event) => setTarget(event.target.value)} required>
+              <option value="">Choose an account…</option>
+              {candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title} ({candidate.collection})</option>)}
+            </Select>
+          </Field>
+          <Field label={`Spend ceiling (${context.org.currency})`} required hint="An unbounded mission cannot be authorised.">
+            <TextInput value={budget} inputMode="decimal" align="end" onChange={(event) => setBudget(event.target.value)} invalid={!(amountMinor > 0)} required />
+          </Field>
+        </Stack>
+      </OverlaySection>
+
+      <OverlaySection title="Tools and scope" hint="Only what is ticked is written into the mission contract.">
+        <Stack gap={2}>
+          {MISSION_GRANTS.map((grant) => (
+            <Row key={grant.id} gap={2}>
+              <div className="ds-grow">
+                <Checkbox
+                  label={grant.label}
+                  disabled={!grant.available}
+                  checked={grants.includes(grant.id)}
+                  onChange={(event) => setGrants((current) => event.target.checked ? [...current, grant.id] : current.filter((item) => item !== grant.id))}
+                />
+              </div>
+              {!grant.available && <Pill tone="warning">{grant.why}</Pill>}
+            </Row>
+          ))}
+        </Stack>
+      </OverlaySection>
+
+      <OverlaySection title="Human approval" tone="info">
+        <FactGrid
+          items={[
+            { label: "Before any step runs", value: "A person approves the plan" },
+            { label: "Status after this", value: "Proposed, not running" },
+            { label: "Approval policy", value: policy ? (requiresApproval === "all" ? `${policy.title}: a person approves every action` : `${policy.title}: a person approves ${requiresApproval.split(",").join(", ")}`) : "A person approves every action (no policy recorded)" },
+            { label: "Your role view", value: context.can("approve_mission") ? "Can approve" : "Cannot approve" },
+          ]}
+        />
+        <p className="ds-subtle" style={{ marginBlockStart: "var(--space-2)" }}>
+          {targetRecord ? `Target: ${targetRecord.title}. ` : ""}Nothing is sent or published outside this workspace: no provider is connected.
+        </p>
+      </OverlaySection>
     </form>
+  );
+}
+
+function ThreadPreviewSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const conversation = useRecord(payload?.id ?? context.selectedId);
+  if (!conversation) return null;
+  return (
+    <OverlaySummary
+      eyebrow={String(conversation.fields.kind ?? "chief") === "chief" ? "Chief of Staff thread" : "Specialist thread"}
+      title={conversation.title}
+      status={conversation.fields.legalHold === true ? <Pill tone="warning">Legal hold</Pill> : conversation.fields.archived === true ? <Pill tone="neutral">Archived</Pill> : undefined}
+      meta={[`${readTurns(conversation).length} turns`, conversation.fields.shared === true ? "Shared with the workspace" : "Only you", context.relative(conversation.at ?? conversation.updatedAt)]}
+    />
   );
 }
 
@@ -1919,7 +1969,7 @@ function ThreadPreview({ context }: { context: ScreenContext }) {
             variant="secondary"
             disabled={!name.trim() || name.trim() === conversation.title}
             onClick={async () => {
-              await context.mutate.patch(conversation.id, { title: name.trim() }, { expectRevision: conversation.revision, event: `Conversation renamed to ${name.trim()}` });
+              if (!(await context.mutate.patch(conversation.id, { title: name.trim() }, { expectRevision: conversation.revision, event: `Conversation renamed to ${name.trim()}` }))) return;
               context.toast("Renamed", "The thread record carries the new name.");
             }}
           >
@@ -1927,14 +1977,13 @@ function ThreadPreview({ context }: { context: ScreenContext }) {
           </Button>
         </Row>
       </Field>
-      <Properties rows={[
-        { label: "Turns", value: String(turns.length) },
-        { label: "Sharing", value: conversation.fields.shared === true ? "Shared with the workspace" : "Only you" },
-        { label: "Retention", value: conversation.fields.legalHold === true ? "Legal hold — cannot be deleted" : "Standard schedule" },
-        { label: "Last turn", value: context.dateTime(conversation.at ?? conversation.updatedAt) },
+      <FactGrid columns={3} dense items={[
+        { label: "Retention", value: conversation.fields.legalHold === true ? "Legal hold" : "Standard schedule", tone: conversation.fields.legalHold === true ? "warning" : undefined },
+        { label: "Last turn", value: context.dateTime(conversation.at ?? conversation.updatedAt), mono: true },
+        { label: "Turns", value: String(turns.length), mono: true },
       ]} />
       <TurnList turns={turns.slice(-4)} context={context} emptyTitle="No turn in this thread" emptyBody="Nothing has been asked yet." />
-      <Button variant="primary" onClick={() => { context.select(conversation.id); context.closeOverlay(); context.navigate(`/o/${context.org.slug}/ai/chat`); }}>Open in chat</Button>
+      <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => { context.select(conversation.id); context.closeOverlay(); context.navigate(`/o/${context.org.slug}/ai/chat?thread=${conversation.id}`); }}>Open in chat</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1954,7 +2003,7 @@ function DeleteConversation({ context, close }: { context: ScreenContext; close:
           {readTurns(conversation).length} turns and any attachment references go with it. Citations elsewhere that point at this thread will no longer resolve.
         </Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="danger"
         disabled={held || !context.can("delete_records")}
         title={held ? "A legal hold prevents deletion" : context.can("delete_records") ? undefined : "This role view does not delete records"}
@@ -1966,7 +2015,7 @@ function DeleteConversation({ context, close }: { context: ScreenContext; close:
         }}
       >
         Delete this thread
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1981,17 +2030,32 @@ function SharingDialog({ context, close }: { context: ScreenContext; close: () =
       <Notice tone="info" title="Sharing is inside this browser">
         Sharing changes what the role views in this workspace offer. It does not send a link anywhere and is not an account security boundary.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(conversation.id, { fields: { ...conversation.fields, shared } }, { expectRevision: conversation.revision, event: `${conversation.title} sharing changed` });
+          if (!(await context.mutate.patch(conversation.id, { fields: { ...conversation.fields, shared } }, { expectRevision: conversation.revision, event: `${conversation.title} sharing changed` }))) return;
           context.toast("Sharing updated", shared ? "The thread is readable by the workspace." : "The thread is private to you again.");
           close();
         }}
       >
         Save sharing
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
+  );
+}
+
+function AgentSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const agent = useRecord(payload?.id ?? context.params.id);
+  if (!agent) return null;
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      avatar={<Avatar name={agent.title} kind="ai" size="lg" />}
+      title={agent.title}
+      status={<Pill tone={agent.status === "active" ? "success" : "warning"} dot>{agent.status}</Pill>}
+      meta={[String(agent.fields.role ?? ""), "No model connected"]}
+    />
   );
 }
 
@@ -2002,26 +2066,18 @@ function AgentProfileDrawer({ context }: { context: ScreenContext }) {
   const body = agent.body as { skills?: string[]; tools?: { id: string; label: string; granted: boolean; capability?: string }[]; authority?: string[] } | undefined;
   return (
     <Stack gap={4}>
-      <Row gap={3}>
-        <Avatar name={agent.title} kind="ai" size="lg" />
-        <div>
-          <h3>{agent.title}</h3>
-          <p className="ds-subtle">{String(agent.fields.role ?? "")} · {agent.status}</p>
-        </div>
-      </Row>
-      <Properties rows={[
+      <FactGrid items={[
         { label: "Autonomy", value: String(agent.fields.autonomy ?? "draft") },
-        { label: "Manager", value: String(agent.fields.manager ?? "Unassigned") },
-        { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)) },
-        { label: "Recorded provider cost", value: context.money(Number(agent.fields.recordedCostMinor ?? 0)) },
-        { label: "Model", value: <Pill tone="warning">Not connected</Pill> },
+        { label: "Reports to", value: String(agent.fields.manager ?? "Unassigned") },
+        { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)), mono: true },
+        { label: "Provider cost recorded", value: context.money(Number(agent.fields.recordedCostMinor ?? 0)), mono: true },
       ]} />
-      <Card title="Authority" pad="tight">
+      <OverlaySection title="Authority">
         <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>
           {(body?.authority ?? ["Nothing recorded"]).map((line) => <li key={line}>{line}</li>)}
         </ul>
-      </Card>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/${agent.id}`)}>Open the full profile</Button>
+      </OverlaySection>
+      <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/team/agents/${agent.id}`)}>Open the full profile</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2078,6 +2134,7 @@ function MissionEscalation({ context, close }: { context: ScreenContext; close: 
       <Notice tone="info" title="An escalation is a record, not progress">
         The request moves to {coordinator} as a task. Nothing is reported as finished, and the specialist's own answer stays in the thread for audit.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(reason.trim())} />
       <Field label="Why this is outside the contract" required>
         <TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required />
       </Field>
@@ -2088,7 +2145,7 @@ function MissionEscalation({ context, close }: { context: ScreenContext; close: 
 function ParticipantSelector({ context, close }: { context: ScreenContext; close: () => void }) {
   const records = useOrgRecords();
   const room = useRecord(context.params.id);
-  const people = records.filter((record) => record.collection === "members" || record.collection === "agents");
+  const people = internalRoster(records, true);
   const current = String(room?.fields.participants ?? "").split(",").map((id) => id.trim()).filter(Boolean);
   const [selected, setSelected] = useState<string[]>(current);
   if (!room) return <Empty title="No room selected" />;
@@ -2107,16 +2164,16 @@ function ParticipantSelector({ context, close }: { context: ScreenContext; close
       <Notice tone="info" title="Adding an AI employee adds its contract, not new powers">
         A contract in a room reads what its grants allow. It cannot gain a tool by being mentioned here.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(room.id, { fields: { ...room.fields, participants: selected.join(",") } }, { expectRevision: room.revision, event: `Participants changed in ${room.title}` });
+          if (!(await context.mutate.patch(room.id, { fields: { ...room.fields, participants: selected.join(",") } }, { expectRevision: room.revision, event: `Participants changed in ${room.title}` }))) return;
           context.toast("Participants updated", `${selected.length} participants are in ${room.title}.`);
           close();
         }}
       >
         Save participants
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2156,11 +2213,12 @@ function DecisionRecorder({ context, close }: { context: ScreenContext; close: (
         close();
       }}
     >
+      <ModalUnsavedChanges when={Boolean(title.trim() || rationale.trim())} />
       <Field label="Decision" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Why" required hint="The rationale is kept so the decision can be audited later."><TextArea value={rationale} rows={3} onChange={(event) => setRationale(event.target.value)} required /></Field>
       <Field label="Approver">
         <Select value={approver} onChange={(event) => setApprover(event.target.value)}>
-          {[context.actor, ...members.filter((member) => member.fields.kind === "human").map((member) => member.title)]
+          {[context.actor, ...internalRoster(members).map((member) => member.title)]
             .filter((name, index, all) => all.indexOf(name) === index)
             .map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
@@ -2226,12 +2284,12 @@ function TaskHandoffDrawer({ context, close }: { context: ScreenContext; close: 
           Handing it over does not pass the gate. It still waits for a person with approval authority.
         </Notice>
       )}
-      <Button
+      <DrawerActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!task || !target}
         onClick={async () => {
           if (!task || !target) return;
-          await context.mutate.patch(task.id, { fields: { ...task.fields, assignee: target.title, kind: "ai" }, ownerName: target.title }, { expectRevision: task.revision, event: `${task.title} handed to ${target.title}` });
+          if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, assignee: target.title, kind: "ai" }, ownerName: target.title }, { expectRevision: task.revision, event: `${task.title} handed to ${target.title}` }))) return;
           await context.mutate.create({
             collection: "messages",
             title: `Handoff: ${task.title}`,
@@ -2246,7 +2304,7 @@ function TaskHandoffDrawer({ context, close }: { context: ScreenContext; close: 
         }}
       >
         Record the handoff
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2261,9 +2319,9 @@ function EvidenceInspector({ context }: { context: ScreenContext }) {
     <Stack gap={4}>
       {!message ? <Empty title="Choose a message" /> : (
         <>
-          <Card title={String(message.fields.author ?? "")} subtitle={context.dateTime(message.at ?? message.createdAt)}>
+          <OverlaySection title="The claim" hint={`${String(message.fields.author ?? "")} · ${context.dateTime(message.at ?? message.createdAt)}`}>
             <p className="ds-prose">{message.summary}</p>
-          </Card>
+          </OverlaySection>
           {cited.length === 0 ? (
             <Notice tone="warning" title="No evidence is attached to this message">
               A claim with no record behind it stays a claim. Ask for the records before acting on it.
@@ -2303,14 +2361,15 @@ function ReviewDialog({ context, close }: { context: ScreenContext; close: () =>
           <option value="blocked">Blocked — it cannot proceed here</option>
         </Select>
       </Field>
+      <ModalUnsavedChanges when={Boolean(note.trim())} />
       <Field label="What you checked" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
       {!allowed && <Notice tone="warning" title="This role view does not approve missions">The verdict will be recorded as a note, not as an approval.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!note.trim()}
         onClick={async () => {
           if (allowed) {
-            await context.mutate.patch(task.id, { fields: { ...task.fields, stage: verdict, reviewedBy: context.actor, reviewNote: note } }, { expectRevision: task.revision, event: `${task.title} reviewed as ${verdict} by ${context.actor}` });
+            if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, stage: verdict, reviewedBy: context.actor, reviewNote: note } }, { expectRevision: task.revision, event: `${task.title} reviewed as ${verdict} by ${context.actor}` }))) return;
           } else {
             await context.mutate.log(`${context.actor} noted a review of ${task.title}: ${verdict} — ${note}`, { entityId: task.id, type: "review.note" });
           }
@@ -2319,7 +2378,7 @@ function ReviewDialog({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         {allowed ? "Record the review" : "Record a note"}
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2337,7 +2396,7 @@ function MicPermission({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="Why the prompt is not shown">
         Asking for your microphone would imply something could be heard and transcribed. Nothing here can do that, so the permission is not requested at all.
       </Notice>
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.setTab("Transcript"); }}>Open the transcript</Button>
+      <ModalActions><OverlayActions primary={<Button variant="secondary" onClick={() => { context.closeOverlay(); context.setTab("Transcript"); }}>Open the transcript</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2352,7 +2411,7 @@ function VoiceSettingsOverlay({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="These settings cannot take effect">
         They are kept against this workspace so the choice survives, but no speech is produced until a provider is connected.
       </Notice>
-      <Button variant="ghost" onClick={() => context.toast("Nothing to save", "Both controls are unavailable while no speech service is connected.", "info")}>Save preference</Button>
+      <ModalActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.closeOverlay()}>Close</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2368,7 +2427,7 @@ function SensitiveActionConfirmation({ context, close }: { context: ScreenContex
       <Field label={`Type “${phrase}” to confirm`} required>
         <TextInput value={typed} onChange={(event) => setTyped(event.target.value)} invalid={Boolean(typed) && typed !== phrase} />
       </Field>
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="primary"
         disabled={typed !== phrase}
         onClick={async () => {
@@ -2378,7 +2437,7 @@ function SensitiveActionConfirmation({ context, close }: { context: ScreenContex
         }}
       >
         Confirm
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2415,21 +2474,21 @@ function RecordingConsent({ context, close }: { context: ScreenContext; close: (
           </Row>
         ))}
       </Stack>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const body = (meeting.body ?? {}) as Record<string, unknown>;
           const stamped = rows.map((participant) => ({ ...participant, at: participant.consent === "given" ? context.now.toISOString() : undefined }));
-          await context.mutate.patch(meeting.id, {
+          if (!(await context.mutate.patch(meeting.id, {
             body: { ...body, participants: stamped },
             fields: { ...meeting.fields, consentComplete: stamped.filter((participant) => participant.kind === "human").every((participant) => participant.consent === "given") },
-          }, { expectRevision: meeting.revision, event: "Meeting consent updated" });
+          }, { expectRevision: meeting.revision, event: "Meeting consent updated" }))) return;
           context.toast("Consent recorded", "Each participant's state is stored with the time it was given.");
           close();
         }}
       >
         Save consent
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2446,7 +2505,7 @@ function MeetingNotes({ context, close }: { context: ScreenContext; close: () =>
       onSubmit={async (event) => {
         event.preventDefault();
         const body = (meeting.body ?? {}) as Record<string, unknown>;
-        await context.mutate.patch(meeting.id, { body: { ...body, notes: { text: notes, by: context.actor, at: context.now.toISOString() } } }, { expectRevision: meeting.revision, event: "Meeting notes written" });
+        if (!(await context.mutate.patch(meeting.id, { body: { ...body, notes: { text: notes, by: context.actor, at: context.now.toISOString() } } }, { expectRevision: meeting.revision, event: "Meeting notes written" }))) return;
         context.toast("Notes saved", "They are stored on the meeting record with your name and the time.");
         close();
       }}
@@ -2454,6 +2513,7 @@ function MeetingNotes({ context, close }: { context: ScreenContext; close: () =>
       <Notice tone="info" title="Notes are written by a person">
         {transcript.length} transcript line{transcript.length === 1 ? "" : "s"} are available to read while you write. Nothing is summarised for you: no model is connected.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(notes.trim())} />
       <Field label="Notes" required><TextArea value={notes} rows={6} onChange={(event) => setNotes(event.target.value)} required /></Field>
     </form>
   );
@@ -2486,10 +2546,11 @@ function FollowUpApproval({ context, close }: { context: ScreenContext; close: (
       <Notice tone="info" title="An action needs a person to approve it">
         A sentence in a transcript is not an instruction. This creates the action with your name against it.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(title.trim())} />
       <Field label="Action" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Owner">
         <Select value={owner} onChange={(event) => setOwner(event.target.value)}>
-          {[context.actor, ...members.map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => <option key={name} value={name}>{name}</option>)}
+          {[context.actor, ...internalRoster(members).map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
       </Field>
       <Field label="Due"><TextInput type="date" value={due} onChange={(event) => setDue(event.target.value)} /></Field>
@@ -2538,10 +2599,10 @@ function ConfidenceNote({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         const body = (research.body ?? {}) as Record<string, unknown>;
-        await context.mutate.patch(research.id, {
+        if (!(await context.mutate.patch(research.id, {
           fields: { ...research.fields, confidence },
           body: { ...body, confidenceNote: { text: note, by: context.actor, at: context.now.toISOString() } },
-        }, { expectRevision: research.revision, event: `Confidence on ${research.title} set to ${confidence}` });
+        }, { expectRevision: research.revision, event: `Confidence on ${research.title} set to ${confidence}` }))) return;
         context.toast("Confidence recorded", "It is stored with your name and the reason.");
         close();
       }}
@@ -2574,7 +2635,7 @@ function SaveReport({ context, close }: { context: ScreenContext; close: () => v
         { label: "With a source", value: String(findings.filter((finding) => finding.sourceId).length) },
         { label: "Gaps", value: String(gaps.length) },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const text = [
@@ -2598,7 +2659,7 @@ function SaveReport({ context, close }: { context: ScreenContext; close: () => v
         }}
       >
         Publish in this workspace
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2676,6 +2737,7 @@ function SensitiveDataWarning({ context, close }: { context: ScreenContext; clos
       <Notice tone="warning" title="A redaction here is not an erasure">
         Marking text sensitive keeps it out of what this interface offers to an answer. The record and its history still hold the original, so treat this as a handling instruction, not deletion.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(selection.trim())} />
       <Field label="Text to keep out of retrieval" required><TextArea value={selection} rows={4} onChange={(event) => setSelection(event.target.value)} required /></Field>
     </form>
   );
@@ -2710,7 +2772,7 @@ function ShareDialog({ context }: { context: ScreenContext }) {
   const artifact = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.params.id);
   return (
     <Stack gap={4}>
-      <CapabilityLine id="site.publish" title="Sharing outside this browser is not connected" />
+      <CapabilityLine id="document.publish" title="Sharing outside this browser is not connected" />
       <Properties rows={[
         { label: "Inside this workspace", value: "Anyone with a role view that opens this application" },
         { label: "Outside this workspace", value: <Pill tone="warning">Not possible</Pill> },
@@ -2730,7 +2792,7 @@ function ExportDialog({ context, close }: { context: ScreenContext; close: () =>
   return (
     <Stack gap={4}>
       <p className="ds-prose">The export is written by this browser from the artifact record. It contains the current text, the version list and the provenance line.</p>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={() => {
           const content = [
@@ -2754,7 +2816,7 @@ function ExportDialog({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         Download as text
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2764,11 +2826,10 @@ function ExportDialog({ context, close }: { context: ScreenContext; close: () =>
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 const chiefThread = (context: ScreenContext) => threadKey(context.screen.id, context.selectedId ?? new URLSearchParams(window.location.search).get("thread") ?? "active");
@@ -2782,7 +2843,7 @@ async function toggleVoiceMute(context: ScreenContext): Promise<void> {
   const rows = await listPreferences(context);
   const pref = rows.find((row) => row.fields.kind === "voiceSettings");
   const muted = !(pref?.fields.muted === true);
-  if (pref) await context.mutate.patch(pref.id, { fields: { ...pref.fields, muted } }, { skipHistory: true, event: muted ? "Microphone muted" : "Microphone unmuted" });
+  if (pref) if (!(await context.mutate.patch(pref.id, { fields: { ...pref.fields, muted } }, { skipHistory: true, event: muted ? "Microphone muted" : "Microphone unmuted" }))) return;
   else await context.mutate.create({ collection: "preferences", title: "Voice settings", status: "active", fields: { kind: "voiceSettings", muted } }, muted ? "Microphone muted" : "Microphone unmuted");
   context.toast(muted ? "Muted" : "Unmuted", `Sessions will start with the microphone ${muted ? "off" : "on"}. No audio service is connected, so nothing is being captured now.`, "info");
 }
@@ -2822,12 +2883,10 @@ export const aiApp = registerApp({
     "ARL-AI-001": {
       id: "ARL-AI-001",
       title: () => "Chief of Staff",
-      subtitle: (context) => `Answers are composed from ${context.org.name} records and name what they read. No model provider is connected.`,
       statusStrip: (context) => (
         <Row gap={2} wrap>
           <Pill tone="warning" dot>Model: not connected</Pill>
-          <Pill tone="neutral">Reading {context.org.name} only</Pill>
-          <span className="ds-subtle">Every figure comes from a record, or is shown as unavailable.</span>
+          <span className="ds-subtle">Answers are composed from {context.org.name} records and name every record they read. Nothing leaves this browser.</span>
         </Row>
       ),
       tabs: [
@@ -2837,17 +2896,17 @@ export const aiApp = registerApp({
       ],
       actions: [
         { id: "Send text", placement: "primary", run: (context) => { useChatState.getState().requestSend(chiefThread(context)); } },
-        { id: "create mission", label: "Authorise a mission", placement: "primary", capability: "approve_mission", run: (context) => context.openOverlay("task authorization") },
+        { id: "create mission", label: "Propose a mission", placement: "primary", capability: "approve_mission", run: (context) => context.openOverlay("task authorization") },
         { id: "attach", label: "Attach", placement: "secondary", run: (context) => context.openOverlay("upload review") },
         { id: "mention record", label: "Pin records", placement: "secondary", run: (context) => context.openOverlay("Source selector") },
         { id: "dictate", label: "Dictate", placement: "overflow", run: (context) => context.toast("Dictation needs a speech service", "No speech service is connected, so nothing was recorded. Type the message instead; it is kept exactly as written.", "blocked") },
         { id: "open artifact", label: "Open artifact", placement: "overflow", run: (context) => void openLatestArtifact(context) },
       ],
       overlays: [
-        { id: "Source selector", kind: "drawer", title: "Pin records into scope", width: 520, render: ({ ...context }) => <SourceSelector context={context} /> },
-        { id: "upload review", kind: "modal", title: "Attach a file by reference", width: 560, render: ({ ...context }) => <UploadReview context={context} /> },
-        { id: "message action menu", kind: "drawer", title: "Message actions", width: 480, render: ({ close, ...context }) => <MessageActionMenu context={context} close={close} /> },
-        { id: "task authorization", kind: "modal", title: "Authorise a mission", width: 620, render: ({ close, ...context }) => <TaskAuthorization context={context} close={close} />, footer: submitFooter("task-authorization", "Authorise") },
+        { id: "Source selector", kind: "drawer", title: "Pin records into scope", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SourceSelector context={context} /> },
+        { id: "upload review", kind: "modal", title: "Attach a file by reference", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <UploadReview context={context} /> },
+        { id: "message action menu", kind: "drawer", title: "Message actions", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MessageActionMenu context={context} close={close} /> },
+        { id: "task authorization", kind: "modal", title: "Propose a mission", width: OVERLAY_WIDTH.modal, summary: ({ close: _close, ...context }) => <TaskAuthorizationSummary context={context} />, render: ({ close, ...context }) => <TaskAuthorization context={context} close={close} />, footer: submitFooter("task-authorization", "Propose the mission") },
       ],
     },
 
@@ -2866,16 +2925,21 @@ export const aiApp = registerApp({
         { id: "delete", placement: "overflow", tone: "danger", capability: "delete_records", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => context.openOverlay("delete confirmation") },
       ],
       overlays: [
-        { id: "Thread preview", kind: "drawer", title: "Thread", width: 520, render: ({ ...context }) => <ThreadPreview context={context} /> },
-        { id: "delete confirmation", kind: "modal", title: "Delete this thread", tone: "danger", width: 520, render: ({ close, ...context }) => <DeleteConversation context={context} close={close} /> },
-        { id: "sharing dialog", kind: "modal", title: "Sharing", width: 480, render: ({ close, ...context }) => <SharingDialog context={context} close={close} /> },
+        { id: "Thread preview", kind: "drawer", title: "Thread", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <ThreadPreviewSummary context={context} />, render: ({ ...context }) => <ThreadPreview context={context} /> },
+        { id: "delete confirmation", kind: "modal", title: "Delete this thread", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <DeleteConversation context={context} close={close} /> },
+        { id: "sharing dialog", kind: "modal", title: "Sharing", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SharingDialog context={context} close={close} /> },
       ],
     },
 
     "ARL-AI-003": {
       id: "ARL-AI-003",
       title: () => "Specialist chat",
-      header: (context) => <SpecialistHeaderWrapper context={context} />,
+      record: (context) => ({
+        title: <SpecialistHeading context={context} part="title" />,
+        avatar: <SpecialistHeading context={context} part="avatar" />,
+        status: <SpecialistHeading context={context} part="status" />,
+        meta: [<SpecialistHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: [
         { id: "Conversation", render: (context) => <SpecialistChat context={context} /> },
         { id: "Work", render: (context) => <SpecialistWork context={context} /> },
@@ -2889,9 +2953,9 @@ export const aiApp = registerApp({
         { id: "review tool scope", placement: "overflow", run: (context) => context.openOverlay("permission explainer", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Agent profile drawer", kind: "drawer", title: "Specialist", width: 480, render: ({ ...context }) => <AgentProfileDrawer context={context} /> },
-        { id: "permission explainer", kind: "drawer", title: "Tool scope", width: 520, render: ({ ...context }) => <PermissionExplainer context={context} /> },
-        { id: "mission escalation", kind: "modal", title: "Hand this to the coordinator", width: 560, render: ({ close, ...context }) => <MissionEscalation context={context} close={close} />, footer: submitFooter("mission-escalation", "Record the handoff") },
+        { id: "Agent profile drawer", kind: "drawer", title: "Specialist", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="AI employee" />, render: ({ ...context }) => <AgentProfileDrawer context={context} /> },
+        { id: "permission explainer", kind: "drawer", title: "Tool scope", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <AgentSummary context={context} eyebrow="AI employee" />, render: ({ ...context }) => <PermissionExplainer context={context} /> },
+        { id: "mission escalation", kind: "modal", title: "Hand this to the coordinator", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MissionEscalation context={context} close={close} />, footer: submitFooter("mission-escalation", "Record the handoff") },
         { id: "attach record", kind: "modal", title: "Attach a record", width: 560, render: ({ close, ...context }) => <AttachToSpecialist context={context} close={close} /> },
       ],
     },
@@ -2914,7 +2978,7 @@ export const aiApp = registerApp({
       overlays: [
         { id: "Participant selector", kind: "modal", title: "Participants", width: 560, render: ({ close, ...context }) => <ParticipantSelector context={context} close={close} /> },
         { id: "decision recorder", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <DecisionRecorder context={context} close={close} />, footer: submitFooter("decision-recorder", "Record decision") },
-        { id: "topic thread", kind: "drawer", title: "Topic", width: 520, render: ({ ...context }) => <TopicThread context={context} /> },
+        { id: "topic thread", kind: "drawer", title: "Topic", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <TopicThread context={context} /> },
         { id: "assign task", kind: "modal", title: "Assign a task", width: 560, render: ({ close, ...context }) => <AssignRoomTask context={context} close={close} /> },
         { id: "host review", kind: "modal", title: "Host a review", width: 560, render: ({ close, ...context }) => <HostReview context={context} close={close} /> },
       ],
@@ -2923,6 +2987,11 @@ export const aiApp = registerApp({
     "ARL-AI-005": {
       id: "ARL-AI-005",
       title: () => "Mission room",
+      record: (context) => ({
+        title: <MissionHeading context={context} part="title" />,
+        status: <MissionHeading context={context} part="status" />,
+        meta: [<MissionHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: (["Discussion", "Agents", "Tasks", "Reviews"] as const).map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionRoom context={context} view={view} />,
@@ -2935,8 +3004,8 @@ export const aiApp = registerApp({
         { id: "hand over", label: "Hand a task over", placement: "overflow", run: (context) => context.openOverlay("Task handoff drawer") },
       ],
       overlays: [
-        { id: "Task handoff drawer", kind: "drawer", title: "Hand a task over", width: 520, render: ({ close, ...context }) => <TaskHandoffDrawer context={context} close={close} /> },
-        { id: "evidence inspector", kind: "drawer", title: "Evidence", width: 520, render: ({ ...context }) => <EvidenceInspector context={context} /> },
+        { id: "Task handoff drawer", kind: "drawer", title: "Hand a task over", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TaskHandoffDrawer context={context} close={close} /> },
+        { id: "evidence inspector", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <EvidenceInspector context={context} /> },
         { id: "review dialog", kind: "modal", title: "Record a review", width: 560, render: ({ close, ...context }) => <ReviewDialog context={context} close={close} /> },
         { id: "assign reviewer", kind: "modal", title: "Assign a reviewer", width: 560, render: ({ close, ...context }) => <AssignReviewer context={context} close={close} /> },
         { id: "resolve disagreement", kind: "modal", title: "Resolve a disagreement", width: 580, render: ({ close, ...context }) => <ResolveDisagreement context={context} close={close} /> },
@@ -3001,7 +3070,7 @@ export const aiApp = registerApp({
         { id: "publish report", label: "Publish the report", placement: "overflow", run: (context) => context.openOverlay("save report", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Source inspector", kind: "drawer", title: "Source", width: 520, render: ({ ...context }) => <SourceInspector context={context} /> },
+        { id: "Source inspector", kind: "drawer", title: "Source", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "sources" }, render: ({ ...context }) => <SourceInspector context={context} /> },
         { id: "confidence note", kind: "modal", title: "Confidence", width: 560, render: ({ close, ...context }) => <ConfidenceNote context={context} close={close} />, footer: submitFooter("confidence-note", "Record confidence") },
         { id: "save report", kind: "modal", title: "Save as a report", width: 560, render: ({ close, ...context }) => <SaveReport context={context} close={close} /> },
       ],
@@ -3021,8 +3090,8 @@ export const aiApp = registerApp({
         { id: "redact selection", placement: "overflow", run: (context) => context.openOverlay("sensitive data warning") },
       ],
       overlays: [
-        { id: "Context picker", kind: "drawer", title: "Context", width: 560, render: ({ close, ...context }) => <ContextPicker context={context} close={close} /> },
-        { id: "permission explanation", kind: "drawer", title: "Why this is visible", width: 560, render: ({ ...context }) => <PermissionExplanation context={context} /> },
+        { id: "Context picker", kind: "drawer", title: "Context", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ContextPicker context={context} close={close} /> },
+        { id: "permission explanation", kind: "drawer", title: "Why this is visible", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <PermissionExplanation context={context} /> },
         { id: "sensitive data warning", kind: "modal", title: "Keep a selection out of retrieval", tone: "danger", width: 560, render: ({ close, ...context }) => <SensitiveDataWarning context={context} close={close} />, footer: submitFooter("redaction", "Record the request") },
       ],
     },
@@ -3042,18 +3111,38 @@ export const aiApp = registerApp({
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export dialog", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Version comparison", kind: "modal", title: "Compare versions", width: 680, render: ({ ...context }) => <VersionComparison context={context} /> },
-        { id: "share dialog", kind: "modal", title: "Share", width: 560, render: ({ ...context }) => <ShareDialog context={context} /> },
-        { id: "export dialog", kind: "modal", title: "Export", width: 520, render: ({ close, ...context }) => <ExportDialog context={context} close={close} /> },
+        { id: "Version comparison", kind: "modal", title: "Compare versions", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <VersionComparison context={context} /> },
+        { id: "share dialog", kind: "modal", title: "Share", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ShareDialog context={context} /> },
+        { id: "export dialog", kind: "modal", title: "Export", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <ExportDialog context={context} close={close} /> },
         { id: "comment", kind: "modal", title: "Comment on this artifact", width: 540, render: ({ close, ...context }) => <CommentOnArtifact context={context} close={close} /> },
       ],
     },
   },
 });
 
-function SpecialistHeaderWrapper({ context }: { context: ScreenContext }) {
+function MissionHeading({ context, part }: { context: ScreenContext; part: "title" | "status" | "meta" }) {
+  const mission = useRecord(context.params.id);
+  const agents = useCollection("agents");
+  if (!mission || mission.collection !== "missions") return part === "title" ? <>Mission room</> : null;
+  if (part === "title") return <>{mission.title}</>;
+  if (part === "status") return <Pill tone={mission.status === "running" ? "info" : mission.status === "proposed" ? "warning" : "neutral"} dot>{mission.status}</Pill>;
+  const agent = agents.find((item) => item.id === mission.fields.agentId);
+  return (
+    <>
+      {agent ? `${agent.title} ·\u00a0` : ""}
+      <span className="ds-num">ceiling {context.money(Number(mission.fields.budgetMinor ?? 0))}, committed {context.money(Number(mission.fields.committedMinor ?? 0))}, spent {context.money(Number(mission.fields.spentMinor ?? 0))}</span>
+    </>
+  );
+}
+
+function SpecialistHeading({ context, part }: { context: ScreenContext; part: "title" | "avatar" | "status" | "meta" }) {
   const agent = useRecord(context.params.id);
-  return <SpecialistHeader context={context} agent={agent?.collection === "agents" ? agent : undefined} />;
+  if (!agent || agent.collection !== "agents") return part === "title" ? <>Specialist chat</> : null;
+  if (part === "title") return <>{agent.title}</>;
+  if (part === "avatar") return <Avatar name={agent.title} kind="ai" size="lg" />;
+  if (part === "status") return <Pill tone={agent.status === "active" ? "success" : "warning"} dot>{agent.status}</Pill>;
+  const granted = ((agent.body as { tools?: { granted: boolean }[] } | undefined)?.tools ?? []).filter((tool) => tool.granted).length;
+  return <>{String(agent.fields.role ?? "Specialist")} · reports to {String(agent.fields.manager ?? "unassigned")} · autonomy {String(agent.fields.autonomy ?? "draft")} · {granted} tool{granted === 1 ? "" : "s"} granted</>;
 }
 
 /* ---- toolbar handlers that write records ---- */
@@ -3066,10 +3155,10 @@ async function startOrEndVoice(context: ScreenContext): Promise<void> {
     return;
   }
   if (session.status === "open") {
-    await context.mutate.patch(session.id, { status: "closed", endAt: context.now.toISOString() }, { expectRevision: session.revision, event: "Voice session ended" });
+    if (!(await context.mutate.patch(session.id, { status: "closed", endAt: context.now.toISOString() }, { expectRevision: session.revision, event: "Voice session ended" }))) return;
     context.toast("Session ended", "The transcript stays on the record.");
   } else {
-    await context.mutate.patch(session.id, { status: "open" }, { expectRevision: session.revision, event: "Voice session reopened" });
+    if (!(await context.mutate.patch(session.id, { status: "open" }, { expectRevision: session.revision, event: "Voice session reopened" }))) return;
     context.toast("Session reopened", "Typed turns can be added again.");
   }
 }
@@ -3089,9 +3178,9 @@ async function inviteAgentToMeeting(context: ScreenContext): Promise<void> {
   const existing = body.participants ?? [];
   const candidate = agents.find((agent) => !existing.some((participant) => participant.id === agent.id));
   if (!candidate) { context.toast("Every active contract is already here", "No other AI employee is available to add.", "info"); return; }
-  await context.mutate.patch(meeting.id, {
+  if (!(await context.mutate.patch(meeting.id, {
     body: { ...(meeting.body as object), participants: [...existing, { id: candidate.id, name: candidate.title, kind: "ai", consent: "not_applicable" }] },
-  }, { expectRevision: meeting.revision, event: `${candidate.title} added to ${meeting.title}` });
+  }, { expectRevision: meeting.revision, event: `${candidate.title} added to ${meeting.title}` }))) return;
   context.toast("AI employee added", `${candidate.title} can read what its grants allow. It cannot listen: no audio service is connected.`);
 }
 
@@ -3116,7 +3205,7 @@ async function endMeeting(context: ScreenContext): Promise<void> {
   const meeting = await db.records.get(context.params.id ?? "");
   if (!meeting) return;
   if (meeting.status === "held") { context.toast("Already ended", `${meeting.title} is recorded as held.`, "info"); return; }
-  await context.mutate.patch(meeting.id, { status: "held", endAt: context.now.toISOString() }, { expectRevision: meeting.revision, event: `${meeting.title} ended` });
+  if (!(await context.mutate.patch(meeting.id, { status: "held", endAt: context.now.toISOString() }, { expectRevision: meeting.revision, event: `${meeting.title} ended` }))) return;
   context.toast("Meeting ended", "The record carries the end time. Actions and decisions stay as records.");
 }
 
@@ -3128,9 +3217,9 @@ async function refineQuestion(context: ScreenContext): Promise<void> {
   const body = (research.body ?? {}) as { question?: string; assumptions?: string[] };
   const gaps = (research.body as { gaps?: string[] } | undefined)?.gaps ?? [];
   const refined = `${body.question ?? research.title} (refined ${context.date(context.now)}: ${gaps.length ? `narrowed to exclude ${gaps.length} gap${gaps.length === 1 ? "" : "s"} that cannot be closed from these records` : "scope unchanged; no gap was recorded"})`;
-  await context.mutate.patch(research.id, {
+  if (!(await context.mutate.patch(research.id, {
     body: { ...(research.body as object), question: refined },
-  }, { expectRevision: research.revision, event: `Research question refined by ${context.actor}` });
+  }, { expectRevision: research.revision, event: `Research question refined by ${context.actor}` }))) return;
   context.toast("Question refined", "The new wording is on the record; the previous wording is in its history.");
 }
 
@@ -3139,10 +3228,10 @@ async function requestReview(context: ScreenContext): Promise<void> {
   const rows = await db.records.where("[organizationId+collection]").equals([context.org.id, "research"]).toArray();
   const research = rows.find((row) => row.id === context.params.id) ?? rows[0];
   if (!research) return;
-  await context.mutate.patch(research.id, {
+  if (!(await context.mutate.patch(research.id, {
     status: "review",
     fields: { ...research.fields, reviewRequested: true, reviewRequestedBy: context.actor },
-  }, { expectRevision: research.revision, event: `Independent review requested on ${research.title}` });
+  }, { expectRevision: research.revision, event: `Independent review requested on ${research.title}` }))) return;
   context.toast("Review requested", "The question is marked for review with who asked. No reviewer is assigned automatically.");
 }
 
@@ -3158,14 +3247,14 @@ async function reviseArtifact(context: ScreenContext): Promise<void> {
     `Sources read for this revision (${sources.length}): ${sources.join(", ") || "none recorded"}.`,
     "No sentence was generated: this revision only adds the source list and marks any line that has no record behind it.",
   ].join("\n");
-  await context.mutate.patch(artifact.id, {
+  if (!(await context.mutate.patch(artifact.id, {
     fields: { ...artifact.fields, version },
     body: {
       ...body,
       text: `${body.text ?? ""}${appendix}`,
       versions: [...(body.versions ?? []), { version, at: context.now.toISOString(), author: context.actor, summary: "Revision composed locally: source list appended, unsupported lines flagged. No model was called." }],
     },
-  }, { expectRevision: artifact.revision, event: `${artifact.title} revised locally to v${version}` });
+  }, { expectRevision: artifact.revision, event: `${artifact.title} revised locally to v${version}` }))) return;
   context.toast("Revision composed locally", `v${version} adds the source list. No model is connected, so nothing was written for you.`);
 }
 
@@ -3182,10 +3271,10 @@ async function archiveConversation(context: ScreenContext): Promise<void> {
   const conversation = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!conversation || conversation.collection !== "conversations") return;
   const archived = conversation.fields.archived === true;
-  await context.mutate.patch(conversation.id, {
+  if (!(await context.mutate.patch(conversation.id, {
     status: archived ? "active" : "archived",
     fields: { ...conversation.fields, archived: !archived },
-  }, { expectRevision: conversation.revision, event: `${conversation.title} ${archived ? "restored" : "archived"} by ${context.actor}` });
+  }, { expectRevision: conversation.revision, event: `${conversation.title} ${archived ? "restored" : "archived"} by ${context.actor}` }))) return;
   context.toast(archived ? "Restored" : "Archived", archived ? "It is back in Recent." : "It is out of the chat surface and still held for the retention schedule.");
 }
 

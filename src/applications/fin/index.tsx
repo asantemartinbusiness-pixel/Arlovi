@@ -2,8 +2,11 @@ import {
   Banknote, BookOpen, Building2, CircleDollarSign, FileText, Landmark, Percent, PieChart, Receipt,
   ReceiptText, Scale, ScrollText, Wallet,
 } from "lucide-react";
-import { Button, Empty } from "@/design-system";
+import { Button, Empty, OVERLAY_WIDTH } from "@/design-system";
+import "./finance.css";
+import { AccountHead, ConsolidationHead, DeactivationHead, ExpenseHead, MetricHead, ReturnHead } from "./overlayHeads";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { knownRecord } from "@/platform/repo";
 import type { AccountType } from "@/domain/fin-ledger";
 import {
   CashflowTab, CorrectionProposal, FinanceInsights, FinanceOverview, FinanceOverviewHeader, FinanceTasks,
@@ -15,7 +18,7 @@ import {
   ReverseConfirmation,
 } from "./ledger";
 import {
-  ApproveInvoice, BulkActionPreview, DocumentPreview, EmailPreview, exportInvoices, InvoiceActivity, InvoiceHeader,
+  ApproveInvoice, BulkActionPreview, EmailPreview, exportInvoices, InvoiceActivity, invoiceRecord,
   InvoiceInspector, InvoiceLineItems, InvoiceList, InvoiceOverview, InvoicePayments, LineEditor, NewInvoice,
   FinanceTimeInputs, FinanceTimeReview,
   PaymentForm, ReminderApproval, VoidReason,
@@ -59,6 +62,12 @@ import {
  * the engine in `src/platform/money.ts` from jurisdiction, line category,
  * customer status and date — never from the currency.
  * ====================================================================== */
+
+/** Reads the invoice the screen already primed, so a header action can say why it is unavailable. */
+function invoiceGuard(context: ScreenContext, reason: (status: string) => string | undefined): string | undefined {
+  const record = knownRecord(context.params.id);
+  return record?.collection === "invoices" ? reason(record.status) : undefined;
+}
 
 function Unavailable({ context, what }: { context: ScreenContext; what: string }) {
   return (
@@ -120,11 +129,11 @@ export const finApp = registerApp({
         { id: "chief of staff", label: "Open the Chief of Staff chat", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/ai/chat`) },
       ],
       overlays: [
-        { id: "Metric drilldown", kind: "drawer", title: "Where this figure comes from", width: 560, render: ({ ...context }) => <MetricDrilldown context={context} /> },
-        { id: "reporting-period selector", kind: "modal", title: "Reporting period", width: 520, render: ({ close, ...context }) => <PeriodSelector context={context} close={close} /> },
-        { id: "correction proposal", kind: "modal", title: "Propose a correction", width: 540, render: ({ close, ...context }) => <CorrectionProposal context={context} close={close} /> },
-        { id: "issue report", kind: "modal", title: "Issue a management report", width: 600, render: ({ close, ...context }) => <IssueReport context={context} close={close} /> },
-        { id: "ask finance", kind: "drawer", title: "Ask Finance", width: 620, render: ({ close, ...context }) => <AskFinance context={context} close={close} /> },
+        { id: "Metric drilldown", kind: "drawer", title: "Where this figure comes from", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <MetricHead context={context} />, render: ({ ...context }) => <MetricDrilldown context={context} /> },
+        { id: "reporting-period selector", kind: "modal", title: "Reporting period", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PeriodSelector context={context} close={close} /> },
+        { id: "correction proposal", kind: "modal", title: "Propose a correction", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CorrectionProposal context={context} close={close} /> },
+        { id: "issue report", kind: "modal", title: "Issue a management report", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <IssueReport context={context} close={close} /> },
+        { id: "ask finance", kind: "drawer", title: "Ask Finance", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <AskFinance context={context} close={close} /> },
       ],
     },
 
@@ -147,10 +156,10 @@ export const finApp = registerApp({
         { id: "export", label: "Export the chart", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("account history", { export: true }) },
       ],
       overlays: [
-        { id: "Account editor", kind: "modal", title: "Account", width: 580, render: ({ close, ...context }) => <AccountEditor context={context} close={close} /> },
-        { id: "account history", kind: "drawer", title: "Account detail", width: 660, render: ({ close, ...context }) => <AccountHistory context={context} close={close} /> },
-        { id: "deactivation impact", kind: "modal", title: "What deactivating would do", width: 560, tone: "danger", render: ({ close, ...context }) => <DeactivationImpact context={context} close={close} /> },
-        { id: "map category", kind: "modal", title: "Map spending categories", width: 560, render: ({ close, ...context }) => <MapCategory context={context} close={close} /> },
+        { id: "Account editor", kind: "modal", title: "Account", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <AccountEditor context={context} close={close} /> },
+        { id: "account history", kind: "drawer", title: "Account detail", width: OVERLAY_WIDTH.record, summary: ({ close: _close, ...context }) => <AccountHead context={context} />, render: ({ close, ...context }) => <AccountHistory context={context} close={close} /> },
+        { id: "deactivation impact", kind: "modal", title: "What deactivating would do", width: OVERLAY_WIDTH.form, tone: "danger", summary: ({ close: _close, ...context }) => <DeactivationHead context={context} />, render: ({ close, ...context }) => <DeactivationImpact context={context} close={close} /> },
+        { id: "map category", kind: "modal", title: "Map spending categories", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MapCategory context={context} close={close} /> },
       ],
     },
 
@@ -172,17 +181,17 @@ export const finApp = registerApp({
         { id: "search", label: "Search the ledger", placement: "overflow", run: (context) => context.openOverlay("journal search") },
       ],
       overlays: [
-        { id: "Journal form", kind: "drawer", title: (context) => (context.selectedId ? "Journal" : "New journal"), width: 920, render: ({ close, ...context }) => <JournalForm context={context} close={close} /> },
-        { id: "balancing validator", kind: "drawer", title: "Draft journals checked", width: 620, render: ({ ...context }) => <BalancingValidator context={context} /> },
-        { id: "reverse confirmation", kind: "modal", title: "Reverse a posted journal", width: 680, tone: "danger", capability: "post_journal", presentation: { selectedRecord: true, collection: "journals", guidance: "Review the posted entries, choose an open reversal date and record a specific reason before creating the offsetting journal." }, render: ({ close, ...context }) => <ReverseConfirmation context={context} close={close} /> },
-        { id: "journal search", kind: "drawer", title: "Search the ledger", width: 760, render: ({ close, ...context }) => <JournalSearch context={context} close={close} /> },
+        { id: "Journal form", kind: "drawer", title: (context) => (context.selectedId ? "Journal" : "New journal"), width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <JournalForm context={context} close={close} /> },
+        { id: "balancing validator", kind: "drawer", title: "Draft journals checked", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <BalancingValidator context={context} /> },
+        { id: "reverse confirmation", kind: "modal", title: "Reverse a posted journal", width: OVERLAY_WIDTH.record, tone: "danger", capability: "post_journal", presentation: { selectedRecord: true, collection: "journals", noRecordContext: true, guidance: "Review the posted entries, choose an open reversal date and record a specific reason before creating the offsetting journal." }, render: ({ close, ...context }) => <ReverseConfirmation context={context} close={close} /> },
+        { id: "journal search", kind: "drawer", title: "Search the ledger", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <JournalSearch context={context} close={close} /> },
       ],
     },
 
     /* --------------------------- FIN-004 --------------------------- */
     "ARL-FIN-004": {
       id: "ARL-FIN-004",
-      subtitle: (context) => `Every invoice in ${context.org.name}, with the tax code each line resolved to.`,
+      subtitle: () => "Tax is resolved per line from jurisdiction, category, customer status and date.",
       tabs: ["Draft", "Awaiting payment", "Overdue", "Paid", "Void", "Time inputs"].map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => tab === "Time inputs"
@@ -199,13 +208,13 @@ export const finApp = registerApp({
         { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export invoices") },
       ],
       overlays: [
-        { id: "finance time review", kind: "drawer", title: "Review billable time input", width: 580,
+        { id: "finance time review", kind: "drawer", title: "Review billable time input", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true },
           render: ({ close, ...context }) => <FinanceTimeReview context={context} close={close} /> },
-        { id: "New invoice", kind: "modal", title: "New invoice", width: 720, render: ({ close, ...context }) => <NewInvoice context={context} close={close} /> },
-        { id: "bulk action preview", kind: "modal", title: "Reminders to be drafted", width: 680, render: ({ close, ...context }) => <BulkActionPreview context={context} close={close} /> },
-        { id: "reminder approval", kind: "modal", title: "Approve reminders", width: 620, render: ({ close, ...context }) => <ReminderApproval context={context} close={close} /> },
-        { id: "promise to pay", kind: "modal", title: "Record a promise to pay", width: 620, render: ({ close, ...context }) => <PromiseToPayForm context={context} close={close} /> },
-        { id: "export invoices", kind: "modal", title: "Export invoices", width: 520, render: ({ close, ...context }) => <InvoiceExport context={context} close={close} run={(rows, data) => exportInvoices(context, data, rows)} /> },
+        { id: "New invoice", kind: "modal", title: "New invoice", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <NewInvoice context={context} close={close} /> },
+        { id: "bulk action preview", kind: "modal", title: "Reminders to be drafted", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <BulkActionPreview context={context} close={close} /> },
+        { id: "reminder approval", kind: "modal", title: "Approve reminders", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReminderApproval context={context} close={close} /> },
+        { id: "promise to pay", kind: "modal", title: "Record a promise to pay", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <PromiseToPayForm context={context} close={close} /> },
+        { id: "export invoices", kind: "modal", title: "Export invoices", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <InvoiceExport context={context} close={close} run={(rows, data) => exportInvoices(context, data, rows)} /> },
       ],
     },
 
@@ -213,7 +222,7 @@ export const finApp = registerApp({
     "ARL-FIN-005": {
       id: "ARL-FIN-005",
       title: () => "Invoice",
-      header: (context) => <InvoiceHeader context={context} />,
+      record: invoiceRecord,
       inspectorTitle: "Invoice",
       inspector: (context) => <InvoiceInspector context={context} />,
       tabs: [
@@ -223,23 +232,23 @@ export const finApp = registerApp({
         { id: "Activity", render: (context) => <InvoiceActivity context={context} /> },
       ],
       actions: [
-        { id: "approve", label: "Approve and post", placement: "primary", capability: "post_journal", run: (context) => context.openOverlay("approve invoice") },
-        { id: "Edit draft", label: "Edit the lines", placement: "secondary", run: (context) => context.openOverlay("Line item editor") },
+        { id: "approve", label: "Approve and post", placement: "primary", capability: "post_journal", guard: (context) => invoiceGuard(context, (status) => status !== "draft" ? "Only a draft can be approved. This invoice is already issued." : undefined), run: (context) => context.openOverlay("approve invoice") },
+        { id: "Edit draft", label: "Edit the lines", placement: "secondary", guard: (context) => invoiceGuard(context, (status) => status !== "draft" ? "An issued invoice is immutable. Correct it with Void or credit." : undefined), run: (context) => context.openOverlay("Line item editor") },
         { id: "preview", label: "Preview the document", placement: "secondary", run: (context) => context.openOverlay("email preview") },
-        { id: "record payment", label: "Record a payment", placement: "overflow", capability: "post_journal", run: (context) => context.openOverlay("payment form") },
+        { id: "record payment", label: "Record a payment", placement: "overflow", capability: "post_journal", guard: (context) => invoiceGuard(context, (status) => status === "paid" ? "Already paid in full." : status === "void" ? "A void invoice cannot take a payment." : status === "draft" ? "Approve and post the invoice first." : undefined), run: (context) => context.openOverlay("payment form") },
         { id: "send", label: "Send (queued locally)", placement: "overflow", run: (context) => context.openOverlay("send invoice") },
         { id: "draft email", label: "Draft an email", placement: "overflow", run: (context) => context.openOverlay("email preview") },
         { id: "promise", label: "Record a promise to pay", placement: "overflow", run: (context) => context.openOverlay("promise to pay") },
         { id: "void", label: "Void or credit", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("void reason") },
       ],
       overlays: [
-        { id: "Line item editor", kind: "drawer", title: "Line items", width: 1080, render: ({ close, ...context }) => <><LineEditor context={context} close={close} /><ApproveInvoice context={context} close={close} /></> },
-        { id: "email preview", kind: "drawer", title: "Document and message", width: 900, render: ({ close, ...context }) => <><DocumentPreview context={context} /><EmailPreview context={context} close={close} /></> },
-        { id: "payment form", kind: "modal", title: "Record a payment", width: 620, capability: "post_journal", presentation: { selectedRecord: true, collection: "invoices", guidance: "Check the outstanding balance, receipt date and destination account before posting a balanced journal." }, render: ({ close, ...context }) => <PaymentForm context={context} close={close} /> },
-        { id: "void reason", kind: "modal", title: "Void or credit this invoice", width: 580, tone: "danger", render: ({ close, ...context }) => <VoidReason context={context} close={close} /> },
-        { id: "approve invoice", kind: "modal", title: "Approve and post this invoice", width: 680, render: ({ close, ...context }) => <ApproveInvoice context={context} close={close} /> },
-        { id: "send invoice", kind: "modal", title: "Send this invoice", width: 620, render: ({ close, ...context }) => <SendInvoice context={context} close={close} /> },
-        { id: "promise to pay", kind: "modal", title: "Record a promise to pay", width: 620, render: ({ close, ...context }) => <PromiseToPayForm context={{ ...context, overlayPayload: { invoiceId: context.params.id } }} close={close} /> },
+        { id: "Line item editor", kind: "drawer", title: "Line items", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <LineEditor context={context} close={close} withApproval /> },
+        { id: "email preview", kind: "drawer", title: "Document and message", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <EmailPreview context={context} close={close} /> },
+        { id: "payment form", kind: "modal", title: "Record a payment", width: OVERLAY_WIDTH.form, capability: "post_journal", presentation: { selectedRecord: true, collection: "invoices", noRecordContext: true, guidance: "Check the outstanding balance, receipt date and destination account before posting a balanced journal." }, render: ({ close, ...context }) => <PaymentForm context={context} close={close} /> },
+        { id: "void reason", kind: "modal", title: "Void or credit this invoice", width: OVERLAY_WIDTH.form, tone: "danger", presentation: { noRecordContext: true }, render: ({ close, ...context }) => <VoidReason context={context} close={close} /> },
+        { id: "approve invoice", kind: "modal", title: "Approve and post this invoice", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ApproveInvoice context={context} close={close} /> },
+        { id: "send invoice", kind: "modal", title: "Send this invoice", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <SendInvoice context={context} close={close} /> },
+        { id: "promise to pay", kind: "modal", title: "Record a promise to pay", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <PromiseToPayForm context={{ ...context, overlayPayload: { invoiceId: context.params.id } }} close={close} /> },
       ],
     },
 
@@ -260,11 +269,11 @@ export const finApp = registerApp({
         { id: "record payment run", label: "Record a payment run", placement: "overflow", capability: "approve_payment", run: (context) => context.openOverlay("payment authorization") },
       ],
       overlays: [
-        { id: "Bill capture", kind: "modal", title: "Capture a bill", width: 680, render: ({ close, ...context }) => <BillCapture context={context} close={close} /> },
-        { id: "match inspector", kind: "drawer", title: "Bill", width: 580, render: ({ close, ...context }) => <MatchInspector context={context} close={close} /> },
-        { id: "payment authorization", kind: "modal", title: "Record a payment run", width: 760, tone: "danger", render: ({ close, ...context }) => <PaymentAuthorization context={context} close={close} /> },
-        { id: "approve bill", kind: "modal", title: "Approve a bill", width: 640, render: ({ close, ...context }) => <ApproveBill context={context} close={close} /> },
-        { id: "schedule payment", kind: "modal", title: "Schedule a supplier payment", width: 640, render: ({ close, ...context }) => <SchedulePayment context={context} close={close} /> },
+        { id: "Bill capture", kind: "modal", title: "Capture a bill", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BillCapture context={context} close={close} /> },
+        { id: "match inspector", kind: "drawer", title: "Bill", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <MatchInspector context={context} close={close} /> },
+        { id: "payment authorization", kind: "modal", title: "Record a payment run", width: OVERLAY_WIDTH.wide, tone: "danger", render: ({ close, ...context }) => <PaymentAuthorization context={context} close={close} /> },
+        { id: "approve bill", kind: "modal", title: "Approve a bill", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ApproveBill context={context} close={close} /> },
+        { id: "schedule payment", kind: "modal", title: "Schedule a supplier payment", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <SchedulePayment context={context} close={close} /> },
       ],
     },
 
@@ -286,12 +295,12 @@ export const finApp = registerApp({
         { id: "chart of accounts", label: "Chart of accounts", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/fin/accounts`) },
       ],
       overlays: [
-        { id: "Receipt capture", kind: "modal", title: "New expense claim", width: 640, render: ({ close, ...context }) => <ReceiptCapture context={context} close={close} /> },
-        { id: "expense detail", kind: "drawer", title: "Expense claim", width: 560, render: ({ close, ...context }) => <ExpenseDetail context={context} close={close} /> },
-        { id: "approval chain", kind: "drawer", title: "Approval chain", width: 620, render: ({ ...context }) => <ApprovalChain context={context} /> },
-        { id: "assign category", kind: "modal", title: "Assign a category", width: 540, render: ({ close, ...context }) => <AssignCategory context={context} close={close} /> },
-        { id: "approve claim", kind: "modal", title: "Approve an expense claim", width: 580, render: ({ close, ...context }) => <ApproveExpense context={context} close={close} /> },
-        { id: "reimburse claim", kind: "modal", title: "Reimburse an approved claim", width: 620, render: ({ close, ...context }) => <ReimburseExpense context={context} close={close} /> },
+        { id: "Receipt capture", kind: "modal", title: "New expense claim", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ReceiptCapture context={context} close={close} /> },
+        { id: "expense detail", kind: "drawer", title: "Expense claim", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <ExpenseHead context={context} />, render: ({ close, ...context }) => <ExpenseDetail context={context} close={close} /> },
+        { id: "approval chain", kind: "drawer", title: "Approval chain", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ApprovalChain context={context} /> },
+        { id: "assign category", kind: "modal", title: "Assign a category", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <AssignCategory context={context} close={close} /> },
+        { id: "approve claim", kind: "modal", title: "Approve an expense claim", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ApproveExpense context={context} close={close} /> },
+        { id: "reimburse claim", kind: "modal", title: "Reimburse an approved claim", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ReimburseExpense context={context} close={close} /> },
       ],
     },
 
@@ -313,10 +322,10 @@ export const finApp = registerApp({
         { id: "feed incidents", label: "Feed incidents", placement: "overflow", run: (context) => context.openOverlay("feed incident") },
       ],
       overlays: [
-        { id: "Bank connection", kind: "modal", title: "Connect a bank account", width: 580, render: ({ close, ...context }) => <BankConnection context={context} close={close} /> },
-        { id: "CSV mapper", kind: "drawer", title: "Import a CSV statement", width: 820, render: ({ close, ...context }) => <CsvMapper context={context} close={close} /> },
-        { id: "feed incident", kind: "drawer", title: "Feed incidents", width: 560, render: ({ ...context }) => <FeedIncident context={context} /> },
-        { id: "inspect mismatch", kind: "drawer", title: "Statement against ledger", width: 760, render: ({ ...context }) => <InspectMismatch context={context} /> },
+        { id: "Bank connection", kind: "modal", title: "Connect a bank account", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BankConnection context={context} close={close} /> },
+        { id: "CSV mapper", kind: "drawer", title: "Import a CSV statement", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <CsvMapper context={context} close={close} /> },
+        { id: "feed incident", kind: "drawer", title: "Feed incidents", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <FeedIncident context={context} /> },
+        { id: "inspect mismatch", kind: "drawer", title: "Statement against ledger", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <InspectMismatch context={context} /> },
       ],
     },
 
@@ -338,9 +347,9 @@ export const finApp = registerApp({
         { id: "split", label: "Split a line", placement: "overflow", capability: "post_journal", guard: (context) => (context.selectedId ? undefined : "Select a statement line first"), run: (context) => context.openOverlay("adjustment review", { id: context.selectedId, split: true }) },
       ],
       overlays: [
-        { id: "Match candidates", kind: "drawer", title: "Candidates for this line", width: 640, render: ({ close, ...context }) => <MatchCandidatesOverlay context={context} close={close} /> },
-        { id: "adjustment review", kind: "drawer", title: "Post an adjustment", width: 720, render: ({ close, ...context }) => <AdjustmentReview context={context} close={close} /> },
-        { id: "reconciliation approval", kind: "modal", title: "Confirm the reconciliation", width: 600, render: ({ close, ...context }) => <ReconciliationApproval context={context} close={close} /> },
+        { id: "Match candidates", kind: "drawer", title: "Candidates for this line", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <MatchCandidatesOverlay context={context} close={close} /> },
+        { id: "adjustment review", kind: "drawer", title: "Post an adjustment", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <AdjustmentReview context={context} close={close} /> },
+        { id: "reconciliation approval", kind: "modal", title: "Confirm the reconciliation", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReconciliationApproval context={context} close={close} /> },
       ],
     },
 
@@ -361,10 +370,10 @@ export const finApp = registerApp({
         { id: "compare scenarios", label: "Compare scenarios", placement: "secondary", run: (context) => context.setTab("Scenarios") },
       ],
       overlays: [
-        { id: "Model assumptions", kind: "drawer", title: "Forecast assumptions", width: 760, render: ({ close, ...context }) => <ModelAssumptions context={context} close={close} /> },
-        { id: "revision history", kind: "drawer", title: "Budget revisions", width: 640, render: ({ ...context }) => <BudgetRevisionHistory context={context} /> },
-        { id: "variance drilldown", kind: "drawer", title: "Explain a variance", width: 720, render: ({ ...context }) => <VarianceDrilldown context={context} /> },
-        { id: "budget approval", kind: "modal", title: "Submit a budget", width: 620, render: ({ close, ...context }) => <BudgetApprovalOverlay context={context} close={close} /> },
+        { id: "Model assumptions", kind: "drawer", title: "Forecast assumptions", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <ModelAssumptions context={context} close={close} /> },
+        { id: "revision history", kind: "drawer", title: "Budget revisions", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <BudgetRevisionHistory context={context} /> },
+        { id: "variance drilldown", kind: "drawer", title: "Explain a variance", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <VarianceDrilldown context={context} /> },
+        { id: "budget approval", kind: "modal", title: "Submit a budget", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <BudgetApprovalOverlay context={context} close={close} /> },
       ],
     },
 
@@ -387,11 +396,11 @@ export const finApp = registerApp({
         { id: "code configuration", label: "Code configuration", placement: "overflow", run: (context) => context.openOverlay("Tax configuration") },
       ],
       overlays: [
-        { id: "Tax configuration", kind: "drawer", title: "Tax configuration", width: 620, render: ({ close, ...context }) => <TaxConfiguration context={context} close={close} /> },
-        { id: "return review", kind: "modal", title: "Validate the return", width: 620, render: ({ ...context }) => <ReturnReview context={context} /> },
-        { id: "filing authorization", kind: "modal", title: "Before filing", width: 640, tone: "danger", render: ({ close, ...context }) => <FilingAuthorization context={context} close={close} /> },
-        { id: "review filing", kind: "modal", title: "Review a prepared return", width: 640, render: ({ close, ...context }) => <ReviewFiling context={context} close={close} /> },
-        { id: "export return", kind: "modal", title: "Export the return figures", width: 520, render: ({ close, ...context }) => <ExportReturnOverlay context={context} close={close} /> },
+        { id: "Tax configuration", kind: "drawer", title: "Tax configuration", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <TaxConfiguration context={context} close={close} /> },
+        { id: "return review", kind: "modal", title: "Validate the return", width: OVERLAY_WIDTH.record, summary: ({ close: _close, ...context }) => <ReturnHead context={context} />, render: ({ ...context }) => <ReturnReview context={context} /> },
+        { id: "filing authorization", kind: "modal", title: "Before filing", width: OVERLAY_WIDTH.record, tone: "danger", render: ({ close, ...context }) => <FilingAuthorization context={context} close={close} /> },
+        { id: "review filing", kind: "modal", title: "Review a prepared return", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ReviewFiling context={context} close={close} /> },
+        { id: "export return", kind: "modal", title: "Export the return figures", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ExportReturnOverlay context={context} close={close} /> },
       ],
     },
 
@@ -415,11 +424,11 @@ export const finApp = registerApp({
         { id: "schedule", label: "Schedule", placement: "overflow", run: (context) => context.openOverlay("schedule") },
       ],
       overlays: [
-        { id: "Report designer", kind: "modal", title: "Report designer", width: 620, render: ({ close, ...context }) => <ReportDesigner context={context} close={close} /> },
-        { id: "source note", kind: "drawer", title: "Where these statements come from", width: 700, render: ({ ...context }) => <><SourceNoteOverlay context={context} /><DrillDown context={context} /></> },
-        { id: "schedule", kind: "modal", title: "Schedule a report", width: 520, render: ({ close, ...context }) => <ReportSchedule context={context} close={close} /> },
-        { id: "filter statements", kind: "modal", title: "Filter the statements", width: 520, render: ({ close, ...context }) => <StatementFilter context={context} close={close} /> },
-        { id: "export statements", kind: "modal", title: "Export a statement", width: 520, render: ({ close, ...context }) => <ExportStatements context={context} close={close} /> },
+        { id: "Report designer", kind: "modal", title: "Report designer", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ReportDesigner context={context} close={close} /> },
+        { id: "source note", kind: "drawer", title: "Where these statements come from", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <><SourceNoteOverlay context={context} /><DrillDown context={context} /></> },
+        { id: "schedule", kind: "modal", title: "Schedule a report", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReportSchedule context={context} close={close} /> },
+        { id: "filter statements", kind: "modal", title: "Filter the statements", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <StatementFilter context={context} close={close} /> },
+        { id: "export statements", kind: "modal", title: "Export a statement", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ExportStatements context={context} close={close} /> },
       ],
     },
 
@@ -440,10 +449,10 @@ export const finApp = registerApp({
         { id: "inspect postings", label: "Inspect postings", placement: "overflow", run: (context) => context.openOverlay("consolidation preview") },
       ],
       overlays: [
-        { id: "Entity config", kind: "modal", title: "Legal entity", width: 620, render: ({ close, ...context }) => <EntityConfig context={context} close={close} /> },
-        { id: "consolidation preview", kind: "drawer", title: "Consolidation preview", width: 760, render: ({ close, ...context }) => <><ConsolidationPreview context={context} close={close} /><EntityPostings context={context} /></> },
-        { id: "FX sources", kind: "drawer", title: "Exchange rates", width: 560, render: () => <FxSources /> },
-        { id: "eliminate intercompany", kind: "modal", title: "Eliminate intercompany balances", width: 700, render: ({ close, ...context }) => <EliminateIntercompany context={context} close={close} /> },
+        { id: "Entity config", kind: "modal", title: "Legal entity", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <EntityConfig context={context} close={close} /> },
+        { id: "consolidation preview", kind: "drawer", title: "Consolidation preview", width: OVERLAY_WIDTH.wide, summary: () => <ConsolidationHead />, render: ({ close, ...context }) => <><ConsolidationPreview context={context} close={close} /><EntityPostings context={context} /></> },
+        { id: "FX sources", kind: "drawer", title: "Exchange rates", width: OVERLAY_WIDTH.form, render: () => <FxSources /> },
+        { id: "eliminate intercompany", kind: "modal", title: "Eliminate intercompany balances", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <EliminateIntercompany context={context} close={close} /> },
       ],
     },
   },

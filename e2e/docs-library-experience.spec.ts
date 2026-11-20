@@ -3,7 +3,6 @@ import { expect, test } from "@playwright/test";
 test("Documents library presents distinct working states and filters across viewports", async ({ page }) => {
   await page.goto("/o/northline/docs/files");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Your document workspace." })).toBeVisible();
   await expect(main.getByLabel("Document library summary")).toBeVisible();
   for (const label of ["Active documents", "Drafts", "In review", "Confidential"]) {
     await expect(main.getByLabel("Document library summary")).toContainText(label);
@@ -11,7 +10,7 @@ test("Documents library presents distinct working states and filters across view
   const draftFilter = main.getByRole("button", { name: "Drafts", exact: true });
   await draftFilter.click();
   await expect(draftFilter).toHaveAttribute("aria-pressed", "true");
-  await main.getByRole("button", { name: "Clear filters" }).click();
+  await main.getByRole("button", { name: "Clear filters" }).first().click();
   await expect(draftFilter).toHaveAttribute("aria-pressed", "false");
   const sizing = await page.evaluate(() => ({
     pageWidth: document.documentElement.scrollWidth,
@@ -23,7 +22,6 @@ test("Documents library presents distinct working states and filters across view
 test("Documents shared tab describes recorded local sharing, not another person's ownership", async ({ page }) => {
   await page.goto("/o/northline/docs/files?tab=Shared");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Recorded sharing activity." })).toBeVisible();
   await expect(main).toContainText("This does not mean a public link or external access exists.");
   await expect(main.getByRole("button", { name: "New document" }).first()).toBeVisible();
 });
@@ -31,7 +29,6 @@ test("Documents shared tab describes recorded local sharing, not another person'
 test("Documents library archive and search have distinct empty and filter reset states", async ({ page }) => {
   await page.goto("/o/northline/docs/files?tab=Archive");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "The document archive." })).toBeVisible();
   await main.getByRole("searchbox", { name: "Search" }).fill("unfindable-qa-archive-test-string");
   await expect(main.getByText("No documents match the filters")).toBeVisible();
   await main.getByRole("button", { name: "Clear filters" }).first().click();
@@ -56,7 +53,7 @@ test("Document editor displays lifecycle context and routes to review and publis
   await page.goto(`/o/northline/docs/documents/${id}`);
   const status = page.getByLabel("Document working status");
   await expect(status).toBeVisible();
-  await expect(status).toContainText("CURRENT DOCUMENT");
+  await expect(status).toContainText("mandatory review");
   await expect(status).toContainText("draft");
   await status.getByRole("button", { name: "Review history" }).click();
   await expect(page).toHaveURL(/\/review/);
@@ -115,9 +112,8 @@ test("Document approval requires an explicit human confirmation", async ({ page 
   await expect(approve).toBeVisible();
   await approve.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Approve and publish locally");
+  await expect(dialog).toContainText("Approve the document");
   await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).not.toBeChecked();
-  await expect(dialog).toContainText("The dialog’s Approve action is only valid after acknowledgement");
   await dialog.getByRole("checkbox", { name: /reviewed this version/ }).check();
   await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).toBeChecked();
 });
@@ -138,7 +134,7 @@ test("Document reviewer assignment exposes reason, existing state, and no email 
   await page.goto(`/o/northline/docs/documents/${id}/review?tab=Approvals`);
   await page.locator("#main").getByRole("button", { name: "Assign reviewers" }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Assign accountable reviewers");
+  await expect(dialog.getByRole("heading", { name: "Assign reviewers" })).toBeVisible();
   await expect(dialog.getByText("Reason for review assignment")).toBeVisible();
   await expect(dialog).toContainText("Not sent");
 });
@@ -147,7 +143,6 @@ test("Document reviewer assignment exposes reason, existing state, and no email 
 test("Template governance offers discoverable status and search filters", async ({ page }) => {
   await page.goto("/o/northline/docs/templates");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Masters that keep work consistent." })).toBeVisible();
   await expect(main.getByLabel("Template governance summary")).toBeVisible();
   await main.getByRole("searchbox", { name: "Search masters" }).fill("unfindable-qa-template-reference");
   await expect(main).toContainText("No templates match");
@@ -173,7 +168,7 @@ test("Document publishing cannot bypass an approval confirmation", async ({ page
   await expect(button).toBeVisible();
   await button.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Approve and publish locally");
+  await expect(dialog).toContainText("Approve the document");
   await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).not.toBeChecked();
   await expect(page.locator("#main")).toContainText("Publishing requires a named reviewer");
 });
@@ -193,7 +188,6 @@ test("Documents brand insights show grounded company context and template handof
   });
   await page.goto(`/o/northline/docs/documents/${id}/insights?tab=Brand`);
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Brand alignment, with evidence." })).toBeVisible();
   await expect(main).toContainText("Brand assets are not automatically embedded");
   await main.getByRole("button", { name: "Open templates" }).click();
   await expect(page).toHaveURL(/\/docs\/templates/);
@@ -204,7 +198,7 @@ test("New documents expose master provenance and do not offer unpublished templa
   await page.goto("/o/northline/docs/files");
   await page.locator("#main").getByRole("button", { name: "New document" }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Start a new company document");
+  await expect(dialog.getByRole("heading", { name: "New document" })).toBeVisible();
   await expect(dialog).toContainText("Distribution");
   await expect(dialog).toContainText("browser-local record");
   await expect(dialog.getByRole("combobox", { name: "Start from" })).toBeVisible();
@@ -226,7 +220,7 @@ test("Export preview identifies its paper source and does not claim native PDF g
   await page.goto(`/o/northline/docs/documents/${id}/publish?tab=Export`);
   await page.getByRole("button", { name: "Preview the export" }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Inspect the rendered document");
+  await expect(dialog).toContainText("not an approved, signed or externally published document");
   await expect(dialog).toContainText("Pagination remains an estimate");
   await expect(dialog.getByTitle("Export preview of QA Export Preview")).toBeVisible();
 });

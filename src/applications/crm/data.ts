@@ -75,6 +75,11 @@ export function companyOfDeal(data: CrmData, deal: Rec | undefined): Rec | undef
   return companyById(data, String(deal?.fields.companyId ?? deal?.parentId ?? ""));
 }
 
+/** The deal's own account, else the account its named contact belongs to. */
+export function accountOfDeal(data: CrmData, deal: Rec | undefined): Rec | undefined {
+  return companyOfDeal(data, deal) ?? companyById(data, String(contactOfDeal(data, deal)?.fields.companyId ?? ""));
+}
+
 export function contactsOfCompany(data: CrmData, companyId: string | undefined): Rec[] {
   return companyId ? data.contacts.filter((contact) => String(contact.fields.companyId ?? "") === companyId) : [];
 }
@@ -110,11 +115,21 @@ export function bookingsOfContact(data: CrmData, contactId: string | undefined):
   return contactId ? data.bookings.filter((booking) => String(booking.fields.contactId ?? booking.parentId ?? "") === contactId) : [];
 }
 
+/**
+ * The one rule for which invoices belong to a deal: the deal's own link, then an
+ * invoice that names the deal, then (for a won deal only) an invoice to the same
+ * customer for the same net amount. Every CRM surface uses this.
+ */
 export function invoicesOfDeal(data: CrmData, deal: Rec | undefined): Rec[] {
   if (!deal) return [];
   const direct = String(deal.fields.invoiceId ?? "");
-  return data.invoices.filter((invoice) =>
-    invoice.id === direct || String(invoice.fields.dealId ?? "") === deal.id);
+  const linked = data.invoices.filter((invoice) => invoice.id === direct || String(invoice.fields.dealId ?? "") === deal.id);
+  if (linked.length || stageOf(deal).kind !== "won") return linked;
+  const contactId = String(deal.fields.contactId ?? "");
+  return contactId
+    ? data.invoices.filter((invoice) => !invoice.fields.dealId && String(invoice.fields.contactId ?? "") === contactId
+      && Number(invoice.fields.netMinor ?? -1) === Number(deal.amountMinor ?? -2))
+    : [];
 }
 
 export function ticketsOfContact(data: CrmData, contactId: string | undefined): Rec[] {

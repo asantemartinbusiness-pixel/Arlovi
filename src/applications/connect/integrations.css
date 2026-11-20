@@ -1,8 +1,8 @@
 /* Integrations native experiences. Scoped under .connect-* to preserve Arlovi tokens. */
 .connect-marketplace-overview,.connect-connections-overview,.connect-sync-overview{
-  display:flex;flex-direction:column;gap:var(--space-4);background:var(--bg-surface);
-  border:1px solid var(--border-default);border-radius:var(--radius-lg);
-  padding:var(--space-5);min-width:0;
+  display:flex;flex-direction:column;gap:var(--space-3);background:var(--bg-surface);
+  border:1px solid var(--border-default);border-radius:var(--radius-md);
+  padding:var(--space-3) var(--space-4);min-width:0;
 }
 .connect-marketplace-head,.connect-connections-head,.connect-sync-head{
   display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);min-width:0;
@@ -24,7 +24,7 @@
   min-width:0;display:flex;flex-direction:column;gap:var(--space-1)
 }
 .connect-marketplace-metrics span,.connect-connections-metrics span,.connect-sync-metrics span{font-size:var(--text-xs);color:var(--fg-muted)}
-.connect-marketplace-metrics strong,.connect-connections-metrics strong,.connect-sync-metrics strong{font-size:var(--text-xl);font-weight:500;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.connect-marketplace-metrics strong,.connect-connections-metrics strong,.connect-sync-metrics strong{font-size:var(--text-stat);font-weight:500;letter-spacing:-.025em;font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
 .connect-marketplace-toolbar,.connect-connections-toolbar{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;min-width:0}
 .connect-marketplace-search,.connect-connections-search{
   display:flex;align-items:center;gap:var(--space-2);flex:1 1 280px;min-width:0;
@@ -121,3 +121,12 @@
 @media(max-width:560px){.connect-state-legend li{grid-template-columns:minmax(0,1fr)}}
 .connect-mapping-table tbody th{text-transform:none;letter-spacing:normal;font-weight:500}
 .connect-state-legend li>:first-child{justify-self:start}
+
+/* B5: headline-free overviews. The record header and tabs carry the title; these bands carry only the boundary note and live counts. */
+.connect-health-overview,.connect-receipts-overview{padding:var(--space-3) var(--space-4);gap:var(--space-3);border-radius:var(--radius-md)}
+.connect-marketplace-head p,.connect-sync-head p,.connect-health-head p,.connect-receipts-head p{margin-top:0}
+.connect-marketplace-head,.connect-sync-head,.connect-health-head,.connect-receipts-head{align-items:center}
+.connect-band{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;padding:var(--space-2) var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface)}
+.connect-band-counts{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-4);font-size:var(--text-sm);color:var(--fg-muted)}
+.connect-band-counts strong{font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:var(--fg-default);font-weight:500;margin-inline-end:2px}
+.connect-band-note{margin:0;font-size:var(--text-sm);color:var(--fg-muted)}

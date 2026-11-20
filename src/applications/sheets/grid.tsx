@@ -65,6 +65,8 @@ export interface SheetGridProps {
   readOnly?: boolean;
   /** Addresses highlighted as the precedents of the inspected formula. */
   highlighted?: Set<string>;
+  /** Addresses a pending change preview would rewrite. */
+  previewed?: Set<string>;
   height?: number;
   /** Raised when the editor should start from the formula bar. */
   editRequest?: { address: string; initial: string; token: number };
@@ -84,7 +86,7 @@ function columnOffsets(sheet: Sheet): number[] {
 
 export function SheetGrid({
   sheet, values, format, selection, onSelectionChange, onCommit, onClear, onPaste, onCopy,
-  hiddenRows, comments, protectedAddresses, readOnly, highlighted, height = 520, editRequest, onShortcut,
+  hiddenRows, comments, protectedAddresses, readOnly, highlighted, previewed, height = 520, editRequest, onShortcut,
 }: SheetGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const colHeadRef = useRef<HTMLDivElement>(null);
@@ -300,6 +302,7 @@ export function SheetGrid({
       || (typeof result?.value === "string" && result.value.trim() !== "" && !Number.isNaN(Number(result.value)));
     if (numeric) classes.push("ds-num");
     if (highlighted?.has(address)) classes.push("sx-precedent");
+    if (previewed?.has(address)) classes.push("sx-previewed");
     if (protectedAddresses?.has(address)) classes.push("sx-protected");
     const borders = style?.border ?? [];
     return (

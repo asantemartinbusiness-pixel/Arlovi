@@ -39,7 +39,7 @@ export function DisplayPreferences({ onClose }: { onClose: () => void }) {
       <section ref={panel} className="display-panel" role="dialog" aria-modal="true" aria-labelledby="display-title" aria-describedby="display-description">
         <header className="display-panel-heading">
           <div>
-            <h2 id="display-title">Appearance & display</h2>
+            <h2 id="display-title">Display &amp; scaling</h2>
             <p id="display-description">Personalise how Arlovi looks without changing your company’s branding.</p>
           </div>
           <button ref={closeButton} type="button" className="display-icon-button" aria-label="Close display settings" onClick={onClose}><X size={18} /></button>

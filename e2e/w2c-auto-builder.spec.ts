@@ -52,7 +52,7 @@ test("a step's field is checked against the trigger's records; a fixed edit save
   await page.getByRole("button", { name: "Run local test" }).click();
   // Open the condition from the path list.
   await page.getByRole("list", { name: "Path taken" }).getByRole("button", { name: /Older than 7 days/ }).click();
-  const inspector = page.locator("section.ds-card").filter({ has: page.getByRole("heading", { name: "Node properties" }) });
+  const inspector = page.locator("section.auto-inspector");
   const field = inspector.getByRole("combobox", { name: "Field" });
   await expect(field).toHaveValue("overdueDays");
 
@@ -71,7 +71,7 @@ test("a step's field is checked against the trigger's records; a fixed edit save
   await openBuilder(page);
   await page.getByRole("button", { name: "Run local test" }).click();
   await page.getByRole("list", { name: "Path taken" }).getByRole("button", { name: /Older than 7 days/ }).click();
-  await expect(page.locator("section.ds-card").filter({ has: page.getByRole("heading", { name: "Node properties" }) }).getByRole("textbox", { name: "Value" })).toHaveValue("10");
+  await expect(page.locator("section.auto-inspector").getByRole("textbox", { name: "Value" })).toHaveValue("10");
   await expect(page.getByRole("list", { name: "Path taken" }).getByText(/> 10 →/)).toBeVisible();
 });
 
@@ -84,4 +84,35 @@ test.describe("mobile", () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
+});
+
+test("a paused automation cannot be run live, and neither can any automation while the organisation is paused", async ({ page }) => {
+  await page.goto(`/o/northline/auto/workflows?${CLOCK}`);
+  await page.getByText("Chase overdue invoices").first().click();
+  await page.getByRole("button", { name: "Activation review" }).click();
+  const dialog = page.getByRole("dialog", { name: "Activation review" });
+  await dialog.getByRole("button", { name: "Pause the automation" }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.goto(`/o/northline/auto/workflows/nl-workflows-020?${CLOCK}&tab=Test`);
+  const runLive = page.getByRole("button", { name: "Run live" });
+  await expect(runLive).toBeDisabled();
+  await expect(page.getByText(/This automation is paused/).first()).toBeVisible();
+
+  // Resume it, then pause the organisation: the same button is off for the organisation's reason.
+  await page.goto(`/o/northline/auto/workflows?${CLOCK}`);
+  await page.getByText("Chase overdue invoices").first().click();
+  await page.getByRole("button", { name: "Activation review" }).click();
+  await page.getByRole("dialog", { name: "Activation review" }).getByRole("checkbox").check();
+  await page.getByRole("dialog", { name: "Activation review" }).getByRole("button", { name: "Activate" }).click();
+  // Pause the organisation from the Admin autonomy centre, as an owner would.
+  await page.goto(`/o/northline/admin/autonomy?${CLOCK}`);
+  await page.getByRole("main").getByRole("button", { name: "Pause all automation" }).click();
+  const pause = page.getByRole("dialog").getByRole("button", { name: "Pause all automation" });
+  await page.getByRole("dialog").getByLabel("Type PAUSE to confirm").fill("PAUSE");
+  await pause.click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.goto(`/o/northline/auto/workflows/nl-workflows-020?${CLOCK}&tab=Test`);
+  await expect(page.getByRole("button", { name: "Run live" })).toBeDisabled();
+  await expect(page.getByText(/Execution is paused for this organisation/).first()).toBeVisible();
 });

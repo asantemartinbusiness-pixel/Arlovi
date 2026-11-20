@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Circle, CircleAlert, CircleDot, Minus, Trash2 } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput,
+  Button, Card, DataGrid, Empty, Field, Notice, OverlaySummary, Pill, Row, Select, Stack, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -62,12 +62,9 @@ function QuoteComparisonBody({ context, requisition }: { context: ScreenContext;
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Requisition", value: <span className="ds-num">{requisition.title}</span> },
-        { label: "State", value: <Pill tone={statusTone(requisition.status)} dot>{requisition.status.replace(/_/g, " ")}</Pill> },
-        { label: "Approved amount", value: requisition.status === "approved" ? <span className="ds-num">{context.money(requisition.amountMinor)}</span> : <span className="ds-subtle">Not approved yet</span> },
-        { label: "Lines", value: <span className="ds-num">{lines.length}</span> },
-      ]} />
+      <OverlaySummary eyebrow="Quotes for" title={<span className="ds-num">{requisition.title}</span>}
+        status={<Pill tone={statusTone(requisition.status)} dot>{requisition.status.replace(/_/g, " ")}</Pill>}
+        meta={[`${lines.length} line${lines.length === 1 ? "" : "s"}`, requisition.status === "approved" ? `Approved at ${context.money(requisition.amountMinor)}` : "Not approved yet"]} />
       {rows.length === 0 ? (
         <Empty title="No quotes recorded">Record what each supplier quoted below. Two or more quotes make a comparison.</Empty>
       ) : (
@@ -178,11 +175,9 @@ export function PurchaseTrail({ context }: { context: ScreenContext }) {
   const supplier = findSupplier(data, String(order.fields.supplierId));
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Order", value: <span className="ds-num">{order.title}</span> },
-        { label: "Supplier", value: supplier?.title ?? "—" },
-        { label: "Value", value: <span className="ds-num">{context.money(order.amountMinor)}</span> },
-      ]} />
+      <OverlaySummary eyebrow="Purchase trail" title={<span className="ds-num">{order.title}</span>}
+        status={<Pill tone={statusTone(order.status)} dot>{order.status.replace(/_/g, " ")}</Pill>}
+        meta={[supplier?.title, context.money(order.amountMinor)]} />
       <ol className="t4-trail" aria-label="Purchase trail">
         {steps.map((step) => {
           const Icon = STEP_ICON[step.state];

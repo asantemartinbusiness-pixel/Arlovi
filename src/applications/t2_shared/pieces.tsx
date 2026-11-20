@@ -300,7 +300,7 @@ export function TurnList({
             {turn.kind === "blocked" && <Pill tone="warning">Stopped at the provider boundary</Pill>}
             {turn.kind === "clarify" && <Pill tone="warning">Needs clarification</Pill>}
             {onInspect && (
-              <Button size="sm" variant="ghost" onClick={() => onInspect(turn)} aria-label={`Message actions for the turn from ${turn.author}`}>Actions</Button>
+              <Button size="sm" variant="ghost" onClick={() => onInspect(turn)} aria-label={`Message actions for the turn from ${turn.author} at ${context.dateTime(turn.at)}`}>Actions</Button>
             )}
           </Row>
           <p className="ds-prose" style={{ whiteSpace: "pre-wrap", marginBlockStart: "var(--space-2)" }}>{turn.text}</p>

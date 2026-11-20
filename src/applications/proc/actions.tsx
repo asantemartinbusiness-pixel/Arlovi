@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
-  Button, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, DataGrid, DrawerActions, Empty, FactGrid, Field, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary,
+  Pill, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { getRecord, listByCollection } from "@/platform/repo";
@@ -68,15 +69,14 @@ export function LinkContract({ context, close }: { context: ScreenContext; close
         if (!chosen) return;
         const saved = await context.mutate.patch(chosen.id, { fields: { ...chosen.fields, supplierId: supplier.id, linkedBy: context.actor, linkedAt: iso(context), previousSupplierId: String(chosen.fields.supplierId ?? "") } }, { expectRevision: chosen.revision, event: `${chosen.title} linked to ${supplier.title} by ${context.actor}` });
         if (!saved) return;
-        await context.mutate.patch(supplier.id, { fields: { ...supplier.fields, contractCount: linked.length + 1 } }, { expectRevision: supplier.revision, event: `${chosen.title} linked to ${supplier.title}` });
+        const ok14 = await context.mutate.patch(supplier.id, { fields: { ...supplier.fields, contractCount: linked.length + 1 } }, { expectRevision: supplier.revision, event: `${chosen.title} linked to ${supplier.title}` });
+        if (!ok14) return; // the platform has already said the record changed elsewhere
         context.toast("Contract linked", `${chosen.title} now belongs to ${supplier.title}. Its clauses still need a qualified review.`);
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Supplier", value: supplier.title },
-        { label: "Contracts already linked", value: linked.map((contract) => contract.title).join(", ") || "None" },
-      ]} />
+      <OverlaySummary eyebrow="Supplier" title={supplier.title} status={<Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>}
+        meta={[linked.length ? `Linked: ${linked.map((contract) => contract.title).join(", ")}` : "No contract linked yet"]} />
       {available.length === 0 ? <Empty title="No other contract on file">Add the contract in Legal first, then link it here.</Empty> : (
         <Field label="Contract">
           <Select value={chosen?.id ?? ""} onChange={(event) => setContractId(event.target.value)}>
@@ -126,7 +126,7 @@ export function QuoteRequest({ context, close }: { context: ScreenContext; close
       </Row>
       <Field label="Note for the supplier"><TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
       <Notice tone="info">A quote request asks for a price. It is not a requisition or an order and commits no money.</Notice>
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary id="email.send" kept="The quote request, as a draft on this supplier. Nothing is sent." />
     </form>
   );
 }
@@ -187,7 +187,7 @@ export function RejectRequisition({ context, close }: { context: ScreenContext; 
   const payload = context.overlayPayload as { id?: string } | undefined;
   const requisition = useRecord(payload?.id ?? context.selectedId);
   const [reason, setReason] = useState("");
-  if (!requisition) return <Empty title="Select a requisition" />;
+  if (!requisition) return <Empty title="Requisition not found" />;
   const allowed = context.can("approve_payment") || context.role === "owner";
   const pending = requisition.status === "awaiting_approval";
   return (
@@ -206,12 +206,9 @@ export function RejectRequisition({ context, close }: { context: ScreenContext; 
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Requisition", value: <span className="ds-num">{requisition.title}</span> },
-        { label: "Requester", value: String(requisition.fields.requester ?? requisition.ownerName) },
-        { label: "Amount", value: <span className="ds-num">{context.money(requisition.amountMinor)}</span> },
-        { label: "State", value: <Pill tone={statusTone(requisition.status)}>{requisition.status.replace("_", " ")}</Pill> },
-      ]} />
+      <OverlaySummary eyebrow="Requisition" title={<span className="ds-num">{requisition.title}</span>}
+        status={<Pill tone={statusTone(requisition.status)} dot>{requisition.status.replace("_", " ")}</Pill>}
+        meta={[`Requested by ${String(requisition.fields.requester ?? requisition.ownerName)}`, context.money(requisition.amountMinor)]} />
       {!pending && <Notice tone="warning" title="Only a requisition awaiting approval can be rejected">This one is {requisition.status.replace("_", " ")}.</Notice>}
       {!allowed && <Notice tone="danger" title="This role view does not decide requisitions">Rejecting is limited to the views that hold the approval capability. Role views shape the interface; they are not an account security boundary.</Notice>}
       <Field label="Reason" required hint="Shown to the requester."><TextArea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
@@ -274,20 +271,22 @@ export function LocationInspector({ context }: { context: ScreenContext }) {
   const lastCount = moves.filter((move) => String(move.fields.kind) === "count").sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0];
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Site", value: site.title },
-        { label: "Code", value: <span className="ds-num">{String(site.fields.code ?? "—")}</span> },
-        { label: "Units on hand", value: <span className="ds-num">{units}</span> },
-        { label: "Capacity", value: <span className="ds-num">{String(site.fields.capacityUnits ?? "—")}</span> },
-        { label: "Movements recorded", value: <span className="ds-num">{moves.length}</span> },
-        { label: "Last count", value: lastCount ? context.dateTime(lastCount.at) : "Never counted" },
-        { label: "Last audit", value: site.fields.lastAuditAt ? `${context.dateTime(String(site.fields.lastAuditAt))} · ${String(site.fields.lastAuditFindings ?? 0)} findings` : "Never audited" },
+      <OverlaySummary eyebrow="Warehouse" title={site.title} status={<Pill tone={site.status === "active" ? "success" : "neutral"} dot>{site.status}</Pill>}
+        meta={[String(site.fields.code ?? ""), site.fields.managerName ? `Manager ${String(site.fields.managerName)}` : undefined]} />
+      <FactGrid columns={4} items={[
+        { label: "Units on hand", value: String(units), mono: true },
+        { label: "Capacity", value: String(site.fields.capacityUnits ?? "—"), mono: true, hint: site.fields.capacityUnits ? `${Math.round((units / Number(site.fields.capacityUnits)) * 100)}% used` : undefined },
+        { label: "Movements", value: String(moves.length), mono: true },
+        { label: "Last count", value: lastCount ? context.dateTime(lastCount.at) : "Never counted", tone: lastCount ? undefined : "warning" },
       ]} />
+      <span className="ds-subtle">{site.fields.lastAuditAt ? `Last audit ${context.dateTime(String(site.fields.lastAuditAt))}, ${String(site.fields.lastAuditFindings ?? 0)} findings.` : "Never audited."}</span>
+      <OverlaySection title="Stock at this site" flush>
       <DataGrid rows={stock} rowId={(row) => row.product.id} label="Stock at this site" filterable={false}
         columns={[
           { key: "product", header: "Product", primary: true, cell: (row) => row.product.title },
           { key: "onhand", header: "On hand", align: "end", cell: (row) => <span className={row.onHand < 0 ? "ds-field-error" : "ds-num"}>{row.onHand}</span> },
         ]} empty={<Empty title="Nothing held here" />} />
+      </OverlaySection>
     </Stack>
   );
 }
@@ -377,11 +376,13 @@ export function PutAway({ context, close }: { context: ScreenContext; close: () 
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Receipt", value: <span className="ds-num">{receipt.title}</span> },
-        { label: "Received at", value: data.warehouses.find((item) => item.id === dock)?.title ?? "—" },
-        { label: "Moves", value: lines.map((row) => `${row.quantity} × ${row.line.description}${row.productId ? "" : " (not a catalogue item)"}`).join(", ") || "None" },
-      ]} />
+      <OverlaySummary eyebrow="Put away" title={<span className="ds-num">{receipt.title}</span>}
+        meta={[`Received at ${data.warehouses.find((item) => item.id === dock)?.title ?? "—"}`]} />
+      <OverlaySection title="Moves" flush>
+        <ul className="ds-stack ds-gap-1" style={{ margin: 0, paddingInlineStart: "var(--space-4)" }}>
+          {lines.length === 0 ? <li className="ds-subtle">None</li> : lines.map((row) => <li key={row.line.lineId}><span className="ds-num">{row.quantity}</span> × {row.line.description}{row.productId ? "" : " (not a catalogue item)"}</li>)}
+        </ul>
+      </OverlaySection>
       <Field label="Put away into">
         <Select value={destination} onChange={(event) => setTarget(event.target.value)}>
           {data.warehouses.map((site) => <option key={site.id} value={site.id}>{site.title}{site.id === dock ? " (receiving site)" : ""}</option>)}
@@ -557,15 +558,16 @@ export function SupplierInspect({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Field label="Supplier"><Select value={supplier.id} onChange={(event) => setChosen(event.target.value)}>{data.suppliers.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
-      <Properties rows={[
-        { label: "State", value: <Pill tone={statusTone(supplier.status)}>{supplier.status}</Pill> },
-        { label: "Spend counted (gross)", value: <span className="ds-num">{context.money(totals.reduce((sum, item) => sum + item.grossMinor, 0))}</span> },
-        { label: "Of which tax", value: <span className="ds-num">{context.money(totals.reduce((sum, item) => sum + item.taxMinor, 0))}</span> },
-        { label: "Orders counted", value: <span className="ds-num">{counted.length} of {orders.length}</span> },
-        { label: "Excluded", value: `${orders.length - counted.length} draft or cancelled` },
-        { label: "On time (recorded)", value: supplier.fields.onTimeRatePct !== undefined ? `${String(supplier.fields.onTimeRatePct)}%` : "Not recorded" },
+      <FactGrid columns={2} items={[
+        { label: "State", value: <Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill> },
+        { label: "On time (recorded)", value: supplier.fields.onTimeRatePct !== undefined ? `${String(supplier.fields.onTimeRatePct)}%` : "Not recorded", mono: true },
+        { label: "Spend counted (gross)", value: context.money(totals.reduce((sum, item) => sum + item.grossMinor, 0)), mono: true },
+        { label: "Of which tax", value: context.money(totals.reduce((sum, item) => sum + item.taxMinor, 0)), mono: true },
+        { label: "Orders counted", value: `${counted.length} of ${orders.length}`, mono: true, hint: `${orders.length - counted.length} draft or cancelled excluded` },
       ]} />
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/proc/suppliers/${supplier.id}`); }}>Open the supplier</Button>
+      <DrawerActions>
+        <OverlayActions primary={<Button variant="primary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/proc/suppliers/${supplier.id}`); }}>Open the supplier</Button>} end={<OverlayCancel>Close</OverlayCancel>} />
+      </DrawerActions>
     </Stack>
   );
 }

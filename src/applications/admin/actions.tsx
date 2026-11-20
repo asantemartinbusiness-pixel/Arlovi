@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput,
+  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput, ModalActions, OverlayActions, OverlayCancel,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useOrgRecords } from "@/platform/workspace";
@@ -8,6 +8,7 @@ import { capabilityById, CAPABILITY_LABELS } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import { csvCell, ofKind, StepUp, useAdmin } from "./pieces";
 import { clockIso } from "@/platform/clock";
+import { revisedRecord } from "@/platform/repo";
 
 /* ====================================================================== *
  * ADMIN contract actions that change the record they name.
@@ -69,14 +70,17 @@ export function ConfigureEntity({ context, close }: { context: ScreenContext; cl
           onConfirm={async () => {
             if (!entity || !changed || !nextName.trim()) { context.toast("Nothing changed", "Edit a field first.", "info"); return; }
             setBusy(true);
-            const previous = { title: entity.title, registration: entity.fields.registration ?? "", taxId: entity.fields.taxId ?? entity.fields.vatNumber ?? "" };
-            const saved = await context.mutate.patch(entity.id, {
-              title: nextName.trim(),
-              fields: { ...entity.fields, registration: nextRegistration, taxId: nextTax, identityChangedBy: context.actor, identityChangedAt: clockIso(), previousIdentity: JSON.stringify(previous) },
-            }, { expectRevision: entity.revision, event: `Legal identity of ${entity.title} changed by ${context.actor} after a typed confirmation` });
-            if (saved) context.toast("Entity updated", `${nextName.trim()} is saved. The previous identity is kept on the record.`);
-            setBusy(false);
-            close();
+            try {
+              const previous = { title: entity.title, registration: entity.fields.registration ?? "", taxId: entity.fields.taxId ?? entity.fields.vatNumber ?? "" };
+              const saved = await context.mutate.patch(entity.id, {
+                title: nextName.trim(),
+                fields: { ...entity.fields, registration: nextRegistration, taxId: nextTax, identityChangedBy: context.actor, identityChangedAt: clockIso(), previousIdentity: JSON.stringify(previous) },
+              }, { expectRevision: entity.revision, event: `Legal identity of ${entity.title} changed by ${context.actor} after a typed confirmation` });
+              if (saved) context.toast("Entity updated", `${nextName.trim()} is saved. The previous identity is kept on the record.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           <Notice tone="info" title="Nothing is filed">Changing a legal name or number here does not notify any registry or tax authority.</Notice>
@@ -106,31 +110,37 @@ export function SuspendMember({ context, close }: { context: ScreenContext; clos
         { label: "Kept", value: "Role, grants and API keys, so a suspension can be lifted without rebuilding access" },
       ]} />
       {self && <Notice tone="danger" title="You cannot suspend yourself">Ask another owner.</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant={suspended ? "primary" : "danger"}
           busy={busy}
           disabled={self || !context.can("edit_people")}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(member.id, {
-              status: suspended ? "active" : "suspended",
-              fields: { ...member.fields, ...(suspended ? { reinstatedBy: context.actor, reinstatedAt: clockIso() } : { suspendedBy: context.actor, suspendedAt: clockIso() }) },
-            }, { expectRevision: member.revision, event: `${member.title} ${suspended ? "reinstated" : "suspended"} by ${context.actor}` });
-            if (!suspended) {
-              for (const session of sessions) {
-                await context.mutate.patch(session.id, { status: "revoked", fields: { ...session.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Session ended on suspension: ${session.title}` });
+            try {
+              const saved = await context.mutate.patch(member.id, {
+                status: suspended ? "active" : "suspended",
+                fields: { ...member.fields, ...(suspended ? { reinstatedBy: context.actor, reinstatedAt: clockIso() } : { suspendedBy: context.actor, suspendedAt: clockIso() }) },
+              }, { expectRevision: member.revision, event: `${member.title} ${suspended ? "reinstated" : "suspended"} by ${context.actor}` });
+              if (!saved) return;
+              if (!suspended) {
+                for (const session of sessions) {
+                  if (!(await context.mutate.patch(session.id, { status: "revoked", fields: { ...session.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Session ended on suspension: ${session.title}` }))) return;
+                }
               }
+              context.toast(suspended ? "Reinstated" : "Suspended", suspended ? `${member.title} can use the workspace again.` : `${member.title} is suspended and ${sessions.length} session${sessions.length === 1 ? " was" : "s were"} ended.`);
+              close();
+            } finally {
+              setBusy(false);
             }
-            if (saved) context.toast(suspended ? "Reinstated" : "Suspended", suspended ? `${member.title} can use the workspace again.` : `${member.title} is suspended and ${sessions.length} session${sessions.length === 1 ? " was" : "s were"} ended.`);
-            setBusy(false);
-            close();
           }}
         >
           {suspended ? `Reinstate ${member.title}` : `Suspend ${member.title}`}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -143,16 +153,18 @@ export function MembersExport({ context, close }: { context: ScreenContext; clos
     <Stack gap={4}>
       <Checkbox label="Include AI employees" checked={includeAgents} onChange={(event) => setIncludeAgents(event.target.checked)} />
       <p className="ds-subtle">Name, role view, status, second factor, last access and who invited them. Nothing secret is included.</p>
-      <Row gap={2}>
-        <Button variant="primary" onClick={async () => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={async () => {
           const header = "name,kind,role,status,email,mfa,last_access,invited_by\n";
           download(`${context.org.slug}-members.csv`, header + rows.map((row) => [row.title, row.fields.kind, row.fields.role, row.status, row.fields.email, row.fields.mfa, row.fields.lastAccessAt, row.fields.invitedBy].map(cell).join(",")).join("\n"));
           await context.mutate.log(`Member list exported by ${context.actor} (${rows.length} rows)`, { type: "admin.export" });
           context.toast("Exported", `${rows.length} members written to a CSV file in this browser.`);
           close();
-        }}>Download {rows.length} rows</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Download {rows.length} rows</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -187,31 +199,45 @@ export function ApproveIncrease({ context, close }: { context: ScreenContext; cl
         { label: "Provider spend", value: budget.fields.usageKnown === false ? "Unknown: no provider connected" : budget.fields.lagDays ? `Lags ${String(budget.fields.lagDays)} days` : "Local figures" },
       ]} />}
       {blocked && <Notice tone="danger" title="This increase cannot be approved">{blocked}</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("approve_payment")}
           onClick={async () => {
             if (!budget || !request) return;
             setBusy(true);
-            // Bound to the revision the request was raised against, so a concurrent change is refused.
-            const saved = await context.mutate.patch(budget.id, {
-              amountMinor: Number(request.amountMinor ?? 0),
-              fields: { ...budget.fields, previousCapMinor: Number(budget.amountMinor ?? 0), capRaisedBy: context.actor, capRaisedAt: clockIso() },
-            }, { expectRevision: budget.revision, event: `Cap on ${budget.title} raised to ${context.money(request.amountMinor)} by ${context.actor}` });
-            if (saved) {
-              await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decision: "approved", decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Budget increase approved by ${context.actor}` });
+            try {
+              // Both records change together or not at all; each is bound to the revision it was read at,
+              // so a concurrent change is refused rather than half-applied.
+              const now = clockIso();
+              const raised = revisedRecord(budget, {
+                amountMinor: Number(request.amountMinor ?? 0),
+                fields: { ...budget.fields, previousCapMinor: Number(budget.amountMinor ?? 0), capRaisedBy: context.actor, capRaisedAt: now },
+              }, { actor: context.actor, now });
+              const approved = revisedRecord(request, {
+                status: "approved", fields: { ...request.fields, decision: "approved", decidedBy: context.actor, decidedAt: now },
+              }, { actor: context.actor, now });
+              await context.mutate.putMany(
+                [raised, approved],
+                [`Cap on ${budget.title} raised to ${context.money(request.amountMinor)} by ${context.actor}`, `Budget increase approved by ${context.actor}`],
+                { [budget.id]: budget.revision, [request.id]: request.revision }, ["update", "update"],
+              );
               context.toast("Increase approved", `${budget.title} is capped at ${context.money(request.amountMinor)}. ${context.actor} is recorded as approver.`);
+              close();
+            } catch (cause) {
+              context.toast("Increase not approved", cause instanceof Error ? cause.message : "The budget or request changed. Reopen and try again.", "failed");
+            } finally {
+              setBusy(false);
             }
-            setBusy(false);
-            close();
           }}
         >
           Approve the increase
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -226,16 +252,18 @@ export function SessionsExport({ context, close }: { context: ScreenContext; clo
     <Stack gap={4}>
       <Checkbox label="Active sessions only" checked={activeOnly} onChange={(event) => setActiveOnly(event.target.checked)} />
       <Notice tone="info" title="Local session records">These are records in this browser. No identity provider has verified them.</Notice>
-      <Row gap={2}>
-        <Button variant="primary" onClick={async () => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={async () => {
           const header = "session,member,device,platform,location,status,mfa,started\n";
           download(`${context.org.slug}-sessions.csv`, header + rows.map((row) => [row.title, row.fields.member, row.fields.device, row.fields.platform, row.fields.location, row.status, row.fields.mfa, row.at].map(cell).join(",")).join("\n"));
           await context.mutate.log(`Sessions exported by ${context.actor} (${rows.length} rows)`, { type: "admin.export" });
           context.toast("Exported", `${rows.length} sessions written to a CSV file.`);
           close();
-        }}>Download {rows.length} sessions</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Download {rows.length} sessions</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -266,25 +294,30 @@ export function AuditRetention({ context, close }: { context: ScreenContext; clo
       <Field label="Keep audit entries for, years" hint={shorter ? "Shorter than the current promise: refused." : undefined}>
         <TextInput aria-label="Keep audit entries for, years" type="number" min={1} value={String(years)} onChange={(event) => setYears(Math.max(1, Number(event.target.value) || 1))} />
       </Field>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={shorter || years === current || !context.can("manage_policy")}
           onClick={async () => {
             setBusy(true);
-            if (policy) await context.mutate.patch(policy.id, { fields: { ...policy.fields, years, changedBy: context.actor } }, { expectRevision: policy.revision, event: `Audit retention lengthened from ${current} to ${years} years by ${context.actor}` });
-            else await context.mutate.create({ collection: "policies", title: "Audit retention", status: "active", summary: `Audit entries kept for ${years} years.`, fields: { kind: "auditRetention", years, changedBy: context.actor } }, `Audit retention set to ${years} years by ${context.actor}`);
-            context.toast("Retention saved", `Audit entries are kept for ${years} years.`);
-            setBusy(false);
-            close();
+            try {
+              if (policy) { if (!(await context.mutate.patch(policy.id, { fields: { ...policy.fields, years, changedBy: context.actor } }, { expectRevision: policy.revision, event: `Audit retention lengthened from ${current} to ${years} years by ${context.actor}` }))) return; }
+              else await context.mutate.create({ collection: "policies", title: "Audit retention", status: "active", summary: `Audit entries kept for ${years} years.`, fields: { kind: "auditRetention", years, changedBy: context.actor } }, `Audit retention set to ${years} years by ${context.actor}`);
+              context.toast("Retention saved", `Audit entries are kept for ${years} years.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save retention
-        </Button>
-        <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/admin/privacy`); }}>Other retention schedules</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          secondary={<Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/admin/privacy`); }}>Other retention schedules</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -314,27 +347,32 @@ export function PaySubscription({ context, close }: { context: ScreenContext; cl
         </Select>
       </Field>
       {pending && <Notice tone="info" title="Already awaiting the processor">Requested by {String(invoice?.fields.paymentRequestedBy ?? "someone")}. A second request is refused.</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!invoice || pending || !context.can("manage_policy")}
           onClick={async () => {
             if (!invoice) return;
             setBusy(true);
-            const saved = await context.mutate.patch(invoice.id, {
-              fields: { ...invoice.fields, paymentState: "awaiting_external_confirmation", paymentRequestedBy: context.actor, paymentRequestedAt: clockIso() },
-            }, { expectRevision: invoice.revision, event: `Payment of ${invoice.title} requested by ${context.actor}; awaiting a payment processor` });
-            await context.mutate.log(`Payment of ${invoice.title} held at the processor boundary`, { entityId: invoice.id, type: "billing.payment", capability: "awaiting_external_confirmation" });
-            if (saved) context.toast("Awaiting the processor", `${invoice.title} is marked for payment. Nothing was charged and no card data was collected.`, "info");
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(invoice.id, {
+                fields: { ...invoice.fields, paymentState: "awaiting_external_confirmation", paymentRequestedBy: context.actor, paymentRequestedAt: clockIso() },
+              }, { expectRevision: invoice.revision, event: `Payment of ${invoice.title} requested by ${context.actor}; awaiting a payment processor` });
+              await context.mutate.log(`Payment of ${invoice.title} held at the processor boundary`, { entityId: invoice.id, type: "billing.payment", capability: "awaiting_external_confirmation" });
+              if (saved) context.toast("Awaiting the processor", `${invoice.title} is marked for payment. Nothing was charged and no card data was collected.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Pay {invoice ? context.money(invoice.amountMinor) : ""}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -352,15 +390,17 @@ export function DownloadInvoices({ context, close }: { context: ScreenContext; c
             onChange={(event) => setChosen(event.target.checked ? [...chosen, row.id] : chosen.filter((item) => item !== row.id))} />
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="primary" disabled={rows.length === 0} onClick={() => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={rows.length === 0} onClick={() => {
           const header = "invoice,period,lines,amount_minor,status,due,processor\n";
           download(`${context.org.slug}-subscription-invoices.csv`, header + rows.map((row) => [row.title, row.fields.period, row.fields.lines, row.amountMinor, row.status, row.fields.dueAt, row.fields.processor].map(cell).join(",")).join("\n"));
           context.toast("Downloaded", `${rows.length} invoice${rows.length === 1 ? "" : "s"} in a CSV file from this browser.`);
           close();
-        }}>Download {rows.length}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        }}>Download {rows.length}</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -378,26 +418,31 @@ export function UpdatePaymentMethod({ context, close }: { context: ScreenContext
         { label: "Method on file", value: String(subscription?.fields.paymentMethod ?? "None recorded") },
         { label: "Update requested", value: subscription?.fields.methodUpdateRequestedBy ? `${String(subscription.fields.methodUpdateRequestedBy)}, ${context.dateTime(String(subscription.fields.methodUpdateRequestedAt ?? ""))}` : "No" },
       ]} />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!subscription || !context.can("manage_policy")}
           onClick={async () => {
             if (!subscription) return;
             setBusy(true);
-            const saved = await context.mutate.patch(subscription.id, {
-              fields: { ...subscription.fields, methodUpdateRequestedBy: context.actor, methodUpdateRequestedAt: clockIso(), methodUpdateState: "not_connected" },
-            }, { expectRevision: subscription.revision, event: `Payment method update requested by ${context.actor}; no processor connected` });
-            if (saved) context.toast("Request recorded", "The update is waiting for a payment processor. No card data was collected.", "info");
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(subscription.id, {
+                fields: { ...subscription.fields, methodUpdateRequestedBy: context.actor, methodUpdateRequestedAt: clockIso(), methodUpdateState: "not_connected" },
+              }, { expectRevision: subscription.revision, event: `Payment method update requested by ${context.actor}; no processor connected` });
+              if (saved) context.toast("Request recorded", "The update is waiting for a payment processor. No card data was collected.", "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Request a method update
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -414,22 +459,27 @@ export function ExportEverything({ context, close }: { context: ScreenContext; c
         { label: "Format", value: "JSON, written by this browser" },
         { label: "Destination", value: "Your downloads folder. Nothing is uploaded." },
       ]} />
-      <Row gap={2}>
-        <Button variant="primary" busy={busy} disabled={!context.can("export_data")} onClick={async () => {
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" busy={busy} disabled={!context.can("export_data")} onClick={async () => {
           setBusy(true);
-          const payload = JSON.stringify({ organisation: context.org.slug, exportedAt: clockIso(), count: records.length, records }, null, 2);
-          download(`${context.org.slug}-export.json`, payload, "application/json");
-          await context.mutate.create({
-            collection: "backups", title: "Full export", status: "ok",
-            summary: `${records.length} records written to a JSON file from this browser.`,
-            fields: { kind: "export", records: records.length, bytes: payload.length, destination: "Downloads folder", format: "json", requestedBy: context.actor, reason: "Manual export", verified: true },
-          }, `Full export of ${records.length} records`);
-          context.toast("Exported", `${records.length} records in a JSON file, and the export is recorded.`);
-          setBusy(false);
-          close();
-        }}>Export everything</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+          try {
+            const payload = JSON.stringify({ organisation: context.org.slug, exportedAt: clockIso(), count: records.length, records }, null, 2);
+            download(`${context.org.slug}-export.json`, payload, "application/json");
+            await context.mutate.create({
+              collection: "backups", title: "Full export", status: "ok",
+              summary: `${records.length} records written to a JSON file from this browser.`,
+              fields: { kind: "export", records: records.length, bytes: payload.length, destination: "Downloads folder", format: "json", requestedBy: context.actor, reason: "Manual export", verified: true },
+            }, `Full export of ${records.length} records`);
+            context.toast("Exported", `${records.length} records in a JSON file, and the export is recorded.`);
+            close();
+          } finally {
+            setBusy(false);
+          }
+        }}>Export everything</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -451,14 +501,17 @@ export function ArchiveOrg({ context, close }: { context: ScreenContext; close: 
       busy={busy}
       onConfirm={async () => {
         setBusy(true);
-        await context.mutate.create({
-          collection: "backups", title: `Archive ${context.org.name}`, status: "requested",
-          summary: `Archiving requested by ${context.actor}. Records are kept read-only once completed; nothing is deleted.`,
-          fields: { kind: "archiveRequest", requestedBy: context.actor, exportId: latest.id, exportRecords: Number(latest.fields.records ?? 0) },
-        }, `Organisation archive requested by ${context.actor}`);
-        context.toast("Archive requested", "The request is recorded against the latest export. The workspace is unchanged and nothing was deleted.", "info");
-        setBusy(false);
-        close();
+        try {
+          await context.mutate.create({
+            collection: "backups", title: `Archive ${context.org.name}`, status: "requested",
+            summary: `Archiving requested by ${context.actor}. Records are kept read-only once completed; nothing is deleted.`,
+            fields: { kind: "archiveRequest", requestedBy: context.actor, exportId: latest.id, exportRecords: Number(latest.fields.records ?? 0) },
+          }, `Organisation archive requested by ${context.actor}`);
+          context.toast("Archive requested", "The request is recorded against the latest export. The workspace is unchanged and nothing was deleted.", "info");
+          close();
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <Properties rows={[
@@ -500,25 +553,30 @@ export function RotateKey({ context, close }: { context: ScreenContext; close: (
         { label: "Scopes kept", value: String(key.fields.scopes ?? "") },
       ]} />
       <Notice tone="warning" title="The old value stops working at once">Anything still using it fails until it is given the new value.</Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={key.status !== "active" || !context.can("manage_connectors")}
           onClick={async () => {
             setBusy(true);
-            const secret = `${String(key.fields.environment) === "live" ? "arl_live" : "arl_test"}_${randomKey()}`;
-            const saved = await context.mutate.patch(key.id, {
-              fields: { ...key.fields, prefix: secret.slice(0, 13), last4: secret.slice(-4), rotatedBy: context.actor, rotatedAt: clockIso(), previousLast4: String(key.fields.last4 ?? ""), shownOnce: true },
-            }, { expectRevision: key.revision, event: `API key rotated by ${context.actor}: ${key.title}` });
-            if (saved) setIssued(secret);
-            setBusy(false);
+            try {
+              const secret = `${String(key.fields.environment) === "live" ? "arl_live" : "arl_test"}_${randomKey()}`;
+              const saved = await context.mutate.patch(key.id, {
+                fields: { ...key.fields, prefix: secret.slice(0, 13), last4: secret.slice(-4), rotatedBy: context.actor, rotatedAt: clockIso(), previousLast4: String(key.fields.last4 ?? ""), shownOnce: true },
+              }, { expectRevision: key.revision, event: `API key rotated by ${context.actor}: ${key.title}` });
+              if (saved) setIssued(secret);
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Rotate the key
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -536,10 +594,13 @@ export function RevokeKey({ context, close }: { context: ScreenContext; close: (
       busy={busy}
       onConfirm={async () => {
         setBusy(true);
-        const saved = await context.mutate.patch(key.id, { status: "revoked", fields: { ...key.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { expectRevision: key.revision, event: `API key revoked by ${context.actor}: ${key.title}` });
-        if (saved) context.toast("Revoked", `${key.title} no longer works. The record stays for the audit trail.`, "blocked");
-        setBusy(false);
-        close();
+        try {
+          const saved = await context.mutate.patch(key.id, { status: "revoked", fields: { ...key.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { expectRevision: key.revision, event: `API key revoked by ${context.actor}: ${key.title}` });
+          if (saved) context.toast("Revoked", `${key.title} no longer works. The record stays for the audit trail.`, "blocked");
+          close();
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <Properties rows={[

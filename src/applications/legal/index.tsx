@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Archive, CalendarClock, FileText, Gavel, Scale, ShieldAlert } from "lucide-react";
 import {
-  Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayCancel, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, DrawerActions, Empty, FactGrid, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord } from "@/platform/workspace";
-import { capabilityById } from "@/platform/capability";
 import {
   ContractDetail, ContractLibrary, DeadlineEditor, Evidence, GovernanceOverview, ObligationCalendar,
   ObligationQuickView, PolicyRegister, RiskRegister, ScoreRationale, clausesOf, lifecycleLabel, useLegalData,
@@ -21,24 +20,15 @@ import {
 } from "./actions";
 import { getRecord, listByCollection } from "@/platform/repo";
 import { clockIso, clockNow, wallMs } from "@/platform/clock";
+import { contractRecordHeader } from "./recordHeads";
+import { scopedDetailRecord } from "@/platform/recordScope";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
-
-function SignatureBoundary() {
-  const capability = capabilityById("site.publish");
-  return (
-    <Notice tone="warning" title="No e-signature provider is connected">
-      This workspace can prepare a signing request, name the parties and record that somebody signed on paper. It cannot send a
-      request, verify an identity or hold a signing certificate. {capability ? "" : ""}
-    </Notice>
-  );
-}
 
 function IssueCreate({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useLegalData();
@@ -183,8 +173,8 @@ function ContractUpload({ context, close }: { context: ScreenContext; close: () 
 
 function ReviewerPicker({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useLegalData();
-  const contract = useRecord(context.params.id ?? context.selectedId) ?? data.contracts.find((row) => row.status === "draft") ?? data.contracts[0];
-  if (!contract) return <Empty title="Select a contract" icon={<FileText size={20} />} />;
+  const contract = scopedDetailRecord(useRecord(context.params.id ?? context.selectedId), context.org.id, "contracts");
+  if (!contract) return <Empty title="Choose a contract first" icon={<FileText size={20} />}>A review is requested on one contract. None is substituted; choose one in the library.</Empty>;
   return (
     <form
       id="lg-reviewer"
@@ -193,11 +183,11 @@ function ReviewerPicker({ context, close }: { context: ScreenContext; close: () 
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const reviewer = String(form.get("reviewer") ?? "");
-        await context.mutate.patch(contract.id, {
+        if (!(await context.mutate.patch(contract.id, {
           status: "in_review",
           fields: { ...contract.fields, reviewer, reviewRequestedBy: context.actor, reviewRequestedAt: clockIso() },
           body: { ...(contract.body as object ?? {}), reviews: startRound(reviewsOf(contract), reviewer, context.actor, clockIso(), crypto.randomUUID()) },
-        }, { expectRevision: contract.revision, event: `${contract.title} sent for review to ${reviewer} by ${context.actor}` });
+        }, { expectRevision: contract.revision, event: `${contract.title} sent for review to ${reviewer} by ${context.actor}` }))) return;
         context.toast("Review requested", `${contract.title} is in review with ${reviewer}.`);
         close();
       }}
@@ -253,29 +243,25 @@ function ESignRequest({ context, close }: { context: ScreenContext; close: () =>
     <Stack gap={4}>
       <ModalUnsavedChanges when={acknowledged} />
       <ModalInFlight when={busy} />
-      <Properties rows={[
-        { label: "Contract", value: contract.title },
-        { label: "Counterparty", value: String(contract.fields.counterparty ?? "Not recorded") },
-        { label: "Current status", value: <Pill tone={ready ? "success" : "warning"}>{lifecycleLabel(contract.status)}</Pill> },
-        { label: "Signature provider", value: <Pill tone="warning" dot>Not connected</Pill> },
-        { label: "Recorded contract version", value: String(contract.fields.version ?? contract.revision) },
-      ]} />
+      <OverlaySummary
+        eyebrow="Signature handover"
+        title={contract.title}
+        status={<Pill tone={ready ? "success" : "warning"} dot>{lifecycleLabel(contract.status)}</Pill>}
+        meta={[String(contract.fields.counterparty ?? "") || null, `Version ${String(contract.fields.version ?? contract.revision)}`]}
+      />
       {!ready && <Notice tone="warning" title="This contract is not approved for signing">
-        Only an approved contract can be moved to awaiting signature. Current status is {lifecycleLabel(contract.status)}.
+        Only an approved contract can move to awaiting signature. It is {lifecycleLabel(contract.status)}.
       </Notice>}
-      <SignatureBoundary />
-      <Notice tone="info" title="This records a local handover only">
-        Marking the contract awaiting signature does not notify a counterparty, verify a signer
-        or create a signed document. External signature evidence must be collected and recorded separately.
+      <Notice tone="warning" title="No signing request is sent">
+        No e-signature provider is connected, so no email or invitation goes to the counterparty and no signer is verified. This
+        marks the contract awaiting signature in Arlovi; collect the signature outside it and record it afterwards.
       </Notice>
       <Checkbox checked={acknowledged} disabled={busy || !ready}
         onChange={event => setAcknowledged(event.target.checked)}
-        label={`I reviewed ${contract.title}, its counterparty and approved status, and understand no signature request is delivered.`} />
+        label={`I reviewed ${contract.title}, its counterparty and approved status.`} />
       {error && <Notice tone="danger" title="Signature request not recorded">{error}</Notice>}
       <ModalActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button variant="primary" busy={busy}
+        <OverlayActions variant="confirm" end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>} primary={<Button variant="primary" busy={busy}
           disabled={busy || !ready || !acknowledged || !context.can("view_legal")}
           onClick={async () => {
             if (busy || !ready || !acknowledged || !context.can("view_legal")) return;
@@ -298,16 +284,15 @@ function ESignRequest({ context, close }: { context: ScreenContext; close: () =>
             } finally { setBusy(false); }
           }}>
           Mark awaiting signature
-        </Button>
+        </Button>} />
       </ModalActions>
     </Stack>
   );
 }
 
 function ClauseInspector({ context }: { context: ScreenContext }) {
-  const data = useLegalData();
-  const contract = useRecord(context.params.id) ?? data.contracts[0];
-  if (!contract) return <Empty title="No contract" />;
+  const contract = scopedDetailRecord(useRecord(context.params.id), context.org.id, "contracts");
+  if (!contract) return <Empty title="Open a contract first" icon={<FileText size={20} />} />;
   const clauses = clausesOf(contract);
   const flagged = clauses.filter((clause) => clause.risk !== "standard");
   return flagged.length === 0 ? (
@@ -335,9 +320,8 @@ function ClauseInspector({ context }: { context: ScreenContext }) {
 }
 
 function RedlineDiff({ context }: { context: ScreenContext }) {
-  const data = useLegalData();
-  const contract = useRecord(context.params.id) ?? data.contracts.find((row) => versionsOf(row).length > 1) ?? data.contracts[0];
-  if (!contract) return <Empty title="No contract" />;
+  const contract = scopedDetailRecord(useRecord(context.params.id), context.org.id, "contracts");
+  if (!contract) return <Empty title="Open a contract first" icon={<FileText size={20} />} />;
   const versions = versionsOf(contract);
   if (versions.length < 2) {
     return <Empty title="Only one version is stored" icon={<FileText size={20} />}>A comparison needs two versions of the same text.</Empty>;
@@ -351,48 +335,76 @@ function RedlineDiff({ context }: { context: ScreenContext }) {
 }
 
 function SignAuthorization({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useLegalData();
-  const contract = useRecord(context.params.id ?? context.selectedId) ?? data.contracts[0];
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const found = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  const contract = found?.organizationId === context.org.id && found.collection === "contracts" ? found : undefined;
   const [confirmed, setConfirmed] = useState(false);
-  if (!contract) return <Empty title="No contract" />;
+  const [busy, setBusy] = useState(false);
+  if (!contract) return <Empty title="Choose a contract first" icon={<FileText size={20} />}>Recording a signature applies to one contract. None is substituted.</Empty>;
+  const executed = contract.fields.immutableSigned === true;
+  const approvedForSigning = contract.status === "approved" || contract.status === "awaiting_signature";
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Contract", value: contract.title },
-        { label: "Counterparty", value: String(contract.fields.counterparty ?? "") },
-        { label: "Value", value: <span className="ds-num">{contract.amountMinor ? context.money(contract.amountMinor) : "Not a fixed value"}</span> },
-        { label: "Authority needed", value: context.can("view_legal") ? "Held by this role view" : "Not held by this role view" },
+      <ModalUnsavedChanges when={confirmed} />
+      <ModalInFlight when={busy} />
+      <OverlaySummary
+        eyebrow="Record a signature"
+        title={contract.title}
+        status={<Pill tone="neutral" dot>{lifecycleLabel(contract.status)}</Pill>}
+        meta={[String(contract.fields.counterparty ?? "") || null]}
+      />
+      <FactGrid columns={2} items={[
+        { label: "Value", value: contract.amountMinor ? context.money(contract.amountMinor) : "Not a fixed value", mono: true },
+        { label: "Authority", value: context.can("view_legal") ? "Held by this role view" : "Not held by this role view", tone: context.can("view_legal") ? undefined : "warning" },
       ]} />
-      <SignatureBoundary />
+      {!executed && !approvedForSigning && (
+        <Notice tone="warning" title="Approval has not happened">
+          This contract is {lifecycleLabel(contract.status)}. It can be recorded as signed only once it is approved or awaiting signature.
+        </Notice>
+      )}
+      {executed
+        ? <Notice tone="info" title="Already executed">This contract was recorded as signed on {context.date(String(contract.fields.signedAt ?? ""))}. The executed version is immutable; a variation is stored as a new version.</Notice>
+        : <Notice tone="danger" title="This fixes the executed version">
+            Recording the signature makes the contract active and its current text immutable here. Nothing is sent to the
+            counterparty and no signature is verified. Do this only after the document was actually signed.
+          </Notice>}
       <Checkbox
         label={`I am ${context.actor} and I am recording that this was signed outside this workspace`}
         checked={confirmed}
+        disabled={executed || busy || !approvedForSigning}
         onChange={(event) => setConfirmed(event.target.checked)}
       />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={!confirmed || !context.can("view_legal")}
-          onClick={async () => {
-            const body = contract.body as { signatures?: { party: string; name: string; at: string; method: string }[] } | undefined;
-            const now = clockIso();
-            await context.mutate.patch(contract.id, {
-              status: "active",
-              fields: { ...contract.fields, signedAt: now, immutableSigned: true },
-              body: {
-                ...(contract.body as object ?? {}),
-                signatures: [...(body?.signatures ?? []), { party: context.org.name, name: context.actor, at: now, method: "Signed on paper and recorded in this workspace" }],
-              },
-            }, { expectRevision: contract.revision, event: `${contract.title} recorded as signed by ${context.actor}` });
-            context.toast("Signature recorded", "The contract is active and the executed version is now immutable here.");
-            close();
-          }}
-        >
-          Record the signature
-        </Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+          primary={<Button
+            variant="danger"
+            busy={busy}
+            disabled={!confirmed || executed || !approvedForSigning || busy || !context.can("view_legal")}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const body = contract.body as { signatures?: { party: string; name: string; at: string; method: string }[] } | undefined;
+                const now = clockIso();
+                const saved = await context.mutate.patch(contract.id, {
+                  status: "active",
+                  fields: { ...contract.fields, signedAt: now, immutableSigned: true },
+                  body: {
+                    ...(contract.body as object ?? {}),
+                    signatures: [...(body?.signatures ?? []), { party: context.org.name, name: context.actor, at: now, method: "Signed on paper and recorded in this workspace" }],
+                  },
+                }, { expectRevision: contract.revision, event: `${contract.title} recorded as signed by ${context.actor}` });
+                if (!saved) return;
+                context.toast("Signature recorded", "The contract is active and the executed version is now immutable here. Nothing was sent.");
+                close();
+              } finally { setBusy(false); }
+            }}
+          >
+            Record the signature
+          </Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -420,11 +432,11 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
         const due = clockNow();
         due.setFullYear(due.getFullYear() + 1);
         if (existing && existing.status === "draft") {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: String(form.get("title") ?? existing.title),
             summary: String(form.get("summary") ?? existing.summary),
             fields: { ...existing.fields, acknowledgementRequired: fields.acknowledgementRequired, audience: fields.audience },
-          }, { expectRevision: existing.revision, event: `Draft ${existing.title} v${current} edited by ${context.actor}` });
+          }, { expectRevision: existing.revision, event: `Draft ${existing.title} v${current} edited by ${context.actor}` }))) return;
         } else if (existing) {
           await context.mutate.create({
             collection: "policies",
@@ -472,9 +484,9 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
 
 function PolicyAudience({ context }: { context: ScreenContext }) {
   const data = useLegalData();
-  const policy = useRecord(context.selectedId) ?? data.policies[0];
+  const policy = scopedDetailRecord(useRecord(context.selectedId), context.org.id, "policies");
   const staff = data.employees.filter((employee) => employee.status !== "alumni");
-  if (!policy) return <Empty title="Select a policy" icon={<Gavel size={20} />} />;
+  if (!policy) return <Empty title="Select a policy" icon={<Gavel size={20} />}>Choose a policy in the register first. None is substituted.</Empty>;
   const audience = String(policy.fields.audience ?? "All employees");
   const reached = audience === "All employees" ? staff : staff.filter((employee) => String(employee.fields.office ?? "").toLowerCase().includes(audience.toLowerCase()) || String(employee.fields.title ?? "").toLowerCase().includes(audience.toLowerCase()));
   return (
@@ -501,9 +513,9 @@ function PolicyAudience({ context }: { context: ScreenContext }) {
 function PublicationImpact({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const data = useLegalData();
-  const policy = useRecord(payload?.id ?? context.selectedId) ?? data.policies[0];
+  const policy = scopedDetailRecord(useRecord(payload?.id ?? context.selectedId), context.org.id, "policies");
   const staff = data.employees.filter((employee) => employee.status !== "alumni").length;
-  if (!policy) return <Empty title="Select a policy" />;
+  if (!policy) return <Empty title="Select a policy" icon={<Gavel size={20} />}>Choose a policy in the register first. None is substituted.</Empty>;
   const current = String(policy.fields.version ?? "1.0");
   return (
     <Stack gap={4}>
@@ -520,12 +532,17 @@ function PublicationImpact({ context, close }: { context: ScreenContext; close: 
         A decision taken last year was taken under last year's wording. Keeping the old version is what makes that decision
         readable afterwards.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="secondary" onClick={() => { context.select(policy.id); context.openOverlay("Policy editor", { id: policy.id }); }}>Open the editor</Button>
-        {policy.status === "draft" && <Button variant="primary" disabled={!context.can("manage_policy")} onClick={() => publishPolicy(context, policy)}>Publish v{current}</Button>}
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          primary={policy.status === "draft"
+            ? <Button variant="primary" disabled={!context.can("manage_policy")} onClick={() => publishPolicy(context, policy)}>Publish v{current}</Button>
+            : <Button variant="secondary" onClick={() => { context.select(policy.id); context.openOverlay("Policy editor", { id: policy.id }); }}>Open the editor</Button>}
+          secondary={policy.status === "draft"
+            ? <Button variant="secondary" onClick={() => { context.select(policy.id); context.openOverlay("Policy editor", { id: policy.id }); }}>Open the editor</Button>
+            : undefined}
+          end={<Button variant="ghost" onClick={close}>Close</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -555,7 +572,7 @@ function EvidenceUpload({ context, close }: { context: ScreenContext; close: () 
           },
         }, `Evidence pack assembled by ${context.actor}`);
         if (obligation) {
-          await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, evidenceId: created.id } }, { event: `Evidence linked to ${obligation.title}` });
+          if (!(await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, evidenceId: created.id } }, { event: `Evidence linked to ${obligation.title}` }))) return;
         }
         context.toast("Evidence recorded", "The pack is in the evidence directory with a content hash and your name on it.");
         close();
@@ -573,107 +590,160 @@ function EvidenceUpload({ context, close }: { context: ScreenContext; close: () 
   );
 }
 
-function EvidenceDetail({ context }: { context: ScreenContext }) {
+/** The pack a hold, export or detail overlay is about: named by the overlay or the selection, never guessed. */
+function usePack(context: ScreenContext) {
   const payload = context.overlayPayload as { id?: string } | undefined;
+  const pack = useRecord(payload?.id ?? context.selectedId);
+  return pack && pack.organizationId === context.org.id && pack.fields.kind === "evidencePack" ? pack : undefined;
+}
+
+function ChoosePack({ context, what }: { context: ScreenContext; what: string }) {
   const data = useLegalData();
-  const pack = useRecord(payload?.id ?? context.selectedId) ?? data.documents.find((row) => row.fields.kind === "evidencePack");
-  if (!pack) return <Empty title="No evidence pack" icon={<Archive size={20} />} />;
+  const packs = data.documents.filter((row) => row.fields.kind === "evidencePack");
+  return (
+    <Stack gap={3}>
+      <Notice tone="info" title="Choose an evidence pack first">{what} applies to one pack. No pack is substituted.</Notice>
+      {packs.map((pack) => (
+        <Row key={pack.id} gap={2}>
+          <span className="ds-grow ds-truncate">{pack.title}</span>
+          {pack.fields.legalHold === true && <Pill tone="danger" dot>Held</Pill>}
+          <Button size="sm" variant="secondary" onClick={() => context.select(pack.id)}>Choose</Button>
+        </Row>
+      ))}
+      {packs.length === 0 && <Empty title="No evidence packs" icon={<Archive size={20} />} />}
+    </Stack>
+  );
+}
+
+function PackSummary({ context, pack }: { context: ScreenContext; pack: NonNullable<ReturnType<typeof usePack>> }) {
+  const held = pack.fields.legalHold === true;
+  return (
+    <OverlaySummary
+      eyebrow="Evidence pack"
+      title={pack.title}
+      status={held ? <Pill tone="danger" dot>Held</Pill> : <Pill tone="success" dot>Assembled</Pill>}
+      meta={[`${String(pack.fields.items ?? 0)} items`, `Assembled ${context.date(pack.at)} by ${String(pack.fields.assembledBy ?? pack.ownerName)}`]}
+    />
+  );
+}
+
+function EvidenceDetail({ context }: { context: ScreenContext }) {
+  const pack = usePack(context);
+  if (!pack) return <ChoosePack context={context} what="Opening a pack" />;
+  const held = pack.fields.legalHold === true;
   return (
     <Stack gap={4}>
-      <h3>{pack.title}</h3>
-      <p className="ds-subtle">{pack.summary}</p>
-      <Properties rows={[
-        { label: "Items", value: <span className="ds-num">{String(pack.fields.items ?? 0)}</span> },
-        { label: "Assembled by", value: String(pack.fields.assembledBy ?? pack.ownerName) },
-        { label: "Assembled", value: <span className="ds-num">{context.date(pack.at)}</span> },
-        { label: "Content hash", value: <span className="ds-num">{String(pack.fields.hash ?? "")}</span> },
-        { label: "Legal hold", value: pack.fields.legalHold === true ? <Pill tone="danger" dot>On</Pill> : <Pill tone="neutral">Off</Pill> },
+      <PackSummary context={context} pack={pack} />
+      {pack.summary && <p className="ds-prose">{pack.summary}</p>}
+      <FactGrid columns={2} items={[
+        { label: "Content hash", value: String(pack.fields.hash ?? "Not computed"), mono: true },
+        { label: "Legal hold", value: held ? "On: cannot be deleted or exported" : "Off", tone: held ? "danger" : undefined },
       ]} />
       <Notice tone="info" title="Chain of custody, as far as it goes">
-        The record names who assembled the pack and when, and the hash shows the record has not changed since. Nothing here is
+        The record names who assembled the pack and when, and the hash shows it has not changed since. Nothing here is
         countersigned by anybody outside this browser.
       </Notice>
+      <DrawerActions>
+        <OverlayActions
+          primary={context.can("view_legal")
+            ? <Button variant="primary" onClick={() => context.openOverlay("legal hold", { id: pack.id })}>{held ? "Review the hold" : "Place a legal hold"}</Button>
+            : <OverlayCancel>Close</OverlayCancel>}
+          secondary={<Button variant="secondary" onClick={() => context.openOverlay("export permissions", { id: pack.id })}>Export rules</Button>}
+          end={context.can("view_legal") ? <OverlayCancel>Close</OverlayCancel> : undefined}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
 
 function LegalHold({ context, close }: { context: ScreenContext; close: () => void }) {
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const data = useLegalData();
-  const pack = useRecord(payload?.id ?? context.selectedId) ?? data.documents.find((row) => row.fields.kind === "evidencePack");
-  if (!pack) return <Empty title="No evidence pack" />;
+  const pack = usePack(context);
+  const [busy, setBusy] = useState(false);
+  if (!pack) return <ChoosePack context={context} what="A legal hold" />;
   const held = pack.fields.legalHold === true;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Pack", value: pack.title },
-        { label: "Currently", value: held ? <Pill tone="danger" dot>Held</Pill> : <Pill tone="neutral">Not held</Pill> },
-        { label: "Retention schedule", value: "Six years, unless a hold is on" },
+      <ModalInFlight when={busy} />
+      <PackSummary context={context} pack={pack} />
+      <FactGrid columns={2} items={[
+        { label: "Currently", value: held ? "Held" : "Not held", tone: held ? "danger" : undefined },
+        { label: "Retention", value: "Six years, unless a hold is on" },
       ]} />
-      <Notice tone="warning" title="What a hold does">
-        It stops the pack being deleted by the retention schedule and refuses any export, whatever the role view allows.
-        Lifting it is a decision somebody has to take and have recorded against their name.
+      <Notice tone="warning" title={held ? "Lifting the hold" : "What a hold does"}>
+        {held
+          ? "The pack goes back under the retention schedule and can be exported again. Lifting a hold is a decision recorded against your name."
+          : "It stops the pack being deleted by the retention schedule and refuses any export, whatever the role view allows. Lifting it is a decision somebody has to take and have recorded against their name."}
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
-          variant={held ? "outline-danger" : "primary"}
-          disabled={!context.can("view_legal")}
-          onClick={async () => {
-            await context.mutate.patch(pack.id, {
-              status: held ? "assembled" : "held",
-              fields: { ...pack.fields, legalHold: !held, exportable: held, holdChangedBy: context.actor },
-            }, { expectRevision: pack.revision, event: `${held ? "Legal hold lifted" : "Legal hold placed"} on ${pack.title} by ${context.actor}` });
-            context.toast(held ? "Hold lifted" : "Hold placed", held ? "The pack can be exported again." : "The pack cannot be deleted or exported while the hold is on.");
-            close();
-          }}
-        >
-          {held ? "Lift the hold" : "Place a legal hold"}
-        </Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+          primary={<Button
+            variant={held ? "outline-danger" : "danger"}
+            busy={busy}
+            disabled={!context.can("view_legal") || busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                if (!(await context.mutate.patch(pack.id, {
+                  status: held ? "assembled" : "held",
+                  fields: { ...pack.fields, legalHold: !held, exportable: held, holdChangedBy: context.actor },
+                }, { expectRevision: pack.revision, event: `${held ? "Legal hold lifted" : "Legal hold placed"} on ${pack.title} by ${context.actor}` }))) return;
+                context.toast(held ? "Hold lifted" : "Hold placed", held ? `${pack.title} can be exported again.` : `${pack.title} cannot be deleted or exported while the hold is on.`);
+                close();
+              } finally { setBusy(false); }
+            }}
+          >
+            {held ? "Lift the hold" : "Place a legal hold"}
+          </Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 function ExportPermissions({ context }: { context: ScreenContext }) {
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const data = useLegalData();
-  const pack = useRecord(payload?.id ?? context.selectedId) ?? data.documents.find((row) => row.fields.kind === "evidencePack");
-  if (!pack) return <Empty title="No evidence pack" />;
+  const pack = usePack(context);
+  if (!pack) return <ChoosePack context={context} what="Export rules" />;
   const blocked = pack.fields.legalHold === true;
   const allowed = context.can("export_data") && !blocked;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Pack", value: pack.title },
-        { label: "Your role view", value: context.role },
-        { label: "Role view may export", value: context.can("export_data") ? <Pill tone="success">Yes</Pill> : <Pill tone="warning">No</Pill> },
-        { label: "Legal hold", value: blocked ? <Pill tone="danger" dot>On</Pill> : <Pill tone="neutral">Off</Pill> },
-        { label: "Result", value: allowed ? <Pill tone="success" dot>Export permitted</Pill> : <Pill tone="danger" dot>Export refused</Pill> },
-      ]} />
+      <PackSummary context={context} pack={pack} />
+      <OverlaySection title="Can this pack leave?" tone={allowed ? "success" : "danger"}>
+        <FactGrid columns={3} items={[
+          { label: "Your role view", value: context.can("export_data") ? "May export" : "May not export", tone: context.can("export_data") ? "success" : "warning" },
+          { label: "Legal hold", value: blocked ? "On" : "Off", tone: blocked ? "danger" : undefined },
+          { label: "Result", value: allowed ? "Export permitted" : "Export refused", tone: allowed ? "success" : "danger" },
+        ]} />
+      </OverlaySection>
       {blocked && <Notice tone="danger" title="A hold beats a permission">This pack cannot be exported by anybody while the hold is on.</Notice>}
-      <Button
-        variant="primary"
-        disabled={!allowed}
-        onClick={() => {
-          const header = "pack,items,assembled by,assembled,hash\n";
-          const body = `"${pack.title}","${String(pack.fields.items ?? 0)}","${String(pack.fields.assembledBy ?? "")}","${pack.at ?? ""}","${String(pack.fields.hash ?? "")}"`;
-          const blob = new Blob([header + body], { type: "text/csv" });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `${context.org.slug}-evidence.csv`;
-          link.click();
-          URL.revokeObjectURL(url);
-          context.toast("Exported", "The manifest downloaded from this browser.");
-        }}
-      >
-        Export the manifest
-      </Button>
       <Notice tone="info" title="Role views are not an account security boundary">
         What a role view offers is shaped in this browser. A future service would have to enforce an export rule on the server.
       </Notice>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
+            variant="primary"
+            disabled={!allowed}
+            onClick={() => {
+              const header = "pack,items,assembled by,assembled,hash\n";
+              const body = `"${pack.title}","${String(pack.fields.items ?? 0)}","${String(pack.fields.assembledBy ?? "")}","${pack.at ?? ""}","${String(pack.fields.hash ?? "")}"`;
+              const blob = new Blob([header + body], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `${context.org.slug}-evidence.csv`;
+              link.click();
+              URL.revokeObjectURL(url);
+              context.toast("Manifest downloaded", "The manifest was saved from this browser. The pack itself did not leave.");
+            }}
+          >
+            Export the manifest
+          </Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -689,10 +759,10 @@ function Escalation({ context, close }: { context: ScreenContext; close: () => v
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(obligation.id, {
+        if (!(await context.mutate.patch(obligation.id, {
           status: "escalated",
           fields: { ...obligation.fields, escalatedTo: String(form.get("to") ?? ""), escalatedBy: context.actor, escalationReason: String(form.get("why") ?? "") },
-        }, { expectRevision: obligation.revision, event: `${obligation.title} escalated to ${String(form.get("to") ?? "")} by ${context.actor}` });
+        }, { expectRevision: obligation.revision, event: `${obligation.title} escalated to ${String(form.get("to") ?? "")} by ${context.actor}` }))) return;
         context.toast("Escalated", "The record says who escalated it, to whom and why.");
         close();
       }}
@@ -728,7 +798,7 @@ function ControlAssignment({ context, close }: { context: ScreenContext; close: 
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(risk.id, {
+        if (!(await context.mutate.patch(risk.id, {
           status: String(form.get("status") ?? risk.status),
           fields: {
             ...risk.fields,
@@ -736,7 +806,7 @@ function ControlAssignment({ context, close }: { context: ScreenContext; close: 
             mitigation: String(form.get("mitigation") ?? ""),
             owner: String(form.get("owner") ?? risk.fields.owner ?? risk.ownerName),
           },
-        }, { expectRevision: risk.revision, event: `Control assigned on ${risk.title} by ${context.actor}` });
+        }, { expectRevision: risk.revision, event: `Control assigned on ${risk.title} by ${context.actor}` }))) return;
         context.toast("Control recorded", "The mitigation, its control and its owner are on the register.");
         close();
       }}
@@ -817,7 +887,7 @@ export const legalApp = registerApp({
   screens: {
     "ARL-LEGAL-001": {
       id: "ARL-LEGAL-001",
-      subtitle: (context) => `Obligations, contracts and risk in ${context.org.shortName}. Nothing here is legal advice.`,
+      subtitle: () => "Nothing here is legal advice.",
       tabs: (["Overview", "Obligations", "Policies", "Risks"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <GovernanceOverview context={context} lens={lens} />,
       })),
@@ -841,7 +911,6 @@ export const legalApp = registerApp({
 
     "ARL-LEGAL-002": {
       id: "ARL-LEGAL-002",
-      subtitle: () => "Every contract with its counterparty, its dates and where it sits in its life.",
       tabs: (["Draft", "Review", "Active", "Expiring", "Archived"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <ContractLibrary context={context} lens={lens} />,
       })),
@@ -854,15 +923,15 @@ export const legalApp = registerApp({
       overlays: [
         { id: "draft contract", kind: "modal", title: "Draft a contract", width: 640, render: ({ close, ...context }) => <DraftContract context={context} close={close} />, footer: submitFooter("lg-draft", "Create the draft") },
         { id: "Contract upload", kind: "modal", title: "Add a contract", width: 680, render: ({ close, ...context }) => <ContractUpload context={context} close={close} />, footer: submitFooter("lg-contract", "Add contract") },
-        { id: "reviewer picker", kind: "modal", title: "Send for review", width: 560, render: ({ close, ...context }) => <ReviewerPicker context={context} close={close} />, footer: submitFooter("lg-reviewer", "Request review") },
-        { id: "e-sign request", kind: "modal", title: "Signature handover", width: 600, capability: "view_legal", presentation: { noRecordContext: true, guidance: "Select an approved contract and record an awaiting-signature handover; nothing is delivered to a signing provider." }, render: ({ close, ...context }) => <ESignRequest context={context} close={close} /> },
+        { id: "reviewer picker", kind: "modal", title: "Send for review", width: 560, presentation: { selectedRecord: true, collection: "contracts", noRecordContext: true }, render: ({ close, ...context }) => <ReviewerPicker context={context} close={close} />, footer: submitFooter("lg-reviewer", "Request review") },
+        { id: "e-sign request", kind: "modal", title: "Signature handover", width: 520, capability: "view_legal", presentation: { noRecordContext: true, guidance: "Select an approved contract and record an awaiting-signature handover; nothing is delivered to a signing provider." }, render: ({ close, ...context }) => <ESignRequest context={context} close={close} /> },
       ],
     },
 
     "ARL-LEGAL-003": {
       id: "ARL-LEGAL-003",
       title: () => "Contract",
-      subtitle: () => "Parties, clauses, what changed between versions and who signed.",
+      record: contractRecordHeader,
       tabs: ["Overview", "Clauses", "Redline", "Signatures", "History"].map((lens) => ({
         id: lens, render: (context: ScreenContext) => <ContractDetail context={context} lens={lens} />,
       })),
@@ -881,13 +950,13 @@ export const legalApp = registerApp({
         { id: "comment", kind: "modal", title: "Comment on the contract", width: 560, render: ({ close, ...context }) => <CommentOnContract context={context} close={close} />, footer: submitFooter("lg-comment", "Add the comment") },
         { id: "Clause inspector", kind: "drawer", title: "Flagged clauses", width: 560, render: ({ ...context }) => <ClauseInspector context={context} /> },
         { id: "redline diff", kind: "drawer", title: "What changed", width: 720, render: ({ ...context }) => <RedlineDiff context={context} /> },
-        { id: "sign authorization", kind: "modal", title: "Record a signature", tone: "danger", width: 600, render: ({ close, ...context }) => <SignAuthorization context={context} close={close} /> },
+        { id: "e-sign request", kind: "modal", title: "Signature handover", width: 520, capability: "view_legal", presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ESignRequest context={context} close={close} /> },
+        { id: "sign authorization", kind: "modal", title: "Record a signature", tone: "danger", width: 520, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <SignAuthorization context={context} close={close} /> },
       ],
     },
 
     "ARL-LEGAL-004": {
       id: "ARL-LEGAL-004",
-      subtitle: () => "Policy versions, who they apply to and what each revision replaced.",
       tabs: (["All", "Due review", "Draft", "Published"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <PolicyRegister context={context} lens={lens} />,
       })),
@@ -942,7 +1011,6 @@ export const legalApp = registerApp({
 
     "ARL-LEGAL-006": {
       id: "ARL-LEGAL-006",
-      subtitle: () => "Impact against likelihood, scored by a named person with their reasoning.",
       tabs: (["All", "High", "Owned", "Closed"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <RiskRegister context={context} lens={lens} />,
       })),
@@ -956,14 +1024,13 @@ export const legalApp = registerApp({
       overlays: [
         { id: "risk review", kind: "modal", title: "Review a risk", width: 580, render: ({ close, ...context }) => <RiskReview context={context} close={close} />, footer: submitFooter("lg-risk-review", "Record the review") },
         { id: "Risk form", kind: "modal", title: "Add a risk", width: 600, render: ({ close, ...context }) => <RiskForm context={context} close={close} />, footer: submitFooter("lg-issue", "Add risk") },
-        { id: "score rationale", kind: "modal", title: "Score and why", width: 600, render: ({ close, ...context }) => <ScoreRationale context={context} close={close} />, footer: submitFooter("lg-score", "Record the score") },
-        { id: "control assignment", kind: "modal", title: "Mitigation and control", width: 600, render: ({ close, ...context }) => <ControlAssignment context={context} close={close} />, footer: submitFooter("lg-control", "Save control") },
+        { id: "score rationale", kind: "modal", title: "Score and why", width: 600, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <ScoreRationale context={context} close={close} />, footer: submitFooter("lg-score", "Record the score") },
+        { id: "control assignment", kind: "modal", title: "Mitigation and control", width: 600, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <ControlAssignment context={context} close={close} />, footer: submitFooter("lg-control", "Save control") },
       ],
     },
 
     "ARL-LEGAL-007": {
       id: "ARL-LEGAL-007",
-      subtitle: () => "Packs, their hashes, who assembled them and what a hold stops.",
       tabs: (["Packs", "Requests", "Holds", "Exports"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <Evidence context={context} lens={lens} />,
       })),

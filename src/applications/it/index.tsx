@@ -1,5 +1,5 @@
 import { Activity, FileText, HardDrive, Server, ShieldAlert, Siren, Wrench } from "lucide-react";
-import { Button, Notice, Properties, Stack } from "@/design-system";
+import { Button, Field, OVERLAY_WIDTH, KeyValueList, Notice, Select, Stack, TextArea } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import { openAct } from "@/applications/t6kit/act";
@@ -15,6 +15,11 @@ import {
   OperationsHome, RedactionRules, Releases, ReliabilityReports, Remediation,
   RestoreConfirmation, SecurityCentre, ServiceInspector, SystemHealth, TraceWaterfall,
 } from "./panels";
+import { incidentRecordHeader } from "./recordHeads";
+import { incidentSummary } from "./overlayHeads";
+import { SEVERITIES, withEntry } from "./register";
+import { makeEntry } from "./lifecycle";
+import { useCollection } from "@/platform/workspace";
 
 /* ====================================================================== *
  * IT — IT Operations & Reliability
@@ -25,6 +30,11 @@ import {
  * ====================================================================== */
 
 function SeverityChange({ context, close }: { context: ScreenContext; close: () => void }) {
+  const incidents = useCollection("incidents");
+  const id = context.selectedId ?? context.params.id;
+  const record = incidents.find((row) => row.id === id);
+  // Raising to critical commits people and money; it follows the approval permission of the role view.
+  const canEscalate = context.can("approve_mission");
   return (
     <form
       id="severity-change"
@@ -32,26 +42,27 @@ function SeverityChange({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
-        const repo = await import("@/platform/repo");
-        const id = context.selectedId ?? context.params.id;
-        const record = id ? await repo.getRecord(id) : undefined;
         if (!record) { context.toast("No incident selected", "Choose one on the queue first.", "blocked"); close(); return; }
-        await context.mutate.patch(record.id, {
-          fields: { ...record.fields, severity: String(data.get("severity") ?? "medium"), severityReason: String(data.get("reason") ?? "") },
-        }, { expectRevision: record.revision, event: `Severity of ${record.title} changed to ${String(data.get("severity"))}: ${String(data.get("reason") ?? "no reason given")}` });
-        context.toast("Severity changed", "The reason is recorded with the change.");
+        const severity = String(data.get("severity") ?? "medium");
+        const reason = String(data.get("reason") ?? "").trim();
+        if (severity === "critical" && !canEscalate) { context.toast("Needs approval authority", "Raising an incident to critical is limited to roles that can approve.", "blocked"); return; }
+        const saved = await context.mutate.patch(record.id, {
+          fields: { ...record.fields, severity, severityReason: reason },
+          ...withEntry(record, makeEntry(context.actor, "severity", `Severity set to ${severity}: ${reason}`)),
+        }, { expectRevision: record.revision, event: `Severity of ${record.title} changed to ${severity}: ${reason || "no reason given"}` });
+        if (!saved) return;
+        context.toast("Severity changed", "The reason is on the incident timeline.");
         close();
       }}
     >
-      <Notice tone="info" title="A severity change needs a reason">
-        Severity drives who is asked and how fast. Changing it without a reason makes the register impossible to read later.
-      </Notice>
-      <label className="ds-field-label" htmlFor="severity-select">Severity</label>
-      <select id="severity-select" name="severity" className="ds-select" defaultValue="medium">
-        {["low", "medium", "high"].map((level) => <option key={level} value={level}>{level}</option>)}
-      </select>
-      <label className="ds-field-label" htmlFor="severity-reason">Why</label>
-      <textarea id="severity-reason" name="reason" className="ds-textarea" rows={3} required />
+      <Field label="Severity" htmlFor="severity-select" hint={canEscalate ? undefined : "Critical needs approval authority in your role view."}>
+        <Select id="severity-select" name="severity" defaultValue={String(record?.fields.severity ?? "medium")}>
+          {SEVERITIES.map((level) => <option key={level} value={level} disabled={level === "critical" && !canEscalate && record?.fields.severity !== "critical"}>{level}</option>)}
+        </Select>
+      </Field>
+      <Field label="Why" htmlFor="severity-reason" hint="Severity decides who is asked and how fast. The reason is what makes the register readable later." required>
+        <TextArea id="severity-reason" name="reason" rows={3} required />
+      </Field>
     </form>
   );
 }
@@ -62,7 +73,7 @@ function EscalationRules({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="Nothing can page anyone from here">
         Escalation means reaching a person on a channel this workspace does not have. Raising severity changes the register and writes an audit entry; it does not send anything.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "On high severity", value: "The incident moves to the top of the queue and is marked" },
         { label: "Notification", value: "Not connected" },
         { label: "On-call rota", value: "Not modelled — it would be a list nobody is paged from" },
@@ -101,7 +112,7 @@ function SessionRevoke({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="There is no session to revoke">
         No account system issued one. The workspace is open to anything that can open this browser profile, and saying otherwise would be the most dangerous sentence in the product.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Sessions issued", value: <span className="ds-num">0</span> },
         { label: "Tokens held", value: <span className="ds-num">0</span> },
         { label: "What would end access", value: "Clearing site data for this origin in the browser" },
@@ -117,7 +128,7 @@ function PolicySimulation({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="A simulation shows what the interface would offer">
         Switching the role view changes which applications and actions this interface presents. It does not change what the data layer will return, because there is no server enforcing anything.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Current role view", value: <span className="ds-num">{context.role}</span> },
         { label: "Enforced by", value: "This interface" },
         { label: "Not enforced by", value: "Any server" },
@@ -170,9 +181,9 @@ export const itApp = registerApp({
       ],
       overlays: [
         acknowledgeIncident,
-        { id: "Service inspector", kind: "drawer", title: "Checks", width: 600, render: ({ ...context }) => <ServiceInspector context={context} /> },
-        { id: "incident create", kind: "modal", title: "Open an incident", width: 620, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
-        { id: "health test", kind: "modal", title: "Health checks", width: 620, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
+        { id: "Service inspector", kind: "drawer", title: "Checks", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ServiceInspector context={context} /> },
+        { id: "incident create", kind: "modal", title: "Open an incident", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
+        { id: "health test", kind: "modal", title: "Health checks", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
       ],
     },
 
@@ -206,11 +217,11 @@ export const itApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Incident detail", kind: "drawer", title: "Incident", width: 540, render: ({ ...context }) => <IncidentDetailPanel context={context} /> },
-        { id: "incident create", kind: "modal", title: "Open an incident", width: 620, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
+        { id: "Incident detail", kind: "drawer", title: "Incident", width: OVERLAY_WIDTH.form, summary: incidentSummary(), render: ({ ...context }) => <IncidentDetailPanel context={context} /> },
+        { id: "incident create", kind: "modal", title: "Open an incident", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
         assignIncident, pageOwner, resolveIncident,
-        { id: "severity change", kind: "modal", title: "Change severity", width: 520, render: ({ close, ...context }) => <SeverityChange context={context} close={close} />, footer: submitFooter("severity-change", "Change severity") },
-        { id: "escalation rules", kind: "drawer", title: "Escalation", width: 500, render: ({ ...context }) => <EscalationRules context={context} /> },
+        { id: "severity change", kind: "modal", title: "Change severity", width: OVERLAY_WIDTH.compact, summary: incidentSummary("Severity"), render: ({ close, ...context }) => <SeverityChange context={context} close={close} />, footer: submitFooter("severity-change", "Change severity") },
+        { id: "escalation rules", kind: "drawer", title: "Escalation", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <EscalationRules context={context} /> },
         mergeIncidents,
       ],
     },
@@ -218,7 +229,7 @@ export const itApp = registerApp({
     "ARL-IT-003": {
       id: "ARL-IT-003",
       title: () => "Incident",
-      subtitle: () => "Timeline, evidence and a resolution gated on a real check.",
+      record: incidentRecordHeader,
       tabs: (["Overview", "Timeline", "Evidence", "Remediation", "Postmortem"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <IncidentDetail context={context} lens={lens} />,
@@ -229,20 +240,20 @@ export const itApp = registerApp({
           const record = context.params.id ? await repo.getRecord(context.params.id) : undefined;
           if (!record) return;
           if (record.fields.acknowledgedAt) { context.toast("Already acknowledged", `${String(record.fields.acknowledgedBy)} acknowledged it.`, "info"); return; }
-          await context.mutate.patch(record.id, { status: record.status === "open" ? "investigating" : record.status, ownerName: context.actor, fields: { ...record.fields, owner: context.actor, acknowledgedBy: context.actor, acknowledgedAt: context.now.toISOString() } }, { expectRevision: record.revision, event: `${context.actor} acknowledged and took ${record.title}` });
+          if (!(await context.mutate.patch(record.id, { status: record.status === "open" ? "investigating" : record.status, ownerName: context.actor, fields: { ...record.fields, owner: context.actor, acknowledgedBy: context.actor, acknowledgedAt: context.now.toISOString() } }, { expectRevision: record.revision, event: `${context.actor} acknowledged and took ${record.title}` }))) return;
           context.toast("Acknowledged", `${record.title} is acknowledged, assigned to you and marked investigating.`);
         } },
-        { id: "approve repair", label: "Approve the repair", placement: "secondary", run: openAct("Remediation approval") },
+        { id: "approve repair", label: "Approve the repair", placement: "secondary", capability: "approve_mission", run: openAct("Remediation approval") },
         { id: "assign", label: "Assign", placement: "overflow", run: openAct("assign incident") },
         { id: "close", label: "Close", placement: "overflow", run: openAct("close incident") },
         { id: "add note", label: "Add a note", placement: "overflow", run: (context) => context.openOverlay("mitigation note") },
         { id: "change severity", label: "Change severity", placement: "overflow", run: (context) => context.openOverlay("severity change") },
       ],
       overlays: [
-        approveRepair, assignIncident, closeIncident,
-        { id: "affected work", kind: "drawer", title: "Evidence", width: 620, render: ({ ...context }) => <IncidentDetail context={context} lens="Evidence" /> },
-        { id: "mitigation note", kind: "modal", title: "Add a note", width: 520, render: ({ close, ...context }) => <MitigationNote context={context} close={close} />, footer: submitFooter("mitigation-note", "Record the note") },
-        { id: "severity change", kind: "modal", title: "Change severity", width: 520, render: ({ close, ...context }) => <SeverityChange context={context} close={close} />, footer: submitFooter("severity-change", "Change severity") },
+        { ...approveRepair, capability: "approve_mission" }, assignIncident, closeIncident,
+        { id: "affected work", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <IncidentDetail context={context} lens="Evidence" /> },
+        { id: "mitigation note", kind: "modal", title: "Add a note", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MitigationNote context={context} close={close} />, footer: submitFooter("mitigation-note", "Record the note") },
+        { id: "severity change", kind: "modal", title: "Change severity", width: OVERLAY_WIDTH.compact, summary: incidentSummary("Severity"), render: ({ close, ...context }) => <SeverityChange context={context} close={close} />, footer: submitFooter("severity-change", "Change severity") },
       ],
     },
 
@@ -262,13 +273,13 @@ export const itApp = registerApp({
         { id: "alert threshold", label: "Change an alert threshold", placement: "overflow", run: (context) => context.openOverlay("alert threshold") },
       ],
       overlays: [
-        { id: "Service health detail", kind: "drawer", title: "Checks", width: 620, render: ({ ...context }) => <ServiceInspector context={context} /> },
+        { id: "Service health detail", kind: "drawer", title: "Checks", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ServiceInspector context={context} /> },
         addMonitor, alertThreshold,
         { id: "Backup and restore", kind: "drawer", title: "Backup and restore", width: 720, render: ({ ...context }) => <BackupOverlay context={context} /> },
-        { id: "Restore confirmation", kind: "modal", title: "Replace the workspace", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <RestoreConfirmation context={context} close={close} /> },
-        { id: "health test", kind: "modal", title: "Health checks", width: 620, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
+        { id: "Restore confirmation", kind: "modal", title: "Replace the workspace", tone: "danger", width: OVERLAY_WIDTH.modal, blocking: true, render: ({ close, ...context }) => <RestoreConfirmation context={context} close={close} />, footer: closeFooter("Close without restoring") },
+        { id: "health test", kind: "modal", title: "Health checks", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
         {
-          id: "scale request", kind: "modal", title: "Scaling", width: 520,
+          id: "scale request", kind: "modal", title: "Scaling", width: OVERLAY_WIDTH.form,
           render: () => (
             <Notice tone="warning" title="There is nothing to scale">
               The workspace runs in one tab against one browser database. More capacity would mean a server, which is the same boundary every other screen reports.
@@ -295,9 +306,9 @@ export const itApp = registerApp({
         { id: "redaction", label: "Redaction rules", placement: "overflow", run: (context) => context.openOverlay("redaction rules") },
       ],
       overlays: [
-        { id: "Trace waterfall", kind: "drawer", title: "Entry", width: 560, render: ({ ...context }) => <TraceWaterfall context={context} /> },
-        { id: "redaction rules", kind: "modal", title: "Redaction", width: 600, render: () => <RedactionRules />, footer: closeFooter() },
-        { id: "saved filter", kind: "modal", title: "Filter the log", width: 480, render: ({ close, ...context }) => <SavedFilterForm context={context} close={close} />, footer: submitFooter("saved-filter", "Apply the filter") },
+        { id: "Trace waterfall", kind: "drawer", title: "Entry", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <TraceWaterfall context={context} /> },
+        { id: "redaction rules", kind: "modal", title: "Redaction", width: OVERLAY_WIDTH.modal, render: () => <RedactionRules />, footer: closeFooter() },
+        { id: "saved filter", kind: "modal", title: "Filter the log", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SavedFilterForm context={context} close={close} />, footer: submitFooter("saved-filter", "Apply the filter") },
         bookmarkOverlay, shareLog,
       ],
     },
@@ -327,7 +338,7 @@ export const itApp = registerApp({
       overlays: [
         runbookEditor, approveProposal, executeRunbookOverlay, pauseRunbook,
         {
-          id: "remediation impact", kind: "modal", title: "Impact", width: 540,
+          id: "remediation impact", kind: "modal", title: "Impact", width: OVERLAY_WIDTH.form,
           render: () => (
             <Notice tone="info" title="Nothing here changes a system outside this browser">
               The impact of every allowed step is confined to this workspace, which is why they can run without an approval queue. The steps that would reach outside are blocked instead.
@@ -335,7 +346,7 @@ export const itApp = registerApp({
           ),
           footer: closeFooter(),
         },
-        { id: "verify result", kind: "modal", title: "Verify", width: 620, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
+        { id: "verify result", kind: "modal", title: "Verify", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
       ],
     },
 
@@ -355,8 +366,8 @@ export const itApp = registerApp({
         { id: "gates", label: "Release gates", placement: "overflow", run: (context) => context.openOverlay("release gates") },
       ],
       overlays: [
-        { id: "Diff review", kind: "drawer", title: "What changed on the release", width: 560, render: ({ ...context }) => <ReleaseDiff context={context} /> },
-        { id: "release gates", kind: "modal", title: "Release gates", width: 560, render: ({ ...context }) => <ReleaseGatesOverlay context={context} />, footer: closeFooter() },
+        { id: "Diff review", kind: "drawer", title: "What changed on the release", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ReleaseDiff context={context} /> },
+        { id: "release gates", kind: "modal", title: "Release gates", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ReleaseGatesOverlay context={context} />, footer: closeFooter() },
         rollbackRelease, approveRelease, deployRelease, testRelease,
       ],
     },
@@ -379,9 +390,9 @@ export const itApp = registerApp({
         { id: "simulate policy", label: "Policy simulation", placement: "overflow", run: (context) => context.openOverlay("policy simulation") },
       ],
       overlays: [
-        { id: "Security incident", kind: "modal", title: "Open an incident", width: 620, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
-        { id: "session revoke", kind: "modal", title: "Sessions", width: 520, render: ({ ...context }) => <SessionRevoke context={context} />, footer: closeFooter() },
-        { id: "policy simulation", kind: "drawer", title: "Policy", width: 500, render: ({ ...context }) => <PolicySimulation context={context} /> },
+        { id: "Security incident", kind: "modal", title: "Open an incident", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
+        { id: "session revoke", kind: "modal", title: "Sessions", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SessionRevoke context={context} />, footer: closeFooter() },
+        { id: "policy simulation", kind: "drawer", title: "Policy", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <PolicySimulation context={context} /> },
         revokeAccess, isolateConnector,
       ],
     },
@@ -410,8 +421,8 @@ export const itApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Report builder", kind: "drawer", title: "Generate a report", width: 560, render: ({ ...context }) => <ReportBuilderPanel context={context} /> },
-        { id: "incident comparison", kind: "modal", title: "Compare incidents", width: 640, render: ({ ...context }) => <IncidentComparisonPanel context={context} />, footer: closeFooter() },
+        { id: "Report builder", kind: "drawer", title: "Generate a report", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ReportBuilderPanel context={context} /> },
+        { id: "incident comparison", kind: "modal", title: "Compare incidents", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <IncidentComparisonPanel context={context} />, footer: closeFooter() },
         proposalOverlay(),
       ],
     },

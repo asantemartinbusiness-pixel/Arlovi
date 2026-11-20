@@ -1,7 +1,7 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { addDays, clockIso } from "@/platform/clock";
@@ -11,10 +11,11 @@ import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { csvCell, planHireApplicant, planLeaveDecision } from "./decisions";
-import { newRecord } from "@/platform/repo";
+import { knownRecord, newRecord } from "@/platform/repo";
 import { planShiftSwap, planTimesheetApprovals } from "./workforce";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
+import { commitTogether } from "@/platform/commit";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
 /* ------------------------------------------------------------------ *
@@ -81,15 +82,11 @@ export function DirectoryFilter({ context, close }: { context: ScreenContext; cl
           {departments.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={() => {
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button variant="primary" onClick={() => {
           setDirectoryTeam(value);
           if (context.tab === "Teams") context.setTab("People");
           close();
-        }}>Apply the filter</Button>
-      </Row>
+        }}>Apply the filter</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -155,7 +152,9 @@ export function ProfileEditor({ context, close }: { context: ScreenContext; clos
 export async function rescindQueuedGrants(context: ScreenContext, employeeId: string, tasks: Rec[]): Promise<number> {
   const queued = tasks.filter((task) => task.fields.employeeId === employeeId && task.fields.group === "IT access" && task.status !== "done" && task.status !== "rescinded");
   for (const task of queued) {
-    await context.mutate.patch(task.id, { status: "rescinded", fields: { ...task.fields, stage: "rescinded", rescindedBy: context.actor } }, { event: `Queued grant rescinded on offboarding: ${task.title}` });
+    if (!(await context.mutate.patch(task.id, { status: "rescinded", fields: { ...task.fields, stage: "rescinded", rescindedBy: context.actor } }, { event: `Queued grant rescinded on offboarding: ${task.title}` }))) {
+      throw new Error(`${task.title} could not be rescinded.`);
+    }
   }
   return queued.length;
 }
@@ -403,13 +402,14 @@ export function MentorAssign({ context, close }: { context: ScreenContext; close
         event.preventDefault();
         const mentor = String(new FormData(event.currentTarget).get("mentor") ?? "");
         if (!starter || !mentor) return;
-        await context.mutate.patch(starter.id, { fields: { ...starter.fields, mentor } }, { expectRevision: starter.revision, event: `${mentor} assigned as mentor to ${starter.title} by ${context.actor}` });
         const intro = data.tasks.find((task) => task.fields.employeeId === starter.id && task.title.startsWith("Mentor introduction"));
-        if (intro) {
-          await context.mutate.patch(intro.id, { title: `Mentor introduction with ${mentor}`, fields: { ...intro.fields, assignee: mentor } }, { event: `Mentor introduction reassigned to ${mentor}` });
-        } else {
-          await context.mutate.create({ collection: "tasks", title: `Mentor introduction with ${mentor}`, status: "ready", summary: `Manager step for ${starter.title}.`, parentId: starter.id, fields: { kind: "onboarding", employeeId: starter.id, stage: "ready", assignee: mentor, group: "Manager" } }, `Mentor introduction added for ${starter.title}`);
-        }
+        // The mentor and the introduction step change together or not at all.
+        if (!(await commitTogether(context, [
+          { record: starter, patch: { fields: { ...starter.fields, mentor } }, event: `${mentor} assigned as mentor to ${starter.title} by ${context.actor}` },
+          intro
+            ? { record: intro, patch: { title: `Mentor introduction with ${mentor}`, fields: { ...intro.fields, assignee: mentor } }, event: `Mentor introduction reassigned to ${mentor}` }
+            : { create: { collection: "tasks", title: `Mentor introduction with ${mentor}`, status: "ready", summary: `Manager step for ${starter.title}.`, parentId: starter.id, fields: { kind: "onboarding", employeeId: starter.id, stage: "ready", assignee: mentor, group: "Manager" } }, event: `Mentor introduction added for ${starter.title}` },
+        ]))) return;
         context.toast("Mentor assigned", `${mentor} is ${starter.title}'s mentor and owns the introduction step.`);
         close();
       }}
@@ -455,7 +455,7 @@ export async function verifyCompletion(context: ScreenContext): Promise<void> {
         body: `Records that ${context.actor} checked all ${steps.length} steps for ${employee.title}. Access grants stay as they were recorded; verification grants nothing.`,
         confirm: "Verify completion",
         run: async () => {
-          await context.mutate.patch(employee.id, { fields: { ...employee.fields, onboardingVerifiedBy: context.actor, onboardingVerifiedAt: clockIso() } }, { expectRevision: employee.revision, event: `Onboarding for ${employee.title} verified complete by ${context.actor}` });
+          if (!(await context.mutate.patch(employee.id, { fields: { ...employee.fields, onboardingVerifiedBy: context.actor, onboardingVerifiedAt: clockIso() } }, { expectRevision: employee.revision, event: `Onboarding for ${employee.title} verified complete by ${context.actor}` }))) return;
           context.toast("Onboarding verified", `${employee.title}'s checklist is verified by ${context.actor}.`);
         },
       });
@@ -465,14 +465,27 @@ export async function verifyCompletion(context: ScreenContext): Promise<void> {
 
 /* ---------------- ARL-HR-007 · approve / decline / adjust balance ---------------- */
 
+/** The requester's name from the employee record the request points at; never the request's owner. */
+function requesterName(request: Rec): string {
+  const named = String(request.fields.employeeName ?? "").trim();
+  if (named) return named;
+  const employee = knownRecord(String(request.fields.employeeId ?? ""));
+  return employee?.title ?? "the requester";
+}
+
 async function leaveRequestFor(context: ScreenContext, verb: string, then: (request: Rec) => void): Promise<void> {
   const chosen = await recordOf(context, context.selectedId, "leaveRequests");
-  if (chosen && chosen.status === "requested") { then(chosen); return; }
+  if (chosen && chosen.status === "requested") {
+    const { getRecordInOrg } = await import("@/platform/repo");
+    const id = String(chosen.fields.employeeId ?? "");
+    if (id) await getRecordInOrg(context.org.id, id);
+    then(chosen); return;
+  }
   pickRecord(context, {
     title: `${verb} a leave request`,
     collection: "leaveRequests",
     filter: (row) => row.status === "requested",
-    describe: (row) => `${context.date(row.startAt)} – ${context.date(row.endAt)} · ${String(row.fields.type ?? "annual")}`,
+    describe: (row) => `${requesterName(row)} · ${String(row.fields.type ?? "annual")} · ${context.date(row.startAt)} – ${context.date(row.endAt)}`,
     pickLabel: verb,
     empty: "Nothing is waiting for a decision",
     onPick: then,
@@ -481,7 +494,7 @@ async function leaveRequestFor(context: ScreenContext, verb: string, then: (requ
 
 export function approveLeave(context: ScreenContext): Promise<void> {
   return leaveRequestFor(context, "Approve", (request) => {
-    const who = String(request.fields.employeeName ?? request.ownerName);
+    const who = requesterName(request);
     askFirst(context, {
       title: "Approve leave",
       body: `${who} is booked away ${context.date(request.startAt)} – ${context.date(request.endAt)}. The request and the balance both change, and the approval is recorded against ${context.actor}.`,
@@ -507,7 +520,7 @@ export function approveLeave(context: ScreenContext): Promise<void> {
 
 export function declineLeave(context: ScreenContext): Promise<void> {
   return leaveRequestFor(context, "Decline", (request) => {
-    const who = String(request.fields.employeeName ?? request.ownerName);
+    const who = requesterName(request);
     askFirst(context, {
       title: "Decline leave",
       body: `${who}'s request for ${context.date(request.startAt)} – ${context.date(request.endAt)} is recorded as declined by ${context.actor}. No balance moves.`,
@@ -547,7 +560,7 @@ export function BalanceAdjust({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         if (!employee || invalid || !reason.trim()) return;
         const allowance = Number(employee.fields.leaveAllowance ?? 0) + change;
-        await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveAllowance: allowance, lastBalanceAdjustment: `${change > 0 ? "+" : ""}${change} days by ${context.actor}: ${reason.trim()}` } }, { expectRevision: employee.revision, event: `Leave allowance for ${employee.title} adjusted by ${change} days by ${context.actor}: ${reason.trim()}` });
+        if (!(await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveAllowance: allowance, lastBalanceAdjustment: `${change > 0 ? "+" : ""}${change} days by ${context.actor}: ${reason.trim()}` } }, { expectRevision: employee.revision, event: `Leave allowance for ${employee.title} adjusted by ${change} days by ${context.actor}: ${reason.trim()}` }))) return;
         context.toast("Balance adjusted", `${employee.title}'s allowance is now ${allowance} days, with the reason on the record.`);
         close();
       }}
@@ -759,7 +772,7 @@ export async function prepareRun(context: ScreenContext, runs: Rec[], employees:
   const existing = runs.find((row) => row.status === "draft" && String(row.fields.period ?? "") === period);
   let id: string;
   if (existing) {
-    await context.mutate.patch(existing.id, { amountMinor: gross, fields: { ...existing.fields, people: lines.length, grossMinor: gross, netMinor: net, preparedBy: context.actor, preparedAt: clockIso() } }, { expectRevision: existing.revision, event: `Payroll ${period} re-prepared by ${context.actor}` });
+    if (!(await context.mutate.patch(existing.id, { amountMinor: gross, fields: { ...existing.fields, people: lines.length, grossMinor: gross, netMinor: net, preparedBy: context.actor, preparedAt: clockIso() } }, { expectRevision: existing.revision, event: `Payroll ${period} re-prepared by ${context.actor}` }))) return;
     id = existing.id;
   } else {
     const created = await context.mutate.create({ collection: "payrollRuns", title: `Payroll ${period}`, status: "draft", amountMinor: gross, summary: "Prepared locally from employee records. Nothing filed or paid.", fields: { period, people: lines.length, grossMinor: gross, netMinor: net, preparedBy: context.actor, filed: false, banked: false } }, `Payroll ${period} prepared by ${context.actor}`);
@@ -775,7 +788,7 @@ export async function validateRun(context: ScreenContext, runs: Rec[], employees
   const exceptions = payrollSalaryGaps(employees).length
     + shifts.filter((row) => row.fields.kind === "time"
       && (row.fields.approved !== true || row.status !== "approved")).length;
-  await context.mutate.patch(run.id, { fields: { ...run.fields, validatedBy: context.actor, validatedAt: clockIso(), exceptions, jurisdictionValidated: false } }, { expectRevision: run.revision, event: `${run.title} validated by ${context.actor}: ${exceptions} data exceptions; ${context.org.jurisdiction} rules not validated` });
+  if (!(await context.mutate.patch(run.id, { fields: { ...run.fields, validatedBy: context.actor, validatedAt: clockIso(), exceptions, jurisdictionValidated: false } }, { expectRevision: run.revision, event: `${run.title} validated by ${context.actor}: ${exceptions} data exceptions; ${context.org.jurisdiction} rules not validated` }))) return;
   context.toast(exceptions ? "Exceptions found" : "No data exceptions", `${exceptions} exception${exceptions === 1 ? "" : "s"} recorded on the run. ${context.org.jurisdiction} rules still need a payroll provider.`, exceptions ? "blocked" : "ok");
   context.openOverlay("exception report");
 }
@@ -887,11 +900,7 @@ export function ReconcileRun({ context, close }: { context: ScreenContext; close
         </Notice>
         {error && <Notice tone="danger" title="Comparison not saved">{error}</Notice>}
       </PeopleDialogSection>
-      <Row gap={2} wrap>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open ledger</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={!chosen || difference === undefined || !checked}
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} secondary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open ledger</Button>} primary={<Button variant="primary" disabled={!chosen || difference === undefined || !checked}
           onClick={async () => {
             if (!chosen || difference === undefined || !checked) return;
             setError("");
@@ -911,8 +920,7 @@ export function ReconcileRun({ context, close }: { context: ScreenContext; close
             } catch (reason) {
               setError(reason instanceof Error ? reason.message : "The comparison could not be recorded.");
             }
-          }}>Record comparison</Button>
-      </Row>
+          }}>Record comparison</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -933,7 +941,7 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         const reviewer = String(new FormData(event.currentTarget).get("reviewer") ?? "");
         if (!review || !reviewer) return;
-        await context.mutate.patch(review.id, { fields: { ...review.fields, reviewer, reviewerAssignedBy: context.actor } }, { expectRevision: review.revision, event: `${reviewer} assigned to review ${String(review.fields.employeeName ?? "")} by ${context.actor}` });
+        if (!(await context.mutate.patch(review.id, { fields: { ...review.fields, reviewer, reviewerAssignedBy: context.actor } }, { expectRevision: review.revision, event: `${reviewer} assigned to review ${String(review.fields.employeeName ?? "")} by ${context.actor}` }))) return;
         context.toast("Reviewer assigned", `${reviewer} now owns ${review.title}.`);
         close();
       }}
@@ -985,7 +993,7 @@ export function submitReview(context: ScreenContext): Promise<void> {
       body: `${review.title} becomes visible to the next manager up and can no longer be edited by the reviewer alone.`,
       confirm: "Submit the review",
       run: async () => {
-        await context.mutate.patch(review.id, { status: "submitted", fields: { ...review.fields, submittedBy: context.actor, submittedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} submitted by ${context.actor}` });
+        if (!(await context.mutate.patch(review.id, { status: "submitted", fields: { ...review.fields, submittedBy: context.actor, submittedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} submitted by ${context.actor}` }))) return;
         context.toast("Review submitted", `${review.title} is submitted by ${context.actor}.`);
       },
     });
@@ -998,7 +1006,7 @@ export function acknowledgeReview(context: ScreenContext): Promise<void> {
     body: `Records that ${context.actor} has read ${review.title}. Acknowledging is not agreeing; a comment can still be added.`,
     confirm: "Acknowledge",
     run: async () => {
-      await context.mutate.patch(review.id, { status: "acknowledged", fields: { ...review.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} acknowledged by ${context.actor}` });
+      if (!(await context.mutate.patch(review.id, { status: "acknowledged", fields: { ...review.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() } }, { expectRevision: review.revision, event: `Review ${review.title} acknowledged by ${context.actor}` }))) return;
       context.toast("Review acknowledged", `Recorded against ${review.title}.`);
     },
   }));
@@ -1081,9 +1089,12 @@ export function completeModule(context: ScreenContext): void {
       confirm: "Mark complete",
       run: async () => {
         const { getRecord } = await import("@/platform/repo");
-        await context.mutate.patch(record.id, { status: "complete", fields: { ...record.fields, completedAt: clockIso() } }, { expectRevision: record.revision, event: `${record.title} completed` });
         const course = await getRecord(String(record.fields.courseId ?? ""));
-        if (course) await context.mutate.patch(course.id, { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, { expectRevision: course.revision, event: `${course.title} completion recorded for ${context.actor}` });
+        // The completion and the course count change together or not at all.
+        if (!(await commitTogether(context, [
+          { record, patch: { status: "complete", fields: { ...record.fields, completedAt: clockIso() } }, event: `${record.title} completed` },
+          ...(course ? [{ record: course, patch: { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, event: `${course.title} completion recorded for ${context.actor}` }] : []),
+        ]))) return;
         context.toast("Module complete", "The completion and the course count both changed.");
       },
     }),

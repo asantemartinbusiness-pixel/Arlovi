@@ -10,7 +10,8 @@ import {
 import {
   Button, ButtonGroup, Card, Checkbox, DataGrid, Empty, Field, Grid, InspectorSection, Meter,
   Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs, TextArea,
-  TextInput, Tool, Toolbar, ToolbarSeparator,
+  TextInput, Tool, Toolbar, ToolbarSeparator, type RecordHeaderProps,
+  OVERLAY_WIDTH, OverlaySummary,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -35,6 +36,7 @@ import {
 } from "./actions";
 import { useStore } from "@/applications/visual/kit";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
+import { LibraryStrip, ViewToggle, useLibraryView } from "../docs/libraryKit";
 import "./present.css";
 
 /* ====================================================================== *
@@ -53,6 +55,37 @@ function useDeck(context: ScreenContext): Rec | undefined {
   if (context.params.id) return fromRoute?.collection === "decks" ? fromRoute : all.find((record) => record.id === context.params.id);
   return all.find((record) => record.fields.isTemplate !== true) ?? all[0];
 }
+
+/** Identity head for overlays that act on the open deck. */
+function DeckOverlaySummary({ context }: { context: ScreenContext }) {
+  const record = useDeck(context);
+  if (!record) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Deck"
+      title={record.title}
+      status={<Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill>}
+      meta={[record.ownerName, `Revision ${record.revision}`]}
+    />
+  );
+}
+function DeckTitle({ context }: { context: ScreenContext }) { return <>{useDeck(context)?.title ?? "Deck"}</>; }
+function DeckStatus({ context }: { context: ScreenContext }) {
+  const record = useDeck(context);
+  return record ? <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill> : null;
+}
+function DeckFacts({ context }: { context: ScreenContext }) {
+  const record = useDeck(context);
+  if (!record) return null;
+  const deck = readDeck(record.body);
+  const open = deck.comments.filter((item) => !item.resolved).length;
+  return <>{deck.slides.length} slide{deck.slides.length === 1 ? "" : "s"} · {deck.theme.name} · {record.ownerName} · {open} open comment{open === 1 ? "" : "s"}</>;
+}
+/** Identity block for the deck pages beside the editor. Runs outside hook rules, so each piece reads the record itself. */
+function deckRecord(context: ScreenContext): RecordHeaderProps {
+  return { title: <DeckTitle context={context} />, status: <DeckStatus context={context} />, meta: [<DeckFacts key="facts" context={context} />] };
+}
+const deckSummary = (context: ScreenContext) => <DeckOverlaySummary context={context} />;
 
 /** The screen's contract actions, on the editor's own bar (the full-chrome surface has no page header). */
 function EditorActions({ context }: { context: ScreenContext }) {
@@ -184,10 +217,22 @@ function SlideSorter({ editor, context }: { editor: DeckEditor; context: ScreenC
  * ARL-PRESENT-001 — Presentation Library
  * ====================================================================== */
 
+/** A copy is a fresh draft: comments, approvals, export and share records and recorded sharing do not travel with it. */
+async function duplicateDeck(context: ScreenContext, source: Rec): Promise<void> {
+  const deck = readDeck(source.body);
+  const fields = { ...source.fields, sharedWith: "" };
+  await context.mutate.create({
+    collection: "decks", title: `${source.title} copy`, status: "draft", summary: source.summary,
+    tags: source.tags, fields, body: { ...deck, comments: [], approvals: [], exports: [] },
+  }, `${source.title} duplicated`);
+  context.toast("Duplicated", "Slides, objects and theme were copied as a new draft. Comments, approvals, export and share records and sharing lists were not.");
+}
+
 function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" | "Shared" | "Templates" | "Archived" }) {
   const decks = useCollection("decks");
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
+  const [view, setView] = useLibraryView("present", "cards");
   const rows = useMemo(() => {
     const list = tab === "Recent"
       ? [...decks].filter((record) => record.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -202,19 +247,21 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
 
   return (
     <Stack gap={4}>
-      <div className="pr-library-heading">
-        <div><span className="pr-library-eyebrow">PRESENT / DECK LIBRARY</span>
-          <h2>{tab === "Shared" ? "Recorded sharing." : tab === "Templates" ? "Reusable presentations." : tab === "Archived" ? "Presentation archive." : "Presentations in progress."}</h2>
-          <p>{tab === "Shared" ? "Decks with a locally recorded sharing list or active sharing-intent entry appear here. These records do not grant public or workspace access." : "Find and present the right deck with its source, review state and design context visible."}</p>
-        </div>
-        <Button variant="primary" onClick={() => context.openOverlay("new deck")}>New presentation</Button>
+      <LibraryStrip
+        label="Presentation library overview"
+        items={[
+          { label: "Current decks", value: decks.filter((record) => record.status !== "archived").length },
+          { label: "Templates", value: decks.filter((record) => record.fields.isTemplate === true).length },
+          { label: "Archived", value: decks.filter((record) => record.status === "archived").length },
+          { label: "shown in this view", value: rows.length },
+        ]}
+      >
+        <ViewToggle label="Library view" value={view} onChange={setView} />
+      </LibraryStrip>
+      {tab === "Shared" && <p className="ds-subtle">These records do not grant public or workspace access.</p>}
+      <div className="lk-toolbar">
+        <div className="lk-grow"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></div>
       </div>
-      <div className="pr-library-overview" aria-label="Presentation library overview">
-        <div><span>Current decks</span><strong>{decks.filter((record) => record.status !== "archived").length}</strong></div>
-        <div><span>Templates</span><strong>{decks.filter((record) => record.fields.isTemplate === true).length}</strong></div>
-        <div><span>Archived</span><strong>{decks.filter((record) => record.status === "archived").length}</strong></div>
-      </div>
-      <Field label="Find a presentation"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></Field>
       {rows.length === 0 ? <Empty title={query.trim() ? "No presentations match this search" : `No ${tab.toLowerCase()} presentations`} icon={<Presentation size={20} />}
         action={query.trim()
           ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>
@@ -224,7 +271,23 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
           : tab === "Templates" ? "Create a presentation and mark it as a template to reuse its layouts and theme."
           : tab === "Archived" ? "Archived presentations will appear here when there are any."
           : "Create a presentation or import an outline to start."}
-      </Empty> : (
+      </Empty> : view === "table" ? (
+        <DataGrid
+          rows={rows}
+          rowId={(row) => row.id}
+          label={`${tab} presentations`}
+          selectedId={context.selectedId}
+          onSelect={(id) => context.select(id)}
+          onOpen={(id) => context.navigate(`/o/${org.slug}/present/decks/${id}`)}
+          columns={[
+            { key: "title", header: "Deck", primary: true, sortValue: (row) => row.title, cell: (row) => <span className="ds-truncate">{row.title}</span> },
+            { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "published" ? "success" : row.status === "in_review" ? "warning" : "neutral"}>{row.status.replace("_", " ")}</Pill> },
+            { key: "slides", header: "Slides", align: "end", cell: (row) => String(readDeck(row.body).slides.length), hideBelow: 900 },
+            { key: "owner", header: "Owner", cell: (row) => row.ownerName, hideBelow: 1100 },
+            { key: "updated", header: "Changed", align: "end", sortValue: (row) => row.updatedAt, cell: (row) => context.relative(row.updatedAt) },
+          ]}
+        />
+      ) : (
     <Grid>
       {rows.map((record) => {
         const deck = readDeck(record.body);
@@ -242,6 +305,7 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
               <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/present/decks/${record.id}`)}>Edit</Button>
               <Button size="sm" variant="secondary" icon={<Play size={14} />} onClick={() => context.navigate(`/o/${org.slug}/present/decks/${record.id}/present`)}>Present</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("template preview", { id: record.id })}>Preview</Button>
+              <Button size="sm" variant="ghost" onClick={() => void duplicateDeck(context, record)}>Duplicate</Button>
             </>}
           >
             <Stack gap={3}>
@@ -487,7 +551,7 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
           ]} />
           <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-2)" }} onClick={() => context.openOverlay("Layout picker", { mode: "reapply" })}>Change layout</Button>
         </InspectorSection>
-        <InspectorSection title="Speaker notes">
+        <InspectorSection title="Speaker notes · private to the presenter">
           <TextArea
             rows={7}
             aria-label="Speaker notes"
@@ -728,12 +792,24 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
   return (
     <div className="px-shell">
       <div className="px-bar">
-        <div className="px-bar-title">
-          <strong>{record.title}</strong>
-          <span>Slide {editor.deck.index + 1} of {editor.deck.slides.length} · {editor.deck.theme.name} · {layoutById(editor.deck, editor.slide.layoutId).name}</span>
-        </div>
+        <section className="px-bar-main" aria-label="Active slide context">
+          <div className="px-bar-title">
+            <h1 className="px-bar-h1">{record.title}</h1>
+            <span className="px-bar-sub">
+              <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+              <span>Slide {editor.deck.index + 1} of {editor.deck.slides.length} · {layoutById(editor.deck, editor.slide.layoutId).name}</span>
+              <span>{editor.slide.objects.length} objects · {buildOrder(editor.slide).length} animated</span>
+              {editor.slide.hidden && <Pill tone="warning">Hidden from the audience</Pill>}
+              {editor.deck.comments.filter((item) => !item.resolved).length > 0 && <Pill tone="info">{editor.deck.comments.filter((item) => !item.resolved).length} open comments</Pill>}
+            </span>
+          </div>
+          <ButtonGroup label="Deck areas">
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks`)}>Library</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/theme`)}>Theme</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animation`)}>Animation</Button>
+          </ButtonGroup>
+        </section>
         <span className="ds-grow" />
-        <EditorActions context={context} />
         <SaveBadge editor={editor} context={context} />
         <Button size="sm" variant="secondary" disabled={editor.saveState === "clean" || editor.saveState === "saved"} onClick={() => void editor.saveNow()}>Save now</Button>
         <Button size="sm" variant="primary" icon={<Play size={15} />} onClick={() => context.navigate(context.path("/o/:org/present/decks/:id/present", record.id))}>Present</Button>
@@ -742,23 +818,6 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
           <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "canvas" : "aside")}>Inspector</Button>
         </ButtonGroup>
       </div>
-
-      <section className="pr-editor-context" aria-label="Active slide context">
-        <div className="pr-editor-context-main">
-          <span className="pr-library-eyebrow">PRESENT / SLIDE WORKSPACE</span>
-          <Row gap={2} wrap>
-            <strong>{editor.slide.title || `Slide ${editor.deck.index + 1}`}</strong>
-            <Pill tone={editor.slide.hidden ? "warning" : "neutral"}>{editor.slide.hidden ? "Hidden from presenting" : "Included in presentation"}</Pill>
-            <span className="ds-subtle">{editor.slide.objects.length} objects · {buildOrder(editor.slide).length} animated · {editor.deck.comments.filter((item) => !item.resolved).length} open comments</span>
-          </Row>
-          <span className="ds-subtle">Theme: {editor.deck.theme.name} · Layout: {layoutById(editor.deck, editor.slide.layoutId).name}</span>
-        </div>
-        <Row gap={2} wrap>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks`)}>Library</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/theme`)}>Theme</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animation`)}>Animation</Button>
-        </Row>
-      </section>
       <div className="px-bar" style={{ minHeight: 40 }}>
         <Tabs
           label="Editor modes"
@@ -771,6 +830,7 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
             { id: "Review", label: "Review", count: editor.deck.comments.filter((comment) => !comment.resolved).length },
             { id: "View", label: "View" },
           ]}
+          trailing={<EditorActions context={context} />}
         />
       </div>
 
@@ -815,9 +875,10 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
                 onDelete={(ids) => { editor.commitSlide(removeObjects(editor.slide, ids), "Delete objects"); editor.setSelectedIds([]); }}
               scale={scale}
             />
-            <Notice tone="neutral">
-              Drag to move, the eight handles to resize, the round handle above to rotate. From the keyboard: Tab cycles objects, arrows move, Alt and arrows resize, square brackets rotate, Enter edits text, Delete removes.
-            </Notice>
+            <details className="px-keys">
+              <summary>Move, resize and keyboard</summary>
+              <p>Drag to move, the eight handles to resize, the round handle above to rotate. From the keyboard: Tab cycles objects, arrows move, Alt and arrows resize, square brackets rotate, Enter edits text, Delete removes.</p>
+            </details>
           </div>
           <div className="px-status">
             <span>Selection <strong className="ds-num">{editor.selectedIds.length}</strong></span>
@@ -948,8 +1009,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
   return (
     <Stack gap={4}>
       <div className="pr-library-heading">
-        <div><span className="pr-library-eyebrow">PRESENT / DESIGN GOVERNANCE</span><h2>One coherent visual language.</h2>
-          <p>Inspect master layouts, see which slides have been customised and resolve typography before applying changes across the deck.</p></div>
+        <div></div>
         <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
       </div>
       <div className="pr-library-overview" aria-label="Presentation theme overview">
@@ -1185,8 +1245,7 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
   const longTransitions = editor.deck.slides.filter((slide) => slide.transition.durationMs > 600).length;
   const animationOverview = (
     <section className="pr-workflow-overview" aria-label="Animation workflow overview">
-      <div className="pr-library-heading"><div><span className="pr-library-eyebrow">PRESENT / MOTION WORKSPACE</span>
-        <h2>Motion with purpose.</h2><p>Review every slide transition and object animation, including timing and reduced-motion behaviour before presenting.</p>
+      <div className="pr-library-heading"><div>
       </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button></div>
       <div className="pr-library-overview">
         <div><span>Slide transitions</span><strong>{editor.deck.slides.filter((slide) => slide.transition.effect !== "none").length}</strong></div>
@@ -1561,9 +1620,7 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
     return (
       <Stack gap={4}>
         <div className="pr-library-heading">
-          <div><span className="pr-library-eyebrow">PRESENT / AUDIENCE VIEW</span>
-            <h2>What your audience will see.</h2>
-            <p>Preview the current slide without speaker notes. Hidden slides stay out of the visible presentation sequence.</p>
+          <div>
           </div>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
         </div>
@@ -1772,8 +1829,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   const reviewOverview = (
     <section className="pr-workflow-overview" aria-label="Presentation review overview">
       <div className="pr-library-heading">
-        <div><span className="pr-library-eyebrow">PRESENT / REVIEW & DELIVERY</span><h2>Ready for the room.</h2>
-          <p>Review unresolved feedback, output quality and saved changes before distributing a presentation. Exports are generated locally.</p></div>
+        <div></div>
         <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
       </div>
       <div className="pr-library-overview">
@@ -1884,7 +1940,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             )}
             <Row gap={2} wrap>
               <Button variant="primary" disabled={record.status === "published"} onClick={async () => {
-                await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
+                if (!(await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` }))) return;
                 context.toast("Status recorded", "This browser now lists the deck as published. No external access was granted.");
               }}>Mark as published locally</Button>
               <Button variant="secondary" onClick={() => {
@@ -2558,7 +2614,7 @@ function DatasetPicker({ context, close }: { context: ScreenContext; close: () =
             };
             editor.commitSlide(addObject(editor.slide, object), "Insert chart");
             editor.setSelectedIds([object.id]);
-            await context.mutate.patch(record.id, { fields: { ...record.fields, pendingChart: "" } }, { skipHistory: true });
+            if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, pendingChart: "" } }, { skipHistory: true }))) return;
             context.toast("Chart inserted", `Snapshot from ${queued.sourceSheetName}!${queued.sourceRef}, captured ${context.dateTime(queued.capturedAt)}.`);
             close();
             return;
@@ -3075,11 +3131,7 @@ registerApp({
             if (!id) return;
             const source = await import("@/platform/repo").then((module) => module.getRecord(id));
             if (!source) return;
-            await context.mutate.create({
-              collection: "decks", title: `${source.title} copy`, status: "draft", summary: source.summary,
-              tags: source.tags, fields: { ...source.fields }, body: readDeck(source.body),
-            }, `${source.title} duplicated`);
-            context.toast("Duplicated", "Every slide, object and theme token was copied.");
+            await duplicateDeck(context, source);
           },
         },
         {
@@ -3089,31 +3141,33 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "new deck", kind: "modal", title: "New deck", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="new-deck">Create</Button></>, render: (context) => <NewDeck context={context} close={context.close} /> },
-        { id: "Import", kind: "drawer", title: "Import a deck", width: 600, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="import-deck">Import</Button></>, render: (context) => <ImportDeck context={context} close={context.close} /> },
-        { id: "template preview", kind: "drawer", title: "Preview", width: 680, render: (context) => <TemplatePreview context={context} /> },
+        { id: "new deck", kind: "modal", title: "New deck", width: OVERLAY_WIDTH.form, footer: formFooter("new-deck", "Create", false), render: (context) => <NewDeck context={context} close={context.close} /> },
+        { id: "Import", kind: "drawer", summary: deckSummary, title: "Import a deck", width: OVERLAY_WIDTH.record, footer: formFooter("import-deck", "Import", false), render: (context) => <ImportDeck context={context} close={context.close} /> },
+        { id: "template preview", kind: "drawer", summary: deckSummary, title: "Preview", width: OVERLAY_WIDTH.wide, render: (context) => <TemplatePreview context={context} /> },
       ],
     },
 
     "ARL-PRESENT-002": {
       id: "ARL-PRESENT-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <SlideEditorScreen context={context} />,
       tabs: ["Design", "Insert", "Animate", "Review", "View"].map((id) => ({ id, render: () => null })),
       actions: SLIDE_ACTIONS,
       overlays: [
-        { id: "Layout picker", kind: "drawer", title: "Layouts", width: 640, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="layout-picker">Apply</Button></>, render: (context) => <LayoutPicker context={context} close={context.close} /> },
-        { id: "image insert", kind: "modal", title: "Image", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="image-insert">Save</Button></>, render: (context) => <ImageInsert context={context} close={context.close} /> },
-        { id: "properties", kind: "modal", title: "Object", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="properties">Save</Button></>, render: (context) => <PropertiesOverlay context={context} close={context.close} /> },
-        { id: "move object", kind: "modal", title: "Move object", width: 440, footer: formFooter("present-move", "Move"), render: (context) => <MoveObject context={context} close={context.close} /> },
-        { id: "resize object", kind: "modal", title: "Resize object", width: 440, footer: formFooter("present-resize", "Resize"), render: (context) => <ResizeObject context={context} close={context.close} /> },
-        { id: "align objects", kind: "modal", title: "Align", width: 520, render: (context) => <AlignObjects context={context} close={context.close} /> },
-        { id: "AI suggestion", kind: "drawer", title: "Suggestions", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="ai-suggestion">Apply selected</Button></>, render: (context) => <AiSuggestion context={context} close={context.close} /> },
+        { id: "Layout picker", kind: "drawer", summary: deckSummary, title: "Layouts", width: OVERLAY_WIDTH.record, footer: formFooter("layout-picker", "Apply", false), render: (context) => <LayoutPicker context={context} close={context.close} /> },
+        { id: "image insert", kind: "modal", title: "Image", width: OVERLAY_WIDTH.form, footer: formFooter("image-insert", "Save", false), render: (context) => <ImageInsert context={context} close={context.close} /> },
+        { id: "properties", kind: "modal", summary: deckSummary, title: "Object", width: OVERLAY_WIDTH.form, footer: formFooter("properties", "Save", false, "Close"), render: (context) => <PropertiesOverlay context={context} close={context.close} /> },
+        { id: "move object", kind: "modal", title: "Move object", width: OVERLAY_WIDTH.compact, footer: formFooter("present-move", "Move"), render: (context) => <MoveObject context={context} close={context.close} /> },
+        { id: "resize object", kind: "modal", title: "Resize object", width: OVERLAY_WIDTH.compact, footer: formFooter("present-resize", "Resize"), render: (context) => <ResizeObject context={context} close={context.close} /> },
+        { id: "align objects", kind: "modal", title: "Align", width: OVERLAY_WIDTH.form, render: (context) => <AlignObjects context={context} close={context.close} /> },
+        { id: "AI suggestion", kind: "drawer", summary: deckSummary, title: "Suggestions", width: OVERLAY_WIDTH.form, footer: formFooter("ai-suggestion", "Apply selected", false, "Close"), render: (context) => <AiSuggestion context={context} close={context.close} /> },
       ],
     },
 
     "ARL-PRESENT-003": {
       id: "ARL-PRESENT-003",
+      record: deckRecord,
       title: () => "Master & theme",
       tabs: (["Masters", "Colours", "Fonts", "Layouts"] as const).map((id) => ({ id, render: (context) => <ThemeScreen context={context} tab={id} /> })),
       actions: [
@@ -3122,15 +3176,16 @@ registerApp({
         { id: "preview impact", label: "Preview the impact", placement: "overflow", run: (context) => context.openOverlay("global apply review") },
       ],
       overlays: [
-        { id: "Theme editor", kind: "modal", title: "Apply a theme", width: 600, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="theme-editor">Apply</Button></>, render: (context) => <ThemeEditor context={context} close={context.close} /> },
-        { id: "global apply review", kind: "drawer", title: "Apply the master", width: 640, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="global-apply">Apply</Button></>, render: (context) => <GlobalApplyReview context={context} close={context.close} /> },
-        { id: "font resolver", kind: "modal", title: "Fonts", width: 560, render: (context) => <FontResolver context={context} /> },
-        { id: "create layout", kind: "modal", title: "Create a layout", width: 480, footer: formFooter("present-create-layout", "Create"), render: (context) => <CreateLayout context={context} close={context.close} /> },
+        { id: "Theme editor", kind: "modal", summary: deckSummary, title: "Apply a theme", width: OVERLAY_WIDTH.modal, footer: formFooter("theme-editor", "Apply", false), render: (context) => <ThemeEditor context={context} close={context.close} /> },
+        { id: "global apply review", kind: "drawer", summary: deckSummary, title: "Apply the master", width: OVERLAY_WIDTH.record, footer: formFooter("global-apply", "Apply", false), render: (context) => <GlobalApplyReview context={context} close={context.close} /> },
+        { id: "font resolver", kind: "modal", title: "Fonts", width: OVERLAY_WIDTH.modal, render: (context) => <FontResolver context={context} /> },
+        { id: "create layout", kind: "modal", title: "Create a layout", width: OVERLAY_WIDTH.compact, footer: formFooter("present-create-layout", "Create"), render: (context) => <CreateLayout context={context} close={context.close} /> },
       ],
     },
 
     "ARL-PRESENT-004": {
       id: "ARL-PRESENT-004",
+      record: deckRecord,
       title: () => "Charts & data",
       tabs: (["Charts", "Tables", "Sources", "Refresh"] as const).map((id) => ({ id, render: (context) => <DataScreen context={context} tab={id} /> })),
       actions: [
@@ -3141,14 +3196,15 @@ registerApp({
         { id: "freshness", label: "Check freshness", placement: "overflow", run: (context) => context.setTab("Refresh") },
       ],
       overlays: [
-        { id: "Dataset picker", kind: "drawer", title: "Dataset", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="dataset-picker">Insert</Button></>, render: (context) => <DatasetPicker context={context} close={context.close} /> },
-        { id: "chart inspector", kind: "drawer", title: "Chart", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="chart-inspector">Save</Button></>, render: (context) => <ChartInspector context={context} close={context.close} /> },
-        { id: "unlink warning", kind: "modal", title: "Unlink this chart", tone: "danger", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Keep the link</Button><Button variant="outline-danger" type="submit" form="unlink-warning">Unlink</Button></>, render: (context) => <UnlinkWarning context={context} close={context.close} /> },
+        { id: "Dataset picker", kind: "drawer", summary: deckSummary, title: "Dataset", width: OVERLAY_WIDTH.form, footer: formFooter("dataset-picker", "Insert", false), render: (context) => <DatasetPicker context={context} close={context.close} /> },
+        { id: "chart inspector", kind: "drawer", summary: deckSummary, title: "Chart", width: OVERLAY_WIDTH.form, footer: formFooter("chart-inspector", "Save", false, "Close"), render: (context) => <ChartInspector context={context} close={context.close} /> },
+        { id: "unlink warning", kind: "modal", summary: deckSummary, title: "Unlink this chart", tone: "danger", width: OVERLAY_WIDTH.form, footer: formFooter("unlink-warning", "Unlink", true, "Keep the link"), render: (context) => <UnlinkWarning context={context} close={context.close} /> },
       ],
     },
 
     "ARL-PRESENT-005": {
       id: "ARL-PRESENT-005",
+      record: deckRecord,
       title: () => "Transitions & animation",
       tabs: (["Slides", "Objects", "Timing", "Preview"] as const).map((id) => ({ id, render: (context) => <AnimationScreen context={context} tab={id} /> })),
       actions: [
@@ -3159,14 +3215,15 @@ registerApp({
         { id: "accessibility", label: "Accessibility review", placement: "overflow", run: (context) => context.openOverlay("accessibility review") },
       ],
       overlays: [
-        { id: "Motion inspector", kind: "modal", title: "Motion", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="motion-inspector">Done</Button></>, render: (context) => <MotionInspector context={context} close={context.close} /> },
-        { id: "playback", kind: "drawer", title: "Playback", width: 640, render: (context) => <PlaybackOverlay context={context} /> },
-        { id: "accessibility review", kind: "drawer", title: "Accessibility", width: 600, render: (context) => <AccessibilityReview context={context} /> },
+        { id: "Motion inspector", kind: "modal", title: "Motion", width: OVERLAY_WIDTH.form, footer: formFooter("motion-inspector", "Done", false, "Close"), render: (context) => <MotionInspector context={context} close={context.close} /> },
+        { id: "playback", kind: "drawer", summary: deckSummary, title: "Playback", width: OVERLAY_WIDTH.record, render: (context) => <PlaybackOverlay context={context} /> },
+        { id: "accessibility review", kind: "drawer", summary: deckSummary, title: "Accessibility", width: OVERLAY_WIDTH.record, render: (context) => <AccessibilityReview context={context} /> },
       ],
     },
 
     "ARL-PRESENT-006": {
       id: "ARL-PRESENT-006",
+      record: deckRecord,
       title: () => "Presenter mode",
       tabs: (["Audience", "Presenter", "Rehearsal"] as const).map((id) => ({
         id,
@@ -3188,15 +3245,16 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Display selector", kind: "modal", title: "Audience display", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="display-selector">Continue</Button></>, render: (context) => <DisplaySelector context={context} close={context.close} /> },
-        { id: "rehearsal report", kind: "drawer", title: "Rehearsal", width: 600, render: (context) => <RehearsalReport context={context} /> },
-        { id: "annotate", kind: "modal", title: "Annotate the live slide", width: 480, footer: formFooter("present-annotate", "Add"), render: (context) => <Annotate context={context} close={context.close} /> },
-        { id: "access confirmation", kind: "modal", title: "Before you present", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="display-selector">Continue</Button></>, render: (context) => <DisplaySelector context={context} close={context.close} /> },
+        { id: "Display selector", kind: "modal", title: "Audience display", width: OVERLAY_WIDTH.form, footer: formFooter("display-selector", "Continue", false), render: (context) => <DisplaySelector context={context} close={context.close} /> },
+        { id: "rehearsal report", kind: "drawer", summary: deckSummary, title: "Rehearsal", width: OVERLAY_WIDTH.record, render: (context) => <RehearsalReport context={context} /> },
+        { id: "annotate", kind: "modal", title: "Annotate the live slide", width: OVERLAY_WIDTH.compact, footer: formFooter("present-annotate", "Add"), render: (context) => <Annotate context={context} close={context.close} /> },
+        { id: "access confirmation", kind: "modal", summary: deckSummary, title: "Before you present", width: OVERLAY_WIDTH.form, footer: formFooter("display-selector", "Continue", false), render: (context) => <DisplaySelector context={context} close={context.close} /> },
       ],
     },
 
     "ARL-PRESENT-007": {
       id: "ARL-PRESENT-007",
+      record: deckRecord,
       title: () => "Review & publish",
       tabs: (["Comments", "History", "Export", "Publish"] as const).map((id) => ({ id, render: (context) => <ReviewScreen context={context} tab={id} /> })),
       actions: [
@@ -3206,11 +3264,11 @@ registerApp({
         { id: "share", label: "Share…", placement: "overflow", run: (context) => context.openOverlay("share deck") },
       ],
       overlays: [
-        { id: "Version comparison", kind: "drawer", title: "Compare versions", width: 720, render: (context) => <VersionComparison context={context} /> },
-        { id: "export settings", kind: "modal", title: "Export settings", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="export-settings">Export</Button></>, render: (context) => <ExportSettings context={context} close={context.close} /> },
-        { id: "resolve comments", kind: "modal", title: "Resolve comments", width: 560, render: (context) => <ResolveComments context={context} close={context.close} /> },
-        { id: "share deck", kind: "modal", title: "Share the deck", width: 520, footer: formFooter("present-share", "Share"), render: (context) => <ShareDeck context={context} close={context.close} /> },
-        { id: "approval", kind: "modal", title: "Approval", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="approval">Record</Button></>, render: (context) => <ApprovalOverlay context={context} close={context.close} /> },
+        { id: "Version comparison", kind: "drawer", summary: deckSummary, title: "Compare versions", width: OVERLAY_WIDTH.wide, render: (context) => <VersionComparison context={context} /> },
+        { id: "export settings", kind: "modal", summary: deckSummary, title: "Export settings", width: OVERLAY_WIDTH.modal, footer: formFooter("export-settings", "Export", false), render: (context) => <ExportSettings context={context} close={context.close} /> },
+        { id: "resolve comments", kind: "modal", title: "Resolve comments", width: OVERLAY_WIDTH.modal, render: (context) => <ResolveComments context={context} close={context.close} /> },
+        { id: "share deck", kind: "modal", title: "Share the deck", width: OVERLAY_WIDTH.form, footer: formFooter("present-share", "Share"), render: (context) => <ShareDeck context={context} close={context.close} /> },
+        { id: "approval", kind: "modal", summary: deckSummary, title: "Approval", width: OVERLAY_WIDTH.form, footer: formFooter("approval", "Record", false), render: (context) => <ApprovalOverlay context={context} close={context.close} /> },
       ],
     },
   },

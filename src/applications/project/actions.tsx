@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
-import { Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, DataGrid, Empty, Field, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useEvents, useRecord } from "@/platform/workspace";
 import { listByCollection } from "@/platform/repo";
@@ -178,7 +178,7 @@ export async function togglePin(context: ScreenContext): Promise<void> {
   const current = pinnedBy(project);
   const pinned = current.includes(context.actor);
   const next = pinned ? current.filter((name) => name !== context.actor) : [...current, context.actor];
-  await context.mutate.patch(project.id, { fields: { ...project.fields, pinnedBy: next.join(",") } }, { expectRevision: project.revision, event: `${project.title} ${pinned ? "unpinned" : "pinned"} by ${context.actor}` });
+  if (!(await context.mutate.patch(project.id, { fields: { ...project.fields, pinnedBy: next.join(",") } }, { expectRevision: project.revision, event: `${project.title} ${pinned ? "unpinned" : "pinned"} by ${context.actor}` }))) return;
   context.toast(pinned ? "Unpinned" : "Pinned", `${project.title} is ${pinned ? "no longer" : "now"} on ${context.actor}'s Following tab.`);
 }
 
@@ -198,10 +198,10 @@ export function ChangeStatus({ context, close }: { context: ScreenContext; close
         const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
         if (value === project.status) return;
         const pausing = value === "paused";
-        await context.mutate.patch(project.id, {
+        if (!(await context.mutate.patch(project.id, {
           status: value,
           fields: { ...project.fields, automationPaused: pausing ? true : value === "active" ? false : project.fields.automationPaused, statusReason: reason },
-        }, { expectRevision: project.revision, event: `${project.title} status changed from ${project.status} to ${value} by ${context.actor}${reason ? `: ${reason}` : ""}` });
+        }, { expectRevision: project.revision, event: `${project.title} status changed from ${project.status} to ${value} by ${context.actor}${reason ? `: ${reason}` : ""}` }))) return;
         context.toast("Status changed", pausing ? "Paused. Automation configured on this project stopped; tasks and time entries are untouched." : `${project.title} is now ${value}.`);
         close();
       }}
@@ -236,7 +236,7 @@ export function requestUpdate(context: ScreenContext, project: Rec | undefined):
         summary: `Requested by ${context.actor}.`, parentId: project.id, dueAt: due.toISOString(),
         fields: { requestedBy: context.actor, requestedOf: project.ownerName, projectId: project.id },
       }, `${context.actor} requested a status update on ${project.title} from ${project.ownerName}`);
-      await context.mutate.patch(project.id, { fields: { ...project.fields, updateRequestedAt: clockIso(), updateRequestedOf: project.ownerName } }, { expectRevision: project.revision, event: `Update requested from ${project.ownerName}` });
+      if (!(await context.mutate.patch(project.id, { fields: { ...project.fields, updateRequestedAt: clockIso(), updateRequestedOf: project.ownerName } }, { expectRevision: project.revision, event: `Update requested from ${project.ownerName}` }))) return;
       await logBoundary(context, "email.send", `Update request notification for ${project.ownerName} kept locally`, request.id);
       context.toast("Update requested", `${project.ownerName} owes an update by ${context.date(due)}.`);
     },
@@ -255,7 +255,7 @@ export function AssignOwner({ context, close }: { context: ScreenContext; close:
         event.preventDefault();
         const owner = String(new FormData(event.currentTarget).get("owner") ?? "");
         if (!owner || owner === project.ownerName) return;
-        await context.mutate.patch(project.id, { ownerName: owner, fields: { ...project.fields, owner, previousOwner: project.ownerName } }, { expectRevision: project.revision, event: `${project.title} owner changed from ${project.ownerName} to ${owner} by ${context.actor}` });
+        if (!(await context.mutate.patch(project.id, { ownerName: owner, fields: { ...project.fields, owner, previousOwner: project.ownerName } }, { expectRevision: project.revision, event: `${project.title} owner changed from ${project.ownerName} to ${owner} by ${context.actor}` }))) return;
         context.toast("Owner assigned", `${owner} owns ${project.title}. ${project.ownerName}'s earlier changes keep their attribution.`);
         close();
       }}
@@ -363,7 +363,7 @@ export function NewTask({ context, close }: { context: ScreenContext; close: () 
 }
 
 export function MoveTask({ context, close }: { context: ScreenContext; close: () => void }) {
-  const task = useRecord(context.selectedId);
+  const task = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
   const data = useCollections(["tasks"]);
   const [lane, setLane] = useState<LaneId | "">("");
   if (!task || task.collection !== "tasks") return <Empty title="Select a card on the board first" />;
@@ -382,10 +382,8 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
       {blockedByDeps && <Notice tone="danger" title="Task move blocked">{decision?.blocked}</Notice>}
       {skipsReview && <Notice tone="warning" title="This skips Review">High priority work goes through Review. Continuing opens the stage rule so the skip is a recorded decision.</Notice>}
       <Notice tone="info">Moving a card changes its stage only. No automation or external side effect runs from a stage change.</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           disabled={!lane || blockedByDeps}
           onClick={async () => {
@@ -400,8 +398,9 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
           }}
         >
           Move the task
-        </Button>
-      </Row>
+        </Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -423,11 +422,10 @@ export function BoardFilter({ context: _context, close }: { context: ScreenConte
     <Stack gap={4}>
       <Field label="Owner"><Select value={value.assignee} onChange={(event) => setValue({ ...value, assignee: event.target.value })}><option value="">Anyone</option>{owners.map((owner) => <option key={owner}>{owner}</option>)}</Select></Field>
       <Field label="Priority"><Select value={value.priority} onChange={(event) => setValue({ ...value, priority: event.target.value })}><option value="">Any</option>{["low", "normal", "high"].map((option) => <option key={option}>{option}</option>)}</Select></Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={() => { boardFilter.set({ assignee: "", priority: "" }); close(); }}>Clear</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={() => { boardFilter.set(value); close(); }}>Apply the filter</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button variant="primary" onClick={() => { boardFilter.set(value); close(); }}>Apply the filter</Button>}
+        secondary={<Button variant="ghost" onClick={() => { boardFilter.set({ assignee: "", priority: "" }); close(); }}>Clear</Button>}
+      />
     </Stack>
   );
 }
@@ -536,7 +534,7 @@ export function DelegateAI({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         const agent = members.find((row) => row.id === String(new FormData(event.currentTarget).get("agent") ?? ""));
         if (!agent) return;
-        await context.mutate.patch(task.id, { fields: { ...task.fields, assignee: agent.title, delegatedToAgent: true, delegatedBy: context.actor, accountable: context.actor } }, { expectRevision: task.revision, event: `${task.title} delegated to ${agent.title} by ${context.actor}, who stays accountable` });
+        if (!(await context.mutate.patch(task.id, { fields: { ...task.fields, assignee: agent.title, delegatedToAgent: true, delegatedBy: context.actor, accountable: context.actor } }, { expectRevision: task.revision, event: `${task.title} delegated to ${agent.title} by ${context.actor}, who stays accountable` }))) return;
         await logBoundary(context, "model.inference", `${agent.title} has ${task.title} queued; it does not run until a model is connected`, task.id);
         context.toast("Delegated", `${agent.title} holds the task; ${context.actor} stays accountable. No model is called from this browser.`);
         close();
@@ -579,21 +577,20 @@ export function DurationEdit({ context, close }: { context: ScreenContext; close
         { label: "Would end", value: invalid ? "—" : context.date(end) },
       ]} />
       {pushed.length > 0 && <Notice tone="danger" title="Dependent work would start before this ends">{pushed.map((row) => `${row.title} starts ${context.date(row.startAt)}`).join("; ")}. Move those first; an impossible order is refused.</Notice>}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           disabled={invalid || pushed.length > 0 || value === current}
           onClick={async () => {
-            await context.mutate.patch(task.id, { endAt: end.toISOString(), dueAt: end.toISOString() }, { expectRevision: task.revision, event: `${task.title} duration changed from ${current} to ${value} days by ${context.actor}` });
+            if (!(await context.mutate.patch(task.id, { endAt: end.toISOString(), dueAt: end.toISOString() }, { expectRevision: task.revision, event: `${task.title} duration changed from ${current} to ${value} days by ${context.actor}` }))) return;
             context.toast("Duration changed", `${task.title} now ends ${context.date(end)}.`);
             close();
           }}
         >
           Change the duration
-        </Button>
-      </Row>
+        </Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -632,15 +629,14 @@ export function LinkProject({ context, close }: { context: ScreenContext; close:
         ))}
       </fieldset>
       <Notice tone="info">Linking says which work contributes. Progress still comes from a person's check-in, never from the linked projects' task counts.</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={async () => {
-          await context.mutate.patch(objective.id, { fields: { ...objective.fields, projectIds: ids.join(",") } }, { expectRevision: objective.revision, event: `${objective.title} linked to ${ids.length} project${ids.length === 1 ? "" : "s"} by ${context.actor}` });
+      <OverlayActions
+        primary={<Button variant="primary" onClick={async () => {
+          if (!(await context.mutate.patch(objective.id, { fields: { ...objective.fields, projectIds: ids.join(",") } }, { expectRevision: objective.revision, event: `${objective.title} linked to ${ids.length} project${ids.length === 1 ? "" : "s"} by ${context.actor}` }))) return;
           context.toast("Projects linked", `${objective.title} lists ${ids.length} contributing project${ids.length === 1 ? "" : "s"}.`);
           close();
-        }}>Save the links</Button>
-      </Row>
+        }}>Save the links</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }

@@ -1,8 +1,6 @@
-import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowDown, ArrowUp, Circle, Copy, Diamond, Eye, EyeOff, Film, ImageDown, Keyboard, Lock, Square, Trash2, Type, Unlock } from "lucide-react";
-import {
-  Button, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar,
-} from "@/design-system";
+import { Button, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar, ModalActions, OverlayActions, OverlayCancel, DrawerActions, OverlaySummary } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import {
   ColorBox, EditorFrame, NumberBox, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob, slug, useStore, type DocHandle,
@@ -172,6 +170,8 @@ export function EditorScreen({ context, actions }: { context: ScreenContext; act
   return (
     <EditorFrame
       context={context}
+      lean
+      titleLevel={1}
       actions={actions}
       tabs={[{ id: "Animate" }, { id: "Design" }, { id: "Effects" }, { id: "Preview" }]}
       title={record.title}
@@ -393,17 +393,11 @@ function AnimatePanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; 
   const layer = selectedLayer(doc);
   const picked = selectedKeyframe(doc);
   if (!layer) return <Notice title="No layer">Add a layer from the toolbar.</Notice>;
-  return (
-    <Stack gap={3}>
-      <PanelGroup title={`${layer.name} — transform`}>
-        {layer.locked && <Notice tone="warning" title="Locked">Unlock the layer to change it.</Notice>}
-        {TRANSFORM_PROPS.map((property) => <PropertyRow key={property} handle={handle} doc={doc} layer={layer} property={property} />)}
-        <p className="vx-mini">{motionUi.get().animate ? "Animate mode: a changed value is keyed at the playhead." : "A changed value moves the whole property, keeping its animation. Turn on animate mode, or use ◆, to key it at the playhead."}</p>
-      </PanelGroup>
-      <PanelGroup title="Selected keyframe" actions={picked ? <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Keyframe editor")}>Edit…</Button> : undefined}>
+  const keyframePanel = (
+      <PanelGroup title={picked ? `Keyframe · ${PROPERTY_LABEL[picked.property]} · ${picked.keyframe.t.toFixed(2)}s` : "Selected keyframe"} actions={picked ? <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Keyframe editor")}>Edit…</Button> : undefined}>
         {picked ? (
           <Stack gap={2}>
-            <span className="vx-mini">{picked.layer.name} · {PROPERTY_LABEL[picked.property]} · <span className="ds-num">{picked.keyframe.t.toFixed(2)}s</span> → {picked.next ? <span className="ds-num">{picked.next.t.toFixed(2)}s</span> : "end"}</span>
+            <span className="vx-mini">{picked.layer.name}, easing to {picked.next ? <span className="ds-num">{picked.next.t.toFixed(2)}s</span> : "the end"}</span>
             <div className="vx-fieldrow">
               <NumberBox
                 label="Time"
@@ -471,8 +465,18 @@ function AnimatePanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; 
               ? <EasingPreview easing={picked.keyframe.easing} seconds={picked.next.t - picked.keyframe.t} fps={doc.fps} autoPlay={!usesReducedMotion()} />
               : <p className="vx-mini">This is the last keyframe of the property, so nothing eases out of it.</p>}
           </Stack>
-        ) : <p className="vx-mini">Select a keyframe on the timeline (click, or Tab to it) to edit its easing here.</p>}
+        ) : <p className="vx-mini">Select a keyframe on the timeline (click, or Tab to it): its time, value and easing appear here, above the layer's properties.</p>}
       </PanelGroup>
+  );
+  return (
+    <Stack gap={3}>
+      {picked ? keyframePanel : null}
+      <PanelGroup title={`${layer.name} — transform`}>
+        {layer.locked && <Notice tone="warning" title="Locked">Unlock the layer to change it.</Notice>}
+        {TRANSFORM_PROPS.map((property) => <PropertyRow key={property} handle={handle} doc={doc} layer={layer} property={property} />)}
+        <p className="vx-mini">{motionUi.get().animate ? "Animate mode: a changed value is keyed at the playhead." : "A changed value moves the whole property, keeping its animation. Turn on animate mode, or use ◆, to key it at the playhead."}</p>
+      </PanelGroup>
+      {!picked ? keyframePanel : null}
     </Stack>
   );
 }
@@ -583,6 +587,8 @@ export function KeyframeEditor({ close }: { close: () => void }) {
   const [value, setValue] = useState<number | string>(() => found?.keyframe.value ?? 0);
   const [easing, setEasingDraft] = useState<Easing>(() => found?.keyframe.easing ?? { kind: "linear" });
   const [error, setError] = useState<string | null>(null);
+  const foundId = found?.keyframe.id;
+  useEffect(() => { if (found) { setTime(found.keyframe.t); setValue(found.keyframe.value); setEasingDraft(found.keyframe.easing); } }, [foundId]);
   if (!handle || !doc || !found) return <Notice tone="warning" title="Select a keyframe first">Click a keyframe on the timeline, or Tab to it, then open the editor.</Notice>;
   const points = easing.points ?? [0.25, 0.1, 0.25, 1];
   const span = found.next ? found.next.t - found.keyframe.t : 0;
@@ -623,7 +629,9 @@ export function KeyframeEditor({ close }: { close: () => void }) {
       </FormField>
       {easing.kind === "bezier" && (
         <>
-          <EasingGraph easing={easing} size={220} onChange={setEasingDraft} label="Keyframe easing" />
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <div style={{ flex: "0 0 auto" }}><EasingGraph easing={easing} size={170} onChange={setEasingDraft} label="Keyframe easing" /></div>
+          <Stack gap={2} style={{ flex: "1 1 200px", minWidth: 0 }}>
           <div className="vx-fieldrow">
             {(["x1", "y1", "x2", "y2"] as const).map((name, index) => (
               <NumberBox key={name} label={name} value={points[index]} step={0.01} onChange={(next) => {
@@ -634,6 +642,8 @@ export function KeyframeEditor({ close }: { close: () => void }) {
             ))}
           </div>
           <code className="ds-num vx-mini">cubic-bezier({points.join(", ")})</code>
+          </Stack>
+          </div>
         </>
       )}
       {easing.kind === "spring" && (
@@ -645,16 +655,17 @@ export function KeyframeEditor({ close }: { close: () => void }) {
         </div>
       )}
       {error && <Notice tone="danger" title="Not saved">{error}</Notice>}
-      <Row gap={2}>
-        <Button variant="outline-danger" icon={<Trash2 size={14} />} onClick={() => {
-          handle.edit((current) => removeKeyframe(current, found.layer.id, found.property, found.keyframe.id), "Delete a keyframe");
-          motionUi.set((current) => ({ ...current, selectedKeyframeId: undefined }));
-          close();
-        }}>Delete</Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" type="submit">Save the keyframe</Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" type="submit" form="motion-keyframe">Save the keyframe</Button>}
+          secondary={<OverlayCancel>Cancel</OverlayCancel>}
+          end={<Button variant="outline-danger" icon={<Trash2 size={14} />} onClick={() => {
+            handle.edit((current) => removeKeyframe(current, found.layer.id, found.property, found.keyframe.id), "Delete a keyframe");
+            motionUi.set((current) => ({ ...current, selectedKeyframeId: undefined }));
+            close();
+          }}>Delete the keyframe</Button>}
+        />
+      </ModalActions>
     </form>
   );
 }
@@ -663,6 +674,8 @@ export function LayerInspector({ close }: { close: () => void }) {
   const { handle, doc } = useSession();
   const layer = selectedLayer(doc);
   const [draft, setDraft] = useState<MotionLayer | null>(() => (layer ? JSON.parse(JSON.stringify(layer)) as MotionLayer : null));
+  /* A deep link opens before the composition has loaded: take the draft once the layer exists. */
+  useEffect(() => { if (layer && !draft) setDraft(JSON.parse(JSON.stringify(layer)) as MotionLayer); }, [layer, draft]);
   const keyframes = useMemo(() => (layer ? Object.entries(layer.tracks).flatMap(([property, list]) => (list ?? []).map((keyframe) => ({ property: property as AnimatableProperty, keyframe }))) : []), [layer]);
   if (!handle || !doc || !layer || !draft) return <Notice tone="warning" title="Select a layer first">Choose a layer in the layer list.</Notice>;
   const end = sampleLayer(layer, doc.duration);
@@ -700,14 +713,10 @@ export function LayerInspector({ close }: { close: () => void }) {
         )}
         <span className="vx-mini">Settles at x {end.x.toFixed(1)}, y {end.y.toFixed(1)}, scale {end.scale.toFixed(2)}, opacity {end.opacity.toFixed(2)}.</span>
       </PanelGroup>
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <Button variant="primary" onClick={() => {
+      <DrawerActions><OverlayActions primary={<Button variant="primary" onClick={() => {
           handle.edit((current) => ({ ...current, layers: current.layers.map((item) => (item.id === layer.id ? { ...draft, tracks: item.tracks } : item)) }), `Edit ${draft.name}`);
           close();
-        }}>Apply to the layer</Button>
-      </Row>
+        }}>Apply to the layer</Button>} end={<OverlayCancel>Close</OverlayCancel>} /></DrawerActions>
     </Stack>
   );
 }
@@ -735,18 +744,44 @@ export function MotionPicker({ close }: { close: () => void }) {
       </div>
       <NumberBox label="Duration" suffix="s" value={duration} step={0.1} min={0.1} max={doc.duration} onChange={(next) => setDuration(clamp(next, 0.1, doc.duration))} />
       <Stage doc={preview} time={Math.min(doc.duration, start + Math.min(duration, doc.duration - start) * 0.5)} height={150} label={`${preset.name} halfway through, on ${layer.name}`} />
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={() => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={() => {
           handle.edit(preview, `Apply ${preset.name} to ${layer.name}`);
           close();
-        }}>Apply {preset.name}</Button>
-      </Row>
+        }}>Apply {preset.name}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
 
 export function KeyboardHelp() {
   return <ShortcutTable rows={SHORTCUTS} />;
+}
+
+/** Identity block for the keyframe modal: the layer, the property and where on the timeline. */
+export function KeyframeSummary() {
+  const { doc } = useSession();
+  const found = selectedKeyframe(doc);
+  if (!doc || !found) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Keyframe"
+      title={`${found.layer.name} · ${PROPERTY_LABEL[found.property]}`}
+      meta={[<span className="ds-num" key="t">{found.keyframe.t.toFixed(2)}s · frame {Math.round(found.keyframe.t * doc.fps)}</span>, found.next ? <span className="ds-num" key="n">eases to {found.next.t.toFixed(2)}s</span> : "last keyframe"]}
+    />
+  );
+}
+
+/** Identity block for the layer drawer. */
+export function LayerSummary() {
+  const { doc } = useSession();
+  const layer = selectedLayer(doc);
+  if (!doc || !layer) return null;
+  const keyframes = Object.values(layer.tracks).reduce((sum, list) => sum + (list?.length ?? 0), 0);
+  return (
+    <OverlaySummary
+      eyebrow="Layer"
+      title={layer.name}
+      status={layer.locked ? <Pill tone="warning">locked</Pill> : layer.visible ? undefined : <Pill>hidden</Pill>}
+      meta={[layer.kind, `${keyframes} keyframe${keyframes === 1 ? "" : "s"}`]}
+    />
+  );
 }

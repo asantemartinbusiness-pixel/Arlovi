@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Avatar, Button, Empty, Kbd, Notice, Pill, Row, Stack } from "@/design-system";
+import { Avatar, Button, Empty, Kbd, Pill, Row, Stack } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
 
@@ -93,14 +93,15 @@ export function TaskBoard({
 
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="This board works without a mouse">
+      <details className="pj-kbd">
+        <summary>Keyboard controls</summary>
         <Row gap={2} wrap>
           <span>Focus a card, then</span>
           <Kbd>←</Kbd><Kbd>→</Kbd><span>to change its stage,</span>
           <Kbd>↑</Kbd><Kbd>↓</Kbd><span>to move within a lane and</span>
           <Kbd>Enter</Kbd><span>to open it. A stage change saves on the task record.</span>
         </Row>
-      </Notice>
+      </details>
 
       <div className="pj-board" ref={boardRef}>
         {LANES.map((lane) => {

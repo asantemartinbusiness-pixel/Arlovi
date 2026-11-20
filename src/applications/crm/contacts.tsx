@@ -1,10 +1,11 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, Mail, UserRound, Users } from "lucide-react";
+import { Building2, UserRound, Users } from "lucide-react";
 import {
-  Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, KeyValueList, Notice, PageSection, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
+import type { RecordHeaderProps } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { downloadFile } from "@/runtime/db";
@@ -16,9 +17,10 @@ import {
   companyById, contactsOfCompany, dealsOfCompany, bookingsOfContact, dealsOfContact, invoicesOfContact, ticketsOfContact, useCrmData,
 } from "./data";
 import type { CrmData } from "./data";
-import { ActivityPill, CapabilityNotice, ConsentPill, Money, StagePill } from "./parts";
+import { ActivityPill, CapabilityNotice, ConsentPill, consentLabel, Money, StagePill } from "./parts";
 import { MergeGroups } from "./actions";
 import { clockIso } from "@/platform/clock";
+import { commitTogether, type TogetherChange } from "@/platform/commit";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { accountHref } from "./account";
 
@@ -216,28 +218,31 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
         event.preventDefault();
         if (!title.trim()) return;
         setBusy(true);
-        const fields: Record<string, string | number | boolean> = { email: email.trim(), phone, role, owner: contact ? String(contact.fields.owner ?? context.actor) : context.actor };
-        if (companyId) fields.companyId = companyId;
-        if (taxStatus) fields.taxStatus = taxStatus;
-        if (suppressed) fields.suppressed = true;
-        if (consent && !suppressed) fields.consent = contact?.fields.consent ? String(contact.fields.consent) : `recorded-${clockIso().slice(0, 10)}`;
-        if (contact) {
-          await context.mutate.patch(contact.id, {
-            title: title.trim(), summary, fields,
-            tags: suppressed ? [...new Set([...contact.tags, "suppressed"])] : contact.tags.filter((tag) => tag !== "suppressed"),
-          }, { expectRevision: contact.revision, event: `Contact ${title.trim()} updated` });
-          context.toast("Contact saved", suppressed ? `${title.trim()} is suppressed and no automation will contact them.` : `${title.trim()} is updated.`);
-        } else {
-          const created = await context.mutate.create({
-            collection: "contacts", title: title.trim(), status: suppressed ? "suppressed" : "active",
-            summary, fields, tags: suppressed ? ["customer", "suppressed"] : ["customer"],
-          }, `Contact ${title.trim()} created`);
-          context.select(created.id);
-          context.toast("Contact created", taxStatus ? `${created.title} is on file with a ${taxStatus} tax status.` : `${created.title} is on file. Without a tax status an invoice to them cannot resolve a rate.`);
+        try {
+          const fields: Record<string, string | number | boolean> = { email: email.trim(), phone, role, owner: contact ? String(contact.fields.owner ?? context.actor) : context.actor };
+          if (companyId) fields.companyId = companyId;
+          if (taxStatus) fields.taxStatus = taxStatus;
+          if (suppressed) fields.suppressed = true;
+          if (consent && !suppressed) fields.consent = contact?.fields.consent ? String(contact.fields.consent) : `recorded-${clockIso().slice(0, 10)}`;
+          if (contact) {
+            if (!(await context.mutate.patch(contact.id, {
+              title: title.trim(), summary, fields,
+              tags: suppressed ? [...new Set([...contact.tags, "suppressed"])] : contact.tags.filter((tag) => tag !== "suppressed"),
+            }, { expectRevision: contact.revision, event: `Contact ${title.trim()} updated` }))) return;
+            context.toast("Contact saved", suppressed ? `${title.trim()} is suppressed and no automation will contact them.` : `${title.trim()} is updated.`);
+          } else {
+            const created = await context.mutate.create({
+              collection: "contacts", title: title.trim(), status: suppressed ? "suppressed" : "active",
+              summary, fields, tags: suppressed ? ["customer", "suppressed"] : ["customer"],
+            }, `Contact ${title.trim()} created`);
+            context.select(created.id);
+            context.toast("Contact created", taxStatus ? `${created.title} is on file with a ${taxStatus} tax status.` : `${created.title} is on file. Without a tax status an invoice to them cannot resolve a rate.`);
+          }
+          clearWorkingDraft(draftScope);
+          close();
+        } finally {
+          setBusy(false);
         }
-        clearWorkingDraft(draftScope);
-        setBusy(false);
-        close();
       }}
     >
       <Field label="Full name" required><TextInput aria-label="Full name" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
@@ -279,13 +284,17 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
 export function MergePreview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const payload = context.overlayPayload as { ids?: string[] } | undefined;
-  const [picked, setPicked] = useState<string[] | undefined>(payload?.ids);
+  const viewedId = context.params.id;
+  const groups = useMemo(() => duplicateGroups(data.contacts), [data.contacts]);
+  // On a contact page the merge is about that contact only; a single match opens straight to the comparison.
+  const viewedGroups = viewedId ? groups.filter((group) => group.rows.some((row) => row.id === viewedId)) : [];
+  const [picked, setPicked] = useState<string[] | undefined>(payload?.ids ?? (viewedGroups.length === 1 ? viewedGroups[0].rows.map((row) => row.id) : undefined));
   const rows = (picked ?? []).map((id) => data.contacts.find((contact) => contact.id === id)).filter((contact): contact is Rec => Boolean(contact));
   const [keepId, setKeepId] = useState(rows[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
-  const groups = useMemo(() => duplicateGroups(data.contacts), [data.contacts]);
 
   if (rows.length < 2) {
+    if (viewedId) return <Empty title="No duplicate of this contact">Duplicates are found by an identical name. Nothing else matches this contact.</Empty>;
     const forSelected = context.selectedId ? groups.filter((group) => group.rows.some((row) => row.id === context.selectedId)) : [];
     return <MergeGroups groups={forSelected.length ? forSelected : groups} context={context} onPick={(ids) => { setPicked(ids); setKeepId(ids[0]); }} />;
   }
@@ -351,41 +360,54 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
           disabled={!context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = { ...keep.fields };
-            for (const other of others) {
-              for (const [field, value] of Object.entries(other.fields)) {
-                if (fields[field] === undefined || fields[field] === "") fields[field] = value;
+            try {
+              const fields: Record<string, string | number | boolean> = { ...keep.fields };
+              for (const other of others) {
+                for (const [field, value] of Object.entries(other.fields)) {
+                  if (fields[field] === undefined || fields[field] === "") fields[field] = value;
+                }
               }
+              if (anySuppressed) { fields.suppressed = true; delete fields.consent; }
+              else if (consents.length > 0) fields.consent = consents[0];
+              fields.mergedFrom = [String(keep.fields.mergedFrom ?? ""), ...others.map((row) => row.id)].filter(Boolean).join(" ");
+              fields.mergedBy = context.actor;
+              // The survivor, every repointed deal and invoice and every merged-away
+              // contact commit in one transaction: a stale revision leaves nothing half-merged.
+              const changes: TogetherChange[] = [{
+                record: keep,
+                patch: {
+                  status: anySuppressed ? "suppressed" : keep.status,
+                  fields,
+                  tags: anySuppressed ? [...new Set([...keep.tags, "suppressed"])] : keep.tags,
+                },
+                replaceFields: true,
+                event: `Contacts merged into ${keep.title}`,
+              }];
+              for (const other of others) {
+                for (const deal of dealsOfContact(data, other.id)) {
+                  changes.push({ record: deal, patch: { fields: { ...deal.fields, contactId: keep.id } }, event: `${deal.title} repointed to the merged contact` });
+                }
+                for (const invoice of invoicesOfContact(data, other.id)) {
+                  changes.push({ record: invoice, patch: { parentId: keep.id, fields: { ...invoice.fields, contactId: keep.id } }, event: `${invoice.title} repointed to the merged contact` });
+                }
+                // Keep the merged-away record as evidence: its fields, consent and history stay readable.
+                changes.push({
+                  record: other,
+                  patch: { status: "merged", fields: { ...other.fields, mergedInto: keep.id, mergedAt: clockIso(), mergedBy: context.actor } },
+                  event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept`,
+                });
+              }
+              if (!(await commitTogether(context, changes))) return;
+              context.toast("Contacts merged", `${others.length} record${others.length === 1 ? "" : "s"} merged into ${keep.title}. ${anySuppressed ? "The suppression survived the merge." : "The earliest consent was kept."}`);
+              close();
+            } finally {
+              setBusy(false);
             }
-            if (anySuppressed) { fields.suppressed = true; delete fields.consent; }
-            else if (consents.length > 0) fields.consent = consents[0];
-            fields.mergedFrom = [String(keep.fields.mergedFrom ?? ""), ...others.map((row) => row.id)].filter(Boolean).join(" ");
-            fields.mergedBy = context.actor;
-            await context.mutate.patch(keep.id, {
-              status: anySuppressed ? "suppressed" : keep.status,
-              fields,
-              tags: anySuppressed ? [...new Set([...keep.tags, "suppressed"])] : keep.tags,
-            }, { replaceFields: true, expectRevision: keep.revision, event: `Contacts merged into ${keep.title}` });
-            for (const other of others) {
-              for (const deal of dealsOfContact(data, other.id)) {
-                await context.mutate.patch(deal.id, { fields: { ...deal.fields, contactId: keep.id } }, { event: `${deal.title} repointed to the merged contact` });
-              }
-              for (const invoice of invoicesOfContact(data, other.id)) {
-                await context.mutate.patch(invoice.id, { parentId: keep.id, fields: { ...invoice.fields, contactId: keep.id } }, { event: `${invoice.title} repointed to the merged contact` });
-              }
-              // Keep the merged-away record as evidence: its fields, consent and history stay readable.
-              await context.mutate.patch(other.id, {
-                status: "merged",
-                fields: { ...other.fields, mergedInto: keep.id, mergedAt: clockIso(), mergedBy: context.actor },
-              }, { expectRevision: other.revision, event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept` });
-            }
-            context.toast("Contacts merged", `${others.length} record${others.length === 1 ? "" : "s"} merged into ${keep.title}. ${anySuppressed ? "The suppression survived the merge." : "The earliest consent was kept."}`);
-            setBusy(false);
-            close();
           }}
         >
           Merge into {keep.title}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -435,16 +457,20 @@ export function BulkActionConfirmation({ context, close }: { context: ScreenCont
           disabled={eligible.length === 0 || !tag.trim()}
           onClick={async () => {
             setBusy(true);
-            for (const contact of eligible) {
-              await context.mutate.patch(contact.id, { tags: [...new Set([...contact.tags, tag.trim()])] }, { event: `Contact ${contact.title} tagged ${tag.trim()}` });
+            try {
+              for (const contact of eligible) {
+                if (!(await context.mutate.patch(contact.id, { tags: [...new Set([...contact.tags, tag.trim()])] }, { event: `Contact ${contact.title} tagged ${tag.trim()}` }))) return;
+              }
+              context.toast("Tagged", `${eligible.length} contact${eligible.length === 1 ? "" : "s"} tagged ${tag.trim()}. ${suppressed.length} suppressed records were skipped.`);
+              close();
+            } finally {
+              setBusy(false);
             }
-            context.toast("Tagged", `${eligible.length} contact${eligible.length === 1 ? "" : "s"} tagged ${tag.trim()}. ${suppressed.length} suppressed records were skipped.`);
-            setBusy(false);
-            close();
           }}
         >
           Tag {eligible.length} contact{eligible.length === 1 ? "" : "s"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -460,43 +486,62 @@ export function useContact(context: ScreenContext): { contact?: Rec; data: CrmDa
   return { contact, data };
 }
 
-export function ContactHeader({ context }: { context: ScreenContext }) {
+/* RecordHeader slots are components so each can read the live contact;
+   ScreenDef.record itself is called as a plain function. */
+function ContactTitle({ context }: { context: ScreenContext }) {
+  const { contact } = useContact(context);
+  return <>{contact?.title ?? "Contact"}</>;
+}
+
+function ContactStatus({ context }: { context: ScreenContext }) {
+  const { contact } = useContact(context);
+  return <ConsentPill contact={contact} />;
+}
+
+function ContactSubtitle({ context }: { context: ScreenContext }) {
   const { contact, data } = useContact(context);
   if (!contact) return null;
   const company = companyById(data, String(contact.fields.companyId ?? ""));
-  const deals = dealsOfContact(data, contact.id);
-  const open = deals.filter((deal) => stageOf(deal).kind === "open");
+  const role = String(contact.fields.role ?? "");
+  if (!role && !company) return <>No role or account recorded</>;
+  return <>{role}{role && company ? " at " : ""}{company && <Link to={accountHref(context.org.slug, company.id)}>{company.title}</Link>}</>;
+}
+
+function ContactFacts({ context }: { context: ScreenContext }) {
+  const { contact, data } = useContact(context);
+  if (!contact) return null;
+  const company = companyById(data, String(contact.fields.companyId ?? ""));
+  const open = dealsOfContact(data, contact.id).filter((deal) => stageOf(deal).kind === "open");
+  const since = company?.fields.customerSince ? String(company.fields.customerSince) : contact.createdAt;
   return (
-    <Card prov="human" flush>
-      <div className="ds-card-body">
-        <Row gap={4} wrap>
-          <Avatar name={contact.title} size="lg" />
-          <div className="ds-grow">
-            <Row gap={2}>
-              <h2 style={{ fontSize: "var(--text-xl)" }}>{contact.title}</h2>
-              <ConsentPill contact={contact} />
-            </Row>
-            <p className="ds-subtle">{String(contact.fields.role ?? "")}{company && <>{" at "}<Link to={accountHref(context.org.slug, company.id)} style={{ color: "inherit" }}>{company.title}</Link></>}</p>
-            <Row gap={3} wrap style={{ marginBlockStart: "var(--space-2)" }}>
-              <span className="ds-subtle"><Mail size={13} aria-hidden="true" /> {String(contact.fields.email ?? "no email")}</span>
-              <span className="ds-subtle">{String(contact.fields.phone ?? "no phone")}</span>
-              <span className="ds-subtle">Owner {String(contact.fields.owner ?? contact.ownerName)}</span>
-            </Row>
-          </div>
-          <Properties rows={[
-            { label: "Open deals", value: String(open.length) },
-            { label: "Open value", value: context.money(open.reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0)) },
-            { label: "Customer since", value: company?.fields.customerSince ? context.date(String(company.fields.customerSince)) : context.date(contact.createdAt) },
-          ]} />
-        </Row>
-      </div>
-    </Card>
+    <span className="crm-facts">
+      <span>{String(contact.fields.email ?? "no email")}</span>
+      {contact.fields.phone ? <span className="ds-num">{String(contact.fields.phone)}</span> : null}
+      <span className="ds-subtle">owner {String(contact.fields.owner ?? contact.ownerName)}</span>
+      <span className="ds-subtle">{open.length} open deal{open.length === 1 ? "" : "s"}, <span className="ds-num">{context.money(open.reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0))}</span></span>
+      <span className="ds-subtle">since {context.date(since)}</span>
+    </span>
   );
+}
+
+function ContactAvatar({ context }: { context: ScreenContext }) {
+  const { contact } = useContact(context);
+  return <Avatar name={contact?.title ?? "Contact"} size="lg" />;
+}
+
+export function contactRecord(context: ScreenContext): RecordHeaderProps {
+  return {
+    avatar: <ContactAvatar context={context} />,
+    title: <ContactTitle context={context} />,
+    status: <ContactStatus context={context} />,
+    subtitle: <ContactSubtitle context={context} />,
+    meta: [<ContactFacts key="facts" context={context} />],
+  };
 }
 
 export function ContactOverview({ context }: { context: ScreenContext }) {
   const { contact, data } = useContact(context);
-  const { org } = useWorkspace();
+  const { org, now } = useWorkspace();
   if (!contact) return <Empty title="No contact selected" />;
   const company = companyById(data, String(contact.fields.companyId ?? ""));
   const deals = dealsOfContact(data, contact.id);
@@ -504,67 +549,113 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
   const activities = activitiesFor(data.activities, contact.id);
   const tickets = ticketsOfContact(data, contact.id);
   const unpaid = invoices.filter((invoice) => ["awaiting_payment", "part_paid"].includes(invoice.status));
+  const outstanding = unpaid.reduce((sum, invoice) => sum + (Number(invoice.amountMinor ?? 0) - Number(invoice.fields.paidMinor ?? 0)), 0);
+  const tasks = activities.filter((activity) => activity.status === "open");
+  const notes = activities.filter((activity) => activityKind(activity) === "note");
+  const history = activities.filter((activity) => activity.status !== "open");
+  const others = contactsOfCompany(data, company?.id).filter((item) => item.id !== contact.id);
+  const suppressed = contact.fields.suppressed === true;
+  const consent = contact.fields.consent ? String(contact.fields.consent) : "";
+  const openDeals = deals.filter((deal) => stageOf(deal).kind === "open");
+  const wonMinor = deals.filter((deal) => stageOf(deal).kind === "won").reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0);
 
   return (
     <Grid>
-      <Card prov="human" span={4} title="Identity" subtitle="What is recorded, and what is not">
-        <Properties rows={[
+      <PageSection span={8} title="Next actions" hint={tasks.length ? `${tasks.length} open on this person` : undefined}
+        actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("activity composer", { kind: "task" })}>Add a task</Button>}>
+        <div className="crm-next">
+          {tasks.slice(0, 4).map((task) => (
+            <div className="crm-next-row" key={task.id}>
+              <span className="ds-truncate"><ActivityPill activity={task} /> {task.title}</span>
+              <span className="ds-subtle ds-num">{task.dueAt ? context.relative(task.dueAt) : "no date"}</span>
+            </div>
+          ))}
+          {openDeals.length > 0 && openDeals.slice(0, 2).map((deal) => (
+            <div className="crm-next-row" key={deal.id}>
+              <span className="ds-truncate"><StagePill deal={deal} /> <Link to={`/o/${org.slug}/crm/deals/${deal.id}`}>{deal.title}</Link></span>
+              <span className="ds-subtle ds-num">{deal.fields.closeDate ? `close ${context.relative(`${String(deal.fields.closeDate)}T12:00:00.000Z`)}` : "no close date"}</span>
+            </div>
+          ))}
+          {unpaid.length > 0 && (
+            <div className="crm-next-row">
+              <span>{unpaid.length} unpaid invoice{unpaid.length === 1 ? "" : "s"}. Worth knowing before the next call.</span>
+              <span className="ds-num">{context.money(outstanding)}</span>
+            </div>
+          )}
+          {tasks.length === 0 && openDeals.length === 0 && unpaid.length === 0 && (
+            <Row gap={2} wrap>
+              <span className="ds-subtle ds-grow">No open task, deal or invoice. Start the next conversation.</span>
+              <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Compose message")}>Draft a message</Button>
+              <Button size="sm" variant="secondary" onClick={() => context.openOverlay("activity composer", { kind: "meeting" })}>Schedule a meeting</Button>
+            </Row>
+          )}
+        </div>
+      </PageSection>
+
+      <PageSection span={4} title="Consent" hint="Decides whether anything may be sent">
+        <KeyValueList items={[
+          { label: "Email", value: String(contact.fields.email ?? "None on file"), mono: true },
+          { label: "Email consent", value: suppressed ? "Withdrawn" : consent ? consentLabel(consent).replace(/^[A-Za-z]+ consent, /, "Given ") : "Not recorded" },
+          { label: "Messages", value: suppressed ? "Blocked" : "Drafted here, never sent" },
+        ]} />
+      </PageSection>
+
+      <PageSection span={6} title="Identity">
+        <KeyValueList items={[
           { label: "Name", value: contact.title },
           { label: "Role", value: String(contact.fields.role ?? "Not recorded") },
-          { label: "Email", value: String(contact.fields.email ?? "Not recorded") },
-          { label: "Phone", value: String(contact.fields.phone ?? "Not recorded") },
+          { label: "Phone", value: String(contact.fields.phone ?? "Not recorded"), mono: Boolean(contact.fields.phone) },
           { label: "Owner", value: String(contact.fields.owner ?? contact.ownerName) },
-          { label: "Consent", value: <ConsentPill contact={contact} /> },
           { label: "Tax status", value: contact.fields.taxStatus
             ? CUSTOMER_TAX_STATUSES.find((entry) => entry.value === contact.fields.taxStatus)?.label ?? String(contact.fields.taxStatus)
-            : "Not recorded — an invoice cannot resolve a rate" },
+            : "Not recorded. An invoice cannot resolve a rate." },
+          { label: "Added", value: context.date(contact.createdAt), mono: true },
         ]} />
-      </Card>
+      </PageSection>
 
-      <Card prov="human" span={4} title="Relationship context" subtitle={company ? company.title : "No account linked"}>
+      <PageSection span={6} title="Organisation and relationships" hint={company ? undefined : "No account linked"}>
         {company ? (
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
+              { label: "Account", value: <Link to={accountHref(org.slug, company.id)}>{company.title}</Link> },
               { label: "Industry", value: String(company.fields.industry ?? "Not recorded") },
-              { label: "City", value: String(company.fields.city ?? "Not recorded") },
               { label: "Account owner", value: String(company.fields.owner ?? company.ownerName) },
-              { label: "Other contacts", value: String(contactsOfCompany(data, company.id).length - 1) },
-              { label: "Deals at this account", value: String(dealsOfCompany(data, company.id).length) },
+              { label: "Deals at the account", value: String(dealsOfCompany(data, company.id).length), mono: true },
             ]} />
-            <Stack gap={2}>
-              <span className="ds-stat-label">Others at {company.title}</span>
-              {contactsOfCompany(data, company.id).filter((item) => item.id !== contact.id).map((item) => (
+            {others.length > 0
+              ? others.map((item) => (
                 <Row key={item.id} gap={2}>
                   <Avatar name={item.title} size="sm" />
                   <Link to={`/o/${org.slug}/crm/contacts/${item.id}`} className="ds-grow" style={{ color: "inherit" }}>{item.title}</Link>
                   <span className="ds-subtle">{String(item.fields.role ?? "")}</span>
                 </Row>
-              ))}
-              {contactsOfCompany(data, company.id).length <= 1 && <span className="ds-subtle">Nobody else is recorded at this account.</span>}
-            </Stack>
+              ))
+              : <span className="ds-subtle">Nobody else is recorded at {company.title}. Everything rests on this one relationship.</span>}
           </Stack>
         ) : (
           <Empty title="No account" icon={<Building2 size={20} />}>Linking an account gives this person a company, an owner and the rest of the relationship.</Empty>
         )}
-      </Card>
+      </PageSection>
 
-      <Card prov="human" span={4} title="Commercial position" subtitle="Deals and money, from real records">
-        <Stack gap={3}>
-          <Properties rows={[
-            { label: "Deals", value: String(deals.length) },
-            { label: "Open value", value: <Money minor={deals.filter((deal) => stageOf(deal).kind === "open").reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0)} context={context} bold /> },
-            { label: "Won value", value: <Money minor={deals.filter((deal) => stageOf(deal).kind === "won").reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0)} context={context} /> },
-            { label: "Invoices", value: String(invoices.length) },
-            { label: "Outstanding", value: <Money minor={unpaid.reduce((sum, invoice) => sum + (Number(invoice.amountMinor ?? 0) - Number(invoice.fields.paidMinor ?? 0)), 0)} context={context} bold /> },
-            { label: "Open tickets", value: String(tickets.filter((ticket) => ticket.status !== "closed").length) },
-          ]} />
-          {unpaid.length > 0 && (
-            <Notice tone="warning" title={`${unpaid.length} invoice${unpaid.length === 1 ? " is" : "s are"} unpaid`}>
-              Worth knowing before the next conversation. Open them in Finance to see the ageing.
-            </Notice>
-          )}
-        </Stack>
-      </Card>
+      <PageSection span={12} flush title="Opportunities" hint={`${openDeals.length} open, ${deals.length - openDeals.length} closed. Won to date ${context.money(wonMinor)}.`}>
+        {deals.length === 0 ? (
+          <div className="ds-card-body"><span className="ds-subtle">No deal for this person yet.</span></div>
+        ) : (
+          <DataGrid
+            rows={deals}
+            rowId={(row) => row.id}
+            label="Opportunities"
+            filterable={false}
+            columns={[
+              { key: "title", header: "Deal", primary: true, cell: (row) => row.title },
+              { key: "stage", header: "Stage", cell: (row) => <StagePill deal={row} /> },
+              { key: "close", header: "Expected close", cell: (row) => row.fields.closeDate ? <span className="ds-num">{context.date(String(row.fields.closeDate))}</span> : <span className="ds-subtle">Not set</span> },
+              { key: "amount", header: "Amount", align: "end", cell: (row) => <Money minor={row.amountMinor} context={context} bold /> },
+            ]}
+            onOpen={(id) => context.navigate(`/o/${org.slug}/crm/deals/${id}`)}
+          />
+        )}
+      </PageSection>
 
       {contact.fields.restrictedNote && (
         <div className="ds-col-12">
@@ -574,12 +665,12 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
         </div>
       )}
 
-      <Card prov="human" span={12} title="Latest touches" subtitle={`${activities.length} activities recorded against this person`} flush>
-        {activities.length === 0 ? (
+      <PageSection span={8} flush title="Communication history" hint={history.length ? `${history.length} calls, meetings, drafts and notes` : undefined}>
+        {history.length === 0 ? (
           <div className="ds-card-body"><Empty title="Nothing logged">A call, meeting, email draft or note recorded here becomes the conversation history.</Empty></div>
         ) : (
           <DataGrid
-            rows={activities.slice(0, 8)}
+            rows={history.slice(0, 6)}
             rowId={(row) => row.id}
             label="Latest activity"
             filterable={false}
@@ -587,11 +678,30 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
               { key: "when", header: "When", cell: (row) => <span className="ds-num">{context.dateTime(row.startAt ?? row.at)}</span> },
               { key: "kind", header: "Kind", cell: (row) => <ActivityPill activity={row} /> },
               { key: "title", header: "What", primary: true, cell: (row) => row.title },
-              { key: "outcome", header: "Outcome", cell: (row) => row.fields.outcome ? String(row.fields.outcome) : <span className="ds-subtle">—</span> },
+              { key: "outcome", header: "Outcome", cell: (row) => row.fields.outcome ? String(row.fields.outcome) : <span className="ds-subtle">-</span> },
             ]}
           />
         )}
-      </Card>
+      </PageSection>
+
+      <PageSection span={4} title="Notes" hint={notes.length ? `${notes.length} on file` : undefined}
+        actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("activity composer", { kind: "note" })}>Add a note</Button>}>
+        {notes.length === 0 ? <span className="ds-subtle">No note yet.</span> : (
+          <Stack gap={2}>
+            {notes.slice(0, 3).map((note) => (
+              <div key={note.id}>
+                <strong>{note.title}</strong>
+                {note.summary && <p className="ds-subtle">{note.summary}</p>}
+                <span className="ds-subtle ds-num">{note.ownerName}, {context.relative(note.startAt ?? note.at ?? note.createdAt)}</span>
+              </div>
+            ))}
+          </Stack>
+        )}
+        {tickets.filter((ticket) => ticket.status !== "closed").length > 0 && (
+          <p className="ds-subtle">{tickets.filter((ticket) => ticket.status !== "closed").length} open service ticket(s). See Service.</p>
+        )}
+      </PageSection>
+      <div className="ds-col-12">{now && <span className="ds-sr-only">as at {context.date(now)}</span>}</div>
     </Grid>
   );
 }
@@ -781,28 +891,31 @@ export function ComposeMessage({ context, close }: { context: ScreenContext; clo
           disabled={Boolean(blocked) || !body.trim()}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.create({
-              collection: "emailThreads",
-              title: `Draft to ${contact.title}`,
-              status: "draft",
-              summary: body.slice(0, 160),
-              fields: { to, delivery: "not_connected", contactId: contact.id, author: context.actor },
-              body: { messages: [{ at: clockIso(), from: `${context.actor} at ${org.name}`, body }] },
-            }, `Message drafted to ${contact.title}`);
-            await context.mutate.create({
-              collection: "activities",
-              title: `Email drafted to ${contact.title}`,
-              status: "draft",
-              summary: body.slice(0, 120),
-              startAt: clockIso(),
-              at: clockIso(),
-              parentId: contact.id,
-              fields: { kind: "email", contactId: contact.id, delivery: "not_connected", owner: context.actor },
-            }, `Activity logged for the draft to ${contact.title}`);
-            clearWorkingDraft(draftScope);
-            context.toast("Draft saved", `The message to ${to} is kept in this workspace and logged as an activity. No mail provider is connected.`, "info");
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.create({
+                collection: "emailThreads",
+                title: `Draft to ${contact.title}`,
+                status: "draft",
+                summary: body.slice(0, 160),
+                fields: { to, delivery: "not_connected", contactId: contact.id, author: context.actor },
+                body: { messages: [{ at: clockIso(), from: `${context.actor} at ${org.name}`, body }] },
+              }, `Message drafted to ${contact.title}`);
+              await context.mutate.create({
+                collection: "activities",
+                title: `Email drafted to ${contact.title}`,
+                status: "draft",
+                summary: body.slice(0, 120),
+                startAt: clockIso(),
+                at: clockIso(),
+                parentId: contact.id,
+                fields: { kind: "email", contactId: contact.id, delivery: "not_connected", owner: context.actor },
+              }, `Activity logged for the draft to ${contact.title}`);
+              clearWorkingDraft(draftScope);
+              context.toast("Draft saved", `The message to ${to} is kept in this workspace and logged as an activity. No mail provider is connected.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save the draft
@@ -836,25 +949,28 @@ export function ActivityComposer({ context, close }: { context: ScreenContext; c
         event.preventDefault();
         if (!title.trim()) return;
         setBusy(true);
-        const fields: Record<string, string | number | boolean> = { kind, owner: context.actor };
-        if (contact) fields.contactId = contact.id;
-        if (dealId) fields.dealId = dealId;
-        if (outcome) fields.outcome = outcome;
-        await context.mutate.create({
-          collection: "activities",
-          title: title.trim(),
-          status: new Date(when) > now ? "open" : "done",
-          summary: note,
-          startAt: new Date(when).toISOString(),
-          at: new Date(when).toISOString(),
-          parentId: dealId || contact?.id,
-          fields,
-        }, `Activity ${title.trim()} logged`);
-        context.toast("Activity logged", new Date(when) > now
-          ? `${title.trim()} is scheduled for ${context.dateTime(when)}. No calendar is connected, so nothing was invited.`
-          : `${title.trim()} is on the record with its outcome.`);
-        setBusy(false);
-        close();
+        try {
+          const fields: Record<string, string | number | boolean> = { kind, owner: context.actor };
+          if (contact) fields.contactId = contact.id;
+          if (dealId) fields.dealId = dealId;
+          if (outcome) fields.outcome = outcome;
+          await context.mutate.create({
+            collection: "activities",
+            title: title.trim(),
+            status: new Date(when) > now ? "open" : "done",
+            summary: note,
+            startAt: new Date(when).toISOString(),
+            at: new Date(when).toISOString(),
+            parentId: dealId || contact?.id,
+            fields,
+          }, `Activity ${title.trim()} logged`);
+          context.toast("Activity logged", new Date(when) > now
+            ? `${title.trim()} is scheduled for ${context.dateTime(when)}. No calendar is connected, so nothing was invited.`
+            : `${title.trim()} is on the record with its outcome.`);
+          close();
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <Row gap={3} wrap>
@@ -880,6 +996,7 @@ export function ActivityComposer({ context, close }: { context: ScreenContext; c
       <Field label="Notes"><TextArea aria-label="Notes" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim()}>Log the activity</Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </form>
@@ -895,15 +1012,12 @@ export function ContactInspector({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Owner", value: String(contact.fields.owner ?? contact.ownerName) },
-        { label: "Consent", value: <ConsentPill contact={contact} /> },
         { label: "Deals", value: String(deals.length) },
         { label: "Invoices", value: String(invoices.length) },
         { label: "Revision", value: String(contact.revision) },
       ]} />
       <Stack gap={2}>
         <Button size="sm" variant="secondary" onClick={() => context.openOverlay("activity composer")}>Log an activity</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Compose message")}>Draft a message</Button>
         <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/crm/contacts`)}>All contacts</Button>
       </Stack>
       {contact.fields.mergedFrom && (

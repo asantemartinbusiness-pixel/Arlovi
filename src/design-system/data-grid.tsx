@@ -41,6 +41,12 @@ export interface DataGridProps<T> {
   filterable?: boolean;
   /** Mobile card renderer; falls back to primary column + first two columns. */
   card?: (row: T) => ReactNode;
+  /**
+   * Set when the custom card renders its own buttons. The card container is
+   * then a keyboard-operable group instead of a <button>, so buttons are never
+   * nested. Without it the whole card stays one button (its text is its name).
+   */
+  cardHasActions?: boolean;
   dense?: boolean;
   pageSize?: number;
   /** Footer summary, e.g. column totals. */
@@ -49,7 +55,7 @@ export interface DataGridProps<T> {
 
 export function DataGrid<T>({
   rows, columns, rowId, label, selectedId, onSelect, onOpen, rowTone,
-  bulkActions, toolbar, empty, filterable = true, card, pageSize = 60, summary,
+  bulkActions, toolbar, empty, filterable = true, card, cardHasActions = false, pageSize = 60, summary,
 }: DataGridProps<T>) {
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
   const [query, setQuery] = useState("");
@@ -243,22 +249,60 @@ export function DataGrid<T>({
             {visible.map((row) => {
               const id = rowId(row);
               return (
-                <div key={id} className="ds-stack ds-gap-1">
-                <button
-                  type="button"
-                  className="ds-record-card"
-                  aria-pressed={bothModes ? id === selectedId : undefined}
-                  onClick={() => (bothModes ? onSelect?.(id) : onOpen ? onOpen(id) : onSelect?.(id))}
-                >
-                  {card ? card(row) : (
+                <div key={id} className="ds-stack ds-gap-1" data-checked={bulkActions && checked.has(id) ? "true" : undefined}>
+                {bulkActions && (
+                  <label className="ds-check ds-record-card-check">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select row ${id}`}
+                      checked={checked.has(id)}
+                      onChange={(event) => setChecked((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(id); else next.delete(id);
+                        return next;
+                      })}
+                    />
+                    <span className="ds-subtle">Select</span>
+                  </label>
+                )}
+                {(() => {
+                  const activate = () => (bothModes ? onSelect?.(id) : onOpen ? onOpen(id) : onSelect?.(id));
+                  const content = card ? card(row) : (
                     <>
                       <strong>{columns.find((column) => column.primary)?.cell(row) ?? columns[0].cell(row)}</strong>
                       <span className="ds-subtle ds-row ds-gap-2 ds-wrap">
                         {columns.slice(1, 3).map((column) => <span key={column.key}>{column.cell(row)}</span>)}
                       </span>
                     </>
-                  )}
-                </button>
+                  );
+                  // A custom card may hold its own action buttons, so its container
+                  // must not itself be a <button> (invalid nesting); it stays
+                  // keyboard-operable and keeps the row as its accessible name.
+                  if (card && cardHasActions) {
+                    const primary = columns.find((column) => column.primary)?.cell(row);
+                    return (
+                      <div
+                        className="ds-record-card"
+                        role="group"
+                        tabIndex={0}
+                        aria-label={typeof primary === "string" ? primary : undefined}
+                        aria-current={bothModes && id === selectedId ? "true" : undefined}
+                        onClick={activate}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(); }
+                        }}
+                      >
+                        {content}
+                      </div>
+                    );
+                  }
+                  return (
+                    <button type="button" className="ds-record-card" aria-pressed={bothModes ? id === selectedId : undefined} onClick={activate}>
+                      {content}
+                    </button>
+                  );
+                })()}
                 {bothModes && id === selectedId && (
                   <Button size="sm" variant="secondary" onClick={() => onOpen?.(id)}>Open</Button>
                 )}

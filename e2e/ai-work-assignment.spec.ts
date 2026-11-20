@@ -14,6 +14,8 @@ test("AI task assignment is durable and never implies that a model ran", async (
   const alreadyPending = await page.getByRole("button", { name: "Assign work" }).isDisabled();
   test.skip(alreadyPending, "Seed task already has a pending assignment");
   await page.getByRole("button", { name: "Assign work" }).click();
+  // Reload only after the assignment is confirmed as saved; reloading mid-write races IndexedDB.
+  await expect(page.getByText(/Assignment recorded/).first()).toBeVisible();
   await expect(page.getByText("Not executing").first()).toBeVisible();
   await page.reload();
   await expect(page.getByText("Not executing").first()).toBeVisible();

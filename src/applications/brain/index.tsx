@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
 import { BookOpen, Brain, Database, FileSearch, GitBranch, Inbox, Lock, Palette, Scale } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
+  BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, Meter, ModalActions, ModalUnsavedChanges, Notice,
+  OVERLAY_WIDTH, OverlayActions, OverlaySection, OverlaySummary, Pill, Properties,
   Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollection, useCollections, useOrgRecords, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness, wallMs } from "@/platform/clock";
 import { CapabilityLine, DiagramToggle } from "@/applications/t2_shared/pieces";
 import { usePanelFlags } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
+import { commitTogether, type TogetherChange } from "@/platform/commit";
 import { internalPeople } from "./people";
 import { KnowledgeWorkspace } from "./knowledge/Workspace";
 import { KNOWLEDGE } from "./knowledge/model";
@@ -33,6 +35,43 @@ function useKnowledge() {
 
 function sourceOf(data: Record<string, Rec[]>, id: unknown): Rec | undefined {
   return (data.sources ?? []).find((source) => source.id === String(id ?? ""));
+}
+
+/** A confidence figure only when one is recorded; a word-only confidence (verified) shows no number. */
+function confidencePct(fact: Rec): string {
+  const score = Number(fact.fields.confidenceScore);
+  return Number.isFinite(score) && score > 0 ? `${score}%` : "";
+}
+
+/** Visibility is the source's sensitivity group: who and what may retrieve it. */
+function visibilityOf(source: Rec | undefined): { label: string; tone: "success" | "info" | "warning" | "neutral" } {
+  if (!source) return { label: "Unknown", tone: "neutral" };
+  const group = String(source.fields.classification ?? "internal");
+  return { label: group === "confidential" ? "Confidential" : group === "public" ? "Public" : "Internal", tone: group === "confidential" ? "warning" : group === "public" ? "success" : "info" };
+}
+
+/** Source, how old it is, and who may see it: the trail behind any assertion. */
+function SourceTrail({ context, source, line }: { context: ScreenContext; source: Rec | undefined; line?: string }) {
+  const { now } = useWorkspace();
+  if (!source) return <Notice tone="danger" title="No source record">Nothing backs this assertion, so it cannot be verified.</Notice>;
+  const age = freshness(String(source.fields.freshness ?? source.updatedAt), now, 45);
+  const visibility = visibilityOf(source);
+  const body = source.body as { corrections?: Correction[] } | undefined;
+  const corrections = line ? correctionsOfLine(line, body?.corrections ?? []) : [];
+  return (
+    <Stack gap={3}>
+      <FactGrid items={[
+        { label: "Source", value: source.title },
+        { label: "State", value: <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> },
+        { label: "Freshness", value: age.known ? `${context.date(String(source.fields.freshness ?? source.updatedAt))} · ${age.days} days` : "Unknown", mono: true, tone: age.stale ? "warning" : undefined },
+        { label: "Visibility", value: <Pill tone={visibility.tone}>{visibility.label}</Pill> },
+      ]} />
+      {line && <p className="ds-prose" style={{ borderInlineStart: "2px solid var(--border-strong)", paddingInlineStart: "var(--space-3)" }}>{line}</p>}
+      {corrections.length > 0 && (
+        <p className="ds-subtle">{corrections.length} correction{corrections.length === 1 ? "" : "s"} tracked on this line, latest by {corrections[0].by} on {context.date(corrections[0].at)}. The original is kept.</p>
+      )}
+    </Stack>
+  );
 }
 
 /* ---------------------------- BRAIN-001 ---------------------------- */
@@ -279,7 +318,7 @@ function SourceLibrary({ context, view }: { context: ScreenContext; view: "Docum
           { key: "scan", header: "Scanned", cell: (row) => row.fields.scanned === true ? "Reviewed" : <Pill tone="warning">Not scanned</Pill> },
         ]}
         bulkActions={[
-          { label: "Retire", onRun: (selected) => selected.forEach((source) => void context.mutate.patch(source.id, { status: "retired" }, { event: `${source.title} retired from the knowledge base` })) },
+          { label: "Retire", onRun: (selected) => void retireSources(context, selected) },
         ]}
       />
       <Notice tone="info" title="Ingestion is isolated by default">
@@ -327,7 +366,8 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
                 return proposed
                   ? <Pill tone={CONFIDENCE_TONE[proposed.status] ?? "neutral"}>{proposed.status}</Pill>
                   : <Button size="sm" variant="secondary" disabled={!context.can("edit_knowledge")} onClick={async () => {
-                    await proposeFactFromLine(context, source, row.line, data.facts);
+                    const proposed = await proposeFactFromLine(context, source, row.line, data.facts);
+                    if (!proposed) { context.toast("Already proposed", "An assertion from this line is already in the fact registry.", "info"); return; }
                     context.toast("Proposed", "The line is a proposed assertion in the fact registry, pending review. It cites this source and line.");
                   }}>Propose as a fact</Button>;
               } },
@@ -624,6 +664,30 @@ function assertionFromLine(line: string): { subject: string; value: string } | u
   return { subject: match[1].trim(), value: match[2].trim().replace(/\.$/, "") };
 }
 
+async function retireSources(context: ScreenContext, sources: Rec[]): Promise<void> {
+  let saved = 0;
+  for (const source of sources) {
+    if (await context.mutate.patch(source.id, { status: "retired" }, { expectRevision: source.revision, event: `${source.title} retired from the knowledge base` })) saved += 1;
+  }
+  if (saved === 0) return;
+  context.toast(saved === sources.length ? `${saved} source${saved === 1 ? "" : "s"} retired` : `${saved} of ${sources.length} retired`, "Retired sources are out of retrieval and stay on the record for the retention period.");
+}
+
+/** Verify or reject assertions one by one, saying how many were really saved. */
+async function decideFacts(context: ScreenContext, facts: Rec[], verdict: "verified" | "rejected"): Promise<void> {
+  let saved = 0;
+  for (const fact of facts) {
+    const patch = verdict === "verified"
+      ? { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10) } }
+      : { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } };
+    const result = await context.mutate.patch(fact.id, patch, { expectRevision: fact.revision, event: `${fact.title} ${verdict === "verified" ? "verified" : "rejected"} by ${context.actor}` });
+    if (result) saved += 1;
+  }
+  if (saved === 0) return;
+  const word = verdict === "verified" ? "verified" : "rejected";
+  context.toast(saved === facts.length ? `${saved} assertion${saved === 1 ? "" : "s"} ${word}` : `${saved} of ${facts.length} ${word}`, saved === facts.length ? "Each carries your name and the date." : "The rest changed elsewhere and were left as they were.");
+}
+
 async function proposeFactFromLine(context: ScreenContext, source: Rec, line: string, existing: Rec[]): Promise<Rec | undefined> {
   const parsed = assertionFromLine(line) ?? { subject: line.trim().slice(0, 80), value: line.trim() };
   if (existing.some((fact) => fact.fields.sourceId === source.id && fact.fields.sourceLine === line && fact.status !== "rejected")) return undefined;
@@ -664,42 +728,55 @@ function FactRegistry({ context, view }: { context: ScreenContext; view: "Verifi
         label={`${view} assertions`}
         selectedId={context.selectedId}
         onSelect={(id) => context.select(id)}
-        onOpen={(id) => context.openOverlay("Evidence drawer", { id })}
+        card={(row) => {
+          const source = sourceOf(data, row.fields.sourceId);
+          return (
+            <>
+              <strong>{row.title}</strong>
+              <span className="ds-subtle ds-row ds-gap-2 ds-wrap">
+                <span>{String(row.fields.value ?? row.summary)}</span>
+                <span>{source?.title ?? "No source"}</span>
+                <span>{visibilityOf(source).label}</span>
+              </span>
+            </>
+          );
+        }}
         columns={[
           { key: "title", header: "Assertion", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "value", header: "Value", cell: (row) => String(row.fields.value ?? row.summary) },
-          { key: "owner", header: "Canonical owner", cell: (row) => row.ownerName },
+          { key: "source", header: "Source", cell: (row) => {
+            const source = sourceOf(data, row.fields.sourceId);
+            if (!source) return <Pill tone="warning">No source</Pill>;
+            const age = freshness(String(source.fields.freshness ?? source.updatedAt), now, 45);
+            return <span>{source.title}{age.known && <span className="ds-subtle ds-num"> · {age.days}d{age.stale ? " old" : ""}</span>}</span>;
+          } },
+          { key: "visibility", header: "Visibility", cell: (row) => { const visibility = visibilityOf(sourceOf(data, row.fields.sourceId)); return <Pill tone={visibility.tone}>{visibility.label}</Pill>; } },
           { key: "confidence", header: "Confidence", cell: (row) => {
             const open = conflictsOfFact(row, data.conflicts).length;
-            return <Row gap={2}><Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill><span className="ds-num">{String(row.fields.confidenceScore ?? 0)}%</span>{open > 0 && <span className="ds-subtle ds-num" title="Open conflicts naming this assertion">{open} open conflict{open === 1 ? "" : "s"}</span>}</Row>;
+            return <Row gap={2}><Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill>{confidencePct(row) && <span className="ds-num">{confidencePct(row)}</span>}{open > 0 && <span className="ds-subtle ds-num" title="Open conflicts naming this assertion">{open} open conflict{open === 1 ? "" : "s"}</span>}</Row>;
           }, sortValue: (row) => Number(row.fields.confidenceScore ?? 0) },
           { key: "valid", header: "Valid", cell: (row) => {
             const to = String(row.fields.validTo ?? "");
             const expired = to && new Date(to) < now;
             return <span>{context.date(String(row.fields.validFrom ?? row.at))}{to ? ` – ${context.date(to)}` : " – open"}{expired ? " · past" : ""}</span>;
           } },
-          { key: "source", header: "Source", cell: (row) => sourceOf(data, row.fields.sourceId)?.title ?? <Pill tone="warning">No source</Pill> },
         ]}
         bulkActions={[
           {
             label: "Approve",
             disabled: (selected) => selected.some((fact) => !sourceOf(data, fact.fields.sourceId)),
-            onRun: (selected) => selected.forEach((fact) => {
-              void context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }, { event: `${fact.title} verified by ${context.actor}` });
-            }),
+            onRun: (selected) => void decideFacts(context, selected, "verified"),
           },
           {
             label: "Reject",
             tone: "danger",
-            onRun: (selected) => selected.forEach((fact) => {
-              void context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { event: `${fact.title} rejected by ${context.actor}` });
-            }),
+            onRun: (selected) => void decideFacts(context, selected, "rejected"),
           },
         ]}
       />
-      <Notice tone="info" title="Approving needs a source">
-        An assertion with no source record cannot be approved in bulk or singly. The registry would have nothing to show a reader who asks why it is true.
-      </Notice>
+      {rows.some((fact) => !sourceOf(data, fact.fields.sourceId)) && (
+        <p className="ds-subtle">An assertion with no source cannot be approved, singly or in bulk: the registry would have nothing to show a reader who asks why it is true.</p>
+      )}
     </Stack>
   );
 }
@@ -717,7 +794,9 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
   const data = useKnowledge();
   const status = view === "In review" ? "in_review" : view.toLowerCase();
   const rows = data.conflicts.filter((conflict) => conflict.status === status);
-  const domains = [...new Set(rows.map((conflict) => String(conflict.fields.domain ?? "general")))];
+  const domains = [...new Set(rows.map((conflict) => String(conflict.fields.domain ?? "general")))]
+    .sort((a, b) => Number(rows.some((conflict) => String(conflict.fields.domain ?? "general") === b && conflictOptions(conflict).length > 0))
+      - Number(rows.some((conflict) => String(conflict.fields.domain ?? "general") === a && conflictOptions(conflict).length > 0)));
 
   if (rows.length === 0) {
     return <Empty title={`No ${view.toLowerCase()} conflict`} icon={<Scale size={20} />}>A conflict is recorded when two sources disagree about the same assertion.</Empty>;
@@ -725,14 +804,16 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="A financial mismatch is not settled here">
-        Where a conflict touches the ledger, this board records it and sends it to an accounting review. Choosing a side would change a figure without a posting behind it.
-      </Notice>
+      {rows.some((conflict) => conflict.fields.requiresLedgerReview === true) && (
+        <Notice tone="warning" title="A financial mismatch is not settled here">
+          Where a conflict touches the ledger, this board records it and sends it to an accounting review. Choosing a side would change a figure without a posting behind it.
+        </Notice>
+      )}
       <Grid>
         {domains.map((domain) => (
-          <Card key={domain} span={6} eyebrow="CONFLICTS" prov="unknown" title={domain} subtitle={`${rows.filter((conflict) => conflict.fields.domain === domain).length} in this domain`}>
+          <Card key={domain} span={6} prov="unknown" title={domain} subtitle={`${rows.filter((conflict) => String(conflict.fields.domain ?? "general") === domain).length} in this domain`}>
             <Stack gap={3}>
-              {rows.filter((conflict) => conflict.fields.domain === domain).map((conflict) => {
+              {rows.filter((conflict) => String(conflict.fields.domain ?? "general") === domain).map((conflict) => {
                 const options = conflictOptions(conflict);
                 const ledger = conflict.fields.requiresLedgerReview === true;
                 const affected = (conflict.body as { affected?: string[] } | undefined)?.affected ?? [];
@@ -742,13 +823,13 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
                       <strong className="ds-grow">{conflict.title}</strong>
                       <Pill tone={String(conflict.fields.urgency) === "critical" ? "danger" : String(conflict.fields.urgency) === "high" ? "warning" : "neutral"}>{String(conflict.fields.urgency ?? "normal")}</Pill>
                     </Row>
-                    <p className="ds-subtle">{conflict.summary}</p>
+                    <p className="ds-subtle">{conflict.summary}{options.length === 0 ? " No competing versions are recorded on it, so there is nothing to choose between yet." : ""}</p>
                     <Stack gap={1} style={{ marginBlock: "var(--space-2)" }}>
                       {options.map((option) => (
                         <Row key={option.id} gap={2}>
                           <Pill tone="neutral">{option.value}</Pill>
-                          <span className="ds-subtle ds-grow ds-truncate">{option.note}</span>
-                          <span className="ds-subtle">{context.date(option.recordedAt)}</span>
+                          <span className="ds-subtle ds-grow ds-truncate">{sourceOf(data, option.sourceId)?.title ?? option.note}</span>
+                          <span className="ds-subtle ds-num">{context.date(option.recordedAt)}</span>
                         </Row>
                       ))}
                     </Stack>
@@ -760,8 +841,8 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
                       <Button
                         size="sm"
                         variant="primary"
-                        disabled={ledger || view === "Resolved"}
-                        title={ledger ? "A ledger review decides this one" : undefined}
+                        disabled={ledger || view === "Resolved" || options.length === 0}
+                        title={ledger ? "A ledger review decides this one" : options.length === 0 ? "No competing versions are recorded, so there is nothing to choose between" : undefined}
                         onClick={() => { context.select(conflict.id); context.openOverlay("resolution dialog", { id: conflict.id }); }}
                       >
                         Choose the source of truth
@@ -908,7 +989,7 @@ function BrandIntelligence({ context, view }: { context: ScreenContext; view: "I
           <p className="ds-prose" style={{ fontSize: "var(--text-lg)" }}>{body?.voice ?? proposalBody?.voice ?? "No voice is recorded."}</p>
         </Card>
         {voiceFact && (
-          <Card title="Registered as an assertion" subtitle={`${voiceFact.status} · ${String(voiceFact.fields.confidenceScore ?? 0)}% confidence`}>
+          <Card title="Registered as an assertion" subtitle={[voiceFact.status, confidencePct(voiceFact) && `${confidencePct(voiceFact)} confidence`].filter(Boolean).join(" · ")}>
             <Properties rows={[
               { label: "Value", value: String(voiceFact.fields.value) },
               { label: "Source", value: data.sources.find((source) => source.id === String(voiceFact.fields.sourceId))?.title ?? "No source" },
@@ -1021,10 +1102,6 @@ function KnowledgePermissions({ context, view }: { context: ScreenContext; view:
           ]}
           onOpen={(id) => { context.select(id); context.openOverlay("Grant dialog", { agentId: id }); }}
         />
-        <Row gap={2} wrap>
-          <Button variant="secondary" onClick={() => context.openOverlay("Grant dialog")}>Adjust a grant</Button>
-          <Button variant="ghost" onClick={() => context.openOverlay("revoke confirmation")}>Revoke a grant</Button>
-        </Row>
       </Stack>
     );
   }
@@ -1051,9 +1128,6 @@ function KnowledgePermissions({ context, view }: { context: ScreenContext; view:
             </Stack>
           )}
         </Card>
-        <Notice tone="warning" title="Residency is this browser">
-          Everything is in this browser's storage. There is no second region to choose and no copy anywhere else.
-        </Notice>
       </Stack>
     );
   }
@@ -1078,9 +1152,6 @@ function KnowledgePermissions({ context, view }: { context: ScreenContext; view:
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="These are interface boundaries">
-        A group shapes what a role view and an AI contract are offered in this browser. It is not account security, and a future service would have to enforce it server-side.
-      </Notice>
       <DataGrid
         rows={groups}
         rowId={(row) => row.id}
@@ -1187,7 +1258,7 @@ function KnowledgeInspector({ context }: { context: ScreenContext }) {
         <Card title={record.title} subtitle={`${record.collection} · ${record.status}`} prov={record.collection === "facts" ? "agent" : "human"}>
           <Properties rows={record.collection === "facts" ? [
             { label: "Value", value: String(record.fields.value ?? record.summary) },
-            { label: "Confidence", value: <Pill tone={CONFIDENCE_TONE[record.status] ?? "neutral"}>{record.status} · {String(record.fields.confidenceScore ?? 0)}%</Pill> },
+            { label: "Confidence", value: <Pill tone={CONFIDENCE_TONE[record.status] ?? "neutral"}>{[record.status, confidencePct(record)].filter(Boolean).join(" · ")}</Pill> },
             { label: "Source", value: sourceOf(data, record.fields.sourceId)?.title ?? "No source record" },
             { label: "Valid from", value: context.date(String(record.fields.validFrom ?? record.at)) },
             { label: "Canonical owner", value: record.ownerName },
@@ -1241,17 +1312,17 @@ function SuggestionApproval({ context, close }: { context: ScreenContext; close:
           { label: "Proposed value", value: String(fact.fields.value ?? "—") },
           { label: "Evidence", value: source?.title ?? "No source record" },
           { label: "Source state", value: source ? <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> : <Pill tone="danger">Missing</Pill> },
-          { label: "Confidence", value: `${String(fact.fields.confidenceScore ?? 0)}%` },
+          { label: "Confidence", value: confidencePct(fact) || fact.status },
         ]} />
       </Card>
       {!source && <Notice tone="danger" title="This cannot be approved">There is no source record behind the claim, so nothing could be shown to a reader who asks why it is true.</Notice>}
       {source?.status === "quarantined" && <Notice tone="warning" title="The source is held">It has not been reviewed, so a fact that cites it cannot be verified yet.</Notice>}
-      <Row gap={2}>
+      <ModalActions><Row gap={2}>
         <Button
           variant="primary"
           disabled={!source || source.status === "quarantined"}
           onClick={async () => {
-            await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10) } }, { expectRevision: fact.revision, event: `${fact.title} verified by ${context.actor}` });
+            if (!(await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10) } }, { expectRevision: fact.revision, event: `${fact.title} verified by ${context.actor}` }))) return;
             context.toast("Verified", `${fact.title} is authoritative, with ${source?.title} as its evidence.`);
             close();
           }}
@@ -1259,11 +1330,11 @@ function SuggestionApproval({ context, close }: { context: ScreenContext; close:
           Verify with this evidence
         </Button>
         <Button variant="ghost" onClick={async () => {
-          await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` });
+          if (!(await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` }))) return;
           context.toast("Rejected", "It stays in the registry marked rejected, with who rejected it.");
           close();
         }}>Reject</Button>
-      </Row>
+      </Row></ModalActions>
     </Stack>
   );
 }
@@ -1315,7 +1386,7 @@ function UploadDialog({ context, close }: { context: ScreenContext; close: () =>
           {file.failed ? <Notice tone="danger" title="Isolated">{file.failed}</Notice> : <p className="ds-subtle" style={{ whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>{file.text?.slice(0, 400) || "No text content."}</p>}
         </Card>
       ))}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={files.length === 0}
         onClick={async () => {
@@ -1335,8 +1406,21 @@ function UploadDialog({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         Register {files.length || ""} source{files.length === 1 ? "" : "s"}
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
+  );
+}
+
+function SourceSummary({ context }: { context: ScreenContext }) {
+  const source = useRecord(context.selectedId);
+  if (!source || source.collection !== "sources") return null;
+  return (
+    <OverlaySummary
+      eyebrow="Knowledge source"
+      title={source.title}
+      status={<Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill>}
+      meta={[String(source.fields.kind ?? "file"), visibilityOf(source).label, `Fresh ${context.date(String(source.fields.freshness ?? source.updatedAt))}`]}
+    />
   );
 }
 
@@ -1347,20 +1431,18 @@ function SourceDetailDrawer({ context }: { context: ScreenContext }) {
   const body = source.body as { extracted?: string[]; note?: string } | undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Kind", value: String(source.fields.kind ?? "file") },
-        { label: "Classification", value: String(source.fields.classification ?? "internal") },
-        { label: "Indexing", value: <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> },
-        { label: "Freshness", value: context.date(String(source.fields.freshness ?? source.updatedAt)) },
-        { label: "Assertions", value: String(data.facts.filter((fact) => fact.fields.sourceId === source.id).length) },
+      <FactGrid columns={3} dense items={[
+        { label: "Assertions citing it", value: String(data.facts.filter((fact) => fact.fields.sourceId === source.id).length), mono: true },
+        { label: "Scanned", value: source.fields.scanned === true ? "Reviewed" : "Not scanned" },
+        { label: "Owner", value: source.ownerName },
       ]} />
       {body?.note && <Notice tone="warning">{body.note}</Notice>}
-      <Card title="Extracted" pad="tight">
+      <OverlaySection title="Extracted">
         {(body?.extracted ?? []).length === 0 ? <span className="ds-subtle">Nothing was read from this source.</span> : (
           <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.extracted ?? []).map((line) => <li key={line}>{line}</li>)}</ul>
         )}
-      </Card>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the full record</Button>
+      </OverlaySection>
+      <DrawerActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the full record</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Cancel</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1382,16 +1464,16 @@ function RetentionDialog({ context, close }: { context: ScreenContext; close: ()
           {facts.map((fact) => fact.title).join(", ")}. They will show their evidence as retired, which is a reason to re-verify them.
         </Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="danger"
         onClick={async () => {
-          await context.mutate.patch(source.id, { status: "retired", fields: { ...source.fields, indexing: "retired", retiredBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} retired from retrieval` });
+          if (!(await context.mutate.patch(source.id, { status: "retired", fields: { ...source.fields, indexing: "retired", retiredBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} retired from retrieval` }))) return;
           context.toast("Retired", "It is out of retrieval and still on the record for its retention period.");
           close();
         }}
       >
         Retire this source
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1425,13 +1507,13 @@ function CorrectionForm({ context, close }: { context: ScreenContext; close: () 
         const corrections = body?.corrections ?? [];
         const extracted = body?.extracted ?? [];
         const correction: Correction = { id: `corr-${wallMs()}`, at: context.now.toISOString(), by: context.actor, from: original, to: annotate ? original : value, note };
-        await context.mutate.patch(source.id, {
+        if (!(await context.mutate.patch(source.id, {
           body: {
             ...(source.body as object),
             extracted: annotate ? extracted : extracted.map((line) => (line === original ? value : line)),
             corrections: [...corrections, correction],
           },
-        }, { expectRevision: source.revision, event: annotate ? `Annotation added to ${source.title}` : `Extraction corrected on ${source.title}` });
+        }, { expectRevision: source.revision, event: annotate ? `Annotation added to ${source.title}` : `Extraction corrected on ${source.title}` }))) return;
         context.toast(annotate ? "Annotation recorded" : "Correction recorded", "The original line and who changed it are kept in the correction history.");
         close();
       }}
@@ -1439,6 +1521,7 @@ function CorrectionForm({ context, close }: { context: ScreenContext; close: () 
       <Notice tone="info" title="Corrections are append-only">
         The original extraction and this change are both kept, with your name and the time. Nothing is overwritten in place.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(note.trim()) || (!annotate && value !== original)} />
       <Field label="Original line"><TextInput value={original} readOnly /></Field>
       {!annotate && <Field label="Corrected line" required><TextInput value={value} onChange={(event) => setValue(event.target.value)} required /></Field>}
       <Field label={annotate ? "Annotation" : "Why"} required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
@@ -1462,16 +1545,16 @@ function PermissionEditor({ context, close }: { context: ScreenContext; close: (
       <Notice tone="warning" title="Changing this changes what answers can read">
         An answer composed after this change reads the new set. Answers already given keep the records they named at the time.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(source.id, { fields: { ...source.fields, classification } }, { expectRevision: source.revision, event: `${source.title} reclassified as ${classification}` });
+          if (!(await context.mutate.patch(source.id, { fields: { ...source.fields, classification } }, { expectRevision: source.revision, event: `${source.title} reclassified as ${classification}` }))) return;
           context.toast("Classification changed", `${source.title} is now ${classification}.`);
           close();
         }}
       >
         Save classification
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1494,7 +1577,7 @@ function DeleteRequest({ context, close }: { context: ScreenContext; close: () =
         </Notice>
       )}
       <Field label="Reason" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="outline-danger"
         disabled={blocked || !reason.trim()}
         onClick={async () => {
@@ -1504,7 +1587,7 @@ function DeleteRequest({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Record the request
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1589,12 +1672,12 @@ function MergePreview({ context, close }: { context: ScreenContext; close: () =>
         <Card span={6} title={to?.title ?? String(link.fields.toId)} subtitle={to?.collection}><p className="ds-prose">{to?.summary}</p></Card>
       </Grid>
       <Checkbox label="I have checked both records and they are the same entity" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-      <Row gap={2}>
+      <ModalActions><Row gap={2}>
         <Button
           variant="primary"
           disabled={!confirmed}
           onClick={async () => {
-            await context.mutate.patch(link.id, { status: "confirmed", fields: { ...link.fields, confidence: 100, confirmedBy: context.actor, confirmedAt: context.now.toISOString(), mergedFromConfidence: Number(link.fields.confidence ?? 0) } }, { expectRevision: link.revision, event: `${link.title} confirmed as the same entity by ${context.actor}` });
+            if (!(await context.mutate.patch(link.id, { status: "confirmed", fields: { ...link.fields, confidence: 100, confirmedBy: context.actor, confirmedAt: context.now.toISOString(), mergedFromConfidence: Number(link.fields.confidence ?? 0) } }, { expectRevision: link.revision, event: `${link.title} confirmed as the same entity by ${context.actor}` }))) return;
             context.toast("Link confirmed", "The two records are recorded as the same entity, with who confirmed it.");
             close();
           }}
@@ -1602,11 +1685,11 @@ function MergePreview({ context, close }: { context: ScreenContext; close: () =>
           Confirm the link
         </Button>
         <Button variant="ghost" onClick={async () => {
-          await context.mutate.patch(link.id, { status: "rejected" }, { expectRevision: link.revision, event: `${link.title} rejected` });
+          if (!(await context.mutate.patch(link.id, { status: "rejected" }, { expectRevision: link.revision, event: `${link.title} rejected` }))) return;
           context.toast("Rejected", "The candidate is recorded as not a match.");
           close();
         }}>Not a match</Button>
-      </Row>
+      </Row></ModalActions>
     </Stack>
   );
 }
@@ -1623,7 +1706,7 @@ function RelationshipEditor({ context, close }: { context: ScreenContext; close:
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(link.id, { fields: { ...link.fields, kind, confidence: Number(confidence) || 0 } }, { expectRevision: link.revision, event: `${link.title} relationship updated` });
+        if (!(await context.mutate.patch(link.id, { fields: { ...link.fields, kind, confidence: Number(confidence) || 0 } }, { expectRevision: link.revision, event: `${link.title} relationship updated` }))) return;
         context.toast("Relationship saved", "The link and its confidence are recorded.");
         close();
       }}
@@ -1637,33 +1720,60 @@ function RelationshipEditor({ context, close }: { context: ScreenContext; close:
   );
 }
 
+function usedFact(data: Record<string, Rec[]>, context: ScreenContext): Rec | undefined {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  return data.facts.find((item) => item.id === (payload?.id ?? context.selectedId));
+}
+
+function FactSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useKnowledge();
+  const fact = usedFact(data, context);
+  if (!fact) return null;
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={fact.title}
+      status={<Pill tone={CONFIDENCE_TONE[fact.status] ?? "neutral"}>{fact.status}</Pill>}
+      meta={[String(fact.fields.value ?? fact.summary), confidencePct(fact) ? `${confidencePct(fact)} confidence` : undefined]}
+    />
+  );
+}
+
 function EvidenceDrawer({ context }: { context: ScreenContext }) {
   const data = useKnowledge();
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const fact = data.facts.find((item) => item.id === (payload?.id ?? context.selectedId));
+  const fact = usedFact(data, context);
   if (!fact) return <Empty title="Choose an assertion" />;
   const source = sourceOf(data, fact.fields.sourceId);
   const open = conflictsOfFact(fact, data.conflicts);
-  const body = source?.body as { extracted?: string[] } | undefined;
+  const canVerify = context.can("edit_knowledge") && Boolean(source) && ["proposed", "conflicting"].includes(fact.status) && open.length === 0;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Assertion", value: `${String(fact.fields.subject)} — ${String(fact.fields.predicate)}` },
-        { label: "Value", value: String(fact.fields.value ?? fact.summary) },
-        { label: "Confidence", value: <Pill tone={CONFIDENCE_TONE[fact.status] ?? "neutral"}>{fact.status} · {String(fact.fields.confidenceScore ?? 0)}%</Pill> },
-        { label: "Valid", value: `${context.date(String(fact.fields.validFrom ?? fact.at))}${fact.fields.validTo ? ` – ${context.date(String(fact.fields.validTo))}` : " – open"}` },
-        { label: "Owner", value: fact.ownerName },
-      ]} />
-      {source ? (
-        <Card title={source.title} subtitle={`${source.status} · ${context.date(String(source.fields.freshness ?? source.updatedAt))}`} prov="human">
-          <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.extracted ?? ["No extracted line recorded."]).map((line) => <li key={line}>{line}</li>)}</ul>
-        </Card>
-      ) : <Notice tone="danger" title="No source record">This assertion cannot be verified while nothing backs it.</Notice>}
+      <OverlaySection title="Assertion">
+        <FactGrid items={[
+          { label: "Subject", value: String(fact.fields.subject ?? fact.title) },
+          { label: "Value", value: String(fact.fields.value ?? fact.summary) },
+          { label: "Valid", value: `${context.date(String(fact.fields.validFrom ?? fact.at))}${fact.fields.validTo ? ` – ${context.date(String(fact.fields.validTo))}` : " – open"}`, mono: true },
+          { label: "Canonical owner", value: fact.ownerName },
+          ...(fact.fields.verifiedBy ? [{ label: "Verified by", value: String(fact.fields.verifiedBy) }] : []),
+        ]} />
+      </OverlaySection>
+      <OverlaySection title="Where it came from" hint="The source record, how old it is and who may see it.">
+        <SourceTrail context={context} source={source} line={String(fact.fields.sourceLine ?? "") || undefined} />
+      </OverlaySection>
       {open.length > 0 && (
         <Notice tone="warning" title={`${open.length} open conflict${open.length === 1 ? "" : "s"}`}>
           {open.map((conflict) => `${conflict.title}: ${conflictOptions(conflict).map((option) => option.value).join(" or ")}`).join("; ")}. Two incompatible assertions are never both authoritative.
         </Notice>
       )}
+      <DrawerActions>
+        <OverlayActions
+          primary={canVerify
+            ? <Button variant="primary" onClick={() => { context.closeOverlay(); context.openOverlay("verification dialog", { id: fact.id }); }}>Verify this assertion</Button>
+            : source ? <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the source</Button> : undefined}
+          secondary={canVerify && source ? <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the source</Button> : undefined}
+          end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1676,28 +1786,29 @@ function VerificationDialog({ context, close }: { context: ScreenContext; close:
   const [note, setNote] = useState("");
   if (!fact) return <Empty title="Select an assertion first" />;
   const source = sourceOf(data, fact.fields.sourceId);
+  const expiring = payload?.mode === "expiry";
+  const blocked = !expiring && !source;
   return (
     <form
       id="verification"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(fact.id, {
-          status: payload?.mode === "expiry" ? fact.status : "verified",
-          fields: { ...fact.fields, validTo: expiry, note, verifiedBy: payload?.mode === "expiry" ? String(fact.fields.verifiedBy ?? "") : context.actor },
-        }, { expectRevision: fact.revision, event: payload?.mode === "expiry" ? `Expiry set on ${fact.title}` : `${fact.title} verified by ${context.actor}` });
-        context.toast(payload?.mode === "expiry" ? "Expiry recorded" : "Verified", payload?.mode === "expiry" ? "The assertion expires on that date and will be shown as expired afterwards." : `${fact.title} is authoritative.`);
+        if (blocked) return;
+        if (!(await context.mutate.patch(fact.id, {
+          status: expiring ? fact.status : "verified",
+          fields: { ...fact.fields, validTo: expiry, note, verifiedBy: expiring ? String(fact.fields.verifiedBy ?? "") : context.actor },
+        }, { expectRevision: fact.revision, event: expiring ? `Expiry set on ${fact.title}` : `${fact.title} verified by ${context.actor}` }))) return;
+        context.toast(expiring ? "Expiry recorded" : "Verified", expiring ? "The assertion expires on that date and will be shown as expired afterwards." : `${fact.title} is authoritative.`);
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Assertion", value: fact.title },
-        { label: "Evidence", value: source?.title ?? "No source record" },
-      ]} />
-      {!source && <Notice tone="danger" title="Nothing backs this assertion">Verifying it would make a claim this workspace cannot show evidence for.</Notice>}
+      <ModalUnsavedChanges when={Boolean(note.trim()) || expiry !== String(fact.fields.validTo ?? "")} />
+      <OverlaySection title="Evidence"><SourceTrail context={context} source={source} line={String(fact.fields.sourceLine ?? "") || undefined} /></OverlaySection>
+      {blocked && <Notice tone="danger" title="Nothing backs this assertion">Verifying it would make a claim this workspace cannot show evidence for.</Notice>}
       <Field label="Valid until" hint="Leave empty for an assertion with no end date."><TextInput type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} /></Field>
       <Field label="Note"><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
-      {source && <Notice tone="info">Verifying records your name against the assertion. It can be changed later, and the change is kept.</Notice>}
+      {source && !expiring && <p className="ds-subtle">Verifying records your name against the assertion. It can be changed later, and the change is kept.</p>}
     </form>
   );
 }
@@ -1714,101 +1825,198 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
   const ledger = conflict.fields.requiresLedgerReview === true;
   return (
     <Stack gap={4}>
-      <Card title={conflict.title} subtitle={conflict.summary} prov="unknown" />
-      {ledger ? (
-        <Notice tone="danger" title="This is a financial mismatch">
-          A figure cannot be chosen here. It goes to an accounting review so the ledger and the record agree for a reason that can be audited.
-        </Notice>
-      ) : (
-        <Stack gap={3}>
-          {options.map((option) => (
-            <label key={option.id} className="ds-panel" style={{ padding: "var(--space-3)", display: "block", cursor: "pointer" }}>
-              <Row gap={2}>
-                <input type="radio" name="truth" value={option.id} checked={chosen === option.id} onChange={() => setPicked(option.id)} />
-                <strong className="ds-grow">{option.value}</strong>
-                <span className="ds-subtle">{context.date(option.recordedAt)}</span>
-              </Row>
-              <span className="ds-subtle">{option.note}</span>
-            </label>
-          ))}
-          <Field label="Why this one" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-        </Stack>
-      )}
-      <Button
-        variant="primary"
-        disabled={ledger || !chosen || !reason.trim()}
-        onClick={async () => {
-          const option = options.find((item) => item.id === chosen);
-          await context.mutate.patch(conflict.id, {
-            status: "resolved",
-            fields: { ...conflict.fields, chosen: option?.factId ?? chosen, resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason },
-          }, { expectRevision: conflict.revision, event: `${conflict.title} resolved by ${context.actor}` });
-          if (option?.factId) {
-            const fact = data.facts.find((item) => item.id === option.factId);
-            if (fact) {
-              await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }, { event: `${fact.title} became the source of truth` });
-            }
-          }
-          context.toast("Conflict resolved", "The chosen assertion is authoritative; the other stays on the record as rejected evidence.");
-          close();
-        }}
-      >
-        Record the resolution
-      </Button>
+      <ModalUnsavedChanges when={Boolean(reason.trim())} />
+      <OverlaySection title={conflict.title} hint={conflict.summary} tone={ledger ? "danger" : "neutral"}>
+        {ledger ? (
+          <Notice tone="danger" title="This is a financial mismatch">
+            A figure cannot be chosen here. It goes to an accounting review so the ledger and the record agree for a reason that can be audited.
+          </Notice>
+        ) : options.length === 0 ? (
+          <Notice tone="info" title="Nothing to choose between">
+            No competing versions are recorded on this conflict. Compare the two sources it names, then record the versions before choosing one.
+          </Notice>
+        ) : (
+          <Stack gap={3}>
+            {options.map((option) => {
+              const source = sourceOf(data, option.sourceId);
+              return (
+                <label key={option.id} className="ds-panel" style={{ padding: "var(--space-3)", display: "block", cursor: "pointer" }}>
+                  <Row gap={2}>
+                    <input type="radio" name="truth" value={option.id} checked={chosen === option.id} onChange={() => setPicked(option.id)} />
+                    <strong className="ds-grow">{option.value}</strong>
+                    <span className="ds-subtle ds-num">{context.date(option.recordedAt)}</span>
+                  </Row>
+                  <span className="ds-subtle">{option.note}{source ? ` · ${source.title}` : ""}</span>
+                </label>
+              );
+            })}
+            <Field label="Why this one" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
+            <p className="ds-subtle">The chosen assertion becomes the current fact. The others stay on the record, marked rejected, with your reason.</p>
+          </Stack>
+        )}
+      </OverlaySection>
+      <ModalActions>
+        <OverlayActions
+          primary={(
+            <Button
+              variant="primary"
+              disabled={ledger || options.length === 0 || !chosen || !reason.trim()}
+              onClick={async () => {
+                const option = options.find((item) => item.id === chosen);
+                const winnerHasFact = Boolean(option && data.facts.some((item) => item.id === option.factId));
+                const changes: TogetherChange[] = [{
+                  record: conflict,
+                  patch: { status: "resolved", fields: { ...conflict.fields, chosen: chosen, chosenFactId: option?.factId ?? "", resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason } },
+                  event: `${conflict.title} resolved by ${context.actor}`,
+                }];
+                for (const candidate of options) {
+                  const fact = data.facts.find((item) => item.id === candidate.factId);
+                  if (!fact) continue;
+                  const verdict = candidate.id === chosen;
+                  changes.push({
+                    record: fact,
+                    patch: verdict
+                      ? { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }
+                      : { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor, rejectedBecause: reason } },
+                    event: verdict ? `${fact.title} became the source of truth` : `${fact.title} rejected in favour of another source`,
+                  });
+                }
+                if (option && !winnerHasFact) {
+                  changes.push({
+                    create: {
+                      collection: "facts",
+                      title: conflict.title,
+                      status: "verified",
+                      summary: `Verified from the conflict “${conflict.title}”: ${option.value}. ${option.note}`,
+                      at: context.now.toISOString(),
+                      ownerName: context.actor,
+                      fields: {
+                        confidence: "verified", subject: conflict.title, predicate: "is", value: option.value, sourceId: option.sourceId,
+                        domain: String(conflict.fields.domain ?? "general"), validFrom: context.now.toISOString().slice(0, 10), validTo: "",
+                        verifiedBy: context.actor, verifiedAt: context.now.toISOString().slice(0, 10), fromConflictId: conflict.id,
+                      },
+                    },
+                    event: `Assertion recorded from the resolution of ${conflict.title}: ${option.value}`,
+                  });
+                }
+                if (!(await commitTogether(context, changes))) return;
+                context.toast("Conflict resolved", winnerHasFact
+                  ? "The chosen assertion is current; the other stays on the record as rejected evidence."
+                  : `The winning record had no assertion, so one was recorded: ${conflict.title} is ${option?.value}. The other stays on the record as rejected evidence.`);
+                close();
+              }}
+            >
+              Record the resolution
+            </Button>
+          )}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
+  );
+}
+
+function ConflictSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useKnowledge();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const conflict = data.conflicts.find((item) => item.id === (payload?.id ?? context.selectedId));
+  if (!conflict) return null;
+  const urgency = String(conflict.fields.urgency ?? "normal");
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={conflict.title}
+      status={<Pill tone={urgency === "critical" ? "danger" : urgency === "high" ? "warning" : "neutral"}>{urgency}</Pill>}
+      meta={[String(conflict.fields.domain ?? "general"), conflict.fields.requiresLedgerReview === true ? "Ledger review decides" : undefined, conflict.status === "in_review" ? "In review" : conflict.status === "resolved" ? "Resolved" : undefined]}
+    />
   );
 }
 
 function ComparisonDrawer({ context }: { context: ScreenContext }) {
   const data = useKnowledge();
+  const everything = useOrgRecords();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const conflict = data.conflicts.find((item) => item.id === (payload?.id ?? context.selectedId));
   if (!conflict) return <Empty title="Choose a conflict" />;
   const options = conflictOptions(conflict);
+  const ledger = conflict.fields.requiresLedgerReview === true;
+  const closed = conflict.status === "resolved";
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Both sides, with their dates">
-        A conflict is shown as evidence against evidence. The newer record is not automatically right.
-      </Notice>
-      {options.map((option) => {
-        const source = sourceOf(data, option.sourceId);
-        return (
-          <Card key={option.id} title={option.value} subtitle={source?.title ?? option.sourceId} prov="human"
-            actions={<Pill tone={source?.status === "indexed" ? "success" : "warning"}>{source?.status ?? "no source record"}</Pill>}>
-            <Properties rows={[
-              { label: "Recorded", value: context.date(option.recordedAt) },
-              { label: "Note", value: option.note },
-              { label: "Source freshness", value: source ? context.date(String(source.fields.freshness ?? source.updatedAt)) : "Unknown" },
-            ]} />
-          </Card>
-        );
-      })}
+      {ledger && (
+        <Notice tone="danger" title="A ledger review decides this one">
+          It touches a financial figure. Choosing a side here would change the figure without a posting behind it, so it goes to accounting.
+        </Notice>
+      )}
+      {options.length === 0 && (
+        <Notice tone="info" title="No competing versions are recorded">
+          {conflict.summary} Nothing is recorded on this conflict to set side by side, so there is nothing to choose between yet.
+        </Notice>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, Math.min(options.length, 2))}, minmax(0, 1fr))`, gap: "var(--space-3)", alignItems: "start" }}>
+        {options.map((option, index) => {
+          const source = sourceOf(data, option.sourceId);
+          const origin = source ?? everything.find((item) => item.id === option.sourceId);
+          const chosen = closed && [option.id, option.factId].includes(String(conflict.fields.chosen ?? "")) && Boolean(conflict.fields.chosen);
+          return (
+            <OverlaySection key={option.id} title={`Version ${String.fromCharCode(65 + index)}${chosen ? " · chosen" : ""}`} tone={chosen ? "success" : "neutral"}>
+              <Stack gap={3}>
+                <h4>{option.value}</h4>
+                <FactGrid columns={2} dense items={[
+                  { label: "Recorded", value: context.date(option.recordedAt), mono: true },
+                  { label: "Source state", value: source ? <Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill> : "No source recorded" },
+                  { label: "Source", value: origin ? `${origin.title} (${origin.collection === "sources" ? "source" : origin.collection})` : "No source recorded" },
+                  { label: "Freshness", value: source ? context.date(String(source.fields.freshness ?? source.updatedAt)) : "Not recorded", mono: Boolean(source) },
+                  { label: "Visibility", value: source ? <Pill tone={visibilityOf(source).tone}>{visibilityOf(source).label}</Pill> : "Not recorded" },
+                ]} />
+                <p className="ds-prose">{option.note}</p>
+              </Stack>
+            </OverlaySection>
+          );
+        })}
+      </div>
+      <p className="ds-subtle">Evidence against evidence: the newer record is not automatically right.</p>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={ledger || closed || options.length === 0 || !context.can("edit_knowledge")} onClick={() => { context.closeOverlay(); context.openOverlay("resolution dialog", { id: conflict.id }); }}>Choose the source of truth</Button>}
+          secondary={ledger
+            ? <Button variant="outline-danger" onClick={() => { context.closeOverlay(); context.openOverlay("escalation", { id: conflict.id }); }}>Send to ledger review</Button>
+            : !closed ? <Button variant="secondary" onClick={() => { context.select(conflict.id); void deferConflict(context); context.closeOverlay(); }}>Defer</Button> : undefined}
+          end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
 
 function Escalation({ context, close }: { context: ScreenContext; close: () => void }) {
-  const conflict = useRecord(context.selectedId);
+  const conflict = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
   const [note, setNote] = useState("");
   if (!conflict) return <Empty title="Choose a conflict" />;
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={Boolean(note.trim())} />
       <CapabilityLine id="bank.feed" title="External confirmation is not connected" />
-      <Notice tone="warning" title="What happens instead">
-        The conflict is marked as needing confirmation from outside this workspace, with your note. Nothing is requested from anyone automatically: no mail or feed is connected.
-      </Notice>
+      <p className="ds-subtle">The conflict is marked as needing confirmation from outside this workspace, with your note. Nothing is requested from anyone: no mail or feed is connected.</p>
       <Field label="What confirmation is needed" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
-      <Button
-        variant="primary"
-        disabled={!note.trim()}
-        onClick={async () => {
-          await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, escalatedBy: context.actor, escalationNote: note } }, { expectRevision: conflict.revision, event: `${conflict.title} escalated for external confirmation` });
-          context.toast("Escalated", "It is in review with your note. No request has left this browser.");
-          close();
-        }}
-      >
-        Mark as needing confirmation
-      </Button>
+      <ModalActions>
+        <OverlayActions
+          primary={(
+            <Button
+              variant="primary"
+              disabled={!note.trim()}
+              onClick={async () => {
+                if (!(await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, escalatedBy: context.actor, escalationNote: note } }, { expectRevision: conflict.revision, event: `${conflict.title} escalated for external confirmation` }))) return;
+                context.toast("Escalated", "It is in review with your note. No request has left this browser.");
+                close();
+              }}
+            >
+              Mark as needing confirmation
+            </Button>
+          )}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1840,6 +2048,7 @@ function DecisionDraft({ context, close }: { context: ScreenContext; close: () =
         close();
       }}
     >
+      <ModalUnsavedChanges when={Boolean(title.trim() || rationale.trim() || alternatives.trim())} />
       <Field label="Decision" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Rationale" required><TextArea value={rationale} rows={4} onChange={(event) => setRationale(event.target.value)} required /></Field>
       <Field label="Alternatives considered" hint="One per line."><TextArea value={alternatives} rows={3} onChange={(event) => setAlternatives(event.target.value)} /></Field>
@@ -1859,25 +2068,33 @@ function DecisionDraft({ context, close }: { context: ScreenContext; close: () =
   );
 }
 
+function DecisionSummary({ context }: { context: ScreenContext }) {
+  const decision = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
+  if (!decision) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Decision register"
+      title={decision.title}
+      status={<Pill tone={decision.status === "approved" ? "success" : decision.status === "superseded" ? "neutral" : "info"}>{decision.status}</Pill>}
+      meta={[decision.fields.approvers ? `Approved by ${String(decision.fields.approvers)}` : "Not approved", decision.fields.approvedAt ? context.date(String(decision.fields.approvedAt)) : undefined]}
+    />
+  );
+}
+
 function ApprovalDetail({ context }: { context: ScreenContext }) {
   const decision = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
   if (!decision) return <Empty title="Choose a decision" />;
   const body = decision.body as { rationale?: string; alternatives?: string[]; outcome?: string } | undefined;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: <Pill tone={decision.status === "approved" ? "success" : decision.status === "superseded" ? "neutral" : "info"}>{decision.status}</Pill> },
-        { label: "Approvers", value: String(decision.fields.approvers || "None recorded") },
-        { label: "Approved", value: decision.fields.approvedAt ? context.date(String(decision.fields.approvedAt)) : "Not approved" },
-        { label: "Superseded by", value: String(decision.fields.supersededBy || "—") },
-      ]} />
-      <Card title="Rationale" pad="tight"><p className="ds-prose">{body?.rationale ?? decision.summary}</p></Card>
+      {decision.fields.supersededBy ? <FactGrid items={[{ label: "Superseded by", value: String(decision.fields.supersededBy), mono: true }]} /> : null}
+      <OverlaySection title="Rationale"><p className="ds-prose">{body?.rationale ?? decision.summary}</p></OverlaySection>
       {(body?.alternatives ?? []).length > 0 && (
-        <Card title="Alternatives considered" pad="tight">
+        <OverlaySection title="Alternatives considered">
           <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.alternatives ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
-        </Card>
+        </OverlaySection>
       )}
-      {body?.outcome && <Card title="Outcome" pad="tight"><p className="ds-prose">{body.outcome}</p></Card>}
+      {body?.outcome && <OverlaySection title="Outcome"><p className="ds-prose">{body.outcome}</p></OverlaySection>}
     </Stack>
   );
 }
@@ -1902,7 +2119,7 @@ function ImpactReview({ context, close }: { context: ScreenContext; close: () =>
           fields: { approvers: context.actor, domain: String(decision.fields.domain ?? "general"), approvedAt: context.now.toISOString().slice(0, 10), supersedes: decision.id },
           body: { rationale, alternatives: [], outcome: "" },
         }, `Decision recorded, superseding ${decision.title}`);
-        await context.mutate.patch(decision.id, { status: "superseded", fields: { ...decision.fields, supersededBy: replacement.id } }, { expectRevision: decision.revision, event: `${decision.title} superseded` });
+        if (!(await context.mutate.patch(decision.id, { status: "superseded", fields: { ...decision.fields, supersededBy: replacement.id } }, { expectRevision: decision.revision, event: `${decision.title} superseded` }))) return;
         context.toast("Superseded", "The old decision stays visible for audit with its approvers and date.");
         close();
       }}
@@ -1910,6 +2127,7 @@ function ImpactReview({ context, close }: { context: ScreenContext; close: () =>
       <Notice tone="warning" title="Superseding keeps the old decision">
         {decision.title} will be marked superseded, not deleted. Anything that cited it still resolves.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(title.trim() || rationale.trim())} />
       <Field label="Replacement decision" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Why it changes" required><TextArea value={rationale} rows={3} onChange={(event) => setRationale(event.target.value)} required /></Field>
     </form>
@@ -1938,7 +2156,7 @@ function BrandRuleEditor({ context, close }: { context: ScreenContext; close: ()
         const next = existing
           ? rules.map((item) => (item.id === existing.id ? { ...item, rule, source, status } : item))
           : [...rules, { id: `rule-${wallMs()}`, rule, source, status }];
-        await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: next } }, { expectRevision: proposal.revision, event: `Brand rule ${existing ? "updated" : "added"}: ${rule.slice(0, 40)}` });
+        if (!(await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: next } }, { expectRevision: proposal.revision, event: `Brand rule ${existing ? "updated" : "added"}: ${rule.slice(0, 40)}` }))) return;
         context.toast("Rule saved", status === "approved" ? "It is an approved rule with its evidence." : "It stays proposed until a person approves it.");
         close();
       }}
@@ -1995,20 +2213,20 @@ function BrandImpactPreview({ context, close }: { context: ScreenContext; close:
         { label: "Extracted from", value: String(proposal.fields.extractedFrom || "Not recorded") },
         { label: "Current state", value: proposal.status },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(proposal.id, {
+          if (!(await context.mutate.patch(proposal.id, {
             status: "approved",
             fields: { ...proposal.fields, approved: true, approvedBy: context.actor },
             body: { ...(proposal.body as object), colours: (body?.colours ?? []).map((colour) => ({ ...colour, approved: true })) },
-          }, { expectRevision: proposal.revision, event: `${proposal.title} approved by ${context.actor}` });
+          }, { expectRevision: proposal.revision, event: `${proposal.title} approved by ${context.actor}` }))) return;
           context.toast("Variant approved", "The proposal is now part of the recorded brand, with who approved it.");
           close();
         }}
       >
         Approve the variant
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2021,12 +2239,17 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
   const [pickedAgent, setPickedAgent] = useState(payload?.agentId ?? "");
   const agentId = pickedAgent || grants[0]?.agentId || data.agents[0]?.id || "";
   const current = grants.find((grant) => grant.agentId === agentId);
-  const [groups, setGroups] = useState<string[]>(current?.groups ?? ["public"]);
+  /* Edits are kept per contract and read over the recorded grant, so the form never starts from a default that
+     differs from what is on record (and saving untouched never narrows a grant). */
+  const [edited, setEdited] = useState<Record<string, string[]>>({});
+  const groups = edited[agentId] ?? current?.groups ?? ["public"];
+  const setGroups = (next: string[]) => setEdited((rows) => ({ ...rows, [agentId]: next }));
   if (!policy) return <Empty title="No grant policy recorded" />;
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={Object.keys(edited).length > 0} />
       <Field label="AI employee">
-        <Select value={agentId} onChange={(event) => { setPickedAgent(event.target.value); setGroups(grants.find((grant) => grant.agentId === event.target.value)?.groups ?? ["public"]); }}>
+        <Select value={agentId} onChange={(event) => setPickedAgent(event.target.value)}>
           {data.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.title} — {String(agent.fields.role ?? "")}</option>)}
         </Select>
       </Field>
@@ -2037,26 +2260,29 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
             key={group}
             label={`${group}${group === "confidential" ? " — most contracts are excluded from this" : ""}`}
             checked={groups.includes(group)}
-            onChange={(event) => setGroups((current2) => event.target.checked ? [...current2, group] : current2.filter((item) => item !== group))}
+            onChange={(event) => setGroups(event.target.checked ? [...groups, group] : groups.filter((item) => item !== group))}
           />
         ))}
       </Stack>
-      <Notice tone="warning" title="A change applies to the next request">
-        An answer already given keeps the records it named. Queued work that was authorised under the old grant is re-checked when it runs.
-      </Notice>
-      <Button
+      <OverlaySection title="What this changes" tone="warning" hint="Applies to the next request. An answer already given keeps the records it named; queued work authorised under the old grant is re-checked when it runs.">
+        <FactGrid columns={2} items={[
+          { label: "Sources in reach now", value: String(data.sources.filter((source) => (current?.groups ?? []).includes(String(source.fields.classification ?? "internal")) && source.status === "indexed").length), mono: true },
+          { label: "Sources in reach after", value: String(data.sources.filter((source) => groups.includes(String(source.fields.classification ?? "internal")) && source.status === "indexed").length), mono: true, tone: groups.includes("confidential") ? "warning" : undefined },
+        ]} />
+      </OverlaySection>
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const next = grants.some((grant) => grant.agentId === agentId)
             ? grants.map((grant) => (grant.agentId === agentId ? { ...grant, groups } : grant))
             : [...grants, { agentId, groups, note: `Set by ${context.actor}.` }];
-          await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Source grant changed for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` });
+          if (!(await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Source grant changed for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` }))) return;
           context.toast("Grant saved", `${groups.join(", ") || "no group"} is what this contract may retrieve.`);
           close();
         }}
       >
         Save the grant
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2065,7 +2291,8 @@ function SimulationReport({ context }: { context: ScreenContext }) {
   const data = useKnowledge();
   const policy = data.policies.find((item) => item.fields.kind === "grants");
   const grants = (policy?.body as { grants?: Grant[] } | undefined)?.grants ?? [];
-  const [agentId, setAgentId] = useState(grants[0]?.agentId ?? data.agents[0]?.id ?? "");
+  const [pickedAgent, setAgentId] = useState("");
+  const agentId = pickedAgent || grants[0]?.agentId || data.agents[0]?.id || "";
   const grant = grants.find((item) => item.agentId === agentId);
   const reachable = data.sources.filter((source) => (grant?.groups ?? []).includes(String(source.fields.classification ?? "internal")) && source.status === "indexed");
   const excluded = data.sources.filter((source) => !reachable.includes(source));
@@ -2116,18 +2343,18 @@ function RevokeConfirmation({ context, close }: { context: ScreenContext; close:
       <Notice tone="warning" title="What revoking reaches">
         The contract stops being offered those sources from its next request. Answers already written keep the records they named: this workspace cannot unsay them, and it does not pretend to.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="danger"
         disabled={!agentId}
         onClick={async () => {
           const next = grants.map((grant) => (grant.agentId === agentId ? { ...grant, groups: [], note: `Revoked by ${context.actor}.` } : grant));
-          await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Grant revoked for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` });
+          if (!(await context.mutate.patch(policy.id, { body: { ...(policy.body as object), grants: next } }, { expectRevision: policy.revision, event: `Grant revoked for ${data.agents.find((agent) => agent.id === agentId)?.title ?? agentId}` }))) return;
           context.toast("Grant revoked", "That contract can retrieve nothing until a grant is given again.");
           close();
         }}
       >
         Revoke
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2172,17 +2399,17 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
           <option value="confidential">Confidential</option>
         </Select>
       </Field>
-      <Row gap={2} wrap>
+      <ModalActions><Row gap={2} wrap>
         <Button
           variant="primary"
           disabled={failed}
           title={failed ? "A file that could not be parsed cannot be approved" : undefined}
           onClick={async () => {
-            await context.mutate.patch(source.id, {
+            if (!(await context.mutate.patch(source.id, {
               status: "indexed",
               ownerName: owner || source.ownerName,
               fields: { ...source.fields, scanned: true, indexing: "indexed", classification, reviewedBy: context.actor },
-            }, { expectRevision: source.revision, event: `${source.title} approved into the knowledge base by ${context.actor}` });
+            }, { expectRevision: source.revision, event: `${source.title} approved into the knowledge base by ${context.actor}` }))) return;
             let proposed = 0;
             for (const line of mapped) if (await proposeFactFromLine(context, { ...source, ownerName: owner || source.ownerName }, line, facts)) proposed += 1;
             context.toast("Approved", `The source is indexed and available to answers in this workspace.${proposed ? ` ${proposed} assertion${proposed === 1 ? " is" : "s are"} proposed in the fact registry, pending review.` : ""}`);
@@ -2194,14 +2421,14 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
         <Button
           variant="secondary"
           onClick={async () => {
-            await context.mutate.patch(source.id, { ownerName: owner || source.ownerName, fields: { ...source.fields, classification, routedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} routed to ${owner || source.ownerName}` });
+            if (!(await context.mutate.patch(source.id, { ownerName: owner || source.ownerName, fields: { ...source.fields, classification, routedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} routed to ${owner || source.ownerName}` }))) return;
             context.toast("Routed", `${owner || source.ownerName} owns it. It stays out of retrieval until approved.`);
             close();
           }}
         >
           Route without approving
         </Button>
-      </Row>
+      </Row></ModalActions>
     </Stack>
   );
 }
@@ -2235,11 +2462,10 @@ function UnsupportedFormat({ context }: { context: ScreenContext }) {
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 async function records(context: ScreenContext, collection: string): Promise<Rec[]> {
@@ -2254,9 +2480,9 @@ async function reprocessSource(context: ScreenContext): Promise<void> {
   if (!source || source.collection !== "sources") { context.toast("Select a source first", "Choose the source to re-read.", "info"); return; }
   const body = (source.body ?? {}) as { extracted?: string[] };
   const lines = body.extracted?.length ?? 0;
-  await context.mutate.patch(source.id, {
+  if (!(await context.mutate.patch(source.id, {
     fields: { ...source.fields, reprocessedBy: context.actor, reprocessedAt: context.now.toISOString() },
-  }, { expectRevision: source.revision, event: `${source.title} re-read locally by ${context.actor}` });
+  }, { expectRevision: source.revision, event: `${source.title} re-read locally by ${context.actor}` }))) return;
   context.toast(
     "Re-read what is stored",
     lines > 0
@@ -2275,7 +2501,7 @@ async function reindexSource(context: ScreenContext): Promise<void> {
     context.toast("Cannot index an unreviewed file", "No scanner is connected, so a person has to review it before it can be indexed.", "blocked");
     return;
   }
-  await context.mutate.patch(source.id, { status: "indexed", fields: { ...source.fields, indexing: "indexed", indexedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} indexed by ${context.actor}` });
+  if (!(await context.mutate.patch(source.id, { status: "indexed", fields: { ...source.fields, indexing: "indexed", indexedBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} indexed by ${context.actor}` }))) return;
   context.toast("Indexed", "The source is available to answers composed from now on.");
 }
 
@@ -2320,7 +2546,7 @@ async function importBrandGuide(context: ScreenContext): Promise<void> {
     .filter((line) => !existing.some((rule) => rule.rule === line))
     .map((line, index) => ({ id: `rule-import-${wallMs()}-${index}`, rule: line, source: guide.id, status: "proposed" }));
   if (added.length === 0) { context.toast("Nothing new", `Every line in ${guide.title} is already a rule.`, "info"); return; }
-  await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: [...existing, ...added] } }, { expectRevision: proposal.revision, event: `${added.length} brand rules proposed from ${guide.title}` });
+  if (!(await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: [...existing, ...added] } }, { expectRevision: proposal.revision, event: `${added.length} brand rules proposed from ${guide.title}` }))) return;
   context.toast("Rules proposed", `${added.length} line${added.length === 1 ? "" : "s"} from ${guide.title} are proposed. None was applied to the approved set.`);
 }
 
@@ -2329,7 +2555,7 @@ async function deferConflict(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const conflict = id ? await db.records.get(id) : undefined;
   if (!conflict || conflict.collection !== "conflicts") { context.toast("Select a conflict first", "Choose the conflict to defer.", "info"); return; }
-  await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, deferredBy: context.actor, deferredAt: context.now.toISOString() } }, { expectRevision: conflict.revision, event: `${conflict.title} deferred by ${context.actor}` });
+  if (!(await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, deferredBy: context.actor, deferredAt: context.now.toISOString() } }, { expectRevision: conflict.revision, event: `${conflict.title} deferred by ${context.actor}` }))) return;
   context.toast("Deferred", "It moves to In review with who deferred it. Both sides stay unresolved, so neither is authoritative.");
 }
 
@@ -2338,9 +2564,9 @@ async function retrySafeStep(context: ScreenContext): Promise<void> {
   const failed = sources.filter((source) => source.status === "failed");
   if (failed.length === 0) { context.toast("Nothing failed", "No file is in the failed queue.", "info"); return; }
   const target = failed[0];
-  await context.mutate.patch(target.id, {
+  if (!(await context.mutate.patch(target.id, {
     fields: { ...target.fields, retries: Number(target.fields.retries ?? 0) + 1, lastRetryBy: context.actor },
-  }, { expectRevision: target.revision, event: `${target.title} retry attempted and reported` });
+  }, { expectRevision: target.revision, event: `${target.title} retry attempted and reported` }))) return;
   context.toast(
     "Retried the safe step",
     `Re-reading ${target.title} needs the original file, which is not in this browser. The attempt is recorded and the file stays isolated.`,
@@ -2393,9 +2619,9 @@ export const brainApp = registerApp({
         { id: "inspect missing source", placement: "overflow", run: (context) => { context.setTab("Quality"); context.toast("Assertions with no source", "They are listed on the Quality tab and cannot be verified until one is attached.", "info"); } },
       ],
       overlays: [
-        { id: "Knowledge inspector", kind: "drawer", title: "Knowledge", width: 560, render: ({ ...context }) => <KnowledgeInspector context={context} /> },
-        { id: "suggestion approval", kind: "modal", title: "Review a suggestion", width: 560, render: ({ close, ...context }) => <SuggestionApproval context={context} close={close} /> },
-        { id: "upload", kind: "modal", title: "Import a source", width: 620, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
+        { id: "Knowledge inspector", kind: "drawer", title: "Knowledge", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <KnowledgeInspector context={context} /> },
+        { id: "suggestion approval", kind: "modal", title: "Review a suggestion", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SuggestionApproval context={context} close={close} /> },
+        { id: "upload", kind: "modal", title: "Import a source", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
       ],
     },
 
@@ -2414,9 +2640,9 @@ export const brainApp = registerApp({
         { id: "retire source", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Select a source first"), run: (context) => context.openOverlay("retention dialog") },
       ],
       overlays: [
-        { id: "Upload dialog", kind: "modal", title: "Add sources", width: 620, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
-        { id: "source detail drawer", kind: "drawer", title: "Source", width: 520, render: ({ ...context }) => <SourceDetailDrawer context={context} /> },
-        { id: "retention dialog", kind: "modal", title: "Retire this source", tone: "danger", width: 560, render: ({ close, ...context }) => <RetentionDialog context={context} close={close} /> },
+        { id: "Upload dialog", kind: "modal", title: "Add sources", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
+        { id: "source detail drawer", kind: "drawer", title: "Source", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <SourceSummary context={context} />, render: ({ ...context }) => <SourceDetailDrawer context={context} /> },
+        { id: "retention dialog", kind: "modal", title: "Retire this source", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <RetentionDialog context={context} close={close} /> },
       ],
     },
 
@@ -2435,9 +2661,9 @@ export const brainApp = registerApp({
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => void exportSource(context) },
       ],
       overlays: [
-        { id: "Correction form", kind: "modal", title: "Correct an extraction", width: 560, render: ({ close, ...context }) => <CorrectionForm context={context} close={close} />, footer: submitFooter("correction-form", "Record the change") },
-        { id: "permission editor", kind: "modal", title: "Restrict this source", width: 520, render: ({ close, ...context }) => <PermissionEditor context={context} close={close} /> },
-        { id: "delete request", kind: "modal", title: "Request deletion", tone: "danger", width: 560, render: ({ close, ...context }) => <DeleteRequest context={context} close={close} /> },
+        { id: "Correction form", kind: "modal", title: "Correct an extraction", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CorrectionForm context={context} close={close} />, footer: submitFooter("correction-form", "Record the change") },
+        { id: "permission editor", kind: "modal", title: "Restrict this source", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <PermissionEditor context={context} close={close} /> },
+        { id: "delete request", kind: "modal", title: "Request deletion", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DeleteRequest context={context} close={close} /> },
       ],
     },
 
@@ -2449,17 +2675,17 @@ export const brainApp = registerApp({
         render: (context: ScreenContext) => <BusinessGraph context={context} view={view} />,
       })),
       actions: [
-        { id: "Explore node", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Choose an entity in the graph or the list"), run: (context) => context.openOverlay("Entity inspector") },
-        { id: "merge candidates", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("merge preview", { id: "" }) },
+        { id: "Explore node", label: "Explore a node", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Choose an entity in the graph or the list"), run: (context) => context.openOverlay("Entity inspector") },
+        { id: "merge candidates", label: "Review merge candidates", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("merge preview", { id: "" }) },
         { id: "exceptions", label: "All exceptions", placement: "overflow", run: (context) => context.setTab("Exceptions") },
-        { id: "filter graph", placement: "secondary", run: (context) => { context.setTab("Entities"); usePanelFlags.getState().toggle("brain.graph.filter"); context.toast("Filter", "Choose an entity kind beside the display toggle to narrow the graph and the list together.", "info"); } },
-        { id: "split record", placement: "overflow", capability: "edit_knowledge", run: (context) => context.openOverlay("split record") },
+        { id: "filter graph", label: "Filter the graph", placement: "secondary", run: (context) => { context.setTab("Entities"); usePanelFlags.getState().toggle("brain.graph.filter"); context.toast("Filter", "Choose an entity kind beside the display toggle to narrow the graph and the list together.", "info"); } },
+        { id: "split record", label: "Split a record", placement: "overflow", capability: "edit_knowledge", run: (context) => context.openOverlay("split record") },
       ],
       overlays: [
-        { id: "Entity inspector", kind: "drawer", title: "Entity", width: 520, render: ({ ...context }) => <EntityInspector context={context} /> },
-        { id: "merge preview", kind: "modal", title: "Review a merge", width: 680, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
-        { id: "split record", kind: "modal", title: "Split a merged record", width: 600, render: ({ close, ...context }) => <SplitRecord context={context} close={close} /> },
-        { id: "relationship editor", kind: "modal", title: "Relationship", width: 520, render: ({ close, ...context }) => <RelationshipEditor context={context} close={close} />, footer: submitFooter("relationship-editor", "Save relationship") },
+        { id: "Entity inspector", kind: "drawer", title: "Entity", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <EntityInspector context={context} /> },
+        { id: "merge preview", kind: "modal", title: "Review a merge", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
+        { id: "split record", kind: "modal", title: "Split a merged record", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <SplitRecord context={context} close={close} /> },
+        { id: "relationship editor", kind: "modal", title: "Relationship", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "graphLinks", noRecordContext: true }, render: ({ close, ...context }) => <RelationshipEditor context={context} close={close} />, footer: submitFooter("relationship-editor", "Save relationship") },
       ],
     },
 
@@ -2472,16 +2698,22 @@ export const brainApp = registerApp({
         render: (context: ScreenContext) => <FactRegistry context={context} view={view} />,
       })),
       actions: [
-        { id: "Approve", placement: "primary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog") },
-        { id: "reject", placement: "secondary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => void rejectFact(context) },
-        { id: "annotate", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("Evidence drawer") },
-        { id: "set expiry", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog", { mode: "expiry" }) },
-        { id: "compare facts", placement: "overflow", run: (context) => context.openOverlay("conflict resolver") },
+        { id: "Approve", label: "Approve", placement: "primary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog") },
+        { id: "reject", label: "Reject", placement: "secondary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => void rejectFact(context) },
+        { id: "annotate", label: "Open the evidence", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("Evidence drawer") },
+        { id: "set expiry", label: "Set an expiry", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an assertion first"), run: (context) => context.openOverlay("verification dialog", { mode: "expiry" }) },
+        { id: "compare facts", label: "Compare assertions", placement: "overflow", run: (context) => context.openOverlay("conflict resolver") },
       ],
       overlays: [
-        { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: 560, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
-        { id: "verification dialog", kind: "modal", title: "Verify an assertion", width: 560, render: ({ close, ...context }) => <VerificationDialog context={context} close={close} />, footer: submitFooter("verification", "Record") },
-        { id: "conflict resolver", kind: "modal", title: "Resolve a conflict", width: 620, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
+        { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Assertion" />, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
+        {
+          id: "verification dialog", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Set an expiry" : "Verify an assertion"), width: OVERLAY_WIDTH.modal,
+          presentation: { selectedRecord: true, collection: "facts", noRecordContext: true },
+          summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Assertion" />,
+          render: ({ close, ...context }) => <VerificationDialog context={context} close={close} />,
+          footer: ({ close, ...context }) => submitFooter("verification", (context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Record the expiry" : "Record the verification")({ close }),
+        },
+        { id: "conflict resolver", kind: "modal", title: "Resolve a conflict", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
       ],
     },
 
@@ -2494,13 +2726,13 @@ export const brainApp = registerApp({
       })),
       actions: [
         { id: "Select source of truth", placement: "primary", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => context.openOverlay("resolution dialog") },
-        { id: "defer", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => void deferConflict(context) },
+        { id: "defer", label: "Defer", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => void deferConflict(context) },
         { id: "request external confirmation", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => context.openOverlay("escalation") },
       ],
       overlays: [
-        { id: "Comparison drawer", kind: "drawer", title: "Compare the sources", width: 560, render: ({ ...context }) => <ComparisonDrawer context={context} /> },
-        { id: "resolution dialog", kind: "modal", title: "Choose the source of truth", width: 620, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
-        { id: "escalation", kind: "modal", title: "Ask for external confirmation", width: 560, render: ({ close, ...context }) => <Escalation context={context} close={close} /> },
+        { id: "Comparison drawer", kind: "drawer", title: "Compare the sources", width: OVERLAY_WIDTH.wide, summary: ({ close: _close, ...context }) => <ConflictSummary context={context} eyebrow="Conflict" />, render: ({ ...context }) => <ComparisonDrawer context={context} /> },
+        { id: "resolution dialog", kind: "modal", title: "Choose the source of truth", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
+        { id: "escalation", kind: "modal", title: "Ask for external confirmation", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <Escalation context={context} close={close} /> },
       ],
     },
 
@@ -2518,9 +2750,9 @@ export const brainApp = registerApp({
         { id: "supersede", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a decision first"), run: (context) => context.openOverlay("impact review") },
       ],
       overlays: [
-        { id: "Decision draft", kind: "modal", title: "Record a decision", width: 620, render: ({ close, ...context }) => <DecisionDraft context={context} close={close} />, footer: submitFooter("decision-draft", "Record decision") },
-        { id: "approval detail", kind: "drawer", title: "Decision", width: 560, render: ({ ...context }) => <ApprovalDetail context={context} /> },
-        { id: "impact review", kind: "modal", title: "Supersede this decision", width: 560, render: ({ close, ...context }) => <ImpactReview context={context} close={close} />, footer: submitFooter("impact-review", "Supersede") },
+        { id: "Decision draft", kind: "modal", title: "Record a decision", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <DecisionDraft context={context} close={close} />, footer: submitFooter("decision-draft", "Record decision") },
+        { id: "approval detail", kind: "drawer", title: "Decision", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <DecisionSummary context={context} />, render: ({ ...context }) => <ApprovalDetail context={context} /> },
+        { id: "impact review", kind: "modal", title: "Supersede this decision", width: OVERLAY_WIDTH.modal, presentation: { selectedRecord: true, collection: "decisions", noRecordContext: true }, render: ({ close, ...context }) => <ImpactReview context={context} close={close} />, footer: submitFooter("impact-review", "Supersede") },
       ],
     },
 
@@ -2538,10 +2770,10 @@ export const brainApp = registerApp({
         { id: "set usage", placement: "overflow", run: (context) => context.openOverlay("Brand rule editor") },
       ],
       overlays: [
-        { id: "Brand rule editor", kind: "modal", title: "Brand rule", width: 560, render: ({ close, ...context }) => <BrandRuleEditor context={context} close={close} />, footer: submitFooter("brand-rule", "Save rule") },
-        { id: "asset selector", kind: "drawer", title: "Assets", width: 520, render: ({ ...context }) => <AssetSelector context={context} /> },
-        { id: "impact preview", kind: "modal", title: "What approving would change", width: 560, render: ({ close, ...context }) => <BrandImpactPreview context={context} close={close} /> },
-        { id: "edit token", kind: "modal", title: "Edit a design token", width: 560, render: ({ close, ...context }) => <EditToken context={context} close={close} /> },
+        { id: "Brand rule editor", kind: "modal", title: "Brand rule", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BrandRuleEditor context={context} close={close} />, footer: submitFooter("brand-rule", "Save rule") },
+        { id: "asset selector", kind: "drawer", title: "Assets", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <AssetSelector context={context} /> },
+        { id: "impact preview", kind: "modal", title: "What approving would change", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BrandImpactPreview context={context} close={close} /> },
+        { id: "edit token", kind: "modal", title: "Edit a design token", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <EditToken context={context} close={close} /> },
       ],
     },
 
@@ -2560,9 +2792,9 @@ export const brainApp = registerApp({
         { id: "inspect usage", placement: "overflow", run: (context) => context.setTab("Activity") },
       ],
       overlays: [
-        { id: "Grant dialog", kind: "modal", title: "Source grant", width: 560, render: ({ close, ...context }) => <GrantDialog context={context} close={close} /> },
-        { id: "simulation report", kind: "drawer", title: "Simulated retrieval", width: 620, render: ({ ...context }) => <SimulationReport context={context} /> },
-        { id: "revoke confirmation", kind: "modal", title: "Revoke a grant", tone: "danger", width: 560, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
+        { id: "Grant dialog", kind: "modal", title: "Source grant", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <GrantDialog context={context} close={close} /> },
+        { id: "simulation report", kind: "drawer", title: "Simulated retrieval", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <SimulationReport context={context} /> },
+        { id: "revoke confirmation", kind: "modal", title: "Revoke a grant", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
       ],
     },
 
@@ -2581,9 +2813,9 @@ export const brainApp = registerApp({
         { id: "retry safe step", placement: "overflow", run: (context) => void retrySafeStep(context) },
       ],
       overlays: [
-        { id: "File chooser", kind: "modal", title: "Add files", width: 620, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
-        { id: "import review", kind: "modal", title: "Review the import", width: 620, render: ({ close, ...context }) => <ImportReview context={context} close={close} /> },
-        { id: "unsupported format error", kind: "modal", title: "Formats this browser cannot read", tone: "danger", width: 560, render: ({ ...context }) => <UnsupportedFormat context={context} /> },
+        { id: "File chooser", kind: "modal", title: "Add files", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <UploadDialog context={context} close={close} /> },
+        { id: "import review", kind: "modal", title: "Review the import", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImportReview context={context} close={close} /> },
+        { id: "unsupported format error", kind: "modal", title: "Formats this browser cannot read", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <UnsupportedFormat context={context} /> },
       ],
     },
   },
@@ -2593,7 +2825,7 @@ async function rejectFact(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const fact = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!fact || fact.collection !== "facts") return;
-  await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` });
+  if (!(await context.mutate.patch(fact.id, { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor } }, { expectRevision: fact.revision, event: `${fact.title} rejected by ${context.actor}` }))) return;
   context.toast("Rejected", "It stays in the registry marked rejected, with who rejected it and when.");
 }
 
@@ -2608,10 +2840,10 @@ async function linkApproval(context: ScreenContext): Promise<void> {
   }
   const approvers = String(decision.fields.approvers || "").split(",").map((name) => name.trim()).filter(Boolean);
   if (approvers.includes(context.actor)) { context.toast("Already recorded", "Your approval is already on this decision.", "info"); return; }
-  await context.mutate.patch(decision.id, {
+  if (!(await context.mutate.patch(decision.id, {
     status: "approved",
     fields: { ...decision.fields, approvers: [...approvers, context.actor].join(","), approvedAt: context.now.toISOString().slice(0, 10) },
-  }, { expectRevision: decision.revision, event: `${decision.title} approved by ${context.actor}` });
+  }, { expectRevision: decision.revision, event: `${decision.title} approved by ${context.actor}` }))) return;
   context.toast("Approval linked", `${decision.title} now carries your approval and today's date.`);
 }
 

@@ -8,8 +8,10 @@ import {
   RetryReview, RevokeGrant, RiskSummary, ScopeReview, SyncCentre, openConnector, useConnector,
 } from "./panels";
 import { CONNECTOR_ENTRIES } from "./catalog";
+import { connectorRecordHeader } from "./recordHeads";
+import { connectorSummary } from "./overlayHeads";
 import { NangoGuidedSetup } from "./NangoExperience";
-import { Button, Notice, Properties, Stack } from "@/design-system";
+import { Button, FactGrid, Notice, OVERLAY_WIDTH, OverlaySection, Stack } from "@/design-system";
 import { openAct } from "@/applications/t6kit/act";
 import {
   CompareConnectors, ProviderLimits, SchemaDiff, attemptAuthorisation, cancelAuthorisation, chooseTargetsOverlay,
@@ -29,13 +31,13 @@ import {
 
 function ScopeChangePanel({ context }: { context: ScreenContext }) {
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       <Notice tone="warning" title="A scope cannot be changed without a grant">
         Widening or narrowing access means asking the provider again. With no grant, there is nothing to re-ask about.
       </Notice>
-      <Properties rows={[
-        { label: "Scopes granted", value: <span className="ds-num">0</span> },
-        { label: "Change would require", value: "A fresh authorisation, approved by the account holder" },
+      <FactGrid items={[
+        { label: "Scopes granted", value: "0", mono: true },
+        { label: "A change would need", value: "A fresh authorisation, approved by the account holder" },
       ]} />
       <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace`)}>Back to the directory</Button>
     </Stack>
@@ -45,9 +47,9 @@ function ScopeChangePanel({ context }: { context: ScreenContext }) {
 function ReconnectDialog({ context }: { context: ScreenContext }) {
   const { records, entry } = useConnector(context);
   return (
-    <Stack gap={3}>
-      <Notice tone="warning" title="Reconnecting is the same flow that cannot complete">
-        There is no previous connection to restore. Reconnect and connect are the same action, and both stop at the provider redirect.
+    <Stack gap={4}>
+      <Notice tone="warning" title="Reconnecting is the flow that cannot complete">
+        There is no previous connection to restore. Reconnect and connect are the same action, and both stop before the provider redirect.
       </Notice>
       <Button variant="secondary" onClick={() => { context.closeOverlay(); openConnector(context, records, entry ?? CONNECTOR_ENTRIES[0], "connect"); }}>
         Open the authorisation flow
@@ -58,16 +60,16 @@ function ReconnectDialog({ context }: { context: ScreenContext }) {
 
 function HealthReport({ context }: { context: ScreenContext }) {
   return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "Capabilities in the register", value: <span className="ds-num">{String(CONNECTOR_ENTRIES.length)}</span> },
-        { label: "Connected", value: <span className="ds-num">0</span> },
-        { label: "Local checks that passed", value: <span className="ds-num">2</span> },
-        { label: "Checks needing a provider", value: <span className="ds-num">3</span> },
+    <Stack gap={4}>
+      <FactGrid columns={4} items={[
+        { label: "In the register", value: String(CONNECTOR_ENTRIES.length), mono: true },
+        { label: "Connected", value: "0", mono: true },
+        { label: "Local checks passed", value: "2", mono: true, tone: "success" },
+        { label: "Need a provider", value: "3", mono: true, tone: "warning" },
       ]} />
-      <Notice tone="info" title="The report says what was attempted">
-        Two checks read the register and the connector records in this browser. Three would need a network call, and were not attempted rather than failed.
-      </Notice>
+      <OverlaySection title="What was attempted" hint="Two checks read the register and the connector records in this browser. Three would need a network call, and were not attempted rather than failed.">
+        Nothing external was called, so no provider health is claimed either way.
+      </OverlaySection>
       <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/receipts`)}>Read the receipts</Button>
     </Stack>
   );
@@ -75,21 +77,20 @@ function HealthReport({ context }: { context: ScreenContext }) {
 
 function MitigationPanel({ context }: { context: ScreenContext }) {
   return (
-    <Stack gap={3}>
-      <Notice tone="info" title="What can be done without the provider">
-        Every capability has a local equivalent, and those are what the workspace runs on now. The list is the mitigation.
-      </Notice>
-      <div className="t6-matrix-wrap">
-        <table className="t6-matrix">
-          <caption className="ds-sr-only">Local mitigation per capability</caption>
-          <thead><tr><th scope="col">Capability</th><th scope="col">Mitigation in place</th></tr></thead>
-          <tbody>
-            {CONNECTOR_ENTRIES.map((entry) => (
-              <tr key={entry.capability.id}><th scope="row">{entry.capability.label}</th><td>{entry.capability.localEquivalent}</td></tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <Stack gap={4}>
+      <OverlaySection title="What can be done without the provider" hint="Every capability has a local equivalent; those are what the workspace runs on now. The list is the mitigation." flush>
+        <div className="t6-matrix-wrap">
+          <table className="t6-matrix">
+            <caption className="ds-sr-only">Local mitigation per capability</caption>
+            <thead><tr><th scope="col">Capability</th><th scope="col">Mitigation in place</th></tr></thead>
+            <tbody>
+              {CONNECTOR_ENTRIES.map((entry) => (
+                <tr key={entry.capability.id}><th scope="row">{entry.capability.label}</th><td>{entry.capability.localEquivalent}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </OverlaySection>
       <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/it/incidents`)}>Open the incident queue</Button>
     </Stack>
   );
@@ -136,18 +137,18 @@ export const connectApp = registerApp({
         { id: "capability registry", label: "Capability registry", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/connect/capabilities`) },
       ],
       overlays: [
-        { id: "Connector preview", kind: "drawer", title: "Connector", width: 520, render: ({ ...context }) => <ConnectorPreview context={context} /> },
-        { id: "Nango guided setup", kind: "drawer", title: "Connect your software", width: 560, render: ({ ...context }) => <NangoGuidedSetup context={context} /> },
+        { id: "Connector preview", kind: "drawer", title: "Connector", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <ConnectorPreview context={context} /> },
+        { id: "Nango guided setup", kind: "drawer", title: "Connect your software", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <NangoGuidedSetup context={context} /> },
         installConnector,
         { id: "compare connectors", kind: "modal", title: "Compare connectors", width: 820, render: ({ ...context }) => <CompareConnectors context={context} />, footer: closeFooter() },
-        { id: "risk summary", kind: "modal", title: "Risk", width: 560, render: ({ ...context }) => <RiskSummary context={context} />, footer: closeFooter() },
+        { id: "risk summary", kind: "modal", title: "Risk", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <RiskSummary context={context} />, footer: closeFooter() },
       ],
     },
 
     "ARL-CONNECT-002": {
       id: "ARL-CONNECT-002",
       title: () => "Connector",
-      subtitle: () => "Read scopes and write scopes are shown apart, because they are not the same decision.",
+      record: (context) => connectorRecordHeader(context, "connector"),
       tabs: (["Overview", "Capabilities", "Permissions", "Versions", "Help"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ConnectorDetail context={context} lens={lens} />,
@@ -162,9 +163,9 @@ export const connectApp = registerApp({
         { id: "scopes explained", label: "Scopes explained", placement: "overflow", run: (context) => context.openOverlay("scope explanation") },
       ],
       overlays: [
-        { id: "Authorization preview", kind: "drawer", title: "Authorisation", width: 560, capability: "manage_connectors", presentation: { guidance: "Review provider access scopes, account identity and connection status; an unconnected provider cannot be authorised here." }, render: ({ ...context }) => <ExternalOAuth context={context} /> },
-        { id: "scope explanation", kind: "drawer", title: "Scopes", width: 520, render: ({ ...context }) => <ScopeReview context={context} /> },
-        { id: "provider limits", kind: "modal", title: "Provider limits", width: 560, render: ({ ...context }) => <ProviderLimits context={context} />, footer: closeFooter() },
+        { id: "Authorization preview", kind: "drawer", title: "Authorisation", width: OVERLAY_WIDTH.form, summary: connectorSummary("Authorisation preview"), capability: "manage_connectors", presentation: { guidance: "Review provider access scopes, account identity and connection status; an unconnected provider cannot be authorised here." }, render: ({ ...context }) => <ExternalOAuth context={context} /> },
+        { id: "scope explanation", kind: "drawer", title: "Scopes", width: OVERLAY_WIDTH.form, summary: connectorSummary("Scopes"), render: ({ ...context }) => <ScopeReview context={context} /> },
+        { id: "provider limits", kind: "modal", title: "Provider limits", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ProviderLimits context={context} />, footer: closeFooter() },
         testConnection, requestCapability,
       ],
     },
@@ -172,7 +173,7 @@ export const connectApp = registerApp({
     "ARL-CONNECT-003": {
       id: "ARL-CONNECT-003",
       title: () => "Authorise a connector",
-      subtitle: () => "The flow runs as far as it can and then stops, without leaving a connection behind.",
+      record: (context) => connectorRecordHeader(context, "authorise"),
       tabs: (["Account", "Permissions", "Test", "Confirm"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ConnectionWizard context={context} lens={lens} />,
@@ -186,8 +187,8 @@ export const connectApp = registerApp({
       ],
       overlays: [
         attemptAuthorisation, chooseTargetsOverlay(), testConnection, cancelAuthorisation,
-        { id: "scope review", kind: "drawer", title: "Scopes", width: 540, render: ({ ...context }) => <ScopeReview context={context} /> },
-        { id: "consent status", kind: "drawer", title: "Consent", width: 520, render: ({ ...context }) => <ConsentStatus context={context} /> },
+        { id: "scope review", kind: "drawer", title: "Scopes", width: OVERLAY_WIDTH.form, summary: connectorSummary("Scopes"), render: ({ ...context }) => <ScopeReview context={context} /> },
+        { id: "consent status", kind: "drawer", title: "Consent", width: OVERLAY_WIDTH.form, summary: connectorSummary("Consent record"), render: ({ ...context }) => <ConsentStatus context={context} /> },
       ],
     },
 
@@ -212,9 +213,9 @@ export const connectApp = registerApp({
         { id: "revoke", label: "Revoke", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke grant") },
       ],
       overlays: [
-        { id: "Account inspector", kind: "drawer", title: "Account", width: 520, render: ({ ...context }) => <ConsentStatus context={context} /> },
-        { id: "scope change", kind: "modal", title: "Change scopes", width: 520, render: ({ ...context }) => <ScopeChangePanel context={context} />, footer: closeFooter() },
-        { id: "revoke grant", kind: "modal", title: "Revoke", tone: "danger", width: 520, render: ({ ...context }) => <RevokeGrant context={context} />, footer: closeFooter() },
+        { id: "Account inspector", kind: "drawer", title: "Account", width: OVERLAY_WIDTH.form, summary: connectorSummary("Account"), render: ({ ...context }) => <ConsentStatus context={context} /> },
+        { id: "scope change", kind: "modal", title: "Change scopes", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ScopeChangePanel context={context} />, footer: closeFooter() },
+        { id: "revoke grant", kind: "modal", title: "Revoke", tone: "danger", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RevokeGrant context={context} />, footer: closeFooter() },
         reconnectConnection, transferOwner, disableOverlay("suspend connection", "Suspend", "suspended"),
       ],
     },
@@ -222,23 +223,24 @@ export const connectApp = registerApp({
     "ARL-CONNECT-005": {
       id: "ARL-CONNECT-005",
       title: () => "Connection",
-      subtitle: () => "What this connection would be allowed to do, and what it holds now, which is nothing.",
+      record: (context) => connectorRecordHeader(context, "connection"),
       tabs: (["Overview", "Capabilities", "Sync", "Activity", "Security"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ConnectionDetail context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Test", label: "Test this connection", placement: "primary", run: (context) => context.openOverlay("test connection") },
+        { id: "set up", label: "Set up the connection", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/connect/connect/${context.params.id}`) },
+        { id: "Test", label: "Test this connection", placement: "overflow", run: (context) => context.openOverlay("test connection") },
         { id: "limit agents", label: "Limit what agents may use", placement: "secondary", run: (context) => context.openOverlay("limit agents") },
         { id: "rotate auth", label: "Rotate the authorisation", placement: "overflow", run: (context) => context.openOverlay("rotate auth") },
         { id: "disable", label: "Disable", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("disable connection") },
         { id: "revoke", label: "Revoke", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke grant") },
       ],
       overlays: [
-        { id: "Permission matrix", kind: "drawer", title: "Permissions", width: 620, render: ({ ...context }) => <ConnectorDetail context={context} lens="Permissions" /> },
-        { id: "health run", kind: "modal", title: "Health test", width: 560, render: ({ ...context }) => <HealthReport context={context} />, footer: closeFooter() },
-        { id: "reconnect dialog", kind: "modal", title: "Reconnect", width: 520, render: ({ ...context }) => <ReconnectDialog context={context} />, footer: closeFooter() },
-        { id: "revoke grant", kind: "modal", title: "Revoke", tone: "danger", width: 520, render: ({ ...context }) => <RevokeGrant context={context} />, footer: closeFooter() },
+        { id: "Permission matrix", kind: "drawer", title: "Permissions", width: OVERLAY_WIDTH.record, summary: connectorSummary("Permissions"), render: ({ ...context }) => <ConnectorDetail context={context} lens="Permissions" /> },
+        { id: "health run", kind: "modal", title: "Health test", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <HealthReport context={context} />, footer: closeFooter() },
+        { id: "reconnect dialog", kind: "modal", title: "Reconnect", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ReconnectDialog context={context} />, footer: closeFooter() },
+        { id: "revoke grant", kind: "modal", title: "Revoke", tone: "danger", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RevokeGrant context={context} />, footer: closeFooter() },
         testConnection, limitAgentsOverlay(), rotateAuth, disableOverlay("disable connection", "Disable", "disabled"),
       ],
     },
@@ -259,8 +261,8 @@ export const connectApp = registerApp({
         { id: "versions", label: "Versions", placement: "overflow", run: (context) => context.setTab("Versions") },
       ],
       overlays: [
-        { id: "Capability inspector", kind: "drawer", title: "Capability", width: 560, render: ({ ...context }) => <CapabilityInspector context={context} /> },
-        { id: "schema diff", kind: "modal", title: "Schema diff", width: 640, render: ({ ...context }) => <SchemaDiff context={context} />, footer: closeFooter() },
+        { id: "Capability inspector", kind: "drawer", title: "Capability", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <CapabilityInspector context={context} /> },
+        { id: "schema diff", kind: "modal", title: "Schema diff", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <SchemaDiff context={context} />, footer: closeFooter() },
         testMock, retireOperation,
       ],
     },
@@ -279,7 +281,7 @@ export const connectApp = registerApp({
         { id: "inspect conflict", label: "Inspect a conflict", placement: "overflow", run: (context) => { context.setTab("Conflicts"); context.openOverlay("conflict resolver"); } },
       ],
       overlays: [
-        { id: "Mapping editor", kind: "modal", title: "Mapping", width: 560, render: ({ close, ...context }) => <MappingEditor context={context} close={close} />, footer: submitFooter("mapping-editor", "Record the mapping") },
+        { id: "Mapping editor", kind: "modal", title: "Mapping", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MappingEditor context={context} close={close} />, footer: submitFooter("mapping-editor", "Record the mapping") },
         resolveConflict, retrySync,
       ],
     },
@@ -299,9 +301,9 @@ export const connectApp = registerApp({
         { id: "mitigation", label: "Mitigation", placement: "overflow", run: (context) => context.openOverlay("mitigation") },
       ],
       overlays: [
-        { id: "Health report", kind: "modal", title: "Health report", width: 560, render: ({ ...context }) => <HealthReport context={context} />, footer: closeFooter() },
-        { id: "reconnect request", kind: "modal", title: "Reconnect", width: 520, render: ({ ...context }) => <ReconnectDialog context={context} />, footer: closeFooter() },
-        { id: "mitigation", kind: "drawer", title: "Mitigation", width: 620, render: ({ ...context }) => <MitigationPanel context={context} /> },
+        { id: "Health report", kind: "modal", title: "Health report", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <HealthReport context={context} />, footer: closeFooter() },
+        { id: "reconnect request", kind: "modal", title: "Reconnect", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ReconnectDialog context={context} />, footer: closeFooter() },
+        { id: "mitigation", kind: "drawer", title: "Mitigation", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <MitigationPanel context={context} /> },
         openConnectorIncident, contactOwner,
       ],
     },
@@ -323,16 +325,16 @@ export const connectApp = registerApp({
       ],
       overlays: [
         {
-          id: "Secret setup", kind: "modal", title: "Credentials", tone: "danger", width: 560,
+          id: "Secret setup", kind: "modal", title: "Credentials", tone: "danger", width: OVERLAY_WIDTH.modal,
           render: () => (
-            <Stack gap={3}>
+            <Stack gap={4}>
               <Notice tone="danger" title="No credential field is offered">
                 An adapter's credential belongs in an encrypted store on a server. Typed into this browser it would sit in IndexedDB in plain text. Nothing here stores one, and nothing generates one.
               </Notice>
-              <Properties rows={[
-                { label: "Credentials stored", value: <span className="ds-num">0</span> },
-                { label: "Credentials generated", value: <span className="ds-num">0</span> },
-                { label: "What an adapter declares instead", value: "The name of the scope it would need" },
+              <FactGrid columns={3} items={[
+                { label: "Credentials stored", value: "0", mono: true },
+                { label: "Credentials generated", value: "0", mono: true },
+                { label: "An adapter declares", value: "The name of the scope it needs" },
               ]} />
             </Stack>
           ),
@@ -358,9 +360,9 @@ export const connectApp = registerApp({
         { id: "provider evidence", label: "Provider evidence", placement: "overflow", run: (context) => context.openOverlay("provider evidence") },
       ],
       overlays: [
-        { id: "Receipt detail", kind: "drawer", title: "Receipt", width: 540, render: ({ ...context }) => <ReceiptDetail context={context} /> },
-        { id: "provider evidence", kind: "modal", title: "Provider evidence", width: 520, render: () => <ProviderEvidence />, footer: closeFooter() },
-        { id: "retry review", kind: "modal", title: "Retry", width: 520, render: ({ ...context }) => <RetryReview context={context} />, footer: closeFooter() },
+        { id: "Receipt detail", kind: "drawer", title: "Receipt", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ReceiptDetail context={context} /> },
+        { id: "provider evidence", kind: "modal", title: "Provider evidence", width: OVERLAY_WIDTH.form, render: () => <ProviderEvidence />, footer: closeFooter() },
+        { id: "retry review", kind: "modal", title: "Retry", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RetryReview context={context} />, footer: closeFooter() },
         reconcileReceipts, openMission,
       ],
     },

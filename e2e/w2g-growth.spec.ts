@@ -12,7 +12,9 @@ const dialog = (page: Page) => page.getByRole("dialog");
 async function action(page: Page, label: string) {
   const bar = page.locator(".pg-actions");
   const direct = bar.getByRole("button", { name: label, exact: true });
-  await direct.first().waitFor({ state: "visible", timeout: 1500 }).catch(() => undefined);
+  // The application may still be opening; its bar is complete once either control shows.
+  await expect(page.locator('.pg[aria-busy="true"]')).toHaveCount(0, { timeout: 20_000 });
+  await direct.or(bar.getByRole("button", { name: "More actions" })).first().waitFor({ state: "visible" });
   if (await direct.count()) { await direct.first().click(); return; }
   await bar.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: label, exact: true }).click();

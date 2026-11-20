@@ -7,12 +7,13 @@ import {
 import {
   BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice,
   Pill, Properties, RoutingLine, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Avatar,
+  FactGrid, KeyValueList, OverlayActions, OverlaySection, OverlaySummary, OVERLAY_WIDTH,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import * as repo from "@/platform/repo";
 import { addDays, clockIso, freshness, resolveRange, sameDay } from "@/platform/clock";
-import { Building } from "@/applications/hq/pieces";
+import { Building, BuildingSummary } from "@/applications/hq/pieces";
 import { outstandingMinor, receivablePosition } from "@/applications/fin/data";
 import { approvalRows } from "@/applications/inbox/engine";
 import {
@@ -212,18 +213,18 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
         ) : approvals.length === 0 ? (
           <Empty title="Nothing to approve" icon={<Flag size={20} />}>Approvals appear here when a record is submitted for a decision.</Empty>
         ) : (
-          <Stack gap={2}>
+          <div className="hq-rows">
             {approvals.slice(0, 5).map((record) => (
-              <Row key={record.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                <div className="ds-grow">
-                  <strong>{record.title}</strong>
-                  <p className="ds-subtle">{record.summary}</p>
+              <div key={record.id} className="hq-row">
+                <div className="hq-row-main">
+                  <strong className="hq-row-title">{record.title}</strong>
+                  <p className="ds-subtle hq-row-sub">{record.summary}</p>
                 </div>
                 {record.amountMinor !== undefined && <strong className="ds-num">{context.money(record.amountMinor)}</strong>}
-                <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/inbox/approvals`)}>Review</Button>
-              </Row>
+                <Button size="sm" variant="secondary" aria-label={`Review ${record.title}`} onClick={() => context.navigate(`/o/${org.slug}/inbox/approvals`)}>Review</Button>
+              </div>
             ))}
-          </Stack>
+          </div>
         )}
       </Card>
     ),
@@ -359,8 +360,9 @@ function MyWorkspace({ context, view }: { context: ScreenContext; view: "Today" 
   const upcoming = mine.filter((task) => task.dueAt && new Date(task.dueAt) > now);
   const done = mine.filter((task) => task.status === "done");
   const pinned = mine.filter((task) => task.tags.includes("pinned"));
+  const showCompleted = flag(usePref("workPrefs"), "showCompleted", false);
   const rows = view === "Today"
-    ? (today.length ? today : mine.filter((task) => task.status !== "done"))
+    ? (today.length ? (showCompleted ? today : today.filter((task) => task.status !== "done")) : mine.filter((task) => showCompleted || task.status !== "done"))
     : view === "Upcoming" ? upcoming : view === "History" ? done : pinned;
   const meetingsToday = data.meetings
     .filter((meeting) => meeting.startAt && sameDay(new Date(meeting.startAt), now))
@@ -434,7 +436,7 @@ function MyWorkspace({ context, view }: { context: ScreenContext; view: "Today" 
             <Row key={member.id} gap={2}>
               <Avatar name={member.title} kind={member.fields.kind === "ai" ? "ai" : "human"} size="sm" />
               <span className="ds-grow ds-truncate">{member.title}</span>
-              <Pill tone={member.fields.kind === "ai" ? "accent" : "success"} dot>{member.fields.kind === "ai" ? "Agent" : "Available"}</Pill>
+              <Pill tone={member.fields.kind === "ai" ? "accent" : "neutral"}>{member.fields.kind === "ai" ? "Agent" : "Person"}</Pill>
             </Row>
           ))}
         </Stack>
@@ -833,16 +835,15 @@ function CompanyGoals({ context, state }: { context: ScreenContext; state: strin
               <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Goal editor", { id: objective.id })}>Edit</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("target change review", { id: objective.id })}>Change target</Button>
               <Button size="sm" variant="ghost" onClick={() => { context.select(objective.id); context.openOverlay("review goal"); }}>Review</Button>
-              <span className="ds-grow" />
-              <span className="ds-subtle">{objective.fields.reviewedAt ? `Reviewed ${context.relative(String(objective.fields.reviewedAt))}` : "Not yet reviewed"}</span>
             </>}
           >
             <Stack gap={3}>
               <ObjectiveKeyResults context={context} objective={objective} />
-              <Properties rows={[
-                { label: "Measure", value: `${String(objective.fields.measure ?? "Not set")}: ${current}${target ? ` of ${target}` : ""}` },
+              <KeyValueList columns={2} items={[
+                { label: "Measure", value: `${String(objective.fields.measure ?? "Not set")}: ${current}${target ? ` of ${target}` : ""}`, mono: true },
                 { label: "Owner", value: objective.ownerName },
                 { label: "Mission", value: missions.find((mission) => mission.id === objective.fields.missionId)?.title ?? "None linked" },
+                { label: "Reviewed", value: objective.fields.reviewedAt ? context.relative(String(objective.fields.reviewedAt)) : "Not yet" },
               ]} />
               {ratio >= 1 && objective.status !== "achieved" && (
                 <Notice tone="info">The measure has reached its target. Marking an objective achieved requires confirming the measure, not a summary.</Notice>
@@ -1020,36 +1021,71 @@ function WorkplaceDirectory({ context, lens }: { context: ScreenContext; lens: s
  * Shared overlay bodies
  * ====================================================================== */
 
+function MetricSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { metric?: string } | undefined;
+  const data = useCollections(["invoices", "journals"]);
+  const { now } = useWorkspace();
+  const metric = payload?.metric ?? "receivable";
+  if (metric === "ledger") {
+    const latest = data.journals.filter((journal) => journal.status === "posted").map((journal) => journal.at ?? journal.updatedAt).sort().at(-1);
+    const age = freshness(latest, now);
+    return (
+      <OverlaySummary
+        eyebrow="Ledger posted"
+        title={age.known ? context.date(latest) : "Unavailable"}
+        status={age.stale ? <Pill tone="warning" dot>Stale</Pill> : age.known ? <Pill tone="success" dot>Current</Pill> : <Pill tone="neutral">No source</Pill>}
+        meta={[age.known ? `${age.days} ${age.days === 1 ? "day" : "days"} old` : "No posting recorded"]}
+      />
+    );
+  }
+  const position = receivablePosition(data.invoices, now);
+  const overdue = metric === "overdue";
+  const rows = overdue ? position.overdue : position.open;
+  const total = overdue ? position.overdueMinor : position.receivableMinor;
+  return (
+    <OverlaySummary
+      eyebrow={overdue ? "Overdue" : "Receivable"}
+      title={<span className="ds-num">{context.money(total)}</span>}
+      status={overdue && rows.length > 0 ? <Pill tone="danger" dot>{rows.length} past due</Pill> : <Pill tone="success" dot>Posted</Pill>}
+      meta={[`${rows.length} invoice ${rows.length === 1 ? "record" : "records"}`, "Finance computation"]}
+    />
+  );
+}
+
 function MetricInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { metric?: string } | undefined;
   const data = useCollections(["invoices", "journals"]);
   const { now } = useWorkspace();
   const metric = payload?.metric ?? "receivable";
   if (metric === "ledger") {
-    const latest = data.journals.map((journal) => journal.at ?? journal.updatedAt).sort().at(-1);
+    const latest = data.journals.filter((journal) => journal.status === "posted").map((journal) => journal.at ?? journal.updatedAt).sort().at(-1);
     const age = freshness(latest, now);
     return (
       <Stack gap={3}>
-        <Properties rows={[
+        <FactGrid columns={2} items={[
           { label: "Source", value: "Posted journals in this browser" },
-          { label: "Last posting", value: age.known ? context.date(latest) : "Not recorded" },
-          { label: "Age", value: age.known ? `${age.days} days` : "Unknown" },
-          { label: "Confidence", value: age.stale ? <Pill tone="warning">Stale</Pill> : <Pill tone="success">Current</Pill> },
+          { label: "Last posting", value: age.known ? context.date(latest) : "Not recorded", mono: true },
+          { label: "Age", value: age.known ? `${age.days} days` : "Unknown", mono: true, tone: age.stale ? "warning" : undefined },
+          { label: "Posted journals", value: String(data.journals.filter((journal) => journal.status === "posted").length), mono: true },
         ]} />
-        <Notice tone="warning" title="No bank feed is connected">A figure without a source is shown as unavailable rather than filled in.</Notice>
+        <OverlaySection title="Not connected" tone="warning">
+          <p>No bank feed is connected, so a figure without a source shows as unavailable instead of being filled in.</p>
+        </OverlaySection>
       </Stack>
     );
   }
   const position = receivablePosition(data.invoices, now);
-  const rows = metric === "overdue" ? position.overdue : position.open;
+  const overdue = metric === "overdue";
+  const rows = overdue ? position.overdue : position.open;
   return (
     <Stack gap={3}>
-      <p className="ds-subtle">Computed from {rows.length} invoice records. Each row is the source of the figure.</p>
-      <DataGrid rows={rows} rowId={(row) => row.id} label="Metric sources" filterable={false} columns={[
-        { key: "title", header: "Invoice", primary: true, cell: (row) => row.title },
-        { key: "due", header: "Due", cell: (row) => context.date(row.dueAt) },
-        { key: "amount", header: "Outstanding", align: "end", cell: (row) => context.money(outstandingMinor(row)) },
-      ]} />
+      <OverlaySection title="Sources" hint="The same computation Finance uses. Each row adds to the figure.">
+        <DataGrid rows={rows} rowId={(row) => row.id} label="Metric sources" filterable={false} columns={[
+          { key: "title", header: "Invoice", primary: true, cell: (row) => row.title },
+          { key: "due", header: "Due", cell: (row) => <span className="ds-num">{context.date(row.dueAt)}</span> },
+          { key: "amount", header: "Outstanding", align: "end", cell: (row) => <span className="ds-num">{context.money(outstandingMinor(row))}</span> },
+        ]} />
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1104,7 +1140,7 @@ function GoalEditor({ context, close }: { context: ScreenContext; close: () => v
         event.preventDefault();
         const fields = { measure, target: Number(target) || 0, current: Number(current) || 0 };
         if (existing) {
-          await context.mutate.patch(existing.id, { title, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: "Objective updated" });
+          if (!(await context.mutate.patch(existing.id, { title, fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: "Objective updated" }))) return;
         } else {
           await context.mutate.create({ collection: "objectives", title, status: "active", summary: `${measure} to ${target}`, fields }, "Objective created");
         }
@@ -1123,28 +1159,45 @@ function GoalEditor({ context, close }: { context: ScreenContext; close: () => v
   );
 }
 
+function MemberSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const member = useRecord(payload?.id ?? context.selectedId);
+  const departments = useCollection("departments");
+  if (!member) return null;
+  const ai = member.fields.kind === "ai";
+  const department = departments.find((dept) => dept.id === member.fields.departmentId);
+  return (
+    <OverlaySummary
+      avatar={<Avatar name={member.title} kind={ai ? "ai" : "human"} size="lg" />}
+      eyebrow={ai ? "AI employee" : "Person"}
+      title={member.title}
+      status={<Pill tone={ai ? "info" : "neutral"}>{String(member.fields.role ?? "member")}</Pill>}
+      meta={[String(member.fields.title ?? ""), department?.title]}
+      actions={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/hq/directory`)}>Directory</Button>}
+    />
+  );
+}
+
 function MemberInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const member = useRecord(payload?.id ?? context.selectedId);
   const departments = useCollection("departments");
-  if (!member) return <Empty title="Select a member" />;
+  if (!member) return <Empty title="Select a member">Choose a person on the chart or in the directory to see them here.</Empty>;
+  const ai = member.fields.kind === "ai";
+  const department = departments.find((dept) => dept.id === member.fields.departmentId);
   return (
-    <Stack gap={4}>
-      <Row gap={3}>
-        <Avatar name={member.title} kind={member.fields.kind === "ai" ? "ai" : "human"} size="lg" />
-        <div>
-          <h3>{member.title}</h3>
-          <p className="ds-subtle">{String(member.fields.title ?? "")}</p>
-        </div>
-      </Row>
-      <Properties rows={[
-        { label: "Kind", value: member.fields.kind === "ai" ? "AI employee" : "Person" },
-        { label: "Department", value: departments.find((dept) => dept.id === member.fields.departmentId)?.title ?? "Unassigned" },
+    <Stack gap={3}>
+      <FactGrid columns={2} items={[
+        { label: "Department", value: department?.title ?? "Unassigned" },
         { label: "Role view", value: String(member.fields.role ?? "member") },
-        { label: "About", value: member.summary },
+        { label: "Kind", value: ai ? "AI employee" : "Person" },
+        { label: "Updated", value: context.date(member.updatedAt), mono: true },
       ]} />
-      {member.fields.kind === "ai" && (
-        <Notice tone="info" title="Local agent contract">This AI employee runs from a local contract in this workspace. No model provider is connected.</Notice>
+      {member.summary && <OverlaySection title="About"><p>{member.summary}</p></OverlaySection>}
+      {ai && (
+        <OverlaySection title="Provider" tone="info">
+          <p>Runs from a local contract in this workspace. No model provider is connected.</p>
+        </OverlaySection>
       )}
     </Stack>
   );
@@ -1164,7 +1217,7 @@ function ChangeManager({ context, close }: { context: ScreenContext; close: () =
       onSubmit={async (event) => {
         event.preventDefault();
         if (cycle) return;
-        await context.mutate.patch(member.id, { fields: { ...member.fields, departmentId: deptId } }, { expectRevision: member.revision, event: `Reporting line changed for ${member.title}` });
+        if (!(await context.mutate.patch(member.id, { fields: { ...member.fields, departmentId: deptId } }, { expectRevision: member.revision, event: `Reporting line changed for ${member.title}` }))) return;
         context.toast("Reporting line changed", `${member.title} now reports into ${departments.find((dept) => dept.id === deptId)?.title}.`);
         close();
       }}
@@ -1200,9 +1253,13 @@ function SaveViewDialog({ context, close }: { context: ScreenContext; close: () 
         close();
       }}
     >
-      <Field label="View name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
+      <Field label="View name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required placeholder={`${context.screen.title} · ${context.tab}`} /></Field>
+      <FactGrid columns={3} dense items={[
+        { label: "Screen", value: context.screen.title },
+        { label: "Period", value: context.tab },
+        { label: "Stored", value: "In this browser", hint: shared ? "Listed for the workspace" : "Only you see it" },
+      ]} />
       <Checkbox label="Share with the workspace" checked={shared} onChange={(event) => setShared(event.target.checked)} />
-      <p className="ds-subtle">Saves the period and arrangement of {context.screen.title}, in this browser.</p>
     </form>
   );
 }
@@ -1223,7 +1280,7 @@ function LocationForm({ context, close }: { context: ScreenContext; close: () =>
       onSubmit={async (event) => {
         event.preventDefault();
         if (duplicate) return;
-        if (existing) await context.mutate.patch(existing.id, { title, summary: hours, fields: { ...existing.fields, timezone } }, { expectRevision: existing.revision, event: "Location updated" });
+        if (existing) { if (!(await context.mutate.patch(existing.id, { title, summary: hours, fields: { ...existing.fields, timezone } }, { expectRevision: existing.revision, event: "Location updated" }))) return; }
         else await context.mutate.create({ collection: "locations", title, status: "active", summary: hours, fields: { timezone, kind: "office" } }, "Location added");
         context.toast("Location saved", `${title} uses ${timezone}.`);
         close();
@@ -1246,11 +1303,10 @@ function LocationForm({ context, close }: { context: ScreenContext; close: () =>
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 export const hqApp = registerApp({
@@ -1294,10 +1350,10 @@ export const hqApp = registerApp({
         { id: "log decision", label: "Log a decision", placement: "overflow", run: (context) => context.openOverlay("log decision") },
       ],
       overlays: [
-        { id: "Widget picker", kind: "drawer", title: "Arrange cards", description: "Choose what Executive Home shows, and in what order.", render: ({ close, ...context }) => <ArrangeCards context={context} close={close} />, footer: submitFooter("hq-arrange", "Save arrangement") },
+        { id: "Widget picker", kind: "drawer", title: "Arrange cards", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <ArrangeCards context={context} close={close} />, footer: submitFooter("hq-arrange", "Save arrangement") },
         { id: "recommendations", kind: "drawer", title: "Recommendations", width: 480, render: ({ ...context }) => <RecommendationsDrawer context={context} /> },
-        { id: "metric inspector", kind: "drawer", title: "Where this figure comes from", width: 520, render: ({ ...context }) => <MetricInspector context={context} /> },
-        { id: "save view dialog", kind: "modal", title: "Save this view", width: 460, render: ({ close, ...context }) => <SaveViewDialog context={context} close={close} />, footer: submitFooter("save-view", "Save view") },
+        { id: "metric inspector", kind: "drawer", title: "Where this figure comes from", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <MetricSummary context={context} />, render: ({ ...context }) => <MetricInspector context={context} /> },
+        { id: "save view dialog", kind: "modal", title: "Save this view", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SaveViewDialog context={context} close={close} />, footer: submitFooter("save-view", "Save view") },
         { id: "key results", kind: "modal", title: "Objective check-in", width: 640, render: ({ close, ...context }) => <KeyResultsEditor context={context} close={close} /> },
         { id: "log decision", kind: "modal", title: "Log a decision", width: 580, render: ({ close, ...context }) => <DecisionEditor context={context} close={close} /> },
       ],
@@ -1305,7 +1361,6 @@ export const hqApp = registerApp({
 
     "ARL-HQ-002": {
       id: "ARL-HQ-002",
-      subtitle: (context) => `Everything assigned to ${context.actor}.`,
       tabs: (["Today", "Upcoming", "Saved", "History"] as const).map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MyWorkspace context={context} view={view} />,
@@ -1334,21 +1389,14 @@ export const hqApp = registerApp({
             </form>
           ),
           footer: submitFooter("quick-task", "Add task") },
-        { id: "work item inspector", kind: "drawer", title: "Work item", render: ({ ...context }) => <WorkItemInspector context={context} /> },
+        { id: "work item inspector", kind: "drawer", title: "Work item", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <WorkItemSummary context={context} />, render: ({ ...context }) => <WorkItemInspector context={context} /> },
         { id: "request help", kind: "modal", title: "Request help", width: 520, render: ({ close, ...context }) => <RequestHelp context={context} close={close} />, footer: submitFooter("hq-help", "Ask for help") },
-        { id: "personal preferences", kind: "modal", title: "Personal preferences", width: 480, render: () => (
-          <Stack gap={3}>
-            <Checkbox label="Show completed work in Today" />
-            <Checkbox label="Group by project" defaultChecked />
-            <Notice tone="info">Preferences are stored in this browser for this person.</Notice>
-          </Stack>
-        ) },
+        { id: "personal preferences", kind: "modal", title: "Personal preferences", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <WorkspacePreferences context={context} close={close} />, footer: submitFooter("hq-prefs", "Save preferences") },
       ],
     },
 
     "ARL-HQ-003": {
       id: "ARL-HQ-003",
-      subtitle: (context) => `${context.org.name} as one picture: entity, objectives, operations and the posture behind them.`,
       tabs: (["Business", "Performance", "Operations", "Compliance"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <CompanyOverview context={context} lens={lens} />,
@@ -1360,24 +1408,25 @@ export const hqApp = registerApp({
       ],
       overlays: [
         { id: "KPI builder", kind: "modal", title: "New objective", width: 560, render: ({ close, ...context }) => <GoalEditor context={context} close={close} />, footer: submitFooter("goal-editor", "Save objective") },
-        { id: "executive note", kind: "drawer", title: "Executive note", render: ({ ...context }) => (
-          <form className="ds-stack ds-gap-3" onSubmit={async (event) => {
+        { id: "executive note", kind: "drawer", title: "Executive note", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ close, ...context }) => (
+          <form id="hq-note" className="ds-stack ds-gap-3" onSubmit={async (event) => {
             event.preventDefault();
-            const data = new FormData(event.currentTarget);
-            await context.mutate.log(String(data.get("note") ?? ""), { type: "note" });
+            const form = event.currentTarget;
+            const note = String(new FormData(form).get("note") ?? "").trim();
+            if (!note) return;
+            await context.mutate.log(note, { type: "note" });
             context.toast("Note recorded", "It is in the company activity log.");
+            close();
           }}>
-            <Field label="Note"><TextArea name="note" rows={5} /></Field>
-            <Button type="submit" variant="primary">Record note</Button>
+            <Field label="Note" required hint="Written to the company activity log under your name."><TextArea name="note" rows={5} required /></Field>
           </form>
-        ) },
-        { id: "data freshness inspector", kind: "drawer", title: "Data freshness", width: 480, render: ({ ...context }) => <MetricInspector context={{ ...context, overlayPayload: { metric: "ledger" } }} /> },
+        ), footer: submitFooter("hq-note", "Record the note") },
+        { id: "data freshness inspector", kind: "drawer", title: "Data freshness", width: OVERLAY_WIDTH.compact, summary: ({ ...context }) => <MetricSummary context={{ ...context, overlayPayload: { metric: "ledger" } }} />, render: ({ ...context }) => <MetricInspector context={{ ...context, overlayPayload: { metric: "ledger" } }} /> },
       ],
     },
 
     "ARL-HQ-004": {
       id: "ARL-HQ-004",
-      subtitle: () => "Who owns what, and where people and agents sit.",
       tabs: (["All", "My departments", "Pinned"] as const).map((scope) => ({
         id: scope,
         render: (context: ScreenContext) => <DepartmentsDirectory context={context} scope={scope} />,
@@ -1394,7 +1443,7 @@ export const hqApp = registerApp({
         { id: "assign leader", kind: "modal", title: "Assign a leader", width: 480, render: ({ close, ...context }) => <AssignLeader context={context} close={close} />, footer: submitFooter("hq-leader", "Assign") },
         { id: "open department", kind: "modal", title: "Open a department", width: 460, render: ({ close, ...context }) => <OpenDepartment context={context} close={close} /> },
         { id: "reorder directory", kind: "modal", title: "Reorder the directory", width: 480, render: ({ close, ...context }) => <ReorderDepartments context={context} close={close} />, footer: submitFooter("hq-reorder", "Save order") },
-        { id: "organizational impact preview", kind: "drawer", title: "Organisational impact", width: 460, render: ({ ...context }) => {
+        { id: "organizational impact preview", kind: "drawer", title: "Organisational impact", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <BuildingSummary departmentId={(context.overlayPayload as { departmentId?: string } | undefined)?.departmentId} />, render: ({ ...context }) => {
           const payload = context.overlayPayload as { departmentId?: string } | undefined;
           return <Building departmentId={payload?.departmentId} context={context} />;
         } },
@@ -1404,7 +1453,6 @@ export const hqApp = registerApp({
     "ARL-HQ-005": {
       id: "ARL-HQ-005",
       title: () => "Department workspace",
-      subtitle: () => "One department: its people, its work, its files and how it is performing.",
       tabs: ["Overview", "People", "Work", "Discussions", "Files", "Performance"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <DepartmentWorkspace context={context} lens={lens} />,
@@ -1421,22 +1469,36 @@ export const hqApp = registerApp({
         { id: "assign work", kind: "modal", title: "Assign work", width: 540, render: ({ close, ...context }) => <AssignWork context={context} close={close} />, footer: submitFooter("hq-assign-work", "Assign") },
         { id: "message team", kind: "modal", title: "Message the team", width: 540, render: ({ close, ...context }) => <MessageTeam context={context} close={close} />, footer: submitFooter("hq-message-team", "Post message") },
         { id: "add resource", kind: "modal", title: "Add a resource", width: 520, render: ({ close, ...context }) => <AddResource context={context} close={close} />, footer: submitFooter("hq-resource", "Add resource") },
-        { id: "Department settings", kind: "modal", title: "Department settings", width: 520, render: ({ ...context }) => <Properties rows={[{ label: "Department", value: context.params.id ?? "—" }, { label: "Private records", value: "Visible to members only" }]} /> },
-        { id: "invite member", kind: "modal", title: "Invite a member", width: 460, render: () => (
+        { id: "Department settings", kind: "modal", title: "Department details", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <DepartmentSummary context={context} />, render: ({ ...context }) => <DepartmentSettings context={context} /> },
+        { id: "invite member", kind: "modal", title: "Invite a member", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => (
+          <form id="hq-invite" className="ds-stack ds-gap-3" onSubmit={async (event) => {
+            event.preventDefault();
+            const email = String(new FormData(event.currentTarget).get("email") ?? "").trim();
+            if (!email) return;
+            await context.mutate.create({ collection: "preferences", title: `Invitation draft · ${email}`, status: "draft", summary: `For ${context.params.id ?? "a department"}`, fields: { kind: "invitationDraft", email, departmentId: context.params.id ?? "" } }, `Invitation draft kept for ${email}`);
+            context.toast("Draft kept, not sent", `No mail provider is connected, so ${email} has not been emailed.`, "blocked");
+            close();
+          }}>
+            <Field label="Email" required><TextInput name="email" type="email" required placeholder="name@example.com" /></Field>
+            <Notice tone="warning" title="Invitations cannot be sent">No mail provider is connected. Saving keeps a local draft only.</Notice>
+          </form>
+        ), footer: submitFooter("hq-invite", "Keep the draft") },
+        { id: "permission inspector", kind: "drawer", title: "Permissions", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ ...context }) => (
           <Stack gap={3}>
-            <Field label="Email"><TextInput type="email" placeholder="name@example.com" /></Field>
-            <Notice tone="warning" title="Invitations cannot be sent">No mail provider is connected, so an invitation is kept as a local draft.</Notice>
+            <OverlaySection title="This role view can">
+              <FactGrid columns={2} items={([["edit_people", "Edit people"], ["export_data", "Export data"], ["approve_payment", "Approve payments"], ["manage_policy", "Change policy"]] as const).map(([capability, label]) => {
+                const allowed = context.can(capability);
+                return { label, value: allowed ? "Yes" : "No", tone: allowed ? "success" : undefined } as const;
+              })} />
+            </OverlaySection>
+            <Notice tone="info" title="Role views, not account security">What a role view offers is shaped in this browser. A future service will enforce access on the server.</Notice>
           </Stack>
-        ) },
-        { id: "permission inspector", kind: "drawer", title: "Permissions", render: () => (
-          <Notice tone="info" title="Role views, not account security">What a role view offers is shaped in this browser. A future service will enforce access on the server.</Notice>
         ) },
       ],
     },
 
     "ARL-HQ-006": {
       id: "ARL-HQ-006",
-      subtitle: () => "Reporting lines for people and AI employees, with an accessible list equivalent of the chart.",
       tabs: (["People", "Departments", "AI employees"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <OrgChart context={context} lens={lens} />,
@@ -1449,15 +1511,19 @@ export const hqApp = registerApp({
         { id: "zoom out", label: "Zoom out", placement: "overflow", run: (context) => stepZoom(context, Number(new URLSearchParams(window.location.search).get("zoom") ?? 1) || 1, -1) },
       ],
       overlays: [
-        { id: "Member inspector", kind: "drawer", title: "Member", render: ({ ...context }) => <MemberInspector context={context} /> },
-        { id: "change manager", kind: "modal", title: "Change reporting line", width: 480, render: ({ close, ...context }) => <ChangeManager context={context} close={close} />, footer: submitFooter("change-manager", "Apply change") },
-        { id: "impact confirmation", kind: "modal", title: "Confirm the change", tone: "danger", width: 460, render: () => <p>Changing a reporting line changes what the chart and department views show. Assigned work stays with the member.</p> },
+        { id: "Member inspector", kind: "drawer", title: "Member", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <MemberSummary context={context} />, render: ({ ...context }) => <MemberInspector context={context} /> },
+        { id: "change manager", kind: "modal", title: "Change reporting line", width: 480, presentation: { selectedRecord: true, collection: "members", noRecordContext: true }, render: ({ close, ...context }) => <ChangeManager context={context} close={close} />, footer: submitFooter("change-manager", "Apply change") },
+        { id: "impact confirmation", kind: "modal", title: "Confirm the change", tone: "danger", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ close }) => (
+          <Stack gap={3}>
+            <p>Changing a reporting line changes what the chart and department views show. Assigned work stays with the member.</p>
+            <OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Close</Button>} />
+          </Stack>
+        ) },
       ],
     },
 
     "ARL-HQ-007": {
       id: "ARL-HQ-007",
-      subtitle: () => "Objectives measured against a target, not against a written summary.",
       tabs: ["Active", "Proposed", "Achieved", "Archived"].map((state) => ({
         id: state,
         render: (context: ScreenContext) => <CompanyGoals context={context} state={state} />,
@@ -1482,7 +1548,6 @@ export const hqApp = registerApp({
 
     "ARL-HQ-008": {
       id: "ARL-HQ-008",
-      subtitle: (context) => `Where ${context.org.shortName} operates, under which entity, and on whose clock.`,
       tabs: ["Locations", "Legal entities", "Brands", "Operating calendars"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <LocationsAndEntities context={context} lens={lens} />,
@@ -1507,15 +1572,12 @@ export const hqApp = registerApp({
           </Stack>
         ), footer: submitFooter("hq-scope", "Apply scope") },
         { id: "set primary office", kind: "modal", title: "Set the primary office", width: 480, render: ({ close, ...context }) => <SetPrimaryOffice context={context} close={close} />, footer: submitFooter("hq-primary", "Set primary") },
-        { id: "duplicate checker", kind: "modal", title: "Duplicate check", width: 460, render: ({ ...context }) => (
-          <p>Location names are checked for duplicates when saved, so transfers between {context.org.shortName} sites resolve to one place.</p>
-        ) },
+        { id: "duplicate checker", kind: "modal", title: "Duplicate check", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ ...context }) => <DuplicateChecker context={context} /> },
       ],
     },
 
     "ARL-HQ-009": {
       id: "ARL-HQ-009",
-      subtitle: () => "Decisions, launches and changes, each traceable to the record that made it.",
       tabs: ["All", "Decisions", "Financial", "People", "Technology"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <CompanyTimeline context={context} lens={lens} />,
@@ -1529,7 +1591,7 @@ export const hqApp = registerApp({
       ],
       overlays: [
         { id: "log decision", kind: "modal", title: "Log a decision", width: 580, render: ({ close, ...context }) => <DecisionEditor context={context} close={close} /> },
-        { id: "Event inspector", kind: "drawer", title: "Event", render: ({ ...context }) => {
+        { id: "Event inspector", kind: "drawer", title: "Event", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <EventSummary id={(context.overlayPayload as { id?: string } | undefined)?.id} context={context} />, render: ({ ...context }) => {
           const payload = context.overlayPayload as { id?: string } | undefined;
           return <EventInspector id={payload?.id} context={context} />;
         } },
@@ -1575,48 +1637,135 @@ export const hqApp = registerApp({
         { id: "presence", label: "Presence settings", placement: "overflow", run: (context) => context.openOverlay("presence settings") },
       ],
       overlays: [
-        { id: "Profile quick view", kind: "drawer", title: "Profile", render: ({ ...context }) => <MemberInspector context={context} /> },
+        { id: "Profile quick view", kind: "drawer", title: "Profile", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <MemberSummary context={context} />, render: ({ ...context }) => <MemberInspector context={context} /> },
         { id: "start conversation", kind: "modal", title: "Start a conversation", width: 520, render: ({ close, ...context }) => <StartConversation context={context} close={close} />, footer: submitFooter("hq-conversation", "Send") },
         { id: "assign task", kind: "modal", title: "Assign a task", width: 520, render: ({ close, ...context }) => <AssignTaskTo context={context} close={close} />, footer: submitFooter("hq-assign-task", "Assign") },
         { id: "find colleague", kind: "modal", title: "Find a colleague", width: 520, render: ({ close, ...context }) => <FindColleague context={context} close={close} /> },
-        { id: "presence settings", kind: "modal", title: "Presence and privacy", width: 480, render: () => (
-          <Stack gap={3}>
-            <Checkbox label="Show my working hours in the directory" defaultChecked />
-            <Checkbox label="Show my contact details to the workspace" />
-            <Notice tone="info">Contact details are shown only where the member has allowed it.</Notice>
-          </Stack>
-        ) },
+        { id: "presence settings", kind: "modal", title: "Presence and privacy", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <PresenceSettings context={context} close={close} />, footer: submitFooter("hq-presence", "Save settings") },
       ],
     },
   },
 });
+
+/** Reads a boolean preference stored as a string flag. */
+function flag(record: Rec | undefined, key: string, fallback: boolean): boolean {
+  const value = record?.fields[key];
+  return value === undefined ? fallback : value === true || value === "true";
+}
+
+function WorkspacePreferences({ context, close }: { context: ScreenContext; close: () => void }) {
+  const pref = usePref("workPrefs");
+  const [completed, setCompleted] = useState(flag(pref, "showCompleted", false));
+  return (
+    <form id="hq-prefs" className="ds-stack ds-gap-3" onSubmit={async (event) => {
+      event.preventDefault();
+      await writePref(context, "workPrefs", "My Workspace preferences", { showCompleted: completed });
+      context.toast("Preferences saved", completed ? "Today now includes completed work." : "Today shows open work only.");
+      close();
+    }}>
+      <Checkbox label="Include completed work in Today" checked={completed} onChange={(event) => setCompleted(event.target.checked)} />
+      <p className="ds-subtle">Kept in this browser for this workspace.</p>
+    </form>
+  );
+}
+
+function PresenceSettings({ context, close }: { context: ScreenContext; close: () => void }) {
+  const pref = usePref("presencePrefs");
+  const [hours, setHours] = useState(flag(pref, "showHours", true));
+  const [contact, setContact] = useState(flag(pref, "showContact", false));
+  return (
+    <form id="hq-presence" className="ds-stack ds-gap-3" onSubmit={async (event) => {
+      event.preventDefault();
+      await writePref(context, "presencePrefs", "Presence and privacy", { showHours: hours, showContact: contact });
+      context.toast("Privacy saved", "Applies to the directory in this workspace.");
+      close();
+    }}>
+      <Checkbox label="Show my working hours in the directory" checked={hours} onChange={(event) => setHours(event.target.checked)} />
+      <Checkbox label="Show my contact details to the workspace" checked={contact} onChange={(event) => setContact(event.target.checked)} />
+      <p className="ds-subtle">Contact details are shown only where the member has allowed it.</p>
+    </form>
+  );
+}
+
+function DepartmentSummary({ context }: { context: ScreenContext }) {
+  const dept = useRecord(context.params.id);
+  const members = useCollection("members");
+  if (!dept) return null;
+  const count = members.filter((member) => member.fields.departmentId === dept.id).length;
+  return <OverlaySummary eyebrow="Department" title={dept.title} status={<Pill tone="neutral">{dept.status}</Pill>} meta={[`${count} ${count === 1 ? "member" : "members"}`]} />;
+}
+
+function DepartmentSettings({ context }: { context: ScreenContext }) {
+  const dept = useRecord(context.params.id);
+  if (!dept) return <Empty title="No department open" />;
+  return (
+    <Stack gap={3}>
+      <FactGrid columns={2} items={[
+        { label: "Lead", value: String(dept.fields.lead ?? "Unassigned") },
+        { label: "Private records", value: "Visible to members only" },
+        { label: "Updated", value: context.date(dept.updatedAt), mono: true },
+        { label: "Revision", value: String(dept.revision), mono: true },
+      ]} />
+      <p className="ds-subtle">Change the lead from the Departments directory. These details are read from the record.</p>
+    </Stack>
+  );
+}
+
+function DuplicateChecker({ context }: { context: ScreenContext }) {
+  const locations = useCollection("locations");
+  const seen = new Map<string, Rec[]>();
+  for (const location of locations) {
+    const key = location.title.trim().toLowerCase();
+    seen.set(key, [...(seen.get(key) ?? []), location]);
+  }
+  const duplicates = [...seen.values()].filter((group) => group.length > 1);
+  return (
+    <Stack gap={3}>
+      {duplicates.length === 0
+        ? <Notice tone="success" title="No duplicate names">{locations.length} locations checked. Transfers between {context.org.shortName} sites resolve to one place each.</Notice>
+        : duplicates.map((group) => <Notice key={group[0].id} tone="warning" title={`${group.length} locations are called "${group[0].title}"`}>Rename one so a transfer cannot resolve to the wrong site.</Notice>)}
+    </Stack>
+  );
+}
 
 function RecommendationsDrawer({ context }: { context: ScreenContext }) {
   const insights = useHomeInsights();
   return <RecommendationsManager context={context} insights={insights} />;
 }
 
+function WorkItemSummary({ context }: { context: ScreenContext }) {
+  const task = useRecord(context.selectedId);
+  if (!task) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Task"
+      title={task.title}
+      status={<Pill>{String(task.fields.stage ?? task.status)}</Pill>}
+      meta={[task.tags.includes("pinned") ? "Pinned" : null]}
+      actions={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/project/tasks/${task.id}`)}>Open the task</Button>}
+    />
+  );
+}
+
 function WorkItemInspector({ context }: { context: ScreenContext }) {
   const task = useRecord(context.selectedId);
   const events = useEvents(task?.id, 8);
   if (!task) return <Empty title="Select a task">Choose a row in your work list to see it here.</Empty>;
+  const high = task.fields.priority === "high";
   return (
-    <Stack gap={4}>
-      <h3>{task.title}</h3>
-      <Properties rows={[
-        { label: "Stage", value: <Pill>{String(task.fields.stage ?? task.status)}</Pill> },
-        { label: "Priority", value: <Pill tone={task.fields.priority === "high" ? "danger" : "neutral"}>{String(task.fields.priority ?? "normal")}</Pill> },
+    <Stack gap={3}>
+      <FactGrid columns={3} items={[
         { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
-        { label: "Due", value: context.date(task.dueAt) },
-        { label: "Pinned", value: task.tags.includes("pinned") ? "Yes" : "No" },
+        { label: "Priority", value: String(task.fields.priority ?? "normal"), tone: high ? "danger" : undefined },
+        { label: "Due", value: context.date(task.dueAt), mono: true },
       ]} />
-      {task.summary && <p className="ds-prose">{task.summary}</p>}
-      <Stack gap={2}>
-        <h4 className="ds-eyebrow">Activity</h4>
+      {task.summary && <OverlaySection title="Description"><p>{task.summary}</p></OverlaySection>}
+      <OverlaySection title="Recent activity">
         {events.length === 0 && <span className="ds-subtle">No recorded activity.</span>}
-        {events.map((event) => <Row key={event.id} gap={2}><span className="ds-subtle ds-num">{context.relative(event.at)}</span><span>{event.message}</span></Row>)}
-      </Stack>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/project/tasks/${task.id}`)}>Open the task</Button>
+        <div className="hq-rows">
+          {events.map((event) => <div key={event.id} className="hq-row"><span className="ds-subtle ds-num">{context.relative(event.at)}</span><span className="hq-row-main">{event.message}</span></div>)}
+        </div>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1628,37 +1777,43 @@ function RelatedWork({ context }: { context: ScreenContext }) {
     return <Empty title="Nothing linked yet">Use Link a mission to record which mission works towards an objective.</Empty>;
   }
   return (
-    <Stack gap={3}>
-      {linked.map((objective) => {
-        const mission = data.missions.find((item) => item.id === objective.fields.missionId);
-        return (
-          <div key={objective.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <strong>{objective.title}</strong>
-            <Row gap={2} style={{ marginBlockStart: 6 }}>
-              <span className="ds-subtle ds-grow">{mission ? mission.title : "Linked mission no longer exists"}</span>
-              {mission && <Pill tone="info">{mission.status.replace(/_/g, " ")}</Pill>}
-              {mission && <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>}
-            </Row>
-          </div>
-        );
-      })}
-    </Stack>
+    <OverlaySection title="Objectives and their missions" hint={`${linked.length} linked`}>
+      <div className="hq-rows">
+        {linked.map((objective) => {
+          const mission = data.missions.find((item) => item.id === objective.fields.missionId);
+          return (
+            <div key={objective.id} className="hq-row">
+              <div className="hq-row-main">
+                <strong className="hq-row-title">{objective.title}</strong>
+                <span className="ds-subtle">{mission ? mission.title : "Linked mission no longer exists"}</span>
+              </div>
+              {mission && <Pill tone="info" dot>{mission.status.replace(/_/g, " ")}</Pill>}
+              {mission && <Button size="sm" variant="ghost" aria-label={`Open mission ${mission.title}`} onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>}
+            </div>
+          );
+        })}
+      </div>
+    </OverlaySection>
   );
+}
+
+function EventSummary({ id, context }: { id?: string; context: ScreenContext }) {
+  const event = useRecord(id);
+  if (!event) return null;
+  return <OverlaySummary eyebrow={String(event.fields.kind ?? "event")} title={event.title} meta={[context.dateTime(event.at ?? event.updatedAt)]} />;
 }
 
 function EventInspector({ id, context }: { id?: string; context: ScreenContext }) {
   const event = useRecord(id);
-  if (!event) return <Empty title="Select an event" />;
+  if (!event) return <Empty title="Select an event">Choose an event on the timeline to see its source.</Empty>;
   return (
     <Stack gap={3}>
-      <h3>{event.title}</h3>
-      <Properties rows={[
-        { label: "When", value: context.dateTime(event.at ?? event.updatedAt) },
-        { label: "Kind", value: String(event.fields.kind ?? "event") },
+      <FactGrid columns={2} items={[
+        { label: "When", value: context.dateTime(event.at ?? event.updatedAt), mono: true },
         { label: "Recorded by", value: event.createdBy },
-        { label: "Detail", value: event.summary },
       ]} />
-      <Notice tone="info">Timeline entries are records in this workspace. Restricted events are not shown to a role view that does not hold them.</Notice>
+      {event.summary && <OverlaySection title="Detail"><p>{event.summary}</p></OverlaySection>}
+      <p className="ds-subtle">Restricted events are not shown to a role view that does not hold them.</p>
     </Stack>
   );
 }
@@ -1667,8 +1822,11 @@ function ExportTimeline({ context }: { context: ScreenContext }) {
   const events = useCollection("timelineEvents");
   return (
     <Stack gap={3}>
-      <p>{events.length} events will be written to a CSV file in this browser.</p>
-      <Button
+      <FactGrid columns={2} items={[
+        { label: "Events", value: String(events.length), mono: true },
+        { label: "Format", value: "CSV, from this browser" },
+      ]} />
+      <OverlayActions primary={<Button
         variant="primary"
         onClick={() => {
           const header = "date,kind,title,detail\n";
@@ -1684,7 +1842,7 @@ function ExportTimeline({ context }: { context: ScreenContext }) {
         }}
       >
         Download CSV
-      </Button>
+      </Button>} />
     </Stack>
   );
 }

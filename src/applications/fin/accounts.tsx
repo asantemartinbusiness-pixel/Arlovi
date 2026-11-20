@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -10,7 +10,7 @@ import type { Rec } from "@/domain/types";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABEL, accountCode, accountType, isDebitNormal, journalLines, periodOf, journalDate } from "@/domain/fin-ledger";
 import type { AccountType, TrialRow } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
-import { AccountTypePill, Amount, SourceNote } from "./parts";
+import { AccountTypePill, FormFooter, Amount, SourceNote } from "./parts";
 
 /* ---------------------------- FIN-002 ---------------------------- */
 
@@ -241,12 +241,14 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         if (!codeValid || duplicate || !title.trim() || (typeChanged && hasPostings)) return;
         setBusy(true);
+        try {
         const tags = cash ? [type, "cash"] : [type];
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          const saved14 = await context.mutate.patch(existing.id, {
             title: title.trim(), summary, tags,
             fields: { ...existing.fields, code: code.trim(), type },
           }, { expectRevision: existing.revision, event: `Account ${code.trim()} updated` });
+          if (!saved14) return;
           context.toast("Account saved", `${code.trim()} ${title.trim()} is updated in the chart of accounts.`);
         } else {
           const created = await context.mutate.create({
@@ -256,11 +258,17 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
           context.select(created.id);
           context.toast("Account created", `${code.trim()} ${title.trim()} can now be used on a journal line.`);
         }
-        setBusy(false);
         close();
+        } catch (error) {
+          context.toast("Account not saved", error instanceof Error ? error.message : "The account changed. Reopen it and retry.", "failed");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
-      <Row gap={3} wrap>
+      <ModalUnsavedChanges when={code !== (existing ? accountCode(existing) : "") || title !== (existing?.title ?? "") || summary !== (existing?.summary ?? "")} />
+      <ModalInFlight when={busy} />
+      <div className="fin-form-grid">
         <Field label="Code" required hint="Four digits. The first two group the account in the tree.">
           <TextInput aria-label="Code" value={code} inputMode="numeric" align="end" invalid={Boolean(code) && (!codeValid || duplicate)} onChange={(event) => setCode(event.target.value)} required />
         </Field>
@@ -269,10 +277,12 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
             {ACCOUNT_TYPES.map((item) => <option key={item} value={item}>{ACCOUNT_TYPE_LABEL[item]}</option>)}
           </Select>
         </Field>
-      </Row>
-      <Field label="Account name" required>
-        <TextInput aria-label="Account name" value={title} onChange={(event) => setTitle(event.target.value)} required />
-      </Field>
+        <div data-span="full">
+          <Field label="Account name" required>
+            <TextInput aria-label="Account name" value={title} onChange={(event) => setTitle(event.target.value)} required />
+          </Field>
+        </div>
+      </div>
       <Field label="What it is for">
         <TextArea aria-label="What it is for" value={summary} onChange={(event) => setSummary(event.target.value)} rows={2} />
       </Field>
@@ -284,10 +294,10 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
           The type is fixed once something is posted, because changing it would move a balance between the profit and loss and the balance sheet. Create a new account and reverse instead.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={!codeValid || duplicate || !title.trim()}>{existing ? "Save account" : "Create account"}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button type="submit" variant="primary" busy={busy} disabled={!codeValid || duplicate || !title.trim()}>{existing ? "Save account" : "Create account"}</Button>}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
     </form>
   );
 }
@@ -324,12 +334,9 @@ export function AccountHistory({ context, close }: { context: ScreenContext; clo
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Account", value: `${accountCode(account)} ${account.title}` },
-        { label: "Type", value: <AccountTypePill type={accountType(account)} /> },
-        { label: "Normal side", value: isDebitNormal(accountType(account)) ? "Debit" : "Credit" },
-        { label: "Posted entries", value: String(rows.length) },
-        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold /> },
+      <FactGrid columns={2} items={[
+        { label: "Posted entries", value: String(rows.length), mono: true },
+        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold />, mono: true, tone: "accent" },
       ]} />
       {rows.length === 0 ? (
         <Empty title="Nothing posted to this account" />
@@ -349,7 +356,9 @@ export function AccountHistory({ context, close }: { context: ScreenContext; clo
           onOpen={() => { context.closeOverlay(); context.navigate(`/o/${org.slug}/fin/ledger`); }}
         />
       )}
-      <CategoryMapper context={context} accountCode={accountCode(account)} />
+      <FormFooter drawer end={<Button variant="ghost" onClick={() => close?.()}>Close</Button>}>
+        <Button variant="secondary" onClick={() => { context.select(account.id); context.openOverlay("map category"); }}>Map spending categories</Button>
+      </FormFooter>
       {entries.some((journal) => journal.status === "draft") && (
         <Notice tone="info" title="Draft journals are not in this balance">
           {entries.filter((journal) => journal.status === "draft").length} draft journal mentions this account. A draft moves nothing until it is posted.
@@ -376,13 +385,13 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Account", value: `${accountCode(account)} ${account.title}` },
-        { label: "Posted entries", value: String(posted.length) },
-        { label: "Draft entries", value: String(postings.length - posted.length) },
-        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold /> },
-        { label: "Budgets referencing it", value: String(budgets.length) },
-        { label: "Expense claims coded to it", value: String(expenses.length) },
+      <ModalInFlight when={busy} />
+      <FactGrid columns={3} items={[
+        { label: "Posted entries", value: String(posted.length), mono: true },
+        { label: "Draft entries", value: String(postings.length - posted.length), mono: true },
+        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold zero="0" />, mono: true, tone: balanceBlocked ? "warning" : undefined },
+        { label: "Budgets referencing it", value: String(budgets.length), mono: true },
+        { label: "Expense claims coded to it", value: String(expenses.length), mono: true },
       ]} />
 
       {deleteBlocked ? (
@@ -399,36 +408,39 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
         </Notice>
       )}
 
-      <Row gap={2} wrap>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="secondary"
           busy={busy}
           disabled={account.status === "inactive"}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(account.id, { status: "inactive" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} deactivated` });
+            const saved15 = await context.mutate.patch(account.id, { status: "inactive" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} deactivated` });
+            if (!saved15) { setBusy(false); return; }
             context.toast("Account deactivated", `${account.title} stays in the history and no longer appears on new journal lines.`);
             setBusy(false);
             close();
           }}
         >
           {account.status === "inactive" ? "Already deactivated" : "Deactivate"}
-        </Button>
-        {account.status === "inactive" && (
+        </Button>}
+          secondary={account.status === "inactive" ? (
           <Button
             variant="secondary"
             busy={busy}
             onClick={async () => {
               setBusy(true);
-              await context.mutate.patch(account.id, { status: "active" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} reactivated` });
+              const saved16 = await context.mutate.patch(account.id, { status: "active" }, { expectRevision: account.revision, event: `Account ${accountCode(account)} reactivated` });
+              if (!saved16) { setBusy(false); return; }
               context.toast("Account reactivated", `${account.title} can be used on a journal line again.`);
               setBusy(false);
               close();
             }}
           >
             Reactivate
-          </Button>
-        )}
+          </Button>) : undefined}
+          end={<>
         <Button
           variant="outline-danger"
           busy={busy}
@@ -444,9 +456,10 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
         >
           Delete account
         </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        <OverlayCancel disabled={busy}>Close</OverlayCancel>
+          </>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -496,7 +509,8 @@ export function CategoryMapper({ context, accountCode: fixedCode, close }: { con
           onClick={async () => {
             setBusy(true);
             for (const expense of current) {
-              await context.mutate.patch(expense.id, { fields: { ...expense.fields, accountCode: target } }, { event: `Category ${category} mapped to ${target}` });
+              const saved17 = await context.mutate.patch(expense.id, { fields: { ...expense.fields, accountCode: target } }, { event: `Category ${category} mapped to ${target}` });
+              if (!saved17) { setBusy(false); return; }
             }
             context.toast("Mapping applied", `${current.length} ${current.length === 1 ? "claim" : "claims"} now code to ${target}.`);
             setBusy(false);

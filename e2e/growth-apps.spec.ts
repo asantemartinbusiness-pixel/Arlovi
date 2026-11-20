@@ -39,7 +39,6 @@ test("Growth app entry screens offer native work areas without synthetic record 
   await page.goto("/o/northline/portal/portals");
   const portal = page.getByRole("region", { name: "Client & Partner Portals workflow shortcuts" });
   await expect(portal).toBeVisible();
-  await expect(portal.getByText(/Choose a portal below/)).toBeVisible();
   await expect(portal.locator("a[href*=':id']")).toHaveCount(0);
 });
 
@@ -113,15 +112,14 @@ test("Marketing campaign detail keeps record identity, budget and navigation acr
   await page.goto("/o/northline/market/campaigns");
   await page.getByRole("group", { name: "Campaign layout" }).getByRole("button", { name: "Cards" }).click();
   await page.getByRole("link", { name: "Winter trade list 2026" }).click();
-  const summary = page.getByRole("region", { name: "Campaign plan summary" });
-  await expect(summary).toBeVisible();
-  await expect(summary.getByRole("heading", { name: "Winter trade list 2026" })).toBeVisible();
-  await expect(summary.getByText("Delivery provider not connected")).toBeVisible();
+  const title = page.getByRole("heading", { level: 1, name: "Winter trade list 2026" });
+  await expect(title).toBeVisible();
+  await expect(page.getByRole("list", { name: "Launch checklist" })).toBeVisible();
   await page.getByRole("tab", { name: "Results" }).click();
-  await expect(summary).toBeVisible();
-  await expect(summary.getByRole("link", { name: "All campaigns" }))
-    .toHaveAttribute("href", "/o/northline/market/campaigns");
-  await summary.getByRole("link", { name: "All campaigns" }).click();
+  await expect(title).toBeVisible();
+  const back = page.getByRole("link", { name: "All campaigns" });
+  await expect(back).toHaveAttribute("href", "/o/northline/market/campaigns");
+  await back.click();
   await expect(page).toHaveURL(/\/o\/northline\/market\/campaigns$/);
 });
 
@@ -170,7 +168,6 @@ test("Email campaigns can be filtered by lifecycle without implying mail deliver
   const group = page.getByRole("group", { name: "Email campaign status filters" });
   await group.getByRole("button", { name: "Draft", exact: true }).click();
   await expect(group.getByRole("status")).toContainText("no mail provider connected");
-  await expect(page.getByText("Email preparation is local")).toBeVisible();
   await group.getByRole("button", { name: "All", exact: true }).click();
   await expect(group.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
 });

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("task completion requires explicit approval and survives a reload", async ({ page }) => {
   await page.goto("/o/northline/workspace/work");
-  const project = page.locator('.ws-entry-list a[href*="/project/"]').first();
+  const project = page.locator('.ww-projects a[href*="/project/"]').first();
   await expect(project).toBeVisible();
   await project.click();
   const name = "Review release checklist " + Math.floor(Math.random()*1000000);

@@ -1,13 +1,14 @@
 import {
   Building2, CalendarClock, FileSignature, Inbox, Kanban, LineChart, Target, UserRound, Workflow,
 } from "lucide-react";
-import { Button, Empty } from "@/design-system";
+import { Button, Empty, OVERLAY_WIDTH, Stack } from "@/design-system";
+import "./crm.css";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import {
   CampaignsPanel, CrmMetricDrilldown, CrmOverview, CrmOverviewStrip, InsightCard, MyPipeline, NewLead, TeamOverview,
 } from "./overview";
 import {
-  ActivityComposer, BulkActionConfirmation, ComposeMessage, ContactDeals, ContactFiles, ContactForm, ContactHeader,
+  ActivityComposer, BulkActionConfirmation, ComposeMessage, ContactDeals, ContactFiles, ContactForm, contactRecord,
   ContactInspector, ContactOverview, ContactService, ContactTimeline, ContactsTable, MergePreview,
 } from "./contacts";
 import {
@@ -15,10 +16,10 @@ import {
   RelationshipInspector, RoutingRulesOverlay,
 } from "./companies";
 import {
-  DealDrawer, LostReason, PipelineBoard, PipelineForecast, PipelineList, PipelineStrip, PipelineTeam, StageChangeValidation,
+  DealContextSummary, DealDrawer, DealDrawerSummary, LostReason, PipelineBoard, PipelineForecast, PipelineList, PipelineStrip, PipelineTeam, StageChangeValidation,
 } from "./pipeline";
 import {
-  ClosureConfirmation, CollaboratorPicker, DealActivity, DealDocuments, DealHeader, DealInspector, DealOverview,
+  ClosureConfirmation, ClosureSummary, CollaboratorPicker, DealActivity, DealDocuments, dealRecord, DealInspector, DealOverview,
   DealProducts, DealTeam, RequestApproval,
 } from "./deal";
 import { PricingPolicy, QuoteEditor, QuotesList, QuotesStrip, SendPreview } from "./quotes";
@@ -101,12 +102,12 @@ export const crmApp = registerApp({
         { id: "insights", label: "Notes worth acting on", placement: "overflow", run: (context) => context.openOverlay("insight card") },
       ],
       overlays: [
-        { id: "Metric drilldown", kind: "drawer", title: "Where this figure comes from", width: 720, render: ({ ...context }) => <CrmMetricDrilldown context={context} /> },
-        { id: "new lead", kind: "modal", title: "New lead", width: 640, render: ({ close, ...context }) => <NewLead context={context} close={close} /> },
-        { id: "insight card", kind: "drawer", title: "Notes from the records", width: 600, render: ({ ...context }) => <InsightCard context={context} /> },
-        { id: "open deal", kind: "drawer", title: "Open a deal", width: 720, render: ({ close, ...context }) => <OpenDeal context={context} close={close} /> },
-        { id: "assign follow-up", kind: "modal", title: "Assign a follow-up", width: 620, render: ({ close, ...context }) => <AssignFollowUp context={context} close={close} /> },
-        { id: "ask sales", kind: "drawer", title: "Ask Sales", width: 620, render: ({ close, ...context }) => <AskSales context={context} close={close} /> },
+        { id: "Metric drilldown", kind: "drawer", title: "Where this figure comes from", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <CrmMetricDrilldown context={context} /> },
+        { id: "new lead", kind: "modal", title: "New lead", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <NewLead context={context} close={close} /> },
+        { id: "insight card", kind: "drawer", title: "Notes from the records", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <InsightCard context={context} /> },
+        { id: "open deal", kind: "drawer", title: "Open a deal", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <OpenDeal context={context} close={close} /> },
+        { id: "assign follow-up", kind: "modal", title: "Assign a follow-up", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AssignFollowUp context={context} close={close} /> },
+        { id: "ask sales", kind: "drawer", title: "Ask Sales", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <AskSales context={context} close={close} /> },
       ],
     },
 
@@ -127,17 +128,16 @@ export const crmApp = registerApp({
         { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("bulk action confirmation", { export: true }) },
       ],
       overlays: [
-        { id: "Contact form", kind: "modal", title: "Contact", width: 680, render: ({ close, ...context }) => <ContactForm context={context} close={close} /> },
-        { id: "merge preview", kind: "drawer", title: "Merge two contacts", width: 760, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
-        { id: "bulk action confirmation", kind: "modal", title: "Tag a selection", width: 560, render: ({ close, ...context }) => <BulkActionConfirmation context={context} close={close} /> },
+        { id: "Contact form", kind: "modal", title: "Contact", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ContactForm context={context} close={close} /> },
+        { id: "merge preview", kind: "drawer", title: "Merge two contacts", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
+        { id: "bulk action confirmation", kind: "modal", title: "Tag a selection", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BulkActionConfirmation context={context} close={close} /> },
       ],
     },
 
     /* --------------------------- CRM-003 --------------------------- */
     "ARL-CRM-003": {
       id: "ARL-CRM-003",
-      title: () => "Contact",
-      header: (context) => <ContactHeader context={context} />,
+      record: contactRecord,
       inspectorTitle: "Contact",
       inspector: (context) => <ContactInspector context={context} />,
       tabs: [
@@ -156,11 +156,11 @@ export const crmApp = registerApp({
         { id: "edit contact", label: "Edit the contact", placement: "overflow", run: (context) => context.openOverlay("Contact form", { id: context.params.id }) },
       ],
       overlays: [
-        { id: "Compose message", kind: "modal", title: "Draft a message", width: 640, render: ({ close, ...context }) => <ComposeMessage context={context} close={close} /> },
-        { id: "activity composer", kind: "modal", title: "Log an activity", width: 640, render: ({ close, ...context }) => <ActivityComposer context={context} close={close} /> },
-        { id: "customer merge", kind: "drawer", title: "Merge this contact", width: 760, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
-        { id: "Contact form", kind: "modal", title: "Contact", width: 680, render: ({ close, ...context }) => <ContactForm context={context} close={close} /> },
-        { id: "attach record", kind: "modal", title: "Attach a record", width: 620, render: ({ close, ...context }) => <AttachRecord context={context} close={close} /> },
+        { id: "Compose message", kind: "modal", title: "Draft a message", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ComposeMessage context={context} close={close} /> },
+        { id: "activity composer", kind: "modal", title: "Log an activity", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ActivityComposer context={context} close={close} /> },
+        { id: "customer merge", kind: "drawer", title: "Merge this contact", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
+        { id: "Contact form", kind: "modal", title: "Contact", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ContactForm context={context} close={close} /> },
+        { id: "attach record", kind: "modal", title: "Attach a record", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AttachRecord context={context} close={close} /> },
       ],
     },
 
@@ -181,10 +181,10 @@ export const crmApp = registerApp({
         { id: "campaign links", label: "Campaign links", placement: "overflow", run: (context) => context.openOverlay("relationship inspector", { campaigns: true }) },
       ],
       overlays: [
-        { id: "Account editor", kind: "modal", title: "Account", width: 640, render: ({ close, ...context }) => <AccountEditor context={context} close={close} /> },
-        { id: "relationship inspector", kind: "drawer", title: "Relationships", width: 720, render: ({ ...context }) => <><RelationshipInspector context={context} /><CampaignsPanel context={context} /></> },
-        { id: "merge preview", kind: "drawer", title: "Merge two accounts", width: 760, capability: "edit_pipeline", presentation: { noRecordContext: true, guidance: "Choose both source and retained companies, review every conflicting field and affected relationship before committing the merge." }, render: ({ close, ...context }) => <CompanyMergePreview context={context} close={close} /> },
-        { id: "export accounts", kind: "modal", title: "Export accounts", width: 520, render: ({ close, ...context }) => <CompanyExport context={context} close={close} run={(rows, data) => exportCompanies(context, data, rows)} /> },
+        { id: "Account editor", kind: "modal", title: "Account", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <AccountEditor context={context} close={close} /> },
+        { id: "relationship inspector", kind: "drawer", title: "Relationships", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <><RelationshipInspector context={context} /><CampaignsPanel context={context} /></> },
+        { id: "merge preview", kind: "drawer", title: "Merge two accounts", width: OVERLAY_WIDTH.wide, capability: "edit_pipeline", presentation: { noRecordContext: true, guidance: "Choose both source and retained companies, review every conflicting field and affected relationship before committing the merge." }, render: ({ close, ...context }) => <CompanyMergePreview context={context} close={close} /> },
+        { id: "export accounts", kind: "modal", title: "Export accounts", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CompanyExport context={context} close={close} run={(rows, data) => exportCompanies(context, data, rows)} /> },
       ],
     },
 
@@ -205,11 +205,11 @@ export const crmApp = registerApp({
         { id: "routing rules", label: "Routing rules", placement: "overflow", run: (context) => context.openOverlay("routing rules") },
       ],
       overlays: [
-        { id: "Qualification inspector", kind: "drawer", title: "Qualify a lead", width: 680, render: ({ close, ...context }) => <QualificationInspector context={context} close={close} /> },
-        { id: "convert dialog", kind: "modal", title: "Convert to a deal", width: 640, render: ({ close, ...context }) => <ConvertDialog context={context} close={close} /> },
-        { id: "routing rules", kind: "drawer", title: "Routing rules", width: 760, render: ({ ...context }) => <RoutingRulesOverlay context={context} /> },
-        { id: "assign lead", kind: "modal", title: "Assign a lead", width: 560, render: ({ close, ...context }) => <AssignLead context={context} close={close} /> },
-        { id: "bulk route", kind: "drawer", title: "Route unassigned leads", width: 680, render: ({ close, ...context }) => <BulkRoute context={context} close={close} /> },
+        { id: "Qualification inspector", kind: "drawer", title: "Qualify a lead", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <QualificationInspector context={context} close={close} /> },
+        { id: "convert dialog", kind: "modal", title: "Convert to a deal", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ConvertDialog context={context} close={close} /> },
+        { id: "routing rules", kind: "drawer", title: "Routing rules", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <RoutingRulesOverlay context={context} /> },
+        { id: "assign lead", kind: "modal", title: "Assign a lead", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AssignLead context={context} close={close} /> },
+        { id: "bulk route", kind: "drawer", title: "Route unassigned leads", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <BulkRoute context={context} close={close} /> },
       ],
     },
 
@@ -233,10 +233,10 @@ export const crmApp = registerApp({
         { id: "close lost", label: "Close lost", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Select a deal first"), run: (context) => context.openOverlay("lost reason", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Deal drawer", kind: "drawer", title: "Deal", width: 640, render: ({ close, ...context }) => <DealDrawer context={context} close={close} /> },
-        { id: "stage change validation", kind: "modal", title: "Stage change", width: 620, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
-        { id: "lost reason", kind: "modal", title: "Close the deal as lost", width: 560, tone: "danger", render: ({ close, ...context }) => <LostReason context={context} close={close} /> },
-        { id: "assign owner", kind: "modal", title: "Assign an owner", width: 560, render: ({ close, ...context }) => <AssignOwner context={context} close={close} /> },
+        { id: "Deal drawer", kind: "drawer", title: "Deal", width: OVERLAY_WIDTH.form, summary: ({ close, ...context }) => <DealDrawerSummary context={context} close={close} />, render: ({ close, ...context }) => <DealDrawer context={context} close={close} /> },
+        { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
+        { id: "lost reason", kind: "modal", title: "Close the deal as lost", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, tone: "danger", render: ({ close, ...context }) => <LostReason context={context} close={close} /> },
+        { id: "assign owner", kind: "modal", title: "Assign an owner", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, render: ({ close, ...context }) => <AssignOwner context={context} close={close} /> },
         { id: "quote builder", kind: "drawer", title: "Quote", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
       ],
     },
@@ -244,8 +244,7 @@ export const crmApp = registerApp({
     /* --------------------------- CRM-007 --------------------------- */
     "ARL-CRM-007": {
       id: "ARL-CRM-007",
-      title: () => "Deal",
-      header: (context) => <DealHeader context={context} />,
+      record: dealRecord,
       inspectorTitle: "Deal",
       inspector: (context) => <DealInspector context={context} />,
       tabs: [
@@ -264,9 +263,9 @@ export const crmApp = registerApp({
       ],
       overlays: [
         { id: "Quote builder", kind: "drawer", title: "Quote builder", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
-        { id: "collaborator picker", kind: "drawer", title: "People and approvals", width: 620, render: ({ close, ...context }) => <><CollaboratorPicker context={context} close={close} /><RequestApproval context={context} close={close} /></> },
-        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: 680, capability: "edit_pipeline", presentation: { selectedRecord: true, collection: "deals", guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
-        { id: "stage change validation", kind: "modal", title: "Stage change", width: 620, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
+        { id: "collaborator picker", kind: "drawer", title: "People and approvals", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <Stack gap={4}><CollaboratorPicker context={context} close={close} /><RequestApproval context={context} close={close} /></Stack> },
+        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: OVERLAY_WIDTH.record, capability: "edit_pipeline", summary: (context) => <ClosureSummary context={context} />, presentation: { selectedRecord: true, collection: "deals", guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
+        { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, summary: (context) => <DealContextSummary context={context} eyebrow="Deal" />, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
       ],
     },
 
@@ -290,11 +289,11 @@ export const crmApp = registerApp({
       ],
       overlays: [
         { id: "Quote editor", kind: "drawer", title: "Quote", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
-        { id: "pricing policy", kind: "drawer", title: "Pricing policy", width: 640, render: ({ ...context }) => <PricingPolicy context={context} /> },
-        { id: "send preview", kind: "modal", title: "Send a quote", width: 660, render: ({ close, ...context }) => <SendPreview context={context} close={close} /> },
-        { id: "approve quote", kind: "modal", title: "Approve a quote", width: 580, render: ({ close, ...context }) => <ApproveQuote context={context} close={close} /> },
-        { id: "duplicate quote", kind: "modal", title: "Duplicate for re-pricing", width: 520, render: ({ close, ...context }) => <DuplicateQuote context={context} close={close} /> },
-        { id: "customer acceptance", kind: "modal", title: "Record customer acceptance", width: 620, render: ({ close, ...context }) => <RecordCustomerAcceptance context={context} close={close} /> },
+        { id: "pricing policy", kind: "drawer", title: "Pricing policy", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <PricingPolicy context={context} /> },
+        { id: "send preview", kind: "modal", title: "Send a quote", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <SendPreview context={context} close={close} /> },
+        { id: "approve quote", kind: "modal", title: "Approve a quote", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ApproveQuote context={context} close={close} /> },
+        { id: "duplicate quote", kind: "modal", title: "Duplicate for re-pricing", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DuplicateQuote context={context} close={close} /> },
+        { id: "customer acceptance", kind: "modal", title: "Record customer acceptance", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RecordCustomerAcceptance context={context} close={close} /> },
       ],
     },
 
@@ -316,11 +315,11 @@ export const crmApp = registerApp({
         { id: "check overlaps", label: "Check for overlaps", placement: "overflow", run: (context) => context.openOverlay("calendar conflict") },
       ],
       overlays: [
-        { id: "Activity entry", kind: "modal", title: "Activity", width: 660, render: ({ close, ...context }) => <ActivityEntry context={context} close={close} /> },
-        { id: "calendar conflict", kind: "drawer", title: "Overlaps in your diary", width: 560, render: ({ ...context }) => <CalendarConflict context={context} /> },
-        { id: "meeting composer", kind: "modal", title: "Schedule a meeting", width: 600, render: ({ close, ...context }) => <MeetingComposer context={context} close={close} /> },
-        { id: "add reminder", kind: "modal", title: "Add a reminder", width: 560, render: ({ close, ...context }) => <AddReminder context={context} close={close} /> },
-        { id: "complete task", kind: "modal", title: "Complete a task", width: 600, render: ({ close, ...context }) => <CompleteTask context={context} close={close} /> },
+        { id: "Activity entry", kind: "modal", title: "Activity", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ActivityEntry context={context} close={close} /> },
+        { id: "calendar conflict", kind: "drawer", title: "Overlaps in your diary", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <CalendarConflict context={context} /> },
+        { id: "meeting composer", kind: "modal", title: "Schedule a meeting", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <MeetingComposer context={context} close={close} /> },
+        { id: "add reminder", kind: "modal", title: "Add a reminder", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AddReminder context={context} close={close} /> },
+        { id: "complete task", kind: "modal", title: "Complete a task", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CompleteTask context={context} close={close} /> },
       ],
     },
 
@@ -345,13 +344,13 @@ export const crmApp = registerApp({
         { id: "method", label: "Method", placement: "overflow", run: (context) => context.openOverlay("Forecast model") },
       ],
       overlays: [
-        { id: "Forecast model", kind: "drawer", title: "How the forecast is computed", width: 560, render: ({ ...context }) => <ForecastModel context={context} /> },
-        { id: "confidence explanation", kind: "drawer", title: "Evidence behind each weighting", width: 720, render: () => <ConfidenceExplanation /> },
-        { id: "override reason", kind: "modal", title: "Override a weighting", width: 600, render: ({ close, ...context }) => <OverrideReason context={context} close={close} /> },
-        { id: "adjust assumptions", kind: "modal", title: "Adjust the forecast assumptions", width: 600, render: ({ close, ...context }) => <AdjustAssumptions context={context} close={close} /> },
-        { id: "forecast drill down", kind: "drawer", title: "Deals behind the forecast", width: 820, render: ({ ...context }) => <ForecastDrillDown context={context} /> },
-        { id: "review forecast", kind: "modal", title: "Review the forecast", width: 580, render: ({ close, ...context }) => <ReviewForecast context={context} close={close} /> },
-        { id: "export forecast", kind: "modal", title: "Export the forecast", width: 520, render: ({ close, ...context }) => <ForecastExport context={context} close={close} /> },
+        { id: "Forecast model", kind: "drawer", title: "How the forecast is computed", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ForecastModel context={context} /> },
+        { id: "confidence explanation", kind: "drawer", title: "Evidence behind each weighting", width: OVERLAY_WIDTH.wide, render: () => <ConfidenceExplanation /> },
+        { id: "override reason", kind: "modal", title: "Override a weighting", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <OverrideReason context={context} close={close} /> },
+        { id: "adjust assumptions", kind: "modal", title: "Adjust the forecast assumptions", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AdjustAssumptions context={context} close={close} /> },
+        { id: "forecast drill down", kind: "drawer", title: "Deals behind the forecast", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <ForecastDrillDown context={context} /> },
+        { id: "review forecast", kind: "modal", title: "Review the forecast", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReviewForecast context={context} close={close} /> },
+        { id: "export forecast", kind: "modal", title: "Export the forecast", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ForecastExport context={context} close={close} /> },
       ],
     },
 
@@ -374,10 +373,10 @@ export const crmApp = registerApp({
         { id: "failures", label: "Failures", placement: "overflow", run: (context) => context.setTab("Failures") },
       ],
       overlays: [
-        { id: "Workflow designer", kind: "drawer", title: "Rule", width: 720, render: ({ close, ...context }) => <WorkflowDesigner context={context} close={close} /> },
-        { id: "test data", kind: "drawer", title: "Simulate the rule", width: 720, render: ({ ...context }) => <TestData context={context} /> },
-        { id: "activation approval", kind: "modal", title: "Activate the rule", width: 620, render: ({ close, ...context }) => <ActivationApproval context={context} close={close} /> },
-        { id: "stop rule", kind: "modal", title: "Stop a rule", width: 560, tone: "danger", render: ({ close, ...context }) => <StopRule context={context} close={close} /> },
+        { id: "Workflow designer", kind: "drawer", title: "Rule", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <WorkflowDesigner context={context} close={close} /> },
+        { id: "test data", kind: "drawer", title: "Simulate the rule", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <TestData context={context} /> },
+        { id: "activation approval", kind: "modal", title: "Activate the rule", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ActivationApproval context={context} close={close} /> },
+        { id: "stop rule", kind: "modal", title: "Stop a rule", width: OVERLAY_WIDTH.modal, tone: "danger", render: ({ close, ...context }) => <StopRule context={context} close={close} /> },
       ],
     },
   },

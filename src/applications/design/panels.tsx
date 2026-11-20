@@ -4,12 +4,12 @@ import {
   Frame as FrameIcon, Minus, Hexagon, PenTool, Component, ArrowDown, ArrowUp,
 } from "lucide-react";
 import {
-  Button, Empty, Field, Notice, Pill, Row, Select, Stack, TextInput, Properties,
+  Button, Empty, Field, Notice, Pill, Row, Select, Stack, TextInput, Properties, Popover, FactGrid,
 } from "@/design-system";
 import { ColorBox, NumberBox, PanelGroup, SliderBox, useStore, type DocHandle } from "@/applications/visual/kit";
 import type { ScreenContext } from "@/platform/registry";
 import {
-  absoluteRect, activePage, alignTarget, applyAutoLayout, childrenOf, contrastRatio, flatten, groupNodes,
+  absoluteRect, activePage, alignTarget, applyAutoLayout, childrenOf, contrastRatio, flatten, groupNodes, parentOf,
   patchNode, patchNodes, removeNodes, reorder, selectionBounds, ungroup, updatePage, wcagGrade,
   type DesignDoc, type NodeKind, type SceneNode,
 } from "./scene";
@@ -219,13 +219,33 @@ export function GeometryInspector({ handle, context }: { handle: DocHandle<Desig
   };
 
   if (nodes.length === 0) {
+    const artboards = childrenOf(page, page.id).filter((item) => item.kind === "frame");
     return (
       <Stack gap={3}>
-        <Notice tone="info" title="Nothing selected">Click a layer on the canvas or in the layers panel. Drag on empty canvas to marquee-select; hold shift to add.</Notice>
-        <PanelGroup title="Page">
+        <PanelGroup title="Artboard">
+          <FactGrid
+            dense
+            items={[
+              { label: "Page", value: page.name },
+              { label: "Layers", value: Object.keys(page.nodes).length, mono: true },
+              { label: "Artboards", value: artboards.length, mono: true },
+              { label: "Grid", value: `${page.grid.size}px`, mono: true },
+            ]}
+          />
+          {artboards.length > 0 && (
+            <div className="vx-tree" aria-label="Artboards on this page">
+              {artboards.map((item) => (
+                <button key={item.id} type="button" className="vx-node" onClick={() => setSelection([item.id])}>
+                  <span className="vx-node-label">{item.name}</span>
+                  <span className="vx-mini ds-num">{Math.round(item.w)} × {Math.round(item.h)}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <ColorBox label="Background" value={page.background} onChange={(value) => handle.edit((current) => updatePage(current, (p) => ({ ...p, background: value })), "Page background")} />
           <NumberBox label="Grid size" value={page.grid.size} min={1} onChange={(value) => handle.edit((current) => updatePage(current, (p) => ({ ...p, grid: { ...p.grid, size: Math.max(1, value) } })), "Grid size")} />
         </PanelGroup>
+        <p className="vx-mini">Select a layer to edit it; shift-click adds to the selection.</p>
       </Stack>
     );
   }
@@ -285,6 +305,32 @@ export function GeometryInspector({ handle, context }: { handle: DocHandle<Desig
         <p className="vx-mini">On the page: {Math.round(absolute.x)}, {Math.round(absolute.y)}</p>
       </PanelGroup>
 
+      {(() => {
+        const parentId = parentOf(page, node.id);
+        const parent = parentId && parentId !== page.id ? page.nodes[parentId] : undefined;
+        if (!parent) return null;
+        const options: [string, string][] = [["min", "Start"], ["max", "End"], ["center", "Centre"], ["stretch", "Stretch"], ["scale", "Scale"]];
+        const current = node.constraints ?? { h: "min", v: "min" };
+        const setConstraint = (axis: "h" | "v", value: string) => set({ constraints: { ...current, [axis]: value } as NonNullable<SceneNode["constraints"]> }, "Set constraint");
+        return (
+          <PanelGroup title="Constraints">
+            <p className="vx-mini">Responds to <strong>{parent.name}</strong> resizing.</p>
+            <div className="vx-fieldrow">
+              <Field label="Horizontal">
+                <Select aria-label="Horizontal constraint" value={current.h} onChange={(event) => setConstraint("h", event.target.value)}>
+                  {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </Select>
+              </Field>
+              <Field label="Vertical">
+                <Select aria-label="Vertical constraint" value={current.v} onChange={(event) => setConstraint("v", event.target.value)}>
+                  {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </Select>
+              </Field>
+            </div>
+          </PanelGroup>
+        );
+      })()}
+
       <PanelGroup title="Appearance">
         <SliderBox label="Opacity" value={Math.round(node.opacity * 100)} min={0} max={100} onChange={(value) => set({ opacity: value / 100 }, "Set opacity")} format={(value) => `${Math.round(value)}%`} />
         {node.kind !== "line" && (
@@ -305,6 +351,27 @@ export function GeometryInspector({ handle, context }: { handle: DocHandle<Desig
               </Select>
             </Field>
             {node.fill && <ColorBox label={node.fill.type === "linear" ? "Gradient from" : "Fill"} value={node.fill.color} onChange={(value) => set({ fill: { ...node.fill!, color: value } }, "Set fill")} />}
+            {doc.colors.length > 0 && (
+              <Popover
+                trigger={<Button size="sm" variant="ghost" aria-label="Pick a colour token for the fill">Colour tokens</Button>}
+              >
+                <div className="vx-swatches" role="group" aria-label="Colour tokens">
+                  {doc.colors.map((token) => (
+                    <button
+                      key={token.id}
+                      type="button"
+                      className="vx-token"
+                      title={`${token.name} ${token.value}`}
+                      aria-label={`Fill with ${token.name}`}
+                      onClick={() => set({ fill: { type: "solid", color: token.value } }, `Fill with ${token.name}`)}
+                    >
+                      <span className="vx-token-chip" style={{ background: token.value }} />
+                      <span className="vx-mini">{token.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </Popover>
+            )}
             {node.fill?.type === "linear" && (
               <>
                 <ColorBox label="Gradient to" value={node.fill.to ?? "#36C5BA"} onChange={(value) => set({ fill: { ...node.fill!, to: value } }, "Set gradient end")} />

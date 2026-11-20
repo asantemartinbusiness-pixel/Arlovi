@@ -17,7 +17,7 @@ export function RecordReview({ context, obligation }: { context: ScreenContext; 
         <Notice tone="warning" title="Different jurisdiction">This obligation is under {String(obligation.fields.jurisdiction)}, not {context.org.jurisdiction}. Its interpretation needs legal review.</Notice>
       )}
       <Button variant="secondary" disabled={!note.trim()} onClick={async () => {
-        await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, reviewedBy: context.actor, reviewedAt: clockIso(), reviewNote: note.trim() } }, { expectRevision: obligation.revision, event: `${obligation.title} reviewed by ${context.actor}: ${note.trim()}` });
+        if (!(await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, reviewedBy: context.actor, reviewedAt: clockIso(), reviewNote: note.trim() } }, { expectRevision: obligation.revision, event: `${obligation.title} reviewed by ${context.actor}: ${note.trim()}` }))) return;
         setNote("");
         context.toast("Review recorded", `${obligation.title} is marked reviewed by ${context.actor}. This is not legal advice.`);
       }}>Record my review</Button>

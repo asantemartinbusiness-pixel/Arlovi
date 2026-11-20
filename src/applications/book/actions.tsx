@@ -10,6 +10,7 @@ import { useUi } from "@/runtime/ui";
 import type { Rec } from "@/domain/types";
 import { documentTotals, statusFor, writeLines } from "@/domain/fin-invoice";
 import type { TaxCategory } from "@/platform/money";
+import { commitTogether } from "@/platform/commit";
 import { CHANGED_ELSEWHERE, createStore, downloadCsv, ProviderBoundary, type ConfirmSpec } from "@/applications/market/kit";
 import {
   bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isLive, useBookData,
@@ -216,7 +217,7 @@ function RescheduleNoticeForm({ context, close, booking, data }: { context: Scre
       <Field label="Notice" required><TextArea rows={4} value={text} onChange={(event) => setText(event.target.value)} /></Field>
       {!contact && <Notice tone="warning" title="Nobody to notify">Link a customer to the booking first.</Notice>}
       {contact && !allowed && <Notice tone="info">A notice about an existing appointment is a service message, so it can be kept without marketing consent; the customer's preference is still shown here.</Notice>}
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" />
     </form>
   );
 }
@@ -297,12 +298,12 @@ export async function publishService(context: ScreenContext) {
     boundaryNote: "The page itself is not hosted, so publishing makes the service bookable in this workspace and in the exported page only.",
     confirmLabel: "Publish service",
     run: async () => {
-      const saved = await context.mutate.patch(service.id, { status: "active", fields: { ...service.fields, published: true, publishedBy: context.actor, publishedAt: iso(context) } }, { expectRevision: service.revision, event: `Service ${service.title} published by ${context.actor}` });
+      // The service and the booking page that lists it change together or not at all.
+      const saved = await commitTogether(context, [
+        { record: service, patch: { status: "active", fields: { ...service.fields, published: true, publishedBy: context.actor, publishedAt: iso(context) } }, event: `Service ${service.title} published by ${context.actor}` },
+        ...(page && !onPage ? [{ record: page, patch: { body: { ...pageBody, services: [...(pageBody.services ?? []), service.id] } }, event: `${service.title} offered on ${page.title}` }] : []),
+      ]);
       if (!saved) return CHANGED_ELSEWHERE;
-      if (page && !onPage) {
-        const added = await context.mutate.patch(page.id, { body: { ...pageBody, services: [...(pageBody.services ?? []), service.id] } }, { expectRevision: page.revision, event: `${service.title} offered on ${page.title}` });
-        if (!added) return CHANGED_ELSEWHERE;
-      }
       context.toast("Published", `${service.title} is offered on the booking page model.`);
     },
   });
@@ -332,11 +333,12 @@ export async function archiveService(context: ScreenContext) {
       : problems ? `${problems} booking${problems === 1 ? " is" : "s are"} not reconciled: ${[...upcoming, ...unreconciled, ...owed].slice(0, 3).map((booking) => booking.title).join(", ")}${problems > 3 ? "…" : ""}. Move, close or settle them first.` : undefined,
     confirmLabel: "Archive service",
     run: async () => {
-      const saved = await context.mutate.patch(service.id, { status: "archived", fields: { ...service.fields, published: false, archivedBy: context.actor, archivedAt: iso(context) } }, { expectRevision: service.revision, event: `Service ${service.title} archived by ${context.actor}` });
+      // The service and the booking page that lists it change together or not at all.
+      const saved = await commitTogether(context, [
+        { record: service, patch: { status: "archived", fields: { ...service.fields, published: false, archivedBy: context.actor, archivedAt: iso(context) } }, event: `Service ${service.title} archived by ${context.actor}` },
+        ...(page && (pageBody.services ?? []).includes(service.id) ? [{ record: page, patch: { body: { ...pageBody, services: (pageBody.services ?? []).filter((id) => id !== service.id) } }, event: `${service.title} removed from ${page.title}` }] : []),
+      ]);
       if (!saved) return CHANGED_ELSEWHERE;
-      if (page && (pageBody.services ?? []).includes(service.id)) {
-        await context.mutate.patch(page.id, { body: { ...pageBody, services: (pageBody.services ?? []).filter((id) => id !== service.id) } }, { expectRevision: page.revision, event: `${service.title} removed from ${page.title}` });
-      }
       context.toast("Archived", `${service.title} is no longer offered.`);
     },
   });
@@ -655,7 +657,7 @@ export function ScheduleReport({ context, close }: { context: ScreenContext; clo
       <Field label="Measure"><Select value={measure} onChange={(event) => setMeasure(event.target.value)}>{["Utilisation", "Booked value", "No-show rate", "Seats and slots"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       <Field label="Every"><Select value={every} onChange={(event) => setEvery(event.target.value)}>{["Monday morning", "First of the month", "Friday afternoon"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       <Field label="Deliver to"><Select value={to} onChange={(event) => setTo(event.target.value)}>{["Maya Chen", "Priya Shah", "Theo Marsh", "Jonah Adeyemi"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
-      <ProviderBoundary id="email.send" />
+      <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" />
     </form>
   );
 }

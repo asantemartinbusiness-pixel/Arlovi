@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, Field, Notice, Pill, Properties, Row, Select, Stack } from "@/design-system";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
+import { Button, Field, KeyValueList, Notice, Pill, Row, Select, Stack } from "@/design-system";
 import type { Audit, Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { CAPABILITY_LABELS } from "@/platform/capability";
@@ -50,7 +51,7 @@ function ConnectorFacts({ record }: ActInput) {
   if (!record) return null;
   const entry = entryForRecord(record.fields);
   return (
-    <Properties rows={[
+    <KeyValueList items={[
       { label: "Connector", value: record.title },
       { label: "Capability", value: entry?.capability.label ?? "Custom" },
       { label: "Register state", value: <Pill tone="warning" dot>{CAPABILITY_LABELS[entry?.capability.state ?? "not_connected"]}</Pill> },
@@ -139,7 +140,7 @@ export const installConnector = actOverlay({
   apply: async ({ values, context }) => {
     const entry = entryById(values.capability);
     if (!entry) throw new Error("Choose a connector.");
-    await findOrCreateConnector(context, entry, { installRequestedAt: nowIso(context), installRequestedBy: context.actor }, `Install requested for ${entry.capability.label}; not connected`);
+    if (!(await findOrCreateConnector(context, entry, { installRequestedAt: nowIso(context), installRequestedBy: context.actor }, `Install requested for ${entry.capability.label}; not connected`))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Install requested for ${entry.capability.label}: stopped before the provider. No grant, no token, no connection.`, { type: "capability", capability: "not_connected" });
     return { title: "Recorded, not installed", body: `${entry.capability.label} stays not connected. The request is in the receipts.`, tone: "blocked" };
   },
@@ -153,7 +154,7 @@ export function ProviderLimits({ context }: { context: ScreenContext }) {
   const entry = entryById(payload?.id ?? "") ?? routeEntry(context, records) ?? CONNECTOR_ENTRIES[0];
   return (
     <Stack gap={3}>
-      <Properties rows={[{ label: "Connector", value: entry.capability.label }, { label: "Provider", value: entry.capability.provider }]} />
+      <KeyValueList items={[{ label: "Connector", value: entry.capability.label }, { label: "Provider", value: entry.capability.provider }]} />
       <h4>Limits the provider imposes</h4>
       {entry.limits.length === 0 ? <span className="ds-subtle">No limits are published for this capability.</span> : <ul className="ds-prose">{entry.limits.map((limit) => <li key={limit}>{limit}</li>)}</ul>}
       <h4>Claims this directory does not repeat</h4>
@@ -198,7 +199,7 @@ export const testConnection = actOverlay({
     const checks = connectionChecks(record);
     const met = checks.filter((check) => check.met).length;
     const result = `${met} of ${checks.length} checks met; no provider was contacted`;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, lastTestAt: nowIso(context), lastTestResult: result } }, { expectRevision: record.revision, event: `Connection test for ${record.title}: ${result}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastTestAt: nowIso(context), lastTestResult: result } }, { expectRevision: record.revision, event: `Connection test for ${record.title}: ${result}` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Connection test for ${capabilityLabel(record)}: ${result}.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     return { title: "Test recorded", body: `${result}. It is in the receipts.`, tone: "blocked" };
   },
@@ -249,7 +250,7 @@ export const attemptAuthorisation = actOverlay({
     return `An authorisation for ${entry.capability.label} sends you to a page ${entry.capability.provider.toLowerCase()} controls, and expects a callback to an address this workspace does not have. The attempt is recorded as blocked and nothing is marked connected.`;
   },
   Details: () => (
-    <Properties rows={[
+    <KeyValueList items={[
       { label: "Redirect address", value: <Pill tone="danger">none exists</Pill> },
       { label: "Callback receiver", value: <Pill tone="danger">none exists</Pill> },
       { label: "State after the attempt", value: "Unchanged: not connected" },
@@ -258,7 +259,7 @@ export const attemptAuthorisation = actOverlay({
   submit: "Attempt the authorisation",
   apply: async ({ context, watched }) => {
     const entry = watchedEntry(context, watched) ?? CONNECTOR_ENTRIES[0];
-    await findOrCreateConnector(context, entry, { lastAuthAttemptAt: nowIso(context), lastAuthAttemptBy: context.actor, lastAuthOutcome: "stopped before the provider redirect" }, `Authorisation attempted for ${entry.capability.label}: stopped before the redirect`);
+    if (!(await findOrCreateConnector(context, entry, { lastAuthAttemptAt: nowIso(context), lastAuthAttemptBy: context.actor, lastAuthOutcome: "stopped before the provider redirect" }, `Authorisation attempted for ${entry.capability.label}: stopped before the redirect`))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Authorisation attempted for ${entry.capability.label}: stopped before the provider redirect. No grant, no token, no connection.`, { type: "capability", capability: "not_connected" });
     context.setTab("Confirm");
     return { title: "Authorisation cannot complete", body: "The attempt is recorded in the receipts as blocked, and nothing is marked connected.", tone: "blocked" };
@@ -302,7 +303,7 @@ export const cancelAuthorisation = actOverlay({
   submit: "Cancel and leave it unconnected",
   apply: async ({ record, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, requestedScopes: "", cancelledAt: nowIso(context), cancelledBy: context.actor } }, { expectRevision: record.revision, event: `Authorisation for ${record.title} cancelled; selections cleared` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, requestedScopes: "", cancelledAt: nowIso(context), cancelledBy: context.actor } }, { expectRevision: record.revision, event: `Authorisation for ${record.title} cancelled; selections cleared` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Authorisation for ${capabilityLabel(record)} cancelled. Nothing was connected and nothing is left pending.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     context.navigate(`/o/${context.org.slug}/connect/marketplace`);
     return "Cancelled. Nothing was left behind.";
@@ -359,7 +360,7 @@ export const reconnectConnection = actOverlay({
   submit: "Attempt to reconnect",
   apply: async ({ record, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, lastAuthAttemptAt: nowIso(context), lastAuthAttemptBy: context.actor, lastAuthOutcome: "reconnect stopped before the provider redirect" } }, { expectRevision: record.revision, event: `Reconnect attempted for ${record.title}: stopped before the redirect` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastAuthAttemptAt: nowIso(context), lastAuthAttemptBy: context.actor, lastAuthOutcome: "reconnect stopped before the provider redirect" } }, { expectRevision: record.revision, event: `Reconnect attempted for ${record.title}: stopped before the redirect` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Reconnect attempted for ${capabilityLabel(record)}: stopped before the provider redirect.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     return { title: "Not reconnected", body: `${record.title} stays not connected. The attempt is in the receipts.`, tone: "blocked" };
   },
@@ -405,7 +406,7 @@ export const rotateAuth = actOverlay({
   submit: "Record the rotation request",
   apply: async ({ record, context }) => {
     if (!record) return;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, rotationRequestedAt: nowIso(context), rotationRequestedBy: context.actor } }, { expectRevision: record.revision, event: `Rotation requested for ${record.title}; no grant exists to rotate` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, rotationRequestedAt: nowIso(context), rotationRequestedBy: context.actor } }, { expectRevision: record.revision, event: `Rotation requested for ${record.title}; no grant exists to rotate` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Rotation requested for ${capabilityLabel(record)}: no grant exists, nothing was issued.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     return { title: "Requested, not rotated", body: "There is no grant to rotate. The request is recorded.", tone: "blocked" };
   },
@@ -500,7 +501,7 @@ export const retireOperation = actOverlay({
     const repo = await import("@/platform/repo");
     const existing = recordsFor(entry, await repo.listByCollection(context.org.id, "connectors"))[0];
     const retired = [...new Set([...String(existing?.fields.retiredOps ?? "").split(",").filter(Boolean), name])].join(",");
-    await findOrCreateConnector(context, entry, { retiredOps: retired, retiredReason: values.reason }, `Operation ${entry.capability.label}.${name} retired: ${values.reason}`);
+    if (!(await findOrCreateConnector(context, entry, { retiredOps: retired, retiredReason: values.reason }, `Operation ${entry.capability.label}.${name} retired: ${values.reason}`))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(`Operation ${name} on ${entry.capability.label} retired by ${context.actor}. ${missions.length} missions reference it.`, { type: "capability", capability: "blocked" });
     return `${name} is retired. ${missions.length} missions reference it.`;
   },
@@ -521,7 +522,7 @@ export const retrySync = actOverlay({
     if (!record) return;
     const key = `${record.id}:${String(record.fields.cursor ?? "no-cursor")}`;
     const duplicate = String(record.fields.lastSyncKey ?? "") === key;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, lastSyncAttemptAt: nowIso(context), lastSyncKey: key, lastSyncOutcome: duplicate ? "duplicate retry ignored" : "stopped at the provider boundary" } }, { expectRevision: record.revision, event: duplicate ? `Sync retry for ${record.title} ignored as a duplicate of ${key}` : `Sync retry for ${record.title} stopped at the provider boundary` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, lastSyncAttemptAt: nowIso(context), lastSyncKey: key, lastSyncOutcome: duplicate ? "duplicate retry ignored" : "stopped at the provider boundary" } }, { expectRevision: record.revision, event: duplicate ? `Sync retry for ${record.title} ignored as a duplicate of ${key}` : `Sync retry for ${record.title} stopped at the provider boundary` }))) throw new Error(CHANGED_ELSEWHERE);
     await context.mutate.log(duplicate
       ? `Sync retry for ${capabilityLabel(record)} deduplicated: key ${key} was already attempted.`
       : `Sync retry for ${capabilityLabel(record)}: no provider is connected, nothing was read. Key ${key}.`, { entityId: record.id, type: "capability", capability: "not_connected" });
@@ -598,13 +599,13 @@ export const openConnectorIncident = actOverlay({
     const existing = activeIncidentFor(record, (watched as Rec[] | undefined) ?? []);
     if (existing) {
       const reports = Number(existing.fields.reportCount ?? 1) + 1;
-      await context.mutate.patch(existing.id, {
+      if (!(await context.mutate.patch(existing.id, {
         fields: {
           connectorId: record.id, connectorName: record.title, service: String(existing.fields.service ?? "Connectors"),
           latestReport: values.title, latestReportBy: context.actor, latestReportAt: nowIso(context), reportCount: reports,
           ...(values.impact ? { impact: values.impact } : {}),
         },
-      }, { expectRevision: existing.revision, event: `Report added to ${existing.title} by ${context.actor}: ${values.title}` });
+      }, { expectRevision: existing.revision, event: `Report added to ${existing.title} by ${context.actor}: ${values.title}` }))) throw new Error(CHANGED_ELSEWHERE);
       context.navigate(`/o/${context.org.slug}/it/incidents/${existing.id}`);
       return { title: "Added to the open incident", body: `${existing.title} was already open for ${record.title}, so your report was added to it instead of opening a second incident.`, tone: "info" };
     }
@@ -710,7 +711,7 @@ export const runAdapterTests = actOverlay({
     const checks = adapterChecks(adapterOperations(record.body));
     const failed = checks.filter((check) => check.state === "fail").length;
     const result = failed ? `${failed} of ${checks.length} contract tests fail` : `all ${checks.length} contract tests pass`;
-    await context.mutate.patch(record.id, { fields: { ...record.fields, testsRunAt: nowIso(context), testsPassed: failed === 0, testResult: result } }, { expectRevision: record.revision, event: `Contract tests for ${record.title}: ${result}` });
+    if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, testsRunAt: nowIso(context), testsPassed: failed === 0, testResult: result } }, { expectRevision: record.revision, event: `Contract tests for ${record.title}: ${result}` }))) throw new Error(CHANGED_ELSEWHERE);
     return { body: `${record.title}: ${result}. No live call was made.`, tone: failed ? "failed" : "ok" };
   },
 });
@@ -725,7 +726,7 @@ export const registerAction = actOverlay({
   candidates: (records) => records.filter(isCustom),
   consequence: () => "Paste one operation declaration. It is validated against the contract and, if it holds, appended to the adapter. Text from a provider is data: a declaration never changes what this workspace may do until a person approves the adapter.",
   fields: ({ context }) => [{ name: "declaration", label: "Declaration (JSON)", kind: "textarea", required: true, initial: (context.overlayPayload as { draft?: string } | undefined)?.draft, placeholder: '{ "name": "send_statement", "kind": "action", "scopes": ["statements.write"], "localEquivalent": "The statement is prepared and left as a draft." }' }],
-  Details: ({ record }) => (record ? <Properties rows={[{ label: "Registered now", value: adapterOperations(record.body).map((operation) => operation.name).join(", ") || "none" }]} /> : null),
+  Details: ({ record }) => (record ? <KeyValueList items={[{ label: "Registered now", value: adapterOperations(record.body).map((operation) => operation.name).join(", ") || "none" }]} /> : null),
   submit: "Validate and register",
   apply: async ({ record, values, context }) => {
     if (!record) return;
@@ -793,7 +794,7 @@ export const reconcileReceipts = actOverlay({
     const rows = (watched as Audit[] | undefined) ?? [];
     const pending = rows.filter((row) => row.capability === "queued_local" || row.capability === "awaiting_external_confirmation").length;
     return (
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Receipts", value: <span className="ds-num">{String(rows.length)}</span> },
         { label: "Accepted but unconfirmed", value: <span className="ds-num">{String(pending)}</span> },
         { label: "With provider evidence", value: <span className="ds-num">0</span> },
@@ -824,7 +825,7 @@ export const openMission = actOverlay({
   useWatch: () => useEvents(undefined, 400).filter(isReceipt),
   Details: ({ record, watched }) => {
     const linked = ((watched as Audit[] | undefined) ?? []).filter((event) => record && event.entityId === record.id).length;
-    return record ? <Properties rows={[{ label: "Receipts linked to it", value: <span className="ds-num">{String(linked)}</span> }, { label: "State", value: record.status }]} /> : null;
+    return record ? <KeyValueList items={[{ label: "Receipts linked to it", value: <span className="ds-num">{String(linked)}</span> }, { label: "State", value: record.status }]} /> : null;
   },
   submit: "Open the mission",
   apply: async ({ record, context }) => {

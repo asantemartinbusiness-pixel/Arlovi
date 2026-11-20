@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Notice, Pill, Row, Select, Stack, TextArea } from "@/design-system";
+import { Button, Notice, Pill, Row, Select, Stack, TextArea, ModalActions, OverlayActions, OverlayCancel } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { EditorFrame, NumberBox, PanelGroup, SaveState, useStore, type DocHandle } from "@/applications/visual/kit";
 import { clamp, springValue } from "@/applications/visual/geometry";
@@ -70,6 +70,8 @@ export function EasingScreen({ context, actions }: { context: ScreenContext; act
   return (
     <EditorFrame
       context={context}
+      lean
+      titleLevel={1}
       actions={actions}
       tabs={[{ id: "Curves" }, { id: "Timing" }, { id: "Presets" }, { id: "Spring" }]}
       title={`${record.title} — easing and timing`}
@@ -85,7 +87,7 @@ export function EasingScreen({ context, actions }: { context: ScreenContext; act
               className="mo-layer"
               data-selected={picked?.keyframe.id === segment.from.id}
               style={{ width: "100%", textAlign: "start", border: 0, background: picked?.keyframe.id === segment.from.id ? undefined : "transparent", display: "grid", gap: 0 }}
-              onClick={() => motionUi.set((current) => ({ ...current, selectedLayerId: segment.layerId, selectedProperty: segment.property, selectedKeyframeId: segment.from.id, time: segment.from.t }))}
+              onClick={() => { motionUi.set((current) => ({ ...current, selectedLayerId: segment.layerId, selectedProperty: segment.property, selectedKeyframeId: segment.from.id, time: segment.from.t })); /* the command bar re-reads its guards when the page state changes */ context.select(segment.from.id); }}
             >
               <span>{segment.layer} · {PROPERTY_LABEL[segment.property]}</span>
               <span className="vx-mini"><span className="ds-num">{segment.from.t.toFixed(2)}→{segment.to.t.toFixed(2)}s</span> · {easingName(segment.from.easing)}</span>
@@ -348,7 +350,9 @@ export function CurveEditor({ close }: { close: () => void }) {
     <Stack gap={3}>
       <p className="vx-mini">{found.layer.name} · {PROPERTY_LABEL[found.property]} from <span className="ds-num">{found.keyframe.t.toFixed(2)}s</span>{found.next ? <> to <span className="ds-num">{found.next.t.toFixed(2)}s</span></> : " (last keyframe: its easing has no effect until another follows)"}. Drag a handle or focus it and use the arrow keys.</p>
       {found.keyframe.easing.kind !== "bezier" && <Notice tone="info" title={`Currently ${found.keyframe.easing.kind}`}>Saving replaces it with the bezier curve below.</Notice>}
-      <EasingGraph easing={easing} size={260} onChange={setDraft} label="Curve being edited" />
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ flex: "0 0 auto" }}><EasingGraph easing={easing} size={170} onChange={setDraft} label="Curve being edited" /></div>
+        <Stack gap={2} style={{ flex: "1 1 200px", minWidth: 0 }}>
       <div className="vx-fieldrow">
         {(["x1", "y1", "x2", "y2"] as const).map((name, index) => (
           <NumberBox key={name} label={name} value={points[index]} step={0.01} onChange={(next) => {
@@ -361,12 +365,10 @@ export function CurveEditor({ close }: { close: () => void }) {
       <Row gap={1} wrap>
         {EASING_PRESETS.filter((preset) => preset.easing.kind === "bezier").map((preset) => <Button key={preset.id} size="sm" variant="ghost" onClick={() => setDraft(preset.easing)}>{preset.name}</Button>)}
       </Row>
+        </Stack>
+      </div>
       <code className="ds-num vx-mini">cubic-bezier({points.join(", ")})</code>
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={() => { handle.edit((current) => setEasing(current, found.layer.id, found.property, found.keyframe.id, easing), "Edit the easing curve"); close(); }}>Save the curve</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={() => { handle.edit((current) => setEasing(current, found.layer.id, found.property, found.keyframe.id, easing), "Edit the easing curve"); close(); }}>Save the curve</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

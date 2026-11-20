@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, DataGrid, Empty, FactGrid, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import { capabilityById, CAPABILITY_LABELS } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import { buildReturn } from "@/domain/fin-invoice";
@@ -18,7 +19,7 @@ import type { FinData } from "./data";
 import { useInvoice } from "./invoices";
 import { exportReturn, periodsWithDocuments } from "./tax";
 import { exportStatement, STATEMENT_LABEL, type Statement } from "./reports";
-import { AccountLabel, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
+import { AccountLabel, Amount, FormFooter, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
 import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
@@ -90,7 +91,7 @@ export function IssueReport({ context, close }: { context: ScreenContext; close:
       <Field label="Commentary" hint="Kept with the issued report.">
         <TextArea aria-label="Commentary" value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
       </Field>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -122,8 +123,7 @@ export function IssueReport({ context, close }: { context: ScreenContext; close:
         >
           Issue the report
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -170,7 +170,7 @@ export function MapCategory({ context, close }: { context: ScreenContext; close:
           );
         })}
       </Stack>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -181,11 +181,13 @@ export function MapCategory({ context, close }: { context: ScreenContext; close:
               const other = elsewhere(category);
               if (!other) continue;
               const rest = String(other.fields.mappedCategories ?? "").split(",").map((item) => item.trim()).filter((item) => item && item !== category);
-              await context.mutate.patch(other.id, { fields: { ...other.fields, mappedCategories: rest.join(",") } }, { expectRevision: other.revision, event: `Category ${category} unmapped from ${accountCode(other)}` });
+              const saved19 = await context.mutate.patch(other.id, { fields: { ...other.fields, mappedCategories: rest.join(",") } }, { expectRevision: other.revision, event: `Category ${category} unmapped from ${accountCode(other)}` });
+              if (!saved19) { setBusy(false); return; }
             }
-            await context.mutate.patch(account.id, {
+            const saved20 = await context.mutate.patch(account.id, {
               fields: { ...account.fields, mappedCategories: chosen.join(","), mappedBy: context.actor },
             }, { expectRevision: account.revision, event: `Categories mapped to ${accountCode(account)}: ${chosen.join(", ") || "none"}` });
+            if (!saved20) { setBusy(false); return; }
             context.toast("Mapping saved", `${chosen.length} categor${chosen.length === 1 ? "y posts" : "ies post"} to ${accountCode(account)} ${account.title}.`);
             setBusy(false);
             close();
@@ -193,8 +195,7 @@ export function MapCategory({ context, close }: { context: ScreenContext; close:
         >
           Save the mapping
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -216,10 +217,9 @@ export function InvoiceExport({ close, run }: { context: ScreenContext; close: (
         </Select>
       </Field>
       <SourceNote>Each row carries the tax code its lines resolved to. The file is written in this browser; nothing is uploaded.</SourceNote>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button variant="primary" disabled={rows.length === 0} onClick={() => { run(rows, data); close(); }}>Download {rows.length} invoices as CSV</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -258,7 +258,7 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
         </Notice>
       )}
       {blocked && <Notice tone="danger" title="This invoice cannot be sent">{blocked}</Notice>}
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -266,13 +266,14 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
           onClick={async () => {
             setBusy(true);
             const at = clockIso();
-            await context.mutate.patch(invoice.id, {
+            const saved21 = await context.mutate.patch(invoice.id, {
               body: {
                 ...(invoice.body as object ?? {}),
                 sends: [...sends, { version: issuedVersion, revision: invoice.revision, at, by: context.actor, to, grossMinor: totals.grossMinor, state: "queued_local" }],
               },
               fields: { ...invoice.fields, sendState: "queued_local", lastQueuedAt: at, sentVersion: issuedVersion },
             }, { expectRevision: invoice.revision, event: `${invoice.title} queued to send to ${to}. Not sent: no mail provider is connected` });
+            if (!saved21) { setBusy(false); return; }
             await context.mutate.log(`Send of ${invoice.title} held at the mail provider boundary`, { entityId: invoice.id, type: "finance.send", capability: "queued_local" });
             context.toast("Queued, not sent", `${invoice.title} version ${issuedVersion} is queued locally for ${to}. No mail provider is connected, so nothing left this browser.`, "info");
             setBusy(false);
@@ -281,8 +282,7 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
         >
           Queue the send
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -348,7 +348,7 @@ export function ApproveBill({ context, close }: { context: ScreenContext; close:
         </div></div>
       )}
       {blocked && <Notice tone="danger" title="This bill cannot be approved">{blocked}</Notice>}
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -384,8 +384,7 @@ export function ApproveBill({ context, close }: { context: ScreenContext; close:
         >
           Approve {context.money(gross)}
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -426,7 +425,7 @@ export function SchedulePayment({ context, close }: { context: ScreenContext; cl
       <Field label="Pay on" required hint={past ? "That date is in the past." : undefined}>
         <TextInput aria-label="Pay on" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
       </Field>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -434,10 +433,11 @@ export function SchedulePayment({ context, close }: { context: ScreenContext; cl
           onClick={async () => {
             setBusy(true);
             for (const bill of rows) {
-              await context.mutate.patch(bill.id, {
+              const saved22 = await context.mutate.patch(bill.id, {
                 status: "scheduled",
                 fields: { ...bill.fields, scheduledFor: date, scheduledBy: context.actor, paymentState: "queued_local" },
               }, { expectRevision: bill.revision, event: `Payment of ${bill.title} scheduled for ${date} by ${context.actor}. No money moved` });
+              if (!saved22) { setBusy(false); return; }
             }
             await context.mutate.log(`${rows.length} supplier payments scheduled for ${date}; held locally, no bank mandate`, { type: "finance.payment", capability: "queued_local" });
             context.toast("Payment scheduled", `${rows.length} bill${rows.length === 1 ? "" : "s"} for ${context.money(total)} scheduled for ${context.date(date)}. Nothing was paid: there is no bank connection.`, "info");
@@ -447,8 +447,7 @@ export function SchedulePayment({ context, close }: { context: ScreenContext; cl
         >
           Schedule {context.money(total)}
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -489,7 +488,7 @@ export function AssignCategory({ context, close }: { context: ScreenContext; clo
           {options.map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
         </Select>
       </Field>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -506,8 +505,7 @@ export function AssignCategory({ context, close }: { context: ScreenContext; clo
         >
           Assign
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -546,7 +544,7 @@ export function ApproveExpense({ context, close }: { context: ScreenContext; clo
         {blocked ?? `${context.actor} is recorded as approver. Nothing is posted until the claim is reimbursed.`}
       </Notice>
       <SourceNote>The limit and the no-self-approval rule are local controls. They shape this interface and are not an account security boundary.</SourceNote>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -564,8 +562,7 @@ export function ApproveExpense({ context, close }: { context: ScreenContext; clo
         >
           Approve the claim
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -617,41 +614,54 @@ export function ReimburseExpense({ context, close }: { context: ScreenContext; c
         { label: "Amount", value: <Amount minor={amount} context={context} bold /> },
       ]} />}
       {blocked && <Notice tone="danger" title="This reimbursement cannot be recorded">{blocked}</Notice>}
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
-            if (!expense) return;
+            if (!expense || busy) return;
             setBusy(true);
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Reimburse ${expense.title}`,
-              status: "posted",
-              summary: `Reimbursement to ${String(expense.fields.claimant ?? expense.ownerName)} recorded locally. Payment itself is made outside this workspace.`,
-              amountMinor: amount,
-              at: `${date}T09:00:00.000Z`,
-              parentId: expense.id,
-              tags: ["ledger", "expense"],
-              fields: { date, source: "expense", expenseId: expense.id, postedBy: context.actor },
-              body: { date, memo: expense.title, lines },
-            }, `Expense ${expense.title} reimbursement posted`);
-            await context.mutate.patch(expense.id, {
-              status: "reimbursed",
-              fields: { ...expense.fields, journalId: journal.id, reimbursedAt: clockIso(), reimbursedBy: context.actor, paymentState: "awaiting_external_confirmation" },
-            }, { expectRevision: expense.revision, event: `Expense ${expense.title} reimbursed by ${context.actor}; payment awaits external confirmation` });
-            await context.mutate.log(`Reimbursement of ${expense.title} held at the payment boundary`, { entityId: expense.id, type: "finance.payment", capability: "awaiting_external_confirmation" });
-            context.toast("Reimbursement recorded", `${context.money(amount)} is posted as a balanced journal. No money moved: pay the claimant from your bank.`, "info");
-            setBusy(false);
-            close();
+            try {
+              const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+              const journal = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Reimburse ${expense.title}`,
+                status: "posted",
+                summary: `Reimbursement to ${String(expense.fields.claimant ?? expense.ownerName)} recorded locally. Payment itself is made outside this workspace.`,
+                amountMinor: amount,
+                at: `${date}T09:00:00.000Z`,
+                parentId: expense.id,
+                tags: ["ledger", "expense"],
+                fields: { date, source: "expense", expenseId: expense.id, postedBy: context.actor },
+                body: { date, memo: expense.title, lines },
+              }, ctx);
+              const reimbursed = revisedRecord(expense, {
+                status: "reimbursed",
+                fields: { ...expense.fields, journalId: journal.id, reimbursedAt: ctx.now, reimbursedBy: context.actor, paymentState: "awaiting_external_confirmation" },
+              }, ctx);
+              // Journal and claim commit together; a claim changed elsewhere writes nothing.
+              await context.mutate.putMany(
+                [journal, reimbursed],
+                [`Expense ${expense.title} reimbursement posted`, `Expense ${expense.title} reimbursed by ${context.actor}; payment awaits external confirmation`],
+                { [expense.id]: expense.revision }, ["create", "update"],
+              );
+              await context.mutate.log(`Reimbursement of ${expense.title} held at the payment boundary`, { entityId: expense.id, type: "finance.payment", capability: "awaiting_external_confirmation" });
+              context.toast("Reimbursement recorded", `${context.money(amount)} is posted as a balanced journal. No money moved: pay the claimant from your bank.`, "info");
+              close();
+            } catch (error) {
+              context.toast("Reimbursement not recorded", error instanceof Error ? error.message : "The claim changed. Reopen it and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record the reimbursement
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -707,9 +717,9 @@ export function InspectMismatch({ context }: { context: ScreenContext }) {
           { key: "amount", header: "Value", align: "end", cell: (row) => <Amount minor={journalLines(row).reduce((sum, line) => sum + (line.accountId === recon.bankAccountId ? line.debitMinor - line.creditMinor : 0), 0)} context={context} /> },
         ]}
       />
-      <Row gap={2}>
+      <FormFooter drawer>
         <Button variant="primary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/fin/reconciliation`); }}>Resolve in reconciliation</Button>
-      </Row>
+      </FormFooter>
       <SourceNote>Nothing is marked reconciled from here. A mismatch stays open until a person matches or adjusts it.</SourceNote>
     </Stack>
   );
@@ -759,7 +769,7 @@ export function ReviewFiling({ context, close }: { context: ScreenContext; close
       )}
       {blocked && <Notice tone="warning" title="The review cannot be recorded">{blocked}</Notice>}
       <Field label="Review note"><TextArea aria-label="Review note" value={note} rows={2} onChange={(event) => setNote(event.target.value)} /></Field>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -779,8 +789,7 @@ export function ReviewFiling({ context, close }: { context: ScreenContext; close
         >
           Record the review
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -805,10 +814,9 @@ export function ExportReturnOverlay({ context, close }: { context: ScreenContext
         { label: "Net payable", minor: boxes.payableMinor, bold: true },
       ]} />
       {boxes.unknownDocumentIds.length > 0 && <Notice tone="warning" title="Unresolved rates are excluded">{boxes.unknownDocumentIds.length} document(s) are left out of the boxes and counted in the file.</Notice>}
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button variant="primary" onClick={() => { exportReturn(context, boxes, org.jurisdiction); close(); }}>Download the figures</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -834,14 +842,13 @@ export function StatementFilter({ context, close }: { context: ScreenContext; cl
           {data.periods.map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
         </Select>
       </Field>
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button variant="primary" onClick={() => {
           close();
           navigate(`/o/${org.slug}/fin/reports?tab=Statements&statement=${statement}&period=${period}`);
           context.setTab("Statements");
         }}>Apply the filter</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -871,10 +878,9 @@ export function ExportStatements({ context, close }: { context: ScreenContext; c
       {data.draftJournals.length > 0 && (
         <Notice tone="info" title="Drafts are not in the file">{data.draftJournals.length} draft journal(s) are excluded. The file holds posted figures only.</Notice>
       )}
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button variant="primary" onClick={() => { exportStatement(context, statement, rows, period); close(); }}>Download the CSV</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -898,10 +904,10 @@ export function EliminateIntercompany({ context, close }: { context: ScreenConte
       <Notice tone="info" title="Eliminations live in the consolidation only">
         Each intercompany journal is removed once from the group figures so the same balance is not counted in two entities. No entity ledger is changed and no journal is posted.
       </Notice>
-      <StatementRow context={context} rows={[
-        { label: "Intercompany receivable, 1900", minor: receivable },
-        { label: "Intercompany payable, 2900", minor: payable },
-        { label: "To eliminate", minor: consolidation.eliminationMinor, bold: true },
+      <FactGrid columns={3} items={[
+        { label: "Intercompany receivable, 1900", value: context.money(receivable), mono: true },
+        { label: "Intercompany payable, 2900", value: context.money(payable), mono: true },
+        { label: "To eliminate", value: context.money(consolidation.eliminationMinor), mono: true, tone: mismatch ? "danger" : "accent" },
       ]} />
       {mismatch && (
         <Notice tone="danger" title="The two sides do not agree">
@@ -922,7 +928,7 @@ export function EliminateIntercompany({ context, close }: { context: ScreenConte
           { key: "amount", header: "Value", align: "end", cell: (row) => <Amount minor={journalLines(row).reduce((sum, line) => sum + line.debitMinor, 0)} context={context} /> },
         ]}
       />
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
@@ -947,8 +953,7 @@ export function EliminateIntercompany({ context, close }: { context: ScreenConte
         >
           Record the elimination
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }
@@ -971,7 +976,7 @@ export function AskFinance({ context, close }: { context: ScreenContext; close: 
       <Field label="Your question for Finance" required>
         <TextArea aria-label="Your question for Finance" value={question} rows={3} onChange={(event) => setQuestion(event.target.value)} placeholder="How much rent have we posted this quarter?" />
       </Field>
-      <Row gap={2}>
+      <FormFooter drawer end={<Button variant="ghost" onClick={close}>Close</Button>}>
         <Button variant="primary" busy={busy} disabled={!question.trim()} onClick={async () => {
           setBusy(true);
           await context.mutate.create({
@@ -982,8 +987,7 @@ export function AskFinance({ context, close }: { context: ScreenContext; close: 
           context.toast("Question kept", "No model is connected, so the answer below is only the posted figures and documents that match your words.", "info");
           setBusy(false);
         }}>Ask Finance</Button>
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      </FormFooter>
       {asked && (
         <Stack gap={2}>
           <strong>Posted balances and documents that mention your words</strong>

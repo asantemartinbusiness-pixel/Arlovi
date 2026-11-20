@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { Copy, HardDrive, Images, Palette, ShieldAlert, Wand2 } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill,
-  Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -149,7 +148,8 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
                     disabled={row.status !== "approved"}
                     title={row.status !== "approved" ? "Only an approved asset may join a kit" : undefined}
                     onClick={async () => {
-                      await context.mutate.patch(active.id, { fields: { ...active.fields, assets: [...ids, row.id].join(",") } }, { event: `${row.title} linked into ${active.title}`, expectRevision: active.revision });
+                      const saved1 = await context.mutate.patch(active.id, { fields: { ...active.fields, assets: [...ids, row.id].join(",") } }, { event: `${row.title} linked into ${active.title}`, expectRevision: active.revision });
+                      if (!saved1) return;
                       context.toast("Linked", `${row.title} is part of ${active.title}.`);
                     }}
                   >
@@ -228,7 +228,8 @@ export function TokenEditor({ context, close }: { context: ScreenContext; close:
   const brand = data.brands.find((row) => row.id === (payload?.id ?? context.selectedId));
   const [values, setValues] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
-    for (const token of TOKENS) seed[token] = String(brand?.fields[token] ?? "#234FE8");
+    const defaults: Record<string, string> = { ink: "#14213D", cobalt: "#234FE8", papaya: "#B54708", aqua: "#0B7A75", paper: "#FAFAF7" };
+    for (const token of TOKENS) seed[token] = String(brand?.fields[token] ?? defaults[token]);
     seed.headingFont = String(brand?.fields.headingFont ?? "Inter");
     seed.bodyFont = String(brand?.fields.bodyFont ?? "Inter");
     seed.title = brand?.title ?? "";
@@ -259,10 +260,9 @@ export function TokenEditor({ context, close }: { context: ScreenContext; close:
       <Notice tone={bodyRatio >= 4.5 ? "success" : "warning"} title={`Ink on paper is ${bodyRatio.toFixed(2)}:1`}>
         {bodyRatio >= 4.5 ? "That passes for body text." : "Under 4.5:1. Body text at this pairing would be hard to read."}
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!brand && !values.title.trim()}
@@ -270,9 +270,10 @@ export function TokenEditor({ context, close }: { context: ScreenContext; close:
             setBusy(true);
             try {
               if (brand) {
-                await context.mutate.patch(brand.id, {
+                const saved2 = await context.mutate.patch(brand.id, {
                   fields: { ...brand.fields, ...Object.fromEntries(TOKENS.map((token) => [token, values[token]])), headingFont: values.headingFont, bodyFont: values.bodyFont },
                 }, { event: `Brand tokens updated on ${brand.title}`, expectRevision: brand.revision });
+                if (!saved2) return;
                 context.toast("Tokens saved", `${brand.title} now carries these values, and the previous set is in its history.`);
               } else {
                 await context.mutate.create({
@@ -291,8 +292,10 @@ export function TokenEditor({ context, close }: { context: ScreenContext; close:
           }}
         >
           {brand ? "Save tokens" : "Create the kit"}
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -323,20 +326,22 @@ export function BrandSelection({ context, close }: { context: ScreenContext; clo
           Recording a kit against a surface is how the other applications know which identity to draw on.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(brand.id, { fields: { ...brand.fields, appliedTo: [...new Set([...csvList(brand.fields.appliedTo), surface])].join(",") } }, { event: `${brand.title} recorded against ${surface}`, expectRevision: brand.revision });
+            const saved3 = await context.mutate.patch(brand.id, { fields: { ...brand.fields, appliedTo: [...new Set([...csvList(brand.fields.appliedTo), surface])].join(",") } }, { event: `${brand.title} recorded against ${surface}`, expectRevision: brand.revision });
+            if (!saved3) return;
             context.toast(brand.status === "draft" ? "Recorded as intended" : "Applied", `${brand.title} is recorded against ${surface}.`, brand.status === "draft" ? "info" : "ok");
             close();
           }}
         >
           Record against {surface}
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -377,10 +382,9 @@ export function GlobalImpact({ context, close }: { context: ScreenContext; close
           </Field>
         </>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!approved || phrase !== "PUBLISH"}
@@ -388,17 +392,21 @@ export function GlobalImpact({ context, close }: { context: ScreenContext; close
             setBusy(true);
             try {
               if (master && master.id !== brand.id) {
-                await context.mutate.patch(master.id, { fields: { ...master.fields, master: false } }, { event: `${master.title} is no longer the master kit` });
+                const saved4 = await context.mutate.patch(master.id, { fields: { ...master.fields, master: false } }, { event: `${master.title} is no longer the master kit` });
+                if (!saved4) return;
               }
-              await context.mutate.patch(brand.id, { status: "active", fields: { ...brand.fields, master: true, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `${brand.title} published as the master kit`, expectRevision: brand.revision });
+              const saved5 = await context.mutate.patch(brand.id, { status: "active", fields: { ...brand.fields, master: true, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `${brand.title} published as the master kit`, expectRevision: brand.revision });
+              if (!saved5) return;
               context.toast("Published", `${brand.title} is the master kit. The previous master is kept and can be restored.`);
               close();
             } finally { setBusy(false); }
           }}
         >
           Publish as master
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -561,10 +569,9 @@ export function TransformInspector({ context, close }: { context: ScreenContext;
         It records the size, crop and format. Running it over assets creates variant records with those values; no pixels are
         re-encoded in this browser.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!title.trim()}
@@ -573,7 +580,8 @@ export function TransformInspector({ context, close }: { context: ScreenContext;
             try {
               const fields = { kind: "preset", width, height, fit: "cover", focus: "centre", format, quality, watermark, channel: "Custom", uses: Number(record?.fields.uses ?? 0) };
               if (record) {
-                await context.mutate.patch(record.id, { title, summary: `${width} × ${height} ${format.toUpperCase()} at ${quality}%.`, fields: { ...record.fields, ...fields } }, { event: `Preset updated: ${title}`, expectRevision: record.revision });
+                const saved6 = await context.mutate.patch(record.id, { title, summary: `${width} × ${height} ${format.toUpperCase()} at ${quality}%.`, fields: { ...record.fields, ...fields } }, { event: `Preset updated: ${title}`, expectRevision: record.revision });
+                if (!saved6) return;
                 context.toast("Preset saved", `${title} is ${record.status}.`);
               } else {
                 await context.mutate.create({
@@ -591,8 +599,10 @@ export function TransformInspector({ context, close }: { context: ScreenContext;
           }}
         >
           {record ? "Save preset" : "Create preset"}
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -682,10 +692,9 @@ export function OverwriteReview({ context, close }: { context: ScreenContext; cl
           {blocked.map((row) => `${row.title}: ${licence(row, now).state === "expired" ? "licence expired" : "no file stored"}`).join("; ")}
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={selected.length === 0}
@@ -723,7 +732,8 @@ export function OverwriteReview({ context, close }: { context: ScreenContext; cl
                   ...(blocked.length ? { failureReason: blocked.map((row) => `${row.title}: ${licence(row, now).state === "expired" ? "licence expired" : "no file stored"}`).join("; ") } : {}),
                 },
               }, `Batch export run with ${preset.title}`);
-              await context.mutate.patch(preset.id, { fields: { ...preset.fields, uses: Number(preset.fields.uses ?? 0) + runnable.length } }, { event: `${preset.title} used ${runnable.length} more times` });
+              const saved7 = await context.mutate.patch(preset.id, { fields: { ...preset.fields, uses: Number(preset.fields.uses ?? 0) + runnable.length } }, { event: `${preset.title} used ${runnable.length} more times` });
+              if (!saved7) return;
               context.toast(
                 blocked.length ? "Run finished with skips" : "Variants produced",
                 `${runnable.length} variant ${runnable.length === 1 ? "record" : "records"} added, ${blocked.length} skipped, no original touched.`,
@@ -734,8 +744,10 @@ export function OverwriteReview({ context, close }: { context: ScreenContext; cl
           }}
         >
           Run over {selected.length} {selected.length === 1 ? "asset" : "assets"}
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1009,10 +1021,9 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
         The duplicates are archived with a pointer to the one you keep, and their recorded uses move across. Old references still
         resolve.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!keep}
@@ -1021,22 +1032,26 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
             setBusy(true);
             try {
               for (const row of drop) {
-                await context.mutate.patch(row.id, {
+                const saved8 = await context.mutate.patch(row.id, {
                   status: "archived",
                   fields: { ...row.fields, supersededBy: keep.id, archivedBy: context.actor, archivedAt: clockIso() },
                 }, { event: `Duplicate archived in favour of ${keep.title}`, expectRevision: row.revision });
+                if (!saved8) return;
               }
-              await context.mutate.patch(keep.id, {
+              const saved9 = await context.mutate.patch(keep.id, {
                 fields: { ...keep.fields, usedIn: [...new Set([...usedIn(keep), ...movedUses])].join(", ") },
               }, { event: `Uses merged from ${drop.length} duplicate ${drop.length === 1 ? "record" : "records"}` });
+              if (!saved9) return;
               context.toast("Duplicates resolved", `${drop.length} archived, ${movedUses.length} ${movedUses.length === 1 ? "use" : "uses"} moved to ${keep.title}.`);
               close();
             } finally { setBusy(false); }
           }}
         >
           Keep one, archive {drop.length}
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1079,10 +1094,9 @@ export function ExpiryWarning({ context, close }: { context: ScreenContext; clos
       <Field label="Why" required hint="The reason is what makes the rule defensible later.">
         <TextArea rows={3} value={basis} onChange={(event) => setBasis(event.target.value)} placeholder="Referenced by the Kinsale handover pack" />
       </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!until || !basis.trim()}
@@ -1090,9 +1104,10 @@ export function ExpiryWarning({ context, close }: { context: ScreenContext; clos
             setBusy(true);
             try {
               for (const row of rows) {
-                await context.mutate.patch(row.id, {
+                const saved10 = await context.mutate.patch(row.id, {
                   fields: { ...row.fields, retentionUntil: new Date(`${until}T00:00:00.000Z`).toISOString(), retentionBasis: basis, retentionSetBy: context.actor },
                 }, { event: `Retention set on ${row.title} until ${until}: ${basis}`, expectRevision: row.revision });
+                if (!saved10) return;
               }
               context.toast("Retention set", `${rows.length} ${rows.length === 1 ? "asset" : "assets"} are protected until ${context.date(until)}.`);
               close();
@@ -1100,8 +1115,10 @@ export function ExpiryWarning({ context, close }: { context: ScreenContext; clos
           }}
         >
           Set retention
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

@@ -1,7 +1,8 @@
+import { CountList } from "@/applications/proc/kit";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Button, Card, DataGrid, Empty, Field, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Card, DataGrid, Empty, Field, MoneyInput, FactGrid, Notice, OverlaySummary, Pill, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -136,22 +137,18 @@ function FulfilLinesForm({ context, close, order }: { context: ScreenContext; cl
       context.toast("Shipment started", `${shipment.number} holds ${units} unit${units === 1 ? "" : "s"}${partial ? ". The rest of the order stays open." : "."}`);
       close();
     }}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Order", value: order.title },
         { label: "Shipment", value: <span className="ds-num">{nextShipmentNumber(order)}</span> },
         { label: "Ship from", value: data.warehouses.find((item) => item.id === warehouseId)?.title ?? "Not set" },
       ]} />
-      <DataGrid rows={progress} rowId={(row) => row.line.id} label="Units to put on this shipment" filterable={false}
-        columns={[
-          { key: "line", header: "Line", primary: true, cell: (row) => row.line.description },
-          { key: "remaining", header: "Remaining", align: "end", cell: (row) => <span className="ds-num">{row.remaining}</span> },
-          { key: "qty", header: "This shipment", align: "end", cell: (row) => (
-            <TextInput aria-label={`Units of ${row.line.description} on this shipment`} inputMode="numeric" align="end" style={{ maxWidth: 90 }}
-              value={counts[row.line.id] ?? "0"} disabled={row.remaining === 0}
-              invalid={(request[row.line.id] ?? 0) > row.remaining}
-              onChange={(event) => { setCounts((current) => ({ ...current, [row.line.id]: event.target.value })); setError(""); }} />
-          ) },
-        ]} />
+      <CountList label="Units to put on this shipment" rows={progress.map((row) => ({
+        id: row.line.id, title: row.line.description,
+        facts: [{ label: "Remaining", value: String(row.remaining) }],
+        inputHeader: "This shipment", inputLabel: `Units of ${row.line.description} on this shipment`,
+        value: counts[row.line.id] ?? "0", disabled: row.remaining === 0, invalid: (request[row.line.id] ?? 0) > row.remaining,
+        onChange: (next) => { setCounts((current) => ({ ...current, [row.line.id]: next })); setError(""); },
+      }))} />
       {short.length > 0 && (
         <Notice tone="warning" title="Less on hand than you are picking">
           {short.map((row) => row.line.description).join(", ")} {short.length === 1 ? "has" : "have"} fewer units at this location than requested. Pick what is there and leave the balance for a later shipment.
@@ -218,12 +215,9 @@ function AdvanceShipmentForm({ context, close, order, shipment }: { context: Scr
       context.toast(`${shipment.number} ${SHIPMENT_LABEL[next].toLowerCase()}`, next === "shipped" ? "Stock left with the shipment. Nothing was booked with a carrier." : "Recorded on the order.");
       close();
     }}>
-      <Properties rows={[
-        { label: "Shipment", value: <span className="ds-num">{shipment.number}</span> },
-        { label: "Now", value: <Pill tone={stateTone(shipment.state)}>{SHIPMENT_LABEL[shipment.state]}</Pill> },
-        { label: "Next", value: <Pill tone={stateTone(next)}>{SHIPMENT_LABEL[next]}</Pill> },
-        { label: "Units", value: <span className="ds-num">{shipment.lines.reduce((sum, line) => sum + line.quantity, 0)}</span> },
-      ]} />
+      <OverlaySummary eyebrow="Shipment" title={<span className="ds-num">{shipment.number}</span>}
+        status={<><Pill tone={stateTone(shipment.state)} dot>{SHIPMENT_LABEL[shipment.state]}</Pill><span aria-hidden="true">→</span><Pill tone={stateTone(next)}>{SHIPMENT_LABEL[next]}</Pill></>}
+        meta={[`${shipment.lines.reduce((sum, line) => sum + line.quantity, 0)} units`]} />
       {next === "shipped" && (
         <>
           <Field label="Carrier" required>
@@ -321,7 +315,7 @@ function RaiseReturnForm({ context, close, order, returns }: { context: ScreenCo
         </Select>
       </Field>
       <Field label="What the customer said"><TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
-      <Properties rows={[{ label: "Value at the line price", value: <span className="ds-num">{context.money(valueMinor)}</span> }]} />
+      <FactGrid columns={2} items={[{ label: "Value at the line price", value: <span className="ds-num">{context.money(valueMinor)}</span> }]} />
       {error && <p role="alert" className="ds-field-error">{error}</p>}
     </form>
   );
@@ -365,16 +359,17 @@ function RecordRefundForm({ context, close, item }: { context: ScreenContext; cl
       context.toast("Refund recorded", `${context.money(amount)} is recorded on ${item.title}${full ? ", which is now settled" : `; ${context.money((item.amountMinor ?? 0) - total)} remains`}. No money moved from Arlovi.`);
       close();
     }}>
-      <Properties rows={[
-        { label: "Return", value: item.title },
-        { label: "Value", value: <span className="ds-num">{context.money(item.amountMinor)}</span> },
-        { label: "Already refunded", value: <span className="ds-num">{context.money(refundedMinor(item))}</span> },
-        { label: "Left to refund", value: <strong className="ds-num">{context.money(remaining)}</strong> },
+      <OverlaySummary eyebrow="Record a refund" title={<span className="ds-num">{item.title}</span>}
+        status={<Pill tone="warning" dot>Made outside Arlovi</Pill>} />
+      <FactGrid columns={3} dense items={[
+        { label: "Return value", value: context.money(item.amountMinor), mono: true },
+        { label: "Already refunded", value: context.money(refundedMinor(item)), mono: true },
+        { label: "Left to refund", value: <strong>{context.money(remaining)}</strong>, mono: true },
       ]} />
       <Notice tone="warning" title="No payment provider is connected">
         Arlovi cannot send money. Make the refund in your bank, card terminal or ledger first, then record it here with its reference so the return, the order and the books agree.
       </Notice>
-      <Field label="Amount refunded" required><MoneyInput valueMinor={amount} onChangeMinor={(value) => { setAmount(value); setError(""); }} currency={org.currency} label="Amount refunded" /></Field>
+      <div style={{ maxWidth: 240 }}><Field label="Amount refunded" required><MoneyInput valueMinor={amount} onChangeMinor={(value) => { setAmount(value); setError(""); }} currency={org.currency} label="Amount refunded" /></Field></div>
       <Field label="How it was refunded" required>
         <Select value={method} onChange={(event) => { setMethod(event.target.value); setError(""); }}>
           <option value="">Choose a method</option>
@@ -487,7 +482,7 @@ export function StockHistory({ context }: { context: ScreenContext }) {
           {kinds.map((item) => <option key={item} value={item}>{item.replace(/_/g, " ")}</option>)}
         </Select></Field>
       </div>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "On hand now", value: <strong className="ds-num">{history.at(-1)?.balance ?? 0}</strong> },
         { label: "Movements", value: <span className="ds-num">{history.length}</span> },
         { label: "Product", value: product ? <Link to={`/o/${org.slug}/commerce/products/${product.id}`}>{product.title}</Link> : "—" },

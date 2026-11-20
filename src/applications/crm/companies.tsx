@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Building2, Inbox, Target } from "lucide-react";
 import {
-  Avatar, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, MoneyInput, Notice, OverlayCancel, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Avatar, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, FactGrid, Field, Grid, KeyValueList, Meter, MoneyInput, Notice, OverlayActions, OverlayCancel, OverlaySection, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -187,25 +187,28 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         if (!title.trim() || duplicate) return;
         setBusy(true);
-        const fields = { industry, city, owner };
-        if (company) {
-          await context.mutate.patch(company.id, { title: title.trim(), status, summary, fields: { ...company.fields, ...fields } }, { expectRevision: company.revision, event: `Account ${title.trim()} updated` });
-          context.toast("Account saved", `${title.trim()} is ${status}.`);
-        } else {
-          const created = await context.mutate.create({
-            collection: "companies", title: title.trim(), status, summary,
-            fields: { ...fields, customerSince: clockIso().slice(0, 10) },
-          }, `Account ${title.trim()} created`);
-          context.select(created.id);
-          context.toast("Account created", `${created.title} can now hold contacts and deals.`);
+        try {
+          const fields = { industry, city, owner };
+          if (company) {
+            if (!(await context.mutate.patch(company.id, { title: title.trim(), status, summary, fields: { ...company.fields, ...fields } }, { expectRevision: company.revision, event: `Account ${title.trim()} updated` }))) return;
+            context.toast("Account saved", `${title.trim()} is ${status}.`);
+          } else {
+            const created = await context.mutate.create({
+              collection: "companies", title: title.trim(), status, summary,
+              fields: { ...fields, customerSince: clockIso().slice(0, 10) },
+            }, `Account ${title.trim()} created`);
+            context.select(created.id);
+            context.toast("Account created", `${created.title} can now hold contacts and deals.`);
+          }
+          close();
+        } finally {
+          setBusy(false);
         }
-        setBusy(false);
-        close();
       }}
     >
       <Field label="Account name" required><TextInput aria-label="Account name" value={title} invalid={duplicate} onChange={(event) => setTitle(event.target.value)} required /></Field>
       {duplicate && <Notice tone="danger" title="An account with that name exists">Merging later is harder than naming it correctly now.</Notice>}
-      <Row gap={3} wrap>
+      <div className="crm-deal-pair">
         <Field label="Industry"><TextInput aria-label="Industry" value={industry} onChange={(event) => setIndustry(event.target.value)} /></Field>
         <Field label="Location"><TextInput aria-label="Location" value={city} onChange={(event) => setCity(event.target.value)} /></Field>
         <Field label="State">
@@ -214,10 +217,20 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
           </Select>
         </Field>
         <Field label="Owner"><TextInput aria-label="Owner" value={owner} onChange={(event) => setOwner(event.target.value)} /></Field>
-      </Row>
-      <Field label="What they do"><TextArea aria-label="What they do" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
+      </div>
+      <Field label="What they do"><TextArea aria-label="What they do" value={summary} rows={2} onChange={(event) => setSummary(event.target.value)} /></Field>
+      {company && (
+        <OverlaySection title="On record" hint="Changing the name or owner does not move these.">
+          <FactGrid columns={3} dense items={[
+            { label: "Contacts", value: String(contactsOfCompany(data, company.id).length), mono: true },
+            { label: "Deals", value: String(dealsOfCompany(data, company.id).length), mono: true },
+            { label: "Customer since", value: context.date(String(company.fields.customerSince ?? company.createdAt)), mono: true },
+          ]} />
+        </OverlaySection>
+      )}
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || duplicate}>{company ? "Save the account" : "Create the account"}</Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </form>
@@ -238,17 +251,18 @@ export function RelationshipInspector({ context }: { context: ScreenContext }) {
     .concat(deals.flatMap((deal) => activitiesFor(data.activities, deal.id)));
   const unique = [...new Map(activities.map((activity) => [activity.id, activity])).values()]
     .sort((a, b) => (b.startAt ?? b.at ?? "").localeCompare(a.startAt ?? a.at ?? ""));
+  const openDeals = deals.filter((deal) => stageOf(deal).kind === "open");
+  const openMinor = openDeals.reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0);
+  const unpaidMinor = invoices.filter((invoice) => ["awaiting_payment", "part_paid"].includes(invoice.status))
+    .reduce((sum, invoice) => sum + Number(invoice.amountMinor ?? 0) - Number(invoice.fields.paidMinor ?? 0), 0);
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Account", value: company.title },
-        { label: "Industry", value: String(company.fields.industry ?? "Not recorded") },
-        { label: "Owner", value: String(company.fields.owner ?? company.ownerName) },
-        { label: "Customer since", value: company.fields.customerSince ? context.date(String(company.fields.customerSince)) : context.date(company.createdAt) },
-        { label: "Contacts", value: String(contacts.length) },
-        { label: "Deals", value: String(deals.length) },
-        { label: "Invoices", value: String(invoices.length) },
+      <FactGrid columns={4} items={[
+        { label: "Contacts", value: String(contacts.length), mono: true, tone: contacts.length === 1 ? "warning" : undefined },
+        { label: "Open pipeline", value: context.money(openMinor), mono: true, hint: `${openDeals.length} open` },
+        { label: "Unpaid", value: context.money(unpaidMinor), mono: true, tone: unpaidMinor ? "warning" : undefined, hint: `${invoices.length} invoice(s)` },
+        { label: "Last touch", value: unique[0] ? context.relative(unique[0].startAt ?? unique[0].at) : "Never" },
       ]} />
 
       {contacts.length === 1 && (
@@ -257,7 +271,7 @@ export function RelationshipInspector({ context }: { context: ScreenContext }) {
         </Notice>
       )}
 
-      <Card eyebrow="PEOPLE" prov="human" title="Who we know" subtitle={`${contacts.length} contacts`}>
+      <OverlaySection title="Who we know" hint={`${contacts.length} contacts`}>
         <Stack gap={2}>
           {contacts.map((contact) => (
             <Row key={contact.id} gap={3}>
@@ -269,9 +283,9 @@ export function RelationshipInspector({ context }: { context: ScreenContext }) {
           ))}
           {contacts.length === 0 && <span className="ds-subtle">No contact is linked to this account.</span>}
         </Stack>
-      </Card>
+      </OverlaySection>
 
-      <Card eyebrow="PIPELINE" prov="human" title="Deals" subtitle={`${deals.length} recorded`}>
+      <OverlaySection title="Deals" hint={`${deals.length} recorded`}>
         <Stack gap={2}>
           {deals.map((deal) => (
             <Row key={deal.id} gap={3}>
@@ -282,9 +296,9 @@ export function RelationshipInspector({ context }: { context: ScreenContext }) {
           ))}
           {deals.length === 0 && <span className="ds-subtle">No deal on this account.</span>}
         </Stack>
-      </Card>
+      </OverlaySection>
 
-      <Card eyebrow="LEDGER" prov="posted" title="Invoices" subtitle="From Finance, by the contacts at this account">
+      <OverlaySection title="Invoices" hint="From Finance, by the contacts at this account">
         <Stack gap={2}>
           {invoices.map((invoice) => (
             <Row key={invoice.id} gap={3}>
@@ -295,9 +309,9 @@ export function RelationshipInspector({ context }: { context: ScreenContext }) {
           ))}
           {invoices.length === 0 && <span className="ds-subtle">Nothing has been invoiced to this account.</span>}
         </Stack>
-      </Card>
+      </OverlaySection>
 
-      <Card eyebrow="HISTORY" prov="human" title="Conversation history" subtitle={`${unique.length} activities across the account`}>
+      <OverlaySection title="Conversation history" hint={`${unique.length} activities across the account`}>
         <Stack gap={2}>
           {unique.slice(0, 10).map((activity) => (
             <Row key={activity.id} gap={3}>
@@ -308,7 +322,7 @@ export function RelationshipInspector({ context }: { context: ScreenContext }) {
           ))}
           {unique.length === 0 && <span className="ds-subtle">Nothing logged against this account.</span>}
         </Stack>
-      </Card>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -370,16 +384,18 @@ export function CompanyMergePreview({ context, close }: { context: ScreenContext
         </Notice>
       ) : (
         <>
-          <Properties rows={[
-            { label: "Retained account", value: left!.title },
-            { label: "Source account", value: right!.title },
-            { label: "Contacts moving", value: String(contacts.length) },
-            { label: "Deals moving", value: String(deals.length) },
-            { label: "Field conflicts", value: String(conflicts.length) },
-            { label: "Both source IDs retained", value: `${left!.id}, ${right!.id}` },
+          <FactGrid columns={4} items={[
+            { label: "Contacts moving", value: String(contacts.length), mono: true },
+            { label: "Deals moving", value: String(deals.length), mono: true },
+            { label: "Open value moving", value: context.money(deals.filter((deal) => stageOf(deal).kind === "open").reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0)), mono: true },
+            { label: "Field conflicts", value: String(conflicts.length), mono: true, tone: conflicts.length ? "warning" : undefined },
+          ]} />
+          <KeyValueList items={[
+            { label: "Retained", value: left!.title, hint: left!.id },
+            { label: "Absorbed", value: right!.title, hint: `${right!.id}, kept on the record` },
           ]} />
           {conflicts.length > 0 && (
-            <Card eyebrow="CONFLICTS" prov="human" title="Differences that need review">
+            <OverlaySection title="Differences that need review" tone="warning" hint="The retained account's value wins.">
               <Stack gap={2}>
                 {conflicts.map(item => (
                   <Row key={item.field} gap={3} wrap>
@@ -390,7 +406,7 @@ export function CompanyMergePreview({ context, close }: { context: ScreenContext
                   </Row>
                 ))}
               </Stack>
-            </Card>
+            </OverlaySection>
           )}
           <Checkbox checked={reviewed} disabled={busy}
             onChange={event => setReviewed(event.target.checked)}
@@ -399,8 +415,7 @@ export function CompanyMergePreview({ context, close }: { context: ScreenContext
       )}
       {error && <Notice tone="danger" title="Account merge was not saved">{error}</Notice>}
       <DrawerActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
+        <OverlayActions end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>} primary={
         <Button variant="primary" busy={busy}
           disabled={!valid || !reviewed || busy || !context.can("edit_pipeline")}
           title={!context.can("edit_pipeline") ? "CRM editing permission required" : undefined}
@@ -460,7 +475,7 @@ export function CompanyMergePreview({ context, close }: { context: ScreenContext
             }
           }}>
           {right ? `Merge into ${left?.title ?? "retained account"}` : "Review and merge"}
-        </Button>
+        </Button>} />
       </DrawerActions>
     </Stack>
   );
@@ -575,7 +590,7 @@ export function LeadsBoard({ context, tab }: { context: ScreenContext; tab: stri
               for (const row of selected) {
                 const contact = contactById(data, String(row.lead.fields.contactId ?? ""));
                 if (contact?.fields.suppressed === true) { skipped += 1; continue; }
-                await context.mutate.patch(row.lead.id, { fields: { ...row.lead.fields, owner: context.actor } }, { event: `Lead ${row.lead.title} routed to ${context.actor}` });
+                if (!(await context.mutate.patch(row.lead.id, { fields: { ...row.lead.fields, owner: context.actor } }, { event: `Lead ${row.lead.title} routed to ${context.actor}` }))) return;
                 routed += 1;
               }
               context.toast(routed ? "Leads routed" : "Nothing routed",
@@ -652,46 +667,50 @@ export function QualificationInspector({ context, close }: { context: ScreenCont
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Lead", value: lead.title },
+      <FactGrid columns={4} items={[
+        { label: "Score", value: `${score.total} / 100`, mono: true, hint: score.band },
+        { label: "Recorded value", value: context.money(Number(lead.amountMinor ?? 0)), mono: true },
+        { label: "Age", value: `${Math.floor((now.getTime() - new Date(lead.createdAt).getTime()) / 86_400_000)} days`, mono: true },
         { label: "Source", value: String(lead.fields.source ?? "Not recorded") },
-        { label: "Recorded value", value: <Money minor={lead.amountMinor} context={context} bold /> },
-        { label: "Owner", value: lead.fields.owner ? String(lead.fields.owner) : "Unassigned" },
-        { label: "Contact", value: contact?.title ?? "None" },
+      ]} />
+      <KeyValueList columns={2} items={[
+        { label: "Contact", value: contact ? <ConsentLine contact={contact} /> : "None" },
         { label: "Account", value: company?.title ?? "None" },
-        { label: "Age", value: `${Math.floor((now.getTime() - new Date(lead.createdAt).getTime()) / 86_400_000)} days` },
+        { label: "Owner", value: lead.fields.owner ? String(lead.fields.owner) : "Unassigned" },
+        { label: "Status", value: lead.status },
       ]} />
 
-      <Card eyebrow="SCORE" prov="human" title={`${score.total} of 100, ${score.band}`} subtitle="Every point is attributed to a recorded field">
-        <Stack gap={2}>
+      <OverlaySection title="Where the score comes from" hint="Every point is attributed to a recorded field. It cannot judge fit; a cold score is a reason to look, not to discard.">
+        <ul className="crm-evidence" data-flush>
           {score.factors.map((factor) => (
-            <Row key={factor.label} gap={3}>
-              <span style={{ width: 110 }}>{factor.label}</span>
-              <span className="ds-num" style={{ width: 40, textAlign: "end" }}>{factor.points}</span>
-              <span className="ds-subtle ds-grow">{factor.detail}</span>
-            </Row>
+            <li key={factor.label}>
+              <span className="ds-num">{factor.points > 0 ? `+${factor.points}` : factor.points}</span>
+              <span className="crm-evidence-label">{factor.label}</span>
+              <span className="crm-evidence-value ds-subtle">{factor.detail}</span>
+            </li>
           ))}
-        </Stack>
-        <Notice tone="info" title="What this score cannot tell you">
-          It rewards a recorded value, a warm source and logged contact. It cannot judge fit, and a cold score is a reason to look rather than to discard.
-        </Notice>
-      </Card>
+        </ul>
+      </OverlaySection>
 
       {blockedReason && <Notice tone="danger" title="This lead cannot be converted">{blockedReason}</Notice>}
 
-      <Row gap={2} wrap>
+      <OverlayActions
+        primary={<>
         <Button
           variant="primary"
           busy={busy}
           disabled={lead.status === "qualified" || !context.can("edit_pipeline")}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(lead.id, {
-              status: "qualified",
-              fields: { ...lead.fields, stage: "qualified", qualifiedBy: context.actor, score: score.total },
-            }, { expectRevision: lead.revision, event: `Lead ${lead.title} qualified with a score of ${score.total}` });
-            context.toast("Lead qualified", `${lead.title} is qualified. Converting it creates a deal linked to the contact and the account.`);
-            setBusy(false);
+            try {
+              if (!(await context.mutate.patch(lead.id, {
+                status: "qualified",
+                fields: { ...lead.fields, stage: "qualified", qualifiedBy: context.actor, score: score.total },
+              }, { expectRevision: lead.revision, event: `Lead ${lead.title} qualified with a score of ${score.total}` }))) return;
+              context.toast("Lead qualified", `${lead.title} is qualified. Converting it creates a deal linked to the contact and the account.`);
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Qualify
@@ -705,44 +724,62 @@ export function QualificationInspector({ context, close }: { context: ScreenCont
         >
           Convert to a deal
         </Button>
+</>}
+      />
+      <OverlaySection title="Disqualify" tone="danger" hint="The lead stays on the record with its reason, which is what makes a source worth analysing.">
+        <Row gap={2} wrap>
+        <Field label="Reason if disqualifying">
+          <Select aria-label="Reason if disqualifying" value={reason} onChange={(event) => setReason(event.target.value)}>
+            {["Below the trade minimum", "No contactable detail", ...LOST_REASONS].map((item) => <option key={item}>{item}</option>)}
+          </Select>
+        </Field>
         <Button
           variant="outline-danger"
           busy={busy}
           disabled={lead.status === "disqualified"}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(lead.id, {
-              status: "disqualified",
-              fields: { ...lead.fields, stage: "disqualified", disqualifiedReason: reason, disqualifiedBy: context.actor },
-            }, { expectRevision: lead.revision, event: `Lead ${lead.title} disqualified: ${reason}` });
-            context.toast("Lead disqualified", `${lead.title} stays on the record with its reason, which is what makes a source worth analysing.`, "blocked");
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(lead.id, {
+                status: "disqualified",
+                fields: { ...lead.fields, stage: "disqualified", disqualifiedReason: reason, disqualifiedBy: context.actor },
+              }, { expectRevision: lead.revision, event: `Lead ${lead.title} disqualified: ${reason}` }))) return;
+              context.toast("Lead disqualified", `${lead.title} stays on the record with its reason, which is what makes a source worth analysing.`, "blocked");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Disqualify
         </Button>
-        <Field label="Reason if disqualifying">
-          <Select aria-label="Reason if disqualifying" value={reason} onChange={(event) => setReason(event.target.value)}>
-            {["Below the trade minimum", "No contactable detail", ...LOST_REASONS].map((item) => <option key={item}>{item}</option>)}
-          </Select>
-        </Field>
-      </Row>
+        </Row>
+      </OverlaySection>
     </Stack>
   );
+}
+
+function ConsentLine({ contact }: { contact: Rec }) {
+  return <span>{contact.title} <ConsentPill contact={contact} /></span>;
 }
 
 /** Converting a lead creates a real deal record linked to the contact and account. */
 export function ConvertDialog({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
-  const { now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const lead = data.leads.find((item) => item.id === (payload?.id ?? context.selectedId));
+  if (!lead) return <Empty title="Select a lead first" />;
+  // Seeds its fields from the lead, so it mounts only once the lead has loaded.
+  return <ConvertForm key={lead.id} context={context} close={close} lead={lead} />;
+}
+
+function ConvertForm({ context, close, lead }: { context: ScreenContext; close: () => void; lead: Rec }) {
+  const data = useCrmData();
+  const { now } = useWorkspace();
   const [amount, setAmount] = useState(Number(lead?.amountMinor ?? 0));
   const [owner, setOwner] = useState(String(lead?.fields.owner ?? context.actor));
   const [withQuote, setWithQuote] = useState("yes");
   const [busy, setBusy] = useState(false);
-  if (!lead) return <Empty title="Select a lead first" />;
 
   const contact = contactById(data, String(lead.fields.contactId ?? ""));
   const company = companyById(data, String(lead.fields.companyId ?? ""));
@@ -756,14 +793,15 @@ export function ConvertDialog({ context, close }: { context: ScreenContext; clos
 
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Conversion creates records, not a status">
-        A deal record is created and linked to the contact and the account, and the lead keeps a pointer to it. Optionally a draft quote is created at the same amount so the deal can advance past Proposal.
-      </Notice>
-      <Properties rows={[
-        { label: "Lead", value: lead.title },
-        { label: "Contact", value: contact?.title ?? "None" },
-        { label: "Account", value: company?.title ?? "None, the deal will have no account" },
-      ]} />
+      <OverlaySection title="What conversion creates" hint="Records, not a status. The lead keeps a pointer to the deal.">
+        <FactGrid columns={2} items={[
+          { label: "Deal", value: lead.title, hint: "Qualified, 40%" },
+          { label: "Weighted value", value: context.money(Math.round(amount * 0.4)), mono: true },
+          { label: "Contact", value: contact ? contact.title : "None", tone: contact ? undefined : "danger", hint: contact ? undefined : "Required" },
+          { label: "Account", value: company?.title ?? "None, the deal will have no account" },
+          { label: "Draft quote", value: withQuote === "yes" ? `One line at ${context.money(amount)}` : "Not created", mono: withQuote === "yes" },
+        ]} />
+      </OverlaySection>
       <Row gap={3} wrap>
         <Field label="Deal amount"><MoneyInput label="Deal amount" currency={context.org.currency} valueMinor={amount} onChangeMinor={setAmount} /></Field>
         <Field label="Owner"><TextInput aria-label="Owner" value={owner} onChange={(event) => setOwner(event.target.value)} /></Field>
@@ -783,60 +821,61 @@ export function ConvertDialog({ context, close }: { context: ScreenContext; clos
           title={blocked}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              stage: "qualified", probability: 40, owner, leadId: lead.id, budgetConfirmed: false,
-            };
-            if (contact) fields.contactId = contact.id;
-            if (company) fields.companyId = company.id;
-            const deal = await context.mutate.create({
-              collection: "deals",
-              title: lead.title,
-              status: "qualified",
-              summary: `Converted from the ${String(lead.fields.source ?? "unknown")} lead ${lead.title}.`,
-              amountMinor: amount,
-              at: now.toISOString(),
-              parentId: company?.id,
-              fields,
-            }, `Deal created from lead ${lead.title}`);
-
-            let quoteId: string | undefined;
-            if (withQuote === "yes") {
-              const numbers = data.quotes.map((quote) => Number(/(\d+)/.exec(String(quote.fields.number ?? quote.title))?.[1] ?? 0));
-              const number = `Q-${Math.max(100, ...numbers) + 1}`;
-              const quote = await context.mutate.create({
-                collection: "quotes",
-                title: `${number} ${lead.title}`,
-                status: "draft",
-                summary: `Draft quote created when the lead ${lead.title} was converted.`,
+            try {
+              const fields: Record<string, string | number | boolean> = {
+                stage: "qualified", probability: 40, owner, leadId: lead.id, budgetConfirmed: false,
+              };
+              if (contact) fields.contactId = contact.id;
+              if (company) fields.companyId = company.id;
+              const deal = await context.mutate.create({
+                collection: "deals",
+                title: lead.title,
+                status: "qualified",
+                summary: `Converted from the ${String(lead.fields.source ?? "unknown")} lead ${lead.title}.`,
                 amountMinor: amount,
                 at: now.toISOString(),
-                dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
-                parentId: deal.id,
-                fields: {
-                  number, dealId: deal.id, contactId: contact?.id ?? "", version: 1,
-                  netMinor: amount, taxMinor: 0, customerTaxStatus: String(contact?.fields.taxStatus ?? "domestic"),
-                },
-                body: { lines: [{ id: "l1", description: lead.title, quantity: 1, unitPriceMinor: amount, taxCategory: "standard", discountBp: 0 }] },
-              }, `Quote ${number} drafted from the converted lead`);
-              quoteId = quote.id;
-              await context.mutate.patch(deal.id, { fields: { ...fields, quoteId } }, { event: `Quote ${number} linked to ${deal.title}` });
+                parentId: company?.id,
+                fields,
+              }, `Deal created from lead ${lead.title}`);
+              let quoteId: string | undefined;
+              if (withQuote === "yes") {
+                const numbers = data.quotes.map((quote) => Number(/(\d+)/.exec(String(quote.fields.number ?? quote.title))?.[1] ?? 0));
+                const number = `Q-${Math.max(100, ...numbers) + 1}`;
+                const quote = await context.mutate.create({
+                  collection: "quotes",
+                  title: `${number} ${lead.title}`,
+                  status: "draft",
+                  summary: `Draft quote created when the lead ${lead.title} was converted.`,
+                  amountMinor: amount,
+                  at: now.toISOString(),
+                  dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+                  parentId: deal.id,
+                  fields: {
+                    number, dealId: deal.id, contactId: contact?.id ?? "", version: 1,
+                    netMinor: amount, taxMinor: 0, customerTaxStatus: String(contact?.fields.taxStatus ?? "domestic"),
+                  },
+                  body: { lines: [{ id: "l1", description: lead.title, quantity: 1, unitPriceMinor: amount, taxCategory: "standard", discountBp: 0 }] },
+                }, `Quote ${number} drafted from the converted lead`);
+                quoteId = quote.id;
+                if (!(await context.mutate.patch(deal.id, { fields: { ...fields, quoteId } }, { event: `Quote ${number} linked to ${deal.title}` }))) return;
+              }
+              if (!(await context.mutate.patch(lead.id, {
+                status: "qualified",
+                fields: { ...lead.fields, stage: "converted", dealId: deal.id, convertedBy: context.actor, convertedAt: now.toISOString() },
+              }, { expectRevision: lead.revision, event: `Lead ${lead.title} converted to a deal` }))) return;
+              context.toast("Lead converted", quoteId
+                ? `${deal.title} is in Qualified with a draft quote attached, so it can advance past Proposal.`
+                : `${deal.title} is in Qualified. It will need a quote before it can advance past Proposal.`);
+              close();
+              context.navigate(`/o/${context.org.slug}/crm/deals/${deal.id}`);
+            } finally {
+              setBusy(false);
             }
-
-            await context.mutate.patch(lead.id, {
-              status: "qualified",
-              fields: { ...lead.fields, stage: "converted", dealId: deal.id, convertedBy: context.actor, convertedAt: now.toISOString() },
-            }, { expectRevision: lead.revision, event: `Lead ${lead.title} converted to a deal` });
-
-            context.toast("Lead converted", quoteId
-              ? `${deal.title} is in Qualified with a draft quote attached, so it can advance past Proposal.`
-              : `${deal.title} is in Qualified. It will need a quote before it can advance past Proposal.`);
-            setBusy(false);
-            close();
-            context.navigate(`/o/${context.org.slug}/crm/deals/${deal.id}`);
           }}
         >
           <Target size={15} aria-hidden="true" /> Convert to a deal
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -844,9 +883,45 @@ export function ConvertDialog({ context, close }: { context: ScreenContext; clos
 }
 
 export function RoutingRulesOverlay({ context }: { context: ScreenContext }) {
+  const data = useCrmData();
+  const rules = data.workflows.filter((workflow) => String(workflow.fields.trigger ?? "").startsWith("lead"));
+  const unassigned = data.leads.filter((lead) => !lead.fields.owner && !["disqualified", "converted"].includes(lead.status));
+  const load = data.owners.map((owner) => ({ owner, count: data.leads.filter((lead) => String(lead.fields.owner ?? "") === owner).length }));
+  const most = Math.max(1, ...load.map((item) => item.count));
   return (
     <Stack gap={4}>
-      <RoutingRules context={context} />
+      <FactGrid columns={3} items={[
+        { label: "Rules", value: String(rules.length), mono: true, hint: `${rules.filter((rule) => rule.status === "active").length} active` },
+        { label: "Unassigned leads", value: String(unassigned.length), mono: true, tone: unassigned.length ? "warning" : undefined },
+        { label: "Owners", value: String(load.length), mono: true },
+      ]} />
+      <OverlaySection title="Workload" hint="Routing goes by open leads per owner. No calendar is connected, so availability cannot be checked.">
+        <Stack gap={2}>
+          {load.map((item) => (
+            <Row key={item.owner} gap={3}>
+              <Avatar name={item.owner} size="sm" />
+              <span style={{ width: 110 }}>{item.owner}</span>
+              <span className="ds-grow"><Meter value={item.count} max={most} label={`${item.owner} leads`} /></span>
+              <span className="ds-num">{item.count}</span>
+            </Row>
+          ))}
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="Lead rules" hint="A rule only assigns an owner and raises a task. None contacts a customer; a suppressed contact is refused at the point of sending.">
+        <Stack gap={2}>
+          {rules.map((rule) => (
+            <Row key={rule.id} gap={3}>
+              <div className="ds-grow">
+                <strong>{rule.title}</strong>
+                <p className="ds-subtle">{rule.summary}</p>
+              </div>
+              <Pill tone={rule.status === "active" ? "success" : "neutral"} dot>{rule.status}</Pill>
+            </Row>
+          ))}
+          {rules.length === 0 && <span className="ds-subtle">No lead routing rule is defined.</span>}
+        </Stack>
+      </OverlaySection>
+      <OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/crm/automation`)}>Open Sales Automation</Button>} />
     </Stack>
   );
 }

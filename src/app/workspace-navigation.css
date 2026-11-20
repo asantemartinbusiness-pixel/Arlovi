@@ -23,10 +23,9 @@
 .ws-app-search input{flex:1;min-width:0;border:0;background:none;color:var(--fg-default);font:inherit;outline:none}.ws-app-search:focus-within{box-shadow:var(--focus-ring)}
 .ws-back{color:var(--fg-muted);font-size:var(--text-sm);text-decoration:none}.ws-back:hover{text-decoration:underline}
 .ws-tabs{display:flex;flex-wrap:wrap;gap:var(--space-1);border-bottom:1px solid var(--border-default)}.ws-tabs button{border:0;background:transparent;color:var(--fg-muted);font:500 var(--text-sm) var(--font-sans);min-height:44px;padding:var(--space-2) var(--space-3);cursor:pointer}
-.ws-tabs button[aria-current=page]{border-bottom:2px solid var(--accent);color:var(--fg-default)}.ws-tabs button:focus-visible{outline:2px solid var(--accent)}
+.ws-tabs button:focus-visible{outline:2px solid var(--accent)}
 .ws-note{font-size:var(--text-sm);line-height:1.6;color:var(--fg-muted)}
 .hq-rail-group.ws-primary-group{gap:var(--space-1)}.ws-primary-group .hq-rail-btn{border-radius:var(--radius-md)}
-.hq-rail-group.ws-primary-group .hq-rail-btn[data-active=true]{background:var(--selected-bg);color:var(--selected-fg)}
 .ws-sidebar .hq-navlink{gap:var(--space-3)}
 @media(max-width:699px){.ws-content{padding:var(--space-4) var(--space-4) var(--space-9)}.ws-stat-grid{grid-template-columns:1fr}.ws-stat-grid>div{padding:var(--space-4)}.ws-app-grid{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}.ws-entry{min-height:48px}.ws-page-head h1{font-size:clamp(26px,7vw,36px)}}
 @media(prefers-reduced-motion:reduce){.ws-entry{transition:none}}
@@ -46,8 +45,6 @@
 .ws-side-group+.ws-side-group{border-top:1px solid var(--border-subtle);padding-top:var(--space-2)}
 .ws-side-group .hq-navsection{padding-block:var(--space-2);margin-bottom:2px}
 .ws-sidebar .hq-navlink{min-height:40px;min-width:0;gap:var(--space-3)}
-.ws-sidebar .hq-navlink.ws-side-selected,
-.ws-sidebar .hq-navlink[aria-current=page]{background:var(--selected-bg);color:var(--selected-fg);font-weight:500}
 .ws-sidebar .hq-navlink:focus-visible,.ws-side-back a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ws-side-back{padding:var(--space-1) var(--space-2)}
 .ws-side-back a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--fg-muted);font-size:var(--text-xs);min-height:34px}
@@ -87,7 +84,6 @@
 .ws-detail-progress-track>span{display:block;height:100%;background:var(--accent);border-radius:inherit}
 .ws-detail-tabs{display:flex;gap:var(--space-1);overflow-x:auto;border-bottom:1px solid var(--border-default);scrollbar-width:thin;min-width:0;position:sticky;top:0;background:var(--bg-default);z-index:2}
 .ws-detail-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:0;border-bottom:2px solid transparent;white-space:nowrap;background:transparent;color:var(--fg-muted);min-height:48px;padding:var(--space-2) var(--space-3);font:500 var(--text-sm) var(--font-sans);cursor:pointer}
-.ws-detail-tabs button[aria-current=page]{border-bottom-color:var(--accent);color:var(--fg-default)}
 .ws-detail-tabs button:hover{color:var(--fg-default)}
 .ws-detail-tabs button span{font-size:var(--text-xs);border-radius:var(--radius-pill);background:var(--bg-sunken);padding:2px 6px;color:var(--fg-muted)}
 .ws-detail-overview{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(250px,.8fr);gap:var(--space-4);align-items:start}
@@ -127,24 +123,9 @@
 @media(max-width:680px){.ws-collaboration-head{flex-direction:column;align-items:stretch;padding:var(--space-4)}}
 
 
-/* The workspace's contextual navigation uses the same squared indicator
-   as native applications. Avoid border-radius/box-shadow state collisions. */
-.ws-sidebar .hq-navlink.ws-side-selected,
-.ws-sidebar .hq-navlink[aria-current="page"] {
-  box-shadow: none; border-radius: 9px; position: relative;
-}
-.ws-detail-tabs button[aria-current="page"], .ws-tabs button[aria-current="page"] {
-  border-radius: 0; box-shadow: none;
-}
-
-
-/* The familiar long selected pill, across workspace and app navigation. */
-.ws-sidebar .hq-navlink.ws-side-selected,
-.ws-sidebar .hq-navlink[aria-current="page"] {
-  border-radius: 999px;
-  background: var(--selection-pop);
-  color: var(--selection-pop-fg);
-  box-shadow: none;
-}
-.ws-sidebar .hq-navlink.ws-side-selected::before,
-.ws-sidebar .hq-navlink[aria-current="page"]::before { content: none; display: none; }
+/* Sidebar selection (the single pink pill) is declared once in shell.css; nothing here competes with it.
+   In-page tab strips use the same pill, never an underline. */
+.ws-tabs button,.ws-detail-tabs button{border-radius:var(--radius-pill);min-height:36px}
+.ws-tabs,.ws-detail-tabs{border-bottom:0;gap:var(--space-1)}
+.ws-tabs button[aria-current=page],.ws-detail-tabs button[aria-current=page]{background:var(--selection-pop);color:var(--selection-pop-fg);border-bottom-color:transparent;font-weight:600}
+.ws-tabs button:not([aria-current=page]):hover,.ws-detail-tabs button:not([aria-current=page]):hover{background:var(--bg-hover)}

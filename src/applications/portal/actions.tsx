@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import {
+  Button, Checkbox, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+} from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { getRecord, listByCollection } from "@/platform/repo";
 import { CAPABILITY_LABELS } from "@/platform/capability";
@@ -297,7 +299,8 @@ export async function downloadDocument(context: ScreenContext) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  await context.mutate.patch(document.id, { fields: { ...document.fields, downloads: Number(document.fields.downloads ?? 0) + 1, lastDownloadedAt: iso(context), lastDownloadedBy: context.actor } }, { expectRevision: document.revision, event: `${document.title} downloaded by ${context.actor}` });
+  const saved1 = await context.mutate.patch(document.id, { fields: { ...document.fields, downloads: Number(document.fields.downloads ?? 0) + 1, lastDownloadedAt: iso(context), lastDownloadedBy: context.actor } }, { expectRevision: document.revision, event: `${document.title} downloaded by ${context.actor}` });
+  if (!saved1) return;
   context.toast("Downloaded", "The document's record was saved as a text file. No stored file exists to download.");
 }
 
@@ -469,10 +472,9 @@ export function RevokeAccess({ context, close }: { context: ScreenContext; close
         <>
           <Field label="Person"><Select value={user?.id ?? ""} onChange={(event) => setUserId(event.target.value)}>{users.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.email}</option>)}</Select></Field>
           <Notice tone="warning" title="Revoking takes effect immediately">{user?.name} is removed from the portal's list, so every link they hold stops resolving now. Records they could see stay in the workspace.</Notice>
-          <Row gap={2}>
-            <Button variant="ghost" onClick={close}>Cancel</Button>
-            <span className="ds-grow" />
-            <Button variant="danger" busy={busy} disabled={!user} onClick={async () => {
+          <ModalActions>
+            <OverlayActions variant="confirm"
+              primary={<Button variant="danger" busy={busy} disabled={!user} onClick={async () => {
               if (!user) return;
               setBusy(true);
               const saved = await context.mutate.patch(portal.id, {
@@ -483,8 +485,10 @@ export function RevokeAccess({ context, close }: { context: ScreenContext; close
               if (!saved) return;
               context.toast("Access revoked", `${user.name} can no longer open ${portal.title}.`);
               close();
-            }}>Revoke access</Button>
-          </Row>
+            }}>Revoke access</Button>}
+              end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+            />
+          </ModalActions>
         </>
       )}
     </Stack>

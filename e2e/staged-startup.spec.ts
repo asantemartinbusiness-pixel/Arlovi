@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("workspace opens with core company data while native apps register",async({page})=>{
   await page.goto("/o/northline/workspace/home");
-  await expect(page.getByRole("heading",{name:"Your day, in one place."})).toBeVisible();
+  await expect(page.getByRole("heading",{name:/need you today|waiting on you/i})).toBeVisible();
   await expect(page.getByRole("navigation",{name:/navigation/}).first()).toBeVisible();
 });
 
@@ -18,5 +18,5 @@ test("background contributors preserve customer-created local work across reload
   await expect(page.getByRole("heading",{name:"Projects"})).toBeVisible();
   await page.goto("/o/northline/workspace/home");
   await page.reload();
-  await expect(page.getByRole("heading",{name:"Your day, in one place."})).toBeVisible();
+  await expect(page.getByRole("heading",{name:/need you today|waiting on you/i})).toBeVisible();
 });

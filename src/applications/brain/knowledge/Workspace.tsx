@@ -296,7 +296,7 @@ function CollectionNote({ context, collection, collections, records, onDeleted }
     setBusy(true);
     try {
       for (const record of members) {
-        await context.mutate.patch(record.id, { fields: { ...record.fields, collectionId: "" } }, { event: `Moved to No collection: “${collection.title}” was deleted` });
+        if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, collectionId: "" } }, { event: `Moved to No collection: “${collection.title}” was deleted` }))) return;
       }
       await context.mutate.remove(collection.id, `Knowledge collection “${collection.title}” deleted; ${members.length} record${members.length === 1 ? "" : "s"} moved to No collection`);
       context.toast("Collection deleted", `${members.length} record${members.length === 1 ? "" : "s"} moved to No collection. No record was deleted.`);

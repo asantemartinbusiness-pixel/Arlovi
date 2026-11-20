@@ -1,14 +1,14 @@
 import { resourceCapacity } from "./availability";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice, Pill,
-  Properties, Row, Segmented, Select, Stack, Stat, StatRow,
+  BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, KeyValueList, Meter, Notice, PageSection, Pill,
+  Properties, Row, Segmented, Select, Stack, Stat, StatRow, type RecordHeaderProps,
 } from "@/design-system";
 import { CalendarClock, CalendarDays, Clock, Users, Wrench } from "lucide-react";
 import type { ScreenContext } from "@/platform/registry";
-import { useRecord, useWorkspace } from "@/platform/workspace";
-import { addDays, resolveRange, sameDay, startOfWeek } from "@/platform/clock";
+import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
+import { addDays, resolveRange, sameDay, startOfDay, startOfWeek } from "@/platform/clock";
 import { computeInvoice } from "@/platform/money";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
@@ -100,14 +100,34 @@ export function BookingsOverview({ context, lens }: { context: ScreenContext; le
   }
 
   const rows = lens === "Week" ? weeks : todays;
+  const upcoming = data.bookings
+    .filter((booking) => isLive(booking) && booking.startAt && new Date(booking.startAt) >= now)
+    .sort((a, b) => a.startAt!.localeCompare(b.startAt!))
+    .slice(0, 3);
   return (
     <Stack gap={5}>
+      <PageSection title="Next up" hint={upcoming.length ? "The next appointments, with what each one still needs" : undefined}>
+        {upcoming.length === 0 ? <span className="ds-subtle">Nothing is booked from now on.</span> : (
+          <ul className="book-ledger" data-flush>
+            {upcoming.map((booking) => {
+              const state = String(booking.fields.depositState ?? "none");
+              const needs = booking.status === "hold" ? "Held, not confirmed" : state === "awaiting_payment" ? "Deposit awaiting payment" : state === "not_requested" ? "Deposit not requested" : "Ready";
+              return (
+                <li key={booking.id}>
+                  <Pill tone={needs === "Ready" ? "success" : "warning"} dot>{needs === "Ready" ? "Ready" : "Needs action"}</Pill>
+                  <span className="book-ledger-label"><Link to={`/o/${org.slug}/book/bookings/${booking.id}`}>{booking.title}</Link> <span className="ds-subtle">{resourceOf(data, booking)?.title}</span></span>
+                  <span className="book-ledger-detail ds-num">{context.relative(booking.startAt)}{needs !== "Ready" ? `, ${needs.toLowerCase()}` : ""}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </PageSection>
       <StatRow>
         <Stat label="Appointments today" value={String(todays.filter(isLive).length)} prov="human" meta={`${weeks.filter(isLive).length} this week`} onClick={() => context.openOverlay("capacity alert")} />
         <Stat label="Held, not confirmed" value={String(data.bookings.filter((booking) => booking.status === "hold").length)} prov="human" meta="Blocking a resource" />
         <Stat label="Deposits awaiting payment" value={context.money(data.bookings.filter((booking) => String(booking.fields.depositState) === "awaiting_payment").reduce((sum, booking) => sum + Number(booking.fields.depositMinor ?? 0), 0))} prov="human" meta="No processor is connected" />
         <Stat label="Cancellations" value={String(cancellations.length)} prov="human" meta={`${noShows.length} no-shows recorded`} />
-        <Stat label="Online bookings today" value="Unavailable" unavailable meta="The public page is not hosted" />
       </StatRow>
 
       <Grid>
@@ -174,6 +194,31 @@ export function BookingsOverview({ context, lens }: { context: ScreenContext; le
 
 /* ---------------------------- BOOK-002 ---------------------------- */
 
+/** How full the resource is across the window shown: booked seat-minutes against the working hours it offers. */
+function CapacityStrip({ resource, bookings, from, days }: { resource: Rec; bookings: Rec[]; from: Date; days: number }) {
+  const hours = workingHours(resource);
+  const capacity = resourceCapacity(resource);
+  let offered = 0;
+  for (let index = 0; index < days; index += 1) {
+    if (hours.days.includes(addDays(from, index).getDay())) offered += (hours.endHour - hours.startHour) * 60 * capacity;
+  }
+  const to = addDays(from, days);
+  const booked = bookedMinutes(bookings, resource.id, from, to);
+  const inWindow = bookings.filter((booking) => String(booking.fields.resourceId) === resource.id && booking.startAt && new Date(booking.startAt) >= from && new Date(booking.startAt) < to);
+  const held = inWindow.filter((booking) => booking.status === "hold").length;
+  const confirmed = inWindow.filter((booking) => isLive(booking) && booking.status !== "hold").length;
+  const percent = offered ? Math.min(100, Math.round((booked / offered) * 100)) : 0;
+  return (
+    <div className="book-capstrip" role="group" aria-label={`${resource.title} capacity`}>
+      <span className="book-capstrip-stat"><strong className="ds-num">{percent}%</strong><span className="ds-subtle">of {Math.round(offered / 60)} h offered is booked</span></span>
+      <span className="book-capstrip-meter"><Meter value={percent} max={100} label={`${resource.title} utilisation`} tone={percent >= 90 ? "danger" : percent >= 70 ? "warning" : undefined} /></span>
+      <span className="book-capstrip-stat"><strong className="ds-num">{confirmed}</strong><span className="ds-subtle">confirmed</span></span>
+      <span className="book-capstrip-stat"><strong className="ds-num">{held}</strong><span className="ds-subtle">held, not confirmed</span></span>
+      <span className="book-capstrip-stat"><strong className="ds-num">{capacity}</strong><span className="ds-subtle">{capacity === 1 ? "seat" : "seats"}</span></span>
+          </div>
+  );
+}
+
 export function BookingCalendar({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useBookData();
   const { now, org } = useWorkspace();
@@ -187,10 +232,10 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
     const booking = data.bookings.find((item) => item.id === bookingId);
     if (!booking) return;
     const nextResource = bookable.some((resource) => resource.id === columnId) ? columnId : String(booking.fields.resourceId);
-    await context.mutate.patch(bookingId, {
+    if (!(await context.mutate.patch(bookingId, {
       startAt, endAt, at: startAt,
       fields: { ...booking.fields, resourceId: nextResource },
-    }, { expectRevision: booking.revision, event: `${booking.title} rescheduled to ${startAt}` });
+    }, { expectRevision: booking.revision, event: `${booking.title} rescheduled to ${startAt}` }))) return;
     context.toast("Booking moved", `${booking.title} is now ${context.dateTime(startAt)}. The slot was checked for a conflict before the move.`);
   };
 
@@ -282,6 +327,7 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
           </Select>
         </Field>
       </Row>
+      {active && <CapacityStrip resource={active} bookings={data.bookings} from={mode === "week" ? startOfWeek(anchor, 1) : startOfDay(anchor)} days={mode === "week" ? 7 : 1} />}
       {!active ? <Empty title="No bookable resource" icon={<Wrench size={20} />} /> : (
         <AvailabilityGrid
           bookings={data.bookings}
@@ -300,14 +346,76 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
           onCreate={(_columnId, startAt) => context.openOverlay("Booking form", { resourceId: active.id, startAt })}
         />
       )}
-      <Notice tone="info" title="No resource is booked past its capacity">
-        Every move and every new booking is checked against the existing bookings for that resource, and for any resource linked to it, before it is written. A single-seat resource takes one booking at a time; a multi-seat resource such as the showroom floor takes bookings side by side until its seats are full. A clash is refused with the booking that already holds the slot.
-      </Notice>
     </Stack>
   );
 }
 
 /* ---------------------------- BOOK-003 ---------------------------- */
+
+/* RecordHeader slots are components so each can read the live booking;
+   ScreenDef.record is called as a plain function. */
+function useBookingOf(context: ScreenContext) {
+  const data = useBookData();
+  const booking = useRecord(context.params.id) ?? data.bookings.find((item) => item.id === context.params.id);
+  return { data, booking, service: serviceOf(data, booking), resource: resourceOf(data, booking) };
+}
+
+function BookingTitle({ context }: { context: ScreenContext }) {
+  const { booking } = useBookingOf(context);
+  return <>{booking?.title ?? "Booking"}</>;
+}
+
+function BookingStatus({ context }: { context: ScreenContext }) {
+  const { booking } = useBookingOf(context);
+  if (!booking) return null;
+  const state = String(booking.fields.depositState ?? "none");
+  return (
+    <>
+      <Pill tone={statusTone(booking.status)} dot>{booking.status.replace("_", " ")}</Pill>{" "}
+      {state !== "none" && <Pill tone={state === "paid_local" ? "success" : state === "awaiting_payment" ? "warning" : "neutral"}>{DEPOSIT_LABEL[state] ?? state}</Pill>}
+    </>
+  );
+}
+
+function BookingSubtitle({ context }: { context: ScreenContext }) {
+  const { data, booking } = useBookingOf(context);
+  const contact = data.contacts.find((item) => item.id === String(booking?.fields.contactId ?? ""));
+  if (!booking) return null;
+  return <>{contact ? <Link to={`/o/${context.org.slug}/crm/contacts/${contact.id}`}>{contact.title}</Link> : "Walk-in or internal hold"}</>;
+}
+
+function BookingFactsLine({ context }: { context: ScreenContext }) {
+  const { booking, service, resource } = useBookingOf(context);
+  if (!booking) return null;
+  return (
+    <span className="book-facts">
+      <span className="ds-num">{context.dateTime(booking.startAt)} to {booking.endAt ? context.dateTime(booking.endAt).split(", ").pop() : "?"}</span>
+      <span>{service?.title ?? "No service"}</span>
+      <span>{resource?.title ?? "No resource"}</span>
+      <span className="ds-subtle ds-num">{String(booking.fields.seats ?? 1)} seat{Number(booking.fields.seats ?? 1) === 1 ? "" : "s"}</span>
+    </span>
+  );
+}
+
+export function bookingRecord(context: ScreenContext): RecordHeaderProps {
+  return {
+    title: <BookingTitle context={context} />,
+    status: <BookingStatus context={context} />,
+    subtitle: <BookingSubtitle context={context} />,
+    meta: [<BookingFactsLine key="facts" context={context} />],
+  };
+}
+
+/** One line of the deposit ledger: required, requested, received. */
+function LedgerRow({ label, state, tone, detail }: { label: string; state: string; tone: "success" | "warning" | "neutral" | "info"; detail: ReactNode }) {
+  return (
+    <li>
+      <Pill tone={tone} dot>{state}</Pill>
+      <span className="book-ledger-label">{label}</span>
+      <span className="book-ledger-detail">{detail}</span>
+    </li>
+  );
+}
 
 export function BookingDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useBookData();
@@ -317,6 +425,7 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
   const resource = resourceOf(data, booking);
   const contact = data.contacts.find((item) => item.id === String(booking?.fields.contactId ?? ""));
   const invoice = useRecord(booking?.fields.invoiceId ? String(booking.fields.invoiceId) : undefined);
+  const events = useEvents(booking?.id, 80);
   if (!booking) return <Empty title="Booking not found" />;
 
   const totals = computeInvoice({
@@ -337,7 +446,7 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
           <Stat label="Processor reference" value="Unavailable" unavailable meta="No payment processor is connected" />
         </StatRow>
         <TotalsBlock totals={totals} money={context.money} label="Service" />
-        <ProviderBoundary id="payment.capture" title="A deposit cannot be taken here" >
+        <ProviderBoundary kept={"the deposit is recorded on the booking as requested or received; no card was charged."} id="payment.capture" title="A deposit cannot be taken here" >
           The deposit amount, the service and the person it belongs to are recorded against this booking. Collecting it needs a processor, so the booking says awaiting payment rather than implying money arrived.
         </ProviderBoundary>
       </Stack>
@@ -361,7 +470,7 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
             ))}
           </ol>
         )}
-        <ProviderBoundary id="email.send" />
+        <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" />
       </Stack>
     );
   }
@@ -386,24 +495,29 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
   const noticeHours = Number(service?.fields.cancellationNoticeHours ?? 24);
   const hoursAway = booking.startAt ? (new Date(booking.startAt).getTime() - now.getTime()) / 3_600_000 : 0;
 
+  const requiredMinor = Number(booking.fields.depositMinor ?? service?.fields.depositMinor ?? 0);
+  const depositState = String(booking.fields.depositState ?? "none");
+  const requestedAt = events.find((event) => /^Deposit of .* requested on /.test(event.message))?.at;
+  const receivedAt = events.find((event) => /received outside Arlovi/.test(event.message))?.at;
+  const requested = depositState === "awaiting_payment" || depositState === "paid_local";
+  const received = depositState === "paid_local";
+  const seats = Number(booking.fields.seats ?? 1);
+  const capacity = resource ? resourceCapacity(resource) : 1;
+  const hasWindow = Boolean(booking.startAt && booking.endAt);
+
   return (
     <Grid>
-      <Card span={5} eyebrow="GUEST" prov="human" title={contact?.title ?? "No contact linked"} subtitle={contact ? String(contact.fields.email ?? "") : "Walk-in or internal hold"}>
-        <Properties rows={[
-          { label: "Service", value: service?.title ?? "—" },
-          { label: "Resource", value: resource?.title ?? "—" },
-          { label: "Starts", value: <span className="ds-num">{context.dateTime(booking.startAt)}</span> },
-          { label: "Length", value: <span className="ds-num">{minutesOf(booking)} minutes</span> },
-          { label: "Seats", value: <span className="ds-num">{String(booking.fields.seats ?? 1)}</span> },
-          { label: "Source", value: String(booking.fields.source ?? "internal").replace("_", " ") },
-        ]} />
-      </Card>
-      <Card span={7} eyebrow="STATE" prov="human" title="Status and deposit" subtitle={`${booking.status.replace("_", " ")} · ${DEPOSIT_LABEL[String(booking.fields.depositState ?? "none")] ?? ""}`}>
+      <div className="ds-col-7"><Stack gap={4}>
+      <PageSection title="Time, capacity and resource" hint={clashes.length ? undefined : "Every write re-checks this slot against the resource and anything linked to it."}>
         <Stack gap={3}>
-          <Properties rows={[
-            { label: "Booking state", value: <Pill tone={statusTone(booking.status)} dot>{booking.status.replace("_", " ")}</Pill> },
-            { label: "Deposit", value: Number(booking.fields.depositMinor ?? 0) ? <span className="ds-num">{context.money(Number(booking.fields.depositMinor))}</span> : "None for this service" },
-            { label: "Reminder", value: <Pill tone="warning">{String(booking.fields.reminderState ?? "not_sent").replace(/_/g, " ")}</Pill> },
+          <KeyValueList columns={2} items={[
+            { label: "Starts", value: context.dateTime(booking.startAt), mono: true, hint: booking.startAt ? context.relative(booking.startAt) : undefined },
+            { label: "Ends", value: context.dateTime(booking.endAt), mono: true },
+            { label: "Length", value: `${minutesOf(booking)} minutes`, mono: true },
+            { label: "Seats", value: `${seats} of ${capacity} on ${resource?.title ?? "the resource"}`, mono: true },
+            { label: "Resource", value: resource?.title ?? "None" },
+            { label: "Service", value: service?.title ?? "None" },
+            { label: "Source", value: String(booking.fields.source ?? "internal").replace("_", " ") },
             { label: "Checked in", value: booking.fields.checkedIn === true ? "Yes" : "No" },
           ]} />
           {booking.status === "hold" && (
@@ -416,25 +530,65 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
               {clashes.map((clash) => `${clash.booking.title} holds ${data.resources.find((item) => item.id === clash.resourceId)?.title ?? clash.resourceId}`).join("; ")}. One of them has to move.
             </Notice>
           )}
-          <Notice tone={hoursAway < noticeHours ? "warning" : "info"} title={`Cancellation notice: ${noticeHours} hours`}>
-            {booking.startAt
-              ? hoursAway < 0
-                ? "This appointment is in the past."
-                : hoursAway < noticeHours
-                  ? `It starts in ${Math.round(hoursAway)} hours, inside the notice period. Cancelling now may incur a fee of ${((Number(service?.fields.cancellationFeeBp ?? 0)) / 100).toFixed(0)}% of the service value.`
-                  : `It starts in ${Math.round(hoursAway)} hours, outside the notice period, so no fee applies.`
-              : "No start time is recorded."}
-          </Notice>
+          {resource && hasWindow && blackoutFor(resource, booking.startAt ?? "", booking.endAt ?? "") && (
+            <Notice tone="danger" title="The resource is marked unavailable in this window">
+              {resource.title} has a blackout covering this appointment. It needs moving or the blackout needs changing.
+            </Notice>
+          )}
         </Stack>
-      </Card>
-      <Card span={12} eyebrow="SERVICE HISTORY" prov="human" title="Invoice" subtitle={invoice ? `${invoice.title} · ${invoice.status.replace("_", " ")}` : "No invoice raised for this booking"}>
+      </PageSection>
+
+      <PageSection title="Guest and follow-up">
+        <KeyValueList items={[
+          { label: "Guest", value: contact ? <Link to={`/o/${org.slug}/crm/contacts/${contact.id}`}>{contact.title}</Link> : "No contact linked" },
+          { label: "Email", value: contact ? String(contact.fields.email ?? "None on file") : "None", mono: true },
+          { label: "Reminder", value: <Pill tone="warning">{String(booking.fields.reminderState ?? "not_sent").replace(/_/g, " ")}</Pill> },
+        ]} />
+      </PageSection>
+      </Stack></div>
+
+      <div className="ds-col-5"><Stack gap={4}>
+      <PageSection title="Deposit" hint="Requested and received are different facts. Nothing is charged here.">
+        <Stack gap={3}>
+          {requiredMinor > 0 || depositState !== "none" ? (
+            <ul className="book-ledger">
+              <LedgerRow label="Required" state={requiredMinor ? "Required" : "None"} tone={requiredMinor ? "info" : "neutral"}
+                detail={<span className="ds-num">{requiredMinor ? context.money(requiredMinor) : "No deposit"}</span>} />
+              <LedgerRow label="Requested" state={requested ? "Requested" : depositState === "waived" ? "Waived" : "Not requested"} tone={requested ? "warning" : "neutral"}
+                detail={requested ? <span className={requestedAt ? "ds-num" : undefined}>{requestedAt ? context.relative(requestedAt) : "On the booking record"}</span> : "No request recorded"} />
+              <LedgerRow label="Received" state={received ? "Received" : "Not received"} tone={received ? "success" : "neutral"}
+                detail={received ? <span className="ds-num">{context.money(requiredMinor)}{receivedAt ? `, ${context.relative(receivedAt)}` : ""}</span> : "Nothing has arrived"} />
+            </ul>
+          ) : <span className="ds-subtle">This service takes no deposit.</span>}
+          {requiredMinor > 0 && (
+            <KeyValueList items={[
+              { label: "Outstanding", value: context.money(received ? 0 : requiredMinor), mono: true, tone: received ? undefined : "warning" },
+            ]} />
+          )}
+          {received && <p className="ds-subtle">Marked received outside Arlovi by a person. No processor confirmed it.</p>}
+        </Stack>
+      </PageSection>
+
+      <PageSection title={`Cancellation notice: ${noticeHours} hours`}>
+        <Notice tone={hoursAway < noticeHours ? "warning" : "info"} title={booking.startAt ? (hoursAway < 0 ? "In the past" : hoursAway < noticeHours ? "Inside the notice period" : "Outside the notice period") : "No start time"}>
+          {booking.startAt
+            ? hoursAway < 0
+              ? "This appointment is in the past."
+              : hoursAway < noticeHours
+                ? `It starts in ${Math.round(hoursAway)} hours. Cancelling now may incur a fee of ${((Number(service?.fields.cancellationFeeBp ?? 0)) / 100).toFixed(0)}% of the service value.`
+                : `It starts in ${Math.round(hoursAway)} hours, so no fee applies.`
+            : "No start time is recorded."}
+        </Notice>
+      </PageSection>
+      </Stack></div>
+
+      <PageSection span={12} title="Invoice" hint={invoice ? `${invoice.title} · ${invoice.status.replace("_", " ")}` : "No invoice raised for this booking"}>
         {invoice ? (
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList columns={2} items={[
               { label: "Invoice", value: <Link to={`/o/${org.slug}/fin/invoices/${invoice.id}`}>{invoice.title}</Link> },
               { label: "State in Finance", value: <Pill tone={invoice.status === "paid" ? "success" : "warning"}>{invoice.status.replace("_", " ")}</Pill> },
-              { label: "Gross", value: <span className="ds-num">{context.money(invoice.amountMinor)}</span> },
-              { label: "Customer", value: contact ? <Link to={`/o/${org.slug}/crm/contacts/${contact.id}`}>{contact.title}</Link> : "—" },
+              { label: "Gross", value: context.money(invoice.amountMinor), mono: true },
               { label: "Raised by", value: `${String(booking.fields.invoicedBy ?? invoice.createdBy)} on ${context.dateTime(String(booking.fields.invoicedAt ?? invoice.createdAt))}` },
             ]} />
             {invoice.status === "draft" && <Notice tone="info" title="A draft invoice is not in the ledger">Finance approves and posts it; until then nothing is receivable.</Notice>}
@@ -450,12 +604,7 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
             </Stack>
           );
         })()}
-      </Card>
-      {resource && blackoutFor(resource, booking.startAt ?? "", booking.endAt ?? "") && (
-        <Card span={12} prov="unknown" title="The resource is marked unavailable in this window">
-          <Notice tone="danger">{resource.title} has a blackout covering this appointment. It needs moving or the blackout needs changing.</Notice>
-        </Card>
-      )}
+      </PageSection>
     </Grid>
   );
 }
@@ -737,7 +886,7 @@ export function PublicBookingPage({ context, lens }: { context: ScreenContext; l
             <Button variant="primary" disabled>Request this time — needs hosting</Button>
           </div>
         </div>
-        <ProviderBoundary id="site.publish" title="The booking page is not published" />
+        <ProviderBoundary kept={"the booking page and its fields are saved and export as HTML; nothing is published."} id="site.publish" title="The booking page is not published" />
       </Stack>
     );
   }
@@ -808,7 +957,7 @@ export function RemindersAndNoShows({ context, lens }: { context: ScreenContext;
     const queued = data.bookings.filter((booking) => String(booking.fields.reminderState) === "queued_local");
     return (
       <Stack gap={4}>
-        <ProviderBoundary id="email.send" title="No reminder has ever been delivered" />
+        <ProviderBoundary kept={"the booking and any message are held locally; no confirmation or reminder has been sent."} id="email.send" title="No reminder has ever been delivered" />
         <DataGrid rows={data.bookings.filter((booking) => booking.startAt)} rowId={(row) => row.id} label="Reminder history"
           columns={[
             { key: "title", header: "Booking", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },

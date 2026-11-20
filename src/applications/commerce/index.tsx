@@ -1,9 +1,10 @@
 import { BarChart3, Boxes, CreditCard, Package, RotateCcw, ShoppingBag, Store, Tags, Truck } from "lucide-react";
-import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Empty, KeyValueList, Notice, OVERLAY_WIDTH, Pill, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useRecord, useWorkspace } from "@/platform/workspace";
-import { confirmOverlay, submitFooter } from "@/applications/market/kit";
+import { confirmOverlay } from "@/applications/market/kit";
+import { commerceFooter, hasPayloadIds, OrderHeading, orderMeta, ProductHeading } from "./kit";
 import { RequisitionForm, ScanOverlay } from "@/applications/proc/overlays";
 import {
   archiveProduct, AssignOrder, BuyerMessage, Categorise, ChangePrice, CheckoutPolicy, createLabel, CustomerSegments,
@@ -12,7 +13,7 @@ import {
 } from "./actions";
 import "@/applications/market/growth.css";
 import { AdvanceShipment, FulfilLines, RaiseReturn, RecordRefund, StockAdjustmentForm, StockHistory } from "./operations";
-import { bodyOf, statusTone, taxCategoryOfProduct, type OrderBody, type ProductBody } from "./data";
+import { bodyOf, taxCategoryOfProduct, type ProductBody } from "./data";
 import {
   CheckoutAdmin, CommerceAnalytics, CommerceOverview, Fulfilment, Inventory, OrderDetail,
   Orders, ProductDetail, Products, Promotions, Returns, StorefrontBuilder,
@@ -83,11 +84,11 @@ export const commerceApp = registerApp({
         { id: "location", label: "Choose a location", placement: "overflow", run: (context) => context.openOverlay("store picker") },
       ],
       overlays: [
-        { id: "KPI explanation", kind: "drawer", title: "How this figure is built", width: 600, render: ({ ...context }) => <KpiExplanation context={context} /> },
-        { id: "exception list", kind: "drawer", title: "Exceptions", width: 620, render: ({ ...context }) => <ExceptionList context={context} /> },
-        { id: "store picker", kind: "modal", title: "Choose a location", width: 560, render: ({ close }) => <StorePicker close={close} />, footer: submitFooter("store-picker", "Show this location") },
-        { id: "Offer builder", kind: "drawer", title: "Offer", width: 640, render: ({ close, ...context }) => <OfferBuilder context={context} close={close} />, footer: submitFooter("offer-builder", "Save offer") },
-        { id: "product inspector", kind: "drawer", title: "Product", width: 600, render: ({ ...context }) => <ProductInspect context={context} /> },
+        { id: "KPI explanation", kind: "drawer", title: "How this figure is built", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <KpiExplanation context={context} /> },
+        { id: "exception list", kind: "drawer", title: "Exceptions", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ExceptionList context={context} /> },
+        { id: "store picker", kind: "modal", title: "Choose a location", width: OVERLAY_WIDTH.form, render: ({ close }) => <StorePicker close={close} />, footer: commerceFooter("store-picker", "Show this location") },
+        { id: "Offer builder", kind: "drawer", title: "Offer", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <OfferBuilder context={context} close={close} />, footer: commerceFooter("offer-builder", "Save offer") },
+        { id: "product inspector", kind: "drawer", title: "Product", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <ProductInspect context={context} /> },
       ],
     },
 
@@ -108,10 +109,10 @@ export const commerceApp = registerApp({
         { id: "import", label: "Import from CSV", placement: "overflow", run: (context) => context.openOverlay("import mapping") },
       ],
       overlays: [
-        { id: "Product editor", kind: "drawer", title: "Product", width: 640, render: ({ close, ...context }) => <ProductEditor context={context} close={close} />, footer: submitFooter("product-editor", "Save product") },
-        { id: "import mapping", kind: "modal", title: "Import products", width: 620, render: ({ close, ...context }) => <ImportMapping context={context} close={close} />, footer: submitFooter("import-mapping", "Import as drafts") },
-        { id: "bulk preview", kind: "modal", title: "Bulk publish preview", width: 680, render: ({ close, ...context }) => <BulkPreview context={context} close={close} /> },
-        { id: "categorise", kind: "modal", title: "Categorise", width: 520, render: ({ close, ...context }) => <Categorise context={context} close={close} />, footer: submitFooter("categorise", "Move to collection") },
+        { id: "Product editor", kind: "drawer", title: "Product", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ProductEditor context={context} close={close} />, footer: commerceFooter("product-editor", "Save product") },
+        { id: "import mapping", kind: "modal", title: "Import products", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ImportMapping context={context} close={close} />, footer: commerceFooter("import-mapping", "Import as drafts") },
+        { id: "bulk preview", kind: "modal", title: "Bulk publish preview", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BulkPreview context={context} close={close} /> },
+        { id: "categorise", kind: "modal", title: "Categorise", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <Categorise context={context} close={close} />, footer: commerceFooter("categorise", "Move to collection") },
         confirmOverlay,
       ],
     },
@@ -120,7 +121,12 @@ export const commerceApp = registerApp({
     "ARL-COMMERCE-003": {
       id: "ARL-COMMERCE-003",
       title: () => "Product",
-      subtitle: (context) => `Pricing resolves through the ${context.org.jurisdiction} tax rules for this product's category.`,
+      record: (context) => ({
+        title: <ProductHeading context={context} part="title" />,
+        status: <ProductHeading context={context} part="status" />,
+        subtitle: <ProductHeading context={context} part="subtitle" />,
+        meta: [<ProductHeading key="facts" context={context} part="meta" />],
+      }),
       tabs: ["Overview", "Variants", "Media", "Pricing", "SEO", "History"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ProductDetail context={context} lens={lens} />,
@@ -134,12 +140,12 @@ export const commerceApp = registerApp({
         { id: "media", label: "Media", placement: "overflow", run: (context) => context.openOverlay("media picker") },
       ],
       overlays: [
-        { id: "Variant editor", kind: "modal", title: "New variant", width: 560, render: ({ close, ...context }) => <VariantEditor context={context} close={close} />, footer: submitFooter("variant-editor", "Add variant") },
-        { id: "media picker", kind: "modal", title: "Media", width: 560, render: ({ close, ...context }) => <MediaPicker context={context} close={close} />, footer: submitFooter("media-picker", "Add reference") },
-        { id: "margin impact", kind: "drawer", title: "Margin impact", width: 560, render: ({ ...context }) => <MarginImpact context={context} /> },
-        { id: "publish", kind: "modal", title: "Publish to the storefront", width: 560, render: ({ close, ...context }) => <PublishProduct context={context} close={close} /> },
-        { id: "Product editor", kind: "drawer", title: "Product", width: 640, render: ({ close, ...context }) => <ProductEditor context={context} close={close} />, footer: submitFooter("product-editor", "Save product") },
-        { id: "change price", kind: "modal", title: "Change price", width: 600, render: ({ close, ...context }) => <ChangePrice context={context} close={close} />, footer: submitFooter("change-price", "Change price") },
+        { id: "Variant editor", kind: "modal", title: "New variant", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <VariantEditor context={context} close={close} />, footer: commerceFooter("variant-editor", "Add variant") },
+        { id: "media picker", kind: "modal", title: "Media", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MediaPicker context={context} close={close} />, footer: commerceFooter("media-picker", "Add reference") },
+        { id: "margin impact", kind: "drawer", title: "Margin impact", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <MarginImpact context={context} /> },
+        { id: "publish", kind: "modal", title: "Publish to the storefront", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishProduct context={context} close={close} /> },
+        { id: "Product editor", kind: "drawer", title: "Product", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <ProductEditor context={context} close={close} />, footer: commerceFooter("product-editor", "Save product") },
+        { id: "change price", kind: "modal", title: "Change price", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ChangePrice context={context} close={close} />, footer: commerceFooter("change-price", "Change price") },
       ],
       inspector: (context) => <ProductInspector context={context} />,
       inspectorTitle: "Product facts",
@@ -163,12 +169,12 @@ export const commerceApp = registerApp({
         { id: "receiving", label: "Open Receiving", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/proc/receiving`) },
       ],
       overlays: [
-        { id: "Stock adjustment", kind: "modal", title: "Adjust stock", width: 580, render: ({ close, ...context }) => <StockAdjustmentForm context={context} close={close} />, footer: submitFooter("stock-adjustment", "Record movement") },
-        { id: "stock history", kind: "drawer", title: "Stock history", width: 780, render: ({ ...context }) => <StockHistory context={context} /> },
-        { id: "transfer approval", kind: "modal", title: "Transfer between locations", width: 620, render: ({ close, ...context }) => <TransferApproval context={context} close={close} />, footer: submitFooter("transfer-approval", "Record transfer") },
-        { id: "count reconciliation", kind: "drawer", title: "Stock count", width: 700, render: ({ close, ...context }) => <CountReconciliation context={context} close={close} />, footer: submitFooter("count-reconciliation", "Record variances") },
-        { id: "Requisition form", kind: "drawer", title: "Reorder: raise a requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
-        { id: "receive goods", kind: "drawer", title: "Receive goods", width: 780, render: ({ close, ...context }) => <ScanOverlay context={context} close={close} />, footer: submitFooter("scan-overlay", "Record receipt") },
+        { id: "Stock adjustment", kind: "modal", title: "Adjust stock", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <StockAdjustmentForm context={context} close={close} />, footer: commerceFooter("stock-adjustment", "Record movement") },
+        { id: "stock history", kind: "drawer", title: "Stock history", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <StockHistory context={context} /> },
+        { id: "transfer approval", kind: "modal", title: "Transfer between locations", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <TransferApproval context={context} close={close} />, footer: commerceFooter("transfer-approval", "Record transfer") },
+        { id: "count reconciliation", kind: "drawer", title: "Stock count", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <CountReconciliation context={context} close={close} />, footer: commerceFooter("count-reconciliation", "Record variances") },
+        { id: "Requisition form", kind: "drawer", title: "Reorder: raise a requisition", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: commerceFooter("requisition-form", "Submit for approval") },
+        { id: "receive goods", kind: "drawer", title: "Receive goods", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <ScanOverlay context={context} close={close} />, footer: commerceFooter("scan-overlay", "Record receipt") },
       ],
     },
 
@@ -189,11 +195,11 @@ export const commerceApp = registerApp({
         { id: "propose refund", label: "Propose a refund", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("refund approval", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Order quick view", kind: "drawer", title: "Order", width: 640, render: ({ ...context }) => <OrderQuickView context={context} /> },
-        { id: "bulk operation", kind: "modal", title: "Bulk fulfilment", width: 580, render: ({ close, ...context }) => <BulkOperation context={context} close={close} />, footer: submitFooter("bulk-operation", "Apply to selected") },
-        { id: "refund approval", kind: "modal", title: "Propose a refund", width: 580, render: ({ close, ...context }) => <RefundApproval context={context} close={close} />, footer: submitFooter("refund-approval", "Record proposal") },
-        { id: "order filter", kind: "modal", title: "Filter orders", width: 520, render: ({ close }) => <OrderFilter close={close} />, footer: submitFooter("order-filter", "Apply filter") },
-        { id: "assign order", kind: "modal", title: "Assign order", width: 520, render: ({ close, ...context }) => <AssignOrder context={context} close={close} />, footer: submitFooter("assign-order", "Assign") },
+        { id: "Order quick view", kind: "drawer", title: "Order", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <OrderQuickView context={context} /> },
+        { id: "bulk operation", kind: "modal", title: "Bulk fulfilment", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <BulkOperation context={context} close={close} />, footer: commerceFooter("bulk-operation", "Apply to selected") },
+        { id: "refund approval", kind: "modal", title: "Propose a refund", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RefundApproval context={context} close={close} />, footer: commerceFooter("refund-approval", "Record proposal") },
+        { id: "order filter", kind: "modal", title: "Filter orders", width: OVERLAY_WIDTH.form, render: ({ close }) => <OrderFilter close={close} />, footer: commerceFooter("order-filter", "Apply filter") },
+        { id: "assign order", kind: "modal", title: "Assign order", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <AssignOrder context={context} close={close} />, footer: commerceFooter("assign-order", "Assign") },
       ],
     },
 
@@ -201,7 +207,12 @@ export const commerceApp = registerApp({
     "ARL-COMMERCE-006": {
       id: "ARL-COMMERCE-006",
       title: () => "Order",
-      subtitle: (context) => `Totals resolve through the ${context.org.jurisdiction} tax rules for each line and the buyer's status.`,
+      record: (context) => ({
+        title: <OrderHeading context={context} part="title" />,
+        status: <OrderHeading context={context} part="status" />,
+        subtitle: <OrderHeading context={context} part="subtitle" />,
+        meta: orderMeta(context),
+      }),
       tabs: ["Overview", "Fulfilment", "Payments", "Returns", "Activity"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <OrderDetail context={context} lens={lens} />,
@@ -209,7 +220,7 @@ export const commerceApp = registerApp({
       statusStrip: () => (
         <Row gap={2} wrap>
           <Pill tone="warning" dot>No payment processor</Pill>
-          <span className="ds-subtle">An order can be marked paid in the local ledger; no charge, capture or refund leaves this browser.</span>
+          <span className="ds-subtle">Payment state is a local record. No charge, capture or refund has been attempted from this browser.</span>
         </Row>
       ),
       actions: [
@@ -222,18 +233,16 @@ export const commerceApp = registerApp({
         { id: "cancel", label: "Cancel order", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("cancellation impact") },
       ],
       overlays: [
-        { id: "Shipping label", kind: "modal", title: "Carrier handover", width: 580, render: ({ close, ...context }) => <ShippingLabel context={context} close={close} /> },
-        { id: "fulfil lines", kind: "drawer", title: "Fulfil lines", width: 680, render: ({ close, ...context }) => <FulfilLines context={context} close={close} />, footer: submitFooter("fulfil-lines", "Start shipment") },
-        { id: "advance shipment", kind: "modal", title: "Update shipment", width: 560, render: ({ close, ...context }) => <AdvanceShipment context={context} close={close} />, footer: submitFooter("advance-shipment", "Record") },
-        { id: "raise return", kind: "modal", title: "Raise a return", width: 600, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: submitFooter("raise-return", "Raise return") },
-        { id: "refund authorization", kind: "modal", title: "Record a refund", width: 600, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: submitFooter("record-refund", "Record refund") },
-        { id: "cancellation impact", kind: "modal", title: "What cancelling does", tone: "danger", width: 580, render: ({ close, ...context }) => <CancellationImpact context={context} close={close} /> },
-        { id: "refund confirmation", kind: "drawer", title: "Refund", width: 560, render: ({ ...context }) => <RefundConfirmation context={context} /> },
-        { id: "refund approval", kind: "modal", title: "Propose a refund", width: 580, render: ({ close, ...context }) => <RefundApproval context={context} close={close} />, footer: submitFooter("refund-approval", "Record proposal") },
-        { id: "buyer message", kind: "modal", title: "Contact the buyer", width: 600, render: ({ close, ...context }) => <BuyerMessage context={context} close={close} />, footer: submitFooter("buyer-message", "Keep as a draft") },
+        { id: "Shipping label", kind: "modal", title: "Carrier handover", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ShippingLabel context={context} close={close} /> },
+        { id: "fulfil lines", kind: "drawer", title: "Fulfil lines", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <FulfilLines context={context} close={close} />, footer: commerceFooter("fulfil-lines", "Start shipment") },
+        { id: "advance shipment", kind: "modal", title: "Update shipment", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <AdvanceShipment context={context} close={close} />, footer: commerceFooter("advance-shipment", "Record") },
+        { id: "raise return", kind: "modal", title: "Raise a return", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: commerceFooter("raise-return", "Raise return") },
+        { id: "refund authorization", kind: "modal", title: "Record a refund", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "returns", noRecordContext: true }, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: commerceFooter("record-refund", "Record refund") },
+        { id: "cancellation impact", kind: "modal", title: "What cancelling does", tone: "danger", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <CancellationImpact context={context} close={close} /> },
+        { id: "refund confirmation", kind: "drawer", title: "Refund", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <RefundConfirmation context={context} /> },
+        { id: "refund approval", kind: "modal", title: "Propose a refund", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RefundApproval context={context} close={close} />, footer: commerceFooter("refund-approval", "Record proposal") },
+        { id: "buyer message", kind: "modal", title: "Contact the buyer", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BuyerMessage context={context} close={close} />, footer: commerceFooter("buyer-message", "Keep as a draft") },
       ],
-      inspector: (context) => <OrderInspector context={context} />,
-      inspectorTitle: "Order facts",
     },
 
     /* ------------------------------ 007 ------------------------------ */
@@ -254,10 +263,10 @@ export const commerceApp = registerApp({
         { id: "publication", label: "Publication review", placement: "overflow", run: (context) => context.openOverlay("publication review") },
       ],
       overlays: [
-        { id: "Theme inspector", kind: "drawer", title: "Theme", width: 520, render: ({ close, ...context }) => <ThemeInspector context={context} close={close} />, footer: submitFooter("theme-inspector", "Save theme") },
-        { id: "template picker", kind: "modal", title: "Storefront layout", width: 520, render: ({ close, ...context }) => <TemplatePicker context={context} close={close} />, footer: submitFooter("storefront-template", "Save layout") },
-        { id: "publication review", kind: "modal", title: "Publication review", width: 620, render: ({ ...context }) => <StorefrontVersions context={context} /> },
-        { id: "layout editor", kind: "modal", title: "Arrange the storefront", width: 560, render: ({ close, ...context }) => <LayoutEditor context={context} close={close} />, footer: submitFooter("layout-editor", "Save arrangement") },
+        { id: "Theme inspector", kind: "drawer", title: "Theme", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ThemeInspector context={context} close={close} />, footer: commerceFooter("theme-inspector", "Save theme") },
+        { id: "template picker", kind: "modal", title: "Storefront layout", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TemplatePicker context={context} close={close} />, footer: commerceFooter("storefront-template", "Save layout") },
+        { id: "publication review", kind: "modal", title: "Publication review", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <StorefrontVersions context={context} /> },
+        { id: "layout editor", kind: "modal", title: "Arrange the storefront", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <LayoutEditor context={context} close={close} />, footer: commerceFooter("layout-editor", "Save arrangement") },
         confirmOverlay,
       ],
     },
@@ -279,9 +288,9 @@ export const commerceApp = registerApp({
         { id: "monitor", label: "Monitor held orders", placement: "overflow", run: (context) => context.setTab("Recovery") },
       ],
       overlays: [
-        { id: "Provider setup", kind: "modal", title: "Connect a payment provider", width: 600, render: ({ close, ...context }) => <ProviderSetup context={context} close={close} />, footer: submitFooter("provider-setup", "Record the request") },
-        { id: "checkout test", kind: "drawer", title: "Checkout checks", width: 580, render: ({ ...context }) => <CheckoutTest context={context} /> },
-        { id: "policy change review", kind: "modal", title: "Checkout policy", width: 560, render: ({ close, ...context }) => <CheckoutPolicy context={context} close={close} />, footer: submitFooter("policy-change", "Save policy") },
+        { id: "Provider setup", kind: "modal", title: "Connect a payment provider", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ProviderSetup context={context} close={close} />, footer: commerceFooter("provider-setup", "Record the request") },
+        { id: "checkout test", kind: "drawer", title: "Checkout checks", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <CheckoutTest context={context} /> },
+        { id: "policy change review", kind: "modal", title: "Checkout policy", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CheckoutPolicy context={context} close={close} />, footer: commerceFooter("policy-change", "Save policy") },
         confirmOverlay,
       ],
     },
@@ -304,13 +313,13 @@ export const commerceApp = registerApp({
         { id: "report exception", label: "Record an exception", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("delivery exception", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Carrier selector", kind: "modal", title: "Choose a carrier", width: 560, render: ({ close, ...context }) => <CarrierSelector context={context} close={close} />, footer: submitFooter("carrier-selector", "Assign carrier") },
-        { id: "label preview", kind: "drawer", title: "Label preview", width: 520, render: ({ ...context }) => <LabelPreview context={context} /> },
-        { id: "delivery exception", kind: "modal", title: "Delivery exception", width: 600, render: ({ close, ...context }) => <DeliveryException context={context} close={close} />, footer: submitFooter("delivery-exception", "Record decision") },
-        { id: "scan parcel", kind: "drawer", title: "Scan", width: 600, render: ({ ...context }) => <ScanParcel context={context} /> },
-        { id: "handoff", kind: "modal", title: "Hand off to the carrier", width: 580, render: ({ close, ...context }) => <ShippingLabel context={context} close={close} /> },
-        { id: "fulfil lines", kind: "drawer", title: "Fulfil lines", width: 680, render: ({ close, ...context }) => <FulfilLines context={context} close={close} />, footer: submitFooter("fulfil-lines", "Start shipment") },
-        { id: "advance shipment", kind: "modal", title: "Update shipment", width: 560, render: ({ close, ...context }) => <AdvanceShipment context={context} close={close} />, footer: submitFooter("advance-shipment", "Record") },
+        { id: "Carrier selector", kind: "modal", title: "Choose a carrier", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CarrierSelector context={context} close={close} />, footer: commerceFooter("carrier-selector", "Assign carrier", { ready: hasPayloadIds }) },
+        { id: "label preview", kind: "drawer", title: "Label preview", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <LabelPreview context={context} /> },
+        { id: "delivery exception", kind: "modal", title: "Delivery exception", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DeliveryException context={context} close={close} />, footer: commerceFooter("delivery-exception", "Record decision") },
+        { id: "scan parcel", kind: "drawer", title: "Scan", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ScanParcel context={context} /> },
+        { id: "handoff", kind: "modal", title: "Hand off to the carrier", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ShippingLabel context={context} close={close} /> },
+        { id: "fulfil lines", kind: "drawer", title: "Fulfil lines", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <FulfilLines context={context} close={close} />, footer: commerceFooter("fulfil-lines", "Start shipment") },
+        { id: "advance shipment", kind: "modal", title: "Update shipment", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <AdvanceShipment context={context} close={close} />, footer: commerceFooter("advance-shipment", "Record") },
         confirmOverlay,
       ],
     },
@@ -331,11 +340,11 @@ export const commerceApp = registerApp({
         { id: "communicate", label: "Message the customer", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("buyer message", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Return inspector", kind: "drawer", title: "Return", width: 600, render: ({ close, ...context }) => <ReturnInspector context={context} close={close} /> },
-        { id: "restock assessment", kind: "modal", title: "Restocking", width: 600, render: ({ close, ...context }) => <RestockAssessment context={context} close={close} />, footer: submitFooter("restock-assessment", "Save assessment") },
-        { id: "refund authorization", kind: "modal", title: "Record a refund", width: 600, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: submitFooter("record-refund", "Record refund") },
-        { id: "raise return", kind: "modal", title: "Raise a return", width: 600, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: submitFooter("raise-return", "Raise return") },
-        { id: "buyer message", kind: "modal", title: "Message the customer", width: 600, render: ({ close, ...context }) => <BuyerMessage context={context} close={close} />, footer: submitFooter("buyer-message", "Keep as a draft") },
+        { id: "Return inspector", kind: "drawer", title: "Return", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ReturnInspector context={context} close={close} /> },
+        { id: "restock assessment", kind: "modal", title: "Restocking", width: OVERLAY_WIDTH.modal, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RestockAssessment context={context} close={close} />, footer: commerceFooter("restock-assessment", "Save assessment", { ready: hasPayloadIds }) },
+        { id: "refund authorization", kind: "modal", title: "Record a refund", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "returns", noRecordContext: true }, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: commerceFooter("record-refund", "Record refund") },
+        { id: "raise return", kind: "modal", title: "Raise a return", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: commerceFooter("raise-return", "Raise return") },
+        { id: "buyer message", kind: "modal", title: "Message the customer", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BuyerMessage context={context} close={close} />, footer: commerceFooter("buyer-message", "Keep as a draft") },
       ],
     },
 
@@ -355,10 +364,10 @@ export const commerceApp = registerApp({
         { id: "pause", label: "Pause selected", placement: "overflow", tone: "danger", guard: needsSelection, run: (context) => pauseOffer(context) },
       ],
       overlays: [
-        { id: "Offer builder", kind: "drawer", title: "Offer", width: 660, render: ({ close, ...context }) => <OfferBuilder context={context} close={close} />, footer: submitFooter("offer-builder", "Save offer") },
-        { id: "margin check", kind: "drawer", title: "Margin check", width: 680, render: ({ ...context }) => <MarginCheck context={context} /> },
-        { id: "launch approval", kind: "modal", title: "Make this offer live", width: 560, render: ({ close, ...context }) => <OfferLaunchApproval context={context} close={close} />, footer: submitFooter("offer-launch", "Make live") },
-        { id: "schedule offer", kind: "modal", title: "Schedule an offer", width: 560, render: ({ close, ...context }) => <ScheduleOffer context={context} close={close} />, footer: submitFooter("schedule-offer", "Schedule") },
+        { id: "Offer builder", kind: "drawer", title: "Offer", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <OfferBuilder context={context} close={close} />, footer: commerceFooter("offer-builder", "Save offer") },
+        { id: "margin check", kind: "drawer", title: "Margin check", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <MarginCheck context={context} /> },
+        { id: "launch approval", kind: "modal", title: "Make this offer live", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <OfferLaunchApproval context={context} close={close} />, footer: commerceFooter("offer-launch", "Make live") },
+        { id: "schedule offer", kind: "modal", title: "Schedule an offer", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ScheduleOffer context={context} close={close} />, footer: commerceFooter("schedule-offer", "Schedule") },
         confirmOverlay,
       ],
     },
@@ -380,11 +389,11 @@ export const commerceApp = registerApp({
         { id: "report", label: "Schedule a report", placement: "overflow", run: (context) => context.openOverlay("report schedule") },
       ],
       overlays: [
-        { id: "Chart builder", kind: "modal", title: "Chart", width: 560, render: ({ close, ...context }) => <ChartBuilder context={context} close={close} />, footer: submitFooter("chart-builder", "Save chart") },
-        { id: "KPI inspector", kind: "drawer", title: "What this figure includes", width: 640, render: ({ ...context }) => <KpiInspector context={context} /> },
-        { id: "report schedule", kind: "modal", title: "Schedule a report", width: 560, render: ({ close, ...context }) => <ReportSchedule context={context} close={close} />, footer: submitFooter("report-schedule", "Save schedule") },
-        { id: "period compare", kind: "drawer", title: "Compare periods", width: 640, render: ({ ...context }) => <PeriodCompare context={context} /> },
-        { id: "customer segments", kind: "drawer", title: "Customer segments", width: 700, render: ({ ...context }) => <CustomerSegments context={context} /> },
+        { id: "Chart builder", kind: "modal", title: "Chart", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ChartBuilder context={context} close={close} />, footer: commerceFooter("chart-builder", "Save chart") },
+        { id: "KPI inspector", kind: "drawer", title: "What this figure includes", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <KpiInspector context={context} /> },
+        { id: "report schedule", kind: "modal", title: "Schedule a report", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReportSchedule context={context} close={close} />, footer: commerceFooter("report-schedule", "Save schedule") },
+        { id: "period compare", kind: "drawer", title: "Compare periods", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <PeriodCompare context={context} /> },
+        { id: "customer segments", kind: "drawer", title: "Customer segments", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <CustomerSegments context={context} /> },
       ],
     },
   },
@@ -399,9 +408,7 @@ function ProductInspector({ context }: { context: ScreenContext }) {
   const body = bodyOf<ProductBody>(product, {});
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "SKU", value: <span className="ds-num">{String(product.fields.sku)}</span> },
-        { label: "Status", value: <Pill tone={statusTone(product.status)}>{product.status}</Pill> },
+      <KeyValueList items={[
         { label: "Variants", value: <span className="ds-num">{String((body.variants ?? []).length)}</span> },
         { label: "Tax category", value: taxCategoryOfProduct(product).replace("_", " ") },
         { label: "Jurisdiction", value: org.jurisdiction },
@@ -410,29 +417,6 @@ function ProductInspector({ context }: { context: ScreenContext }) {
       ]} />
       <Notice tone="info" title="Where the stock figure comes from">
         On hand is the sum of every movement for this product. Nothing writes the level directly, so each change is traceable to a count, receipt, sale or adjustment.
-      </Notice>
-    </Stack>
-  );
-}
-
-function OrderInspector({ context }: { context: ScreenContext }) {
-  const order = useRecord(context.params.id);
-  const { org } = useWorkspace();
-  if (!order) return <Empty title="No order" >Open an order to see its facts here.</Empty>;
-  const lines = bodyOf<OrderBody>(order, {}).lines ?? [];
-  return (
-    <Stack gap={4}>
-      <Properties rows={[
-        { label: "Reference", value: <span className="ds-num">{order.title}</span> },
-        { label: "Placed", value: context.dateTime(order.at) },
-        { label: "Channel", value: String(order.fields.channel ?? "—") },
-        { label: "Lines", value: <span className="ds-num">{String(lines.length)}</span> },
-        { label: "Units", value: <span className="ds-num">{String(lines.reduce((sum, line) => sum + line.quantity, 0))}</span> },
-        { label: "Jurisdiction", value: org.jurisdiction },
-        { label: "Revision", value: <span className="ds-num">{String(order.revision)}</span> },
-      ]} />
-      <Notice tone="warning" title="Payment state is a local record">
-        Marking an order paid records that money arrived some other way. No charge, capture or refund has ever been attempted from this browser.
       </Notice>
     </Stack>
   );

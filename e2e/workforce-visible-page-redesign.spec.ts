@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("People Scheduling has distinct Roster, Availability, Timesheets and Exceptions experiences", async ({ page }) => {
   await page.goto("/o/northline/hr/scheduling?tab=Roster&clock=2026-11-17T09%3A00%3A00Z");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "The week, completely in view." })).toBeVisible();
+  await expect(main.locator(".hr-bar")).toBeVisible();
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   const dayStrip = main.getByRole("group", { name: "Focus staffing day" });
   await expect(dayStrip.getByRole("button")).toHaveCount(8);
@@ -14,7 +14,7 @@ test("People Scheduling has distinct Roster, Availability, Timesheets and Except
   await expect(oneDay).toHaveAttribute("aria-pressed", "false");
 
   await page.goto("/o/northline/hr/scheduling?tab=Availability");
-  await expect(main.getByRole("heading", { name: "See the team behind the schedule." })).toBeVisible();
+  await expect(main.locator(".hr-bar")).toBeVisible();
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   const search = main.getByRole("textbox", { name: "Find an employee" });
   await search.fill("qa-no-person-matches-56921");
@@ -24,13 +24,13 @@ test("People Scheduling has distinct Roster, Availability, Timesheets and Except
   await expect(main.getByRole("button", { name: "Hide employees on leave" })).toHaveAttribute("aria-pressed", "true");
 
   await page.goto("/o/northline/hr/scheduling?tab=Timesheets");
-  await expect(main.getByRole("heading", { name: "Review the work. Trust the hours." })).toBeVisible();
+  await expect(main.locator(".hr-bar")).toBeVisible();
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   await main.getByRole("button", { name: /Needs approval \(/ }).click();
   await expect(main.getByRole("button", { name: /Needs approval \(/ })).toHaveAttribute("aria-pressed", "true");
 
   await page.goto("/o/northline/hr/scheduling?tab=Exceptions");
-  await expect(main.getByRole("heading", { name: "Issues with a next action." })).toBeVisible();
+  await expect(main.locator(".hr-bar")).toBeVisible();
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   await main.getByRole("button", { name: /Critical \(/ }).click();
   await expect(main.getByRole("button", { name: /Critical \(/ })).toHaveAttribute("aria-pressed", "true");
@@ -57,7 +57,8 @@ test("Project Time has distinct, functional My time, Team, Costs and Approvals s
 test("Finance Time inputs exposes distinct review filters and a non-invoice status", async ({ page }) => {
   await page.goto("/o/northline/fin/invoices?tab=Time%20inputs");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "From recorded time to accountable billing." })).toBeVisible();
+  // The A1 pass removed the marketing-style heading; the page now opens on the metrics and the queue toolbar.
+  await expect(main.getByText("Billable time queue", { exact: true })).toBeVisible();
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   await expect(main).toContainText("Source records, not an invoice or revenue");
   await main.getByRole("button", { name: /Needs work \(/ }).click();

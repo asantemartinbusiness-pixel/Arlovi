@@ -24,7 +24,7 @@ test("department people tab stores an association without changing the member's 
   await expect(department).toBeVisible();
   await department.click();
   await page.getByRole("button",{name:"People",exact:true}).click();
-  await expect(page.getByRole("heading",{name:"Workspace people"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"People & collaboration"})).toBeVisible();
   await page.getByRole("button",{name:"Add existing person"}).click();
   const picker = page.getByRole("combobox",{name:"Company person"});
   const first = picker.locator("option:not([value=''])").first();

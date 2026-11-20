@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { LayoutPanelTop } from "lucide-react";
 import { BarChart, Button, Empty, Field, Notice, Pill, Properties, Row, Segmented, Select, Stack } from "@/design-system";
 import type { Rec } from "@/domain/types";
@@ -13,6 +14,7 @@ import {
 } from "./model";
 import { NoSite, SiteFormTester, useSiteRecord } from "./panels";
 import { saveSite, useWebUi, BREAKPOINTS, type Breakpoint } from "./state";
+import { siteSummary } from "./summary";
 
 /* ====================================================================== *
  * WEB contract actions. Structural writes go through saveSite (undo stack
@@ -68,6 +70,7 @@ export function SitePreview({ context }: { context: ScreenContext }) {
 
 export const insertBlock = actOverlay({
   id: "insert panel",
+  summary: siteSummary,
   title: "Insert a block",
   collection: "sites",
   noun: "site",
@@ -92,7 +95,7 @@ export const insertBlock = actOverlay({
     const index = values.position === "start" ? 0 : values.position === "after" && selected >= 0 ? selected + 1 : page.blocks.length;
     const blocks = [...page.blocks];
     blocks.splice(index, 0, block);
-    await saveSite(context, record, { ...app, pages: app.pages.map((item) => (item.id === page.id ? { ...item, blocks } : item)) }, `${BLOCK_LABELS[block.type]} block inserted on ${page.name}`);
+    if (!(await saveSite(context, record, { ...app, pages: app.pages.map((item) => (item.id === page.id ? { ...item, blocks } : item)) }, `${BLOCK_LABELS[block.type]} block inserted on ${page.name}`))) throw new Error(CHANGED_ELSEWHERE);
     useWebUi.getState().setPage(page.id);
     useWebUi.getState().select(block.id);
     useWebUi.getState().noteInsert(block.type);
@@ -112,6 +115,7 @@ function selectedBlock(record?: Rec) {
 
 export const resizeBlock = actOverlay({
   id: "resize block",
+  summary: siteSummary,
   title: "Resize the block",
   collection: "sites",
   noun: "site",
@@ -131,13 +135,14 @@ export const resizeBlock = actOverlay({
     const found = selectedBlock(record);
     if (!record || !found) return;
     const props = { ...found.block.props, columns: Number(values.columns), padding: values.padding as "tight" | "normal" | "roomy" };
-    await saveSite(context, record, { ...found.app, pages: found.app.pages.map((page) => (page.id === found.page.id ? { ...page, blocks: page.blocks.map((block) => (block.id === found.block.id ? { ...block, props } : block)) } : page)) }, `${BLOCK_LABELS[found.block.type]} block on ${found.page.name} resized to ${values.columns} columns, ${values.padding} padding`);
+    if (!(await saveSite(context, record, { ...found.app, pages: found.app.pages.map((page) => (page.id === found.page.id ? { ...page, blocks: page.blocks.map((block) => (block.id === found.block.id ? { ...block, props } : block)) } : page)) }, `${BLOCK_LABELS[found.block.type]} block on ${found.page.name} resized to ${values.columns} columns, ${values.padding} padding`))) throw new Error(CHANGED_ELSEWHERE);
     return `Resized. ${values.columns} columns on a desktop, one on a phone.`;
   },
 });
 
 export const reorderBlock = actOverlay({
   id: "reorder blocks",
+  summary: siteSummary,
   title: "Move the block",
   collection: "sites",
   noun: "site",
@@ -158,7 +163,7 @@ export const reorderBlock = actOverlay({
     const blocks = [...found.page.blocks];
     const [moved] = blocks.splice(found.index, 1);
     blocks.splice(to, 0, moved);
-    await saveSite(context, record, { ...found.app, pages: found.app.pages.map((page) => (page.id === found.page.id ? { ...page, blocks } : page)) }, `${BLOCK_LABELS[moved.type]} block moved from ${found.index + 1} to ${to + 1} on ${found.page.name}`);
+    if (!(await saveSite(context, record, { ...found.app, pages: found.app.pages.map((page) => (page.id === found.page.id ? { ...page, blocks } : page)) }, `${BLOCK_LABELS[moved.type]} block moved from ${found.index + 1} to ${to + 1} on ${found.page.name}`))) throw new Error(CHANGED_ELSEWHERE);
     return `Moved to position ${to + 1}.`;
   },
 });
@@ -167,6 +172,7 @@ export const reorderBlock = actOverlay({
 
 export const publishComponent = actOverlay({
   id: "publish component",
+  summary: siteSummary,
   title: "Publish a component",
   collection: "sites",
   noun: "site",
@@ -184,13 +190,14 @@ export const publishComponent = actOverlay({
     const component = app.components.find((item) => item.id === values.component);
     if (!component) throw new Error("Choose a component.");
     if (component.shared) return { body: `${component.name} is already published.`, tone: "info" };
-    await saveSite(context, record, { ...app, components: app.components.map((item) => (item.id === component.id ? { ...item, shared: true } : item)) }, `Component ${component.name} published to the workspace`);
+    if (!(await saveSite(context, record, { ...app, components: app.components.map((item) => (item.id === component.id ? { ...item, shared: true } : item)) }, `Component ${component.name} published to the workspace`))) throw new Error(CHANGED_ELSEWHERE);
     return `${component.name} is published and can be imported by other sites.`;
   },
 });
 
 export const importComponents = actOverlay({
   id: "import components",
+  summary: siteSummary,
   title: "Import a component",
   collection: "sites",
   noun: "site to import into",
@@ -209,7 +216,7 @@ export const importComponents = actOverlay({
     if (!source) throw new Error("Choose a component.");
     const app = site(record);
     const copy = { ...source, id: `c-${wallMs().toString(36)}`, shared: false, usedOn: [], blocks: source.blocks.map((block) => ({ ...block, id: makeBlock(block.type).id })) };
-    await saveSite(context, record, { ...app, components: [...app.components, copy] }, `Component ${source.name} imported`);
+    if (!(await saveSite(context, record, { ...app, components: [...app.components, copy] }, `Component ${source.name} imported`))) throw new Error(CHANGED_ELSEWHERE);
     return `${source.name} imported with ${copy.blocks.length} blocks.`;
   },
 });
@@ -222,6 +229,7 @@ function matchesFor(app: SiteModel, componentId: string) {
 
 export const updateEverywhere = actOverlay({
   id: "breaking change",
+  summary: siteSummary,
   title: "Update everywhere",
   tone: "danger",
   collection: "sites",
@@ -254,7 +262,7 @@ export const updateEverywhere = actOverlay({
     if (pages.length === 0) return { body: "No page uses blocks of these types, so nothing changed.", tone: "info" };
     const byType = new Map(component.blocks.map((block) => [block.type, block.props]));
     const next = { ...app, pages: app.pages.map((page) => (pages.some((item) => item.id === page.id) ? { ...page, blocks: page.blocks.map((block) => (byType.has(block.type) ? { ...block, props: { ...byType.get(block.type)! } } : block)) } : page)), components: app.components.map((item) => (item.id === component.id ? { ...item, usedOn: pages.map((page) => page.name) } : item)) };
-    await saveSite(context, record, next, `Component ${component.name} applied to ${pages.length} pages: ${pages.map((page) => page.name).join(", ")}`);
+    if (!(await saveSite(context, record, next, `Component ${component.name} applied to ${pages.length} pages: ${pages.map((page) => page.name).join(", ")}`))) throw new Error(CHANGED_ELSEWHERE);
     return `${component.name} applied to ${pages.length} pages. One undo reverses it.`;
   },
 });
@@ -263,6 +271,7 @@ export const updateEverywhere = actOverlay({
 
 export const bulkPublish = actOverlay({
   id: "bulk publish",
+  summary: siteSummary,
   title: "Publish entries",
   collection: "sites",
   noun: "site",
@@ -287,7 +296,7 @@ export const bulkPublish = actOverlay({
       return (collection?.fields ?? []).every((field) => !field.required || entry.values[field.id]);
     }).map((entry) => entry.id);
     if (publishable.length === 0) throw new Error("Nothing ticked can be published; each needs its required fields filled.");
-    await saveSite(context, record, { ...app, cms: { ...app.cms, entries: app.cms.entries.map((entry) => (publishable.includes(entry.id) ? { ...entry, status: "published" as const } : entry)) } }, `${publishable.length} entries published`);
+    if (!(await saveSite(context, record, { ...app, cms: { ...app.cms, entries: app.cms.entries.map((entry) => (publishable.includes(entry.id) ? { ...entry, status: "published" as const } : entry)) } }, `${publishable.length} entries published`))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab("Entries");
     return `${publishable.length} entries published${ticked.length > publishable.length ? `; ${ticked.length - publishable.length} skipped for empty required fields` : ""}.`;
   },
@@ -295,6 +304,7 @@ export const bulkPublish = actOverlay({
 
 export const pickEntry = actOverlay({
   id: "pick entry",
+  summary: siteSummary,
   title: "Edit an entry",
   collection: "sites",
   noun: "site",
@@ -318,6 +328,7 @@ export const pickEntry = actOverlay({
 
 export const reorderMenu = actOverlay({
   id: "reorder menu",
+  summary: siteSummary,
   title: "Reorder the menu",
   collection: "sites",
   noun: "site",
@@ -346,7 +357,7 @@ export const reorderMenu = actOverlay({
     if (from === to) return { body: "It is already there.", tone: "info" };
     const [moved] = links.splice(from, 1);
     links.splice(to, 0, moved);
-    await saveSite(context, record, { ...app, nav: { ...app.nav, [which]: links } }, `${which === "header" ? "Header" : "Footer"} link ${moved.label} moved from ${from + 1} to ${to + 1}`);
+    if (!(await saveSite(context, record, { ...app, nav: { ...app.nav, [which]: links } }, `${which === "header" ? "Header" : "Footer"} link ${moved.label} moved from ${from + 1} to ${to + 1}`))) throw new Error(CHANGED_ELSEWHERE);
     context.setTab(which === "header" ? "Header" : "Footer");
     return `${moved.label} is now at position ${to + 1}.`;
   },
@@ -375,6 +386,7 @@ export function TestSubmissionPanel({ context }: { context: ScreenContext }) {
 
 export const publishSiteForm = actOverlay({
   id: "publish site form",
+  summary: siteSummary,
   title: "Publish a site form",
   collection: "sites",
   noun: "site",
@@ -400,7 +412,7 @@ export const publishSiteForm = actOverlay({
     if (!form.formRecordId || !((watched as Rec[] | undefined) ?? []).some((row) => row.id === form.formRecordId)) throw new Error(`${form.name} is not bound to a form record in ${context.org.name}. Bind it on the Forms tab first.`);
     if (form.fields.length === 0) throw new Error(`${form.name} has no fields.`);
     const version = (form.publishedVersion ?? 0) + 1;
-    await saveSite(context, record, { ...app, forms: app.forms.map((item) => (item.id === form.id ? { ...item, publishedVersion: version, publishedAt: nowIso(context), publishedBy: context.actor } : item)) }, `Site form ${form.name} published as version ${version}`);
+    if (!(await saveSite(context, record, { ...app, forms: app.forms.map((item) => (item.id === form.id ? { ...item, publishedVersion: version, publishedAt: nowIso(context), publishedBy: context.actor } : item)) }, `Site form ${form.name} published as version ${version}`))) throw new Error(CHANGED_ELSEWHERE);
     return { body: `${form.name} v${version} is published in the workspace. It reaches a live page only through the export until a host is connected.`, tone: "ok" };
   },
 });
@@ -415,9 +427,9 @@ export async function retestAudit(context: ScreenContext): Promise<void> {
   if (!record) { context.toast("No site", "Create a site first.", "blocked"); return; }
   const counts = issueCounts(auditSite(readSite(record), Object.fromEntries(forms.map((form) => [form.id, form.title]))));
   const before = record.fields.lastAuditAt ? { fail: Number(record.fields.auditFail ?? 0), warn: Number(record.fields.auditWarn ?? 0) } : undefined;
-  await context.mutate.patch(record.id, {
+  if (!(await context.mutate.patch(record.id, {
     fields: { ...record.fields, lastAuditAt: nowIso(context), auditFail: counts.fail, auditWarn: counts.warn, auditPass: counts.pass, previousAuditFail: before?.fail ?? "", previousAuditWarn: before?.warn ?? "" },
-  }, { expectRevision: record.revision, event: `Audit re-run: ${counts.fail} failing, ${counts.warn} to review, ${counts.pass} passing${before ? ` (was ${before.fail} failing, ${before.warn} to review)` : ""}` });
+  }, { expectRevision: record.revision, event: `Audit re-run: ${counts.fail} failing, ${counts.warn} to review, ${counts.pass} passing${before ? ` (was ${before.fail} failing, ${before.warn} to review)` : ""}` }))) return;
   context.toast("Retested", before ? `Failing ${before.fail} → ${counts.fail}, to review ${before.warn} → ${counts.warn}.` : `${counts.fail} failing, ${counts.warn} to review. This is the first recorded run.`, counts.fail ? "blocked" : "ok");
 }
 
@@ -425,6 +437,7 @@ export async function retestAudit(context: ScreenContext): Promise<void> {
 
 export const rollbackDeployment = actOverlay({
   id: "rollback deployment",
+  summary: siteSummary,
   title: "Roll back a deployment",
   tone: "danger",
   collection: "sites",
@@ -445,7 +458,7 @@ export const rollbackDeployment = actOverlay({
     const entry = app.deployments.find((item) => item.id === values.deployment);
     const previous = app.deployments.filter((item) => item.id !== entry?.id && item.state === "exported" && item.at < (entry?.at ?? "")).sort((a, b) => b.at.localeCompare(a.at))[0];
     if (!entry || !previous) throw new Error("There is no earlier export before that attempt to roll back to.");
-    await saveSite(context, record, { ...app, deployments: app.deployments.map((item) => (item.id === entry.id ? { ...item, state: "rolled_back" as const, note: `Rolled back to the export from ${previous.at}.` } : item)) }, `Deployment ${entry.id} rolled back to the export from ${previous.at}`);
+    if (!(await saveSite(context, record, { ...app, deployments: app.deployments.map((item) => (item.id === entry.id ? { ...item, state: "rolled_back" as const, note: `Rolled back to the export from ${previous.at}.` } : item)) }, `Deployment ${entry.id} rolled back to the export from ${previous.at}`))) throw new Error(CHANGED_ELSEWHERE);
     return "Rolled back. The history shows it.";
   },
 });
@@ -499,7 +512,7 @@ export function ChartBuilder({ context }: { context: ScreenContext }) {
       </Row>
       <BarChart title={title} height={220} format={(value) => String(Math.round(value))} series={[{ name: title, points }]} footer="Every bar is a count of records or audit events in this workspace. No visit or rate is estimated." />
       <Button variant="secondary" onClick={async () => {
-        await context.mutate.patch(record.id, { fields: { ...record.fields, savedChart: JSON.stringify({ measure, group, title }) } }, { expectRevision: record.revision, event: `Analytics chart saved: ${title}` });
+        if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, savedChart: JSON.stringify({ measure, group, title }) } }, { expectRevision: record.revision, event: `Analytics chart saved: ${title}` }))) return;
         context.toast("Chart saved", `${title} is saved on the site.`);
       }}>Save this chart on the site</Button>
     </Stack>

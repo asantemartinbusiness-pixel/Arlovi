@@ -34,3 +34,12 @@
 .t4-audience-rules summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:850px){.t4-workarea-head{grid-template-columns:minmax(0,1fr)}.t4-workarea-next{grid-column:1}}
 @media(max-width:580px){.t4-workarea-head{padding:var(--space-3) var(--space-4)}.t4-market-filters{padding:var(--space-3)}.t4-market-filters label{flex:1 1 100%;justify-content:space-between}.t4-market-filters select,.t4-market-filters input{flex:1 1 60%;width:100%}.t4-market-filters .t4-market-filter-count{margin-inline-start:0}.t4-social-accounts summary{flex-wrap:wrap}}
+
+/* Slim work-area strip (replaces the description + stats block). */
+.t4-workarea-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-2) var(--space-5);padding:var(--space-2) var(--space-5)}
+.t4-workarea-head-stats{display:flex;flex-wrap:wrap;gap:var(--space-5)}
+.t4-workarea-head-stats div{flex-direction:row;align-items:baseline;gap:var(--space-2)}
+.t4-workarea-head-stats dd{font-size:var(--text-md,16px);font-family:var(--font-mono)}
+.t4-workarea-head-stats dt{order:2}
+.t4-workarea-next{grid-column:auto}
+@media(max-width:580px){.t4-workarea-head-stats{gap:var(--space-2) var(--space-4)}.t4-workarea-head{padding:var(--space-2) var(--space-4)}}

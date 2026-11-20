@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Image, Images, ShieldAlert, Wand2 } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row,
-  Select, Stack, Stat, StatRow, TextInput,
+  Button, Card, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, Notice, OverlayActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/platform/commit";
 import { csvList, licence, type LicenceState } from "./library-model";
 import type { Rec } from "@/domain/types";
 import { AssetPreview, AssetViewer, FileStateTag, assetPreviewUri, fileState, palette, storedBytes, uploadedFileName } from "./thumbs";
@@ -198,7 +198,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
   if (tab === "Overview") {
     return (
       <Grid>
-        <Card eyebrow="PREVIEW" prov={fileState(record) === "metadata_only" ? "unknown" : "human"} span={7} title="Preview" subtitle={`${String(record.fields.width ?? "?")} × ${String(record.fields.height ?? "?")} · ${String(record.fields.format ?? "").toUpperCase()}`}>
+        <Card eyebrow="PREVIEW" prov={fileState(record) === "metadata_only" ? "unknown" : "human"} span={7} title="Preview" subtitle={[record.fields.width ? `${String(record.fields.width)} × ${String(record.fields.height)}` : "", String(record.fields.format ?? "").toUpperCase()].filter(Boolean).join(" · ") || undefined}>
           <Stack gap={3}>
             <AssetViewer record={record} height={340} fit={["template", "logo", "icon"].includes(String(record.fields.kind)) ? "contain" : "cover"} />
             <FileStateTag record={record} />
@@ -359,6 +359,16 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
             )}
           </Stack>
         </Card>
+        <Card eyebrow="DEPENDS ON THIS RIGHT" prov="human" span={12} title="Uses that stop when the licence does" subtitle={record.fields.licenceExpiry ? `Until ${context.date(String(record.fields.licenceExpiry))}` : "No expiry, so nothing lapses"}>
+          {uses.length === 0 && csvList(record.fields.linkedIds).length === 0 ? (
+            <span className="ds-subtle">Nothing uses it yet.</span>
+          ) : (
+            <Stack gap={2}>
+              {uses.map((use) => <Row key={use} gap={2}><span className="ds-grow">{use}</span><Pill tone={state.state === "expired" ? "danger" : state.state === "expiring" ? "warning" : "neutral"}>{state.state === "expired" ? "Not permitted now" : record.fields.licenceExpiry ? `Ends ${context.date(String(record.fields.licenceExpiry))}` : "No end date"}</Pill></Row>)}
+              <LinkedRecords context={context} record={record} compact />
+            </Stack>
+          )}
+        </Card>
       </Grid>
     );
   }
@@ -449,10 +459,9 @@ export function VariantEditor({ context, close }: { context: ScreenContext; clos
         The variant is a child record with its own size, crop and preset, and a link back to this original. Its preview is drawn from
         the same palette and shape, so nothing claims to be a re-encoded file that does not exist.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={blocked || width < 16 || height < 16}
@@ -481,8 +490,10 @@ export function VariantEditor({ context, close }: { context: ScreenContext; clos
           }}
         >
           Create the variant
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -515,51 +526,104 @@ export function RightsForm({ context, close }: { context: ScreenContext; close: 
       <Field label="Expiry" hint={kind === "owned" ? "An owned asset normally has no expiry." : "Leave empty if the licence does not expire."}>
         <TextInput type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} />
       </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
             if (!licensor.trim()) { setError("Name whoever holds the right, even if it is this company."); return; }
             setBusy(true);
             try {
-              await context.mutate.patch(record.id, {
+              const saved1 = await context.mutate.patch(record.id, {
                 fields: {
                   ...record.fields,
                   licence: kind, licensor, licenceRef: reference,
                   licenceExpiry: expiry ? new Date(`${expiry}T00:00:00.000Z`).toISOString() : "",
                 },
               }, { event: `Rights updated on ${record.title}: ${kind}, ${licensor}${expiry ? `, expires ${expiry}` : ""}`, expectRevision: record.revision });
+              if (!saved1) return;
               context.toast("Rights updated", "The asset record carries the licence, and the change is in its history.");
               close();
             } finally { setBusy(false); }
           }}
         >
           Save the rights
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
+interface ReplaceCheck { id: string; label: string; ok: boolean; blocking: boolean; detail: string }
+
+/** Overlay head naming the asset an overlay acts on, with its licence and file state. */
+export function AssetSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useAssets();
+  const { now } = useWorkspace();
+  const payload = context.overlayPayload as { id?: string; ids?: string[] } | undefined;
+  const record = data.assets.find((row) => row.id === (payload?.id ?? payload?.ids?.[0] ?? context.params.id ?? context.selectedId));
+  if (!record) return null;
+  const state = licence(record, now);
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={record.title}
+      avatar={<div style={{ width: 72 }}><AssetPreview record={record} height={48} fit={String(record.fields.kind) === "template" ? "contain" : "cover"} /></div>}
+      status={<Pill tone={licenceTone(state.state)}>{state.label}</Pill>}
+      meta={[[String(record.fields.kind ?? "asset"), String(record.fields.format ?? "").toUpperCase()].filter(Boolean).join(" · "), record.fields.width ? `${String(record.fields.width)} × ${String(record.fields.height)}` : "", `v${String(record.fields.version ?? 1)}`]}
+    />
+  );
+}
+
+/**
+ * A replacement is validated before anything moves: its licence, its file,
+ * its approval and its shape are checked against the asset it replaces and
+ * the uses that will inherit it. Blocking checks keep the action disabled.
+ */
+export function replacementChecks(record: Rec, replacement: Rec, brandMaster: boolean, now: Date): ReplaceCheck[] {
+  const rights = licence(replacement, now);
+  const w1 = Number(record.fields.width ?? 0); const h1 = Number(record.fields.height ?? 0);
+  const w2 = Number(replacement.fields.width ?? 0); const h2 = Number(replacement.fields.height ?? 0);
+  const ratioDrift = w1 && h1 && w2 && h2 ? Math.abs(w1 / h1 - w2 / h2) / (w1 / h1) : 0;
+  const needsApproval = record.status === "approved" || brandMaster;
+  return [
+    { id: "licence", label: "Licence", ok: rights.state !== "expired" && rights.state !== "expiring", blocking: rights.state === "expired", detail: rights.state === "expired" ? `Expired: ${rights.label.toLowerCase()}. Nothing published may use it.` : rights.state === "expiring" ? `${rights.label}. The uses would lapse with it.` : rights.label },
+    { id: "file", label: "File", ok: fileState(replacement) !== "metadata_only" || fileState(record) === "metadata_only", blocking: fileState(replacement) === "metadata_only" && fileState(record) !== "metadata_only", detail: fileState(replacement) === "metadata_only" ? "Catalogued without a file, so there is nothing to show in place of the original." : "A file or drawn preview is held for it." },
+    { id: "approval", label: "Approval", ok: !needsApproval || replacement.status === "approved", blocking: needsApproval && replacement.status !== "approved", detail: replacement.status === "approved" ? "Approved" : needsApproval ? `Not approved (${replacement.status.replace(/_/g, " ")}). ${brandMaster ? "An unapproved upload cannot replace an asset in the master brand kit." : "It must be approved before it replaces an approved asset."}` : `Not approved (${replacement.status.replace(/_/g, " ")}), and neither is the original.` },
+    { id: "shape", label: "Shape", ok: ratioDrift <= 0.02, blocking: false, detail: ratioDrift > 0.02 ? `${w2} × ${h2} against ${w1} × ${h1}: it will crop differently wherever it is placed.` : w1 && w2 ? `${w2} × ${h2}, the same proportions.` : "Dimensions are not recorded on one of them." },
+    { id: "format", label: "Format", ok: String(record.fields.format ?? "") === String(replacement.fields.format ?? ""), blocking: false, detail: String(record.fields.format ?? "") === String(replacement.fields.format ?? "") ? `${String(record.fields.format ?? "").toUpperCase()} in both.` : `${String(replacement.fields.format ?? "?").toUpperCase()} replaces ${String(record.fields.format ?? "?").toUpperCase()}; check each use accepts it.` },
+  ];
+}
+
 export function ReplacementImpact({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAssets();
+  const { now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const record = data.assets.find((row) => row.id === (payload?.id ?? context.params.id ?? context.selectedId));
   const [withId, setWithId] = useState("");
   const [busy, setBusy] = useState(false);
   if (!record) return <Empty title="No asset" />;
   const uses = usedIn(record);
+  const links = csvList(record.fields.linkedIds);
   const candidates = data.assets.filter((row) => row.id !== record.id && row.status !== "archived" && String(row.fields.kind) === String(record.fields.kind));
   const replacement = candidates.find((row) => row.id === withId);
+  const brandMaster = data.brands.some((brand) => brand.fields.master === true && csvList(brand.fields.assets).includes(record.id));
+  const checks = replacement ? replacementChecks(record, replacement, brandMaster, now) : [];
+  const blocked = checks.some((check) => check.blocking && !check.ok);
+  const total = uses.length + links.length;
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title={`${uses.length} live ${uses.length === 1 ? "use" : "uses"} would change at once`}>
-        {uses.length ? uses.join("; ") : "Nothing references this asset yet."}
-      </Notice>
+      <OverlaySection title="What would change" tone={total ? "warning" : "neutral"}>
+        <FactGrid columns={3} items={[
+          { label: "Recorded uses", value: String(uses.length), mono: true, hint: uses.join("; ") || "None recorded" },
+          { label: "Linked records", value: String(links.length), mono: true, hint: links.length ? "They will point at the replacement" : "None linked" },
+          { label: "Brand kits", value: String(data.brands.filter((row) => csvList(row.fields.assets).includes(record.id)).length), mono: true, tone: brandMaster ? "warning" : undefined, hint: brandMaster ? "In the master kit" : undefined },
+        ]} />
+      </OverlaySection>
       <Field label="Replace with">
         <Select value={withId} onChange={(event) => setWithId(event.target.value)}>
           <option value="">Choose an asset of the same type</option>
@@ -567,41 +631,58 @@ export function ReplacementImpact({ context, close }: { context: ScreenContext; 
         </Select>
       </Field>
       {replacement && (
-        <Grid>
-          <Card eyebrow="NOW" prov="human" span={6} title="Now" subtitle={record.title}><AssetPreview record={record} height={140} /></Card>
-          <Card eyebrow="AFTER" prov="human" span={6} title="After" subtitle={replacement.title}><AssetPreview record={replacement} height={140} /></Card>
-        </Grid>
+        <>
+          <Grid>
+            <Card eyebrow="NOW" prov="human" span={6} title="Now" subtitle={record.title}><AssetPreview record={record} height={140} /></Card>
+            <Card eyebrow="AFTER" prov="human" span={6} title="After" subtitle={replacement.title}><AssetPreview record={replacement} height={140} /></Card>
+          </Grid>
+          <OverlaySection title="Checked before it goes live" tone={blocked ? "danger" : "success"}>
+            <ul className="ds-stack ds-gap-2" aria-label="Replacement checks">
+              {checks.map((check) => (
+                <li key={check.id}>
+                  <Row gap={2} wrap>
+                    <Pill tone={check.ok ? "success" : check.blocking ? "danger" : "warning"} dot>{check.ok ? "Clear" : check.blocking ? "Blocks" : "Check"}</Pill>
+                    <strong>{check.label}</strong>
+                    <span className="ds-subtle">{check.detail}</span>
+                  </Row>
+                </li>
+              ))}
+            </ul>
+          </OverlaySection>
+        </>
       )}
       <Notice tone="info" title="The original is kept, not overwritten">
-        Replacing marks this asset superseded and points it at the replacement. Earlier documents keep resolving, and nothing is
-        destroyed.
+        It is archived and points at the replacement, so earlier documents keep resolving and nothing is destroyed.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!replacement}
-          onClick={async () => {
-            if (!replacement) return;
-            setBusy(true);
-            try {
-              await context.mutate.patch(record.id, {
-                status: "archived",
-                fields: { ...record.fields, supersededBy: replacement.id, archivedBy: context.actor, archivedAt: clockIso() },
-              }, { event: `Asset superseded by ${replacement.title}`, expectRevision: record.revision });
-              await context.mutate.patch(replacement.id, {
-                fields: { ...replacement.fields, usedIn: [...new Set([...usedIn(replacement), ...uses])].join(", "), replaces: record.id },
-              }, { event: `Asset now carries the uses of ${record.title}` });
-              context.toast("Replaced", `${uses.length} ${uses.length === 1 ? "use" : "uses"} moved to ${replacement.title}. The original is archived, not deleted.`);
-              close();
-            } finally { setBusy(false); }
-          }}
-        >
-          Replace across {uses.length} {uses.length === 1 ? "use" : "uses"}
-        </Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!replacement || blocked}
+              onClick={async () => {
+                if (!replacement || blocked) return;
+                setBusy(true);
+                try {
+                  const kits = data.brands.filter((row) => csvList(row.fields.assets).includes(record.id));
+                  const done = await commitTogether(context, [
+                    { record: replacement, patch: { fields: { ...replacement.fields, usedIn: [...new Set([...usedIn(replacement), ...uses])].join(", "), linkedIds: [...new Set([...csvList(replacement.fields.linkedIds), ...links])].join(","), replaces: record.id } }, event: `Asset now carries the uses of ${record.title}` },
+                    ...kits.map((brand) => ({ record: brand, patch: { fields: { ...brand.fields, assets: [...new Set(csvList(brand.fields.assets).map((id) => (id === record.id ? replacement.id : id)))].join(",") } }, event: `${brand.title} now uses ${replacement.title} in place of ${record.title}` })),
+                    { record, patch: { status: "archived", fields: { ...record.fields, supersededBy: replacement.id, archivedBy: context.actor, archivedAt: clockIso() } }, event: `Asset superseded by ${replacement.title}` },
+                  ]);
+                  if (!done) return;
+                  context.toast("Replaced", `${total} ${total === 1 ? "use" : "uses"} moved to ${replacement.title}. The original is archived, not deleted.`);
+                  close();
+                } finally { setBusy(false); }
+              }}
+            >
+              {total ? `Replace across ${total} ${total === 1 ? "use" : "uses"}` : "Replace the asset"}
+            </Button>
+          }
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -677,7 +758,7 @@ export function ArchiveAsset({ context, close }: { context: ScreenContext; close
   if (!record) return <Empty title="No asset" />;
   const uses = usedIn(record);
   const archived = record.status === "archived";
-  const brandMaster = data.brands.some((brand) => brand.fields.master === true && csvList(brand.fields.assetIds).includes(record.id));
+  const brandMaster = data.brands.some((brand) => brand.fields.master === true && csvList(brand.fields.assets).includes(record.id));
   const blocked = archived ? "This asset is already archived." : brandMaster ? "It belongs to the master brand kit. Replace it there first." : undefined;
   return (
     <Stack gap={4}>

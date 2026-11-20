@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { useSearchParams } from "react-router-dom";
 import { Folder, FolderOpen, FolderPlus, Images, Inbox, Link2, Pencil, Upload, X } from "lucide-react";
 import {
-  Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Segmented,
-  Select, Stack, TextArea, TextInput,
+  Button, Checkbox, DataGrid, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Segmented, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useWorkspace } from "@/platform/workspace";
@@ -577,10 +576,9 @@ export function BulkEdit({ context, close }: { context: ScreenContext; close: ()
           </div>
         </Field>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!changes}
@@ -606,8 +604,10 @@ export function BulkEdit({ context, close }: { context: ScreenContext; close: ()
           }}
         >
           Apply to {records.length}
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -691,10 +691,9 @@ export function AssetEditor({ context, close }: { context: ScreenContext; close:
       </Row>
       {approving && expired && <Notice tone="danger" title="Cannot approve">The licence has expired. Renew it in Rights before approving the asset for use.</Notice>}
       {approving && !expired && <Notice tone="info" title="Approval is recorded">The asset is marked approved by {context.actor}, and the decision is in its history.</Notice>}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={approving && expired}
@@ -716,8 +715,10 @@ export function AssetEditor({ context, close }: { context: ScreenContext; close:
           }}
         >
           Save details
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -726,8 +727,10 @@ export function AssetEditor({ context, close }: { context: ScreenContext; close:
 
 export function TagEditor({ context, record }: { context: ScreenContext; record: Rec }) {
   const [value, setValue] = useState("");
-  async function save(tags: string[], message: string) {
-    await context.mutate.patch(record.id, { tags }, { event: message, expectRevision: record.revision });
+  async function save(tags: string[], message: string, typed?: string) {
+    const saved = await context.mutate.patch(record.id, { tags }, { event: message, expectRevision: record.revision });
+    // Refused: give the typed tags back so nothing the person entered is lost.
+    if (!saved && typed !== undefined) setValue(typed);
   }
   return (
     <Stack gap={2}>
@@ -745,8 +748,9 @@ export function TagEditor({ context, record }: { context: ScreenContext; record:
           event.preventDefault();
           const tags = parseTags(value);
           if (!tags.length) return;
+          const typed = value;
           setValue("");
-          void save(addTags(record.tags, tags), `Tagged ${record.title}: ${tags.join(", ")}`);
+          void save(addTags(record.tags, tags), `Tagged ${record.title}: ${tags.join(", ")}`, typed);
         }}
       >
         <Row gap={2}>
@@ -824,10 +828,11 @@ export function LinkRecords({ context, close }: { context: ScreenContext; close:
     setBusyId(target.id);
     try {
       const on = ids.includes(target.id);
-      await context.mutate.patch(record.id, { fields: { ...record.fields, linkedIds: on ? withoutLink(record, target.id) : withLink(record, target.id) } }, {
+      const saved2 = await context.mutate.patch(record.id, { fields: { ...record.fields, linkedIds: on ? withoutLink(record, target.id) : withLink(record, target.id) } }, {
         event: on ? `Asset unlinked from ${target.title}: ${record.title}` : `Asset linked to ${LINKABLE_LABEL[target.collection]?.toLowerCase() ?? "record"} ${target.title}: ${record.title}`,
         expectRevision: record.revision,
       });
+      if (!saved2) return;
     } finally { setBusyId(""); }
   }
 
@@ -1060,10 +1065,9 @@ export function MediaImport({ context, close }: { context: ScreenContext; close:
           </Field>
         </div>
       </Row>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={ready.length === 0 || reading}
@@ -1097,8 +1101,10 @@ export function MediaImport({ context, close }: { context: ScreenContext; close:
           }}
         >
           {ready.length > 1 ? `Add ${ready.length} files to the library` : "Add to the library"}
-        </Button>
-      </Row>
+        </Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

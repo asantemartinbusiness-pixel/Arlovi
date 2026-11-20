@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea,
+  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, Pill, Row, Select, Stack, Stat, StatRow, TextArea,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useWorkspace } from "@/platform/workspace";
@@ -14,7 +14,7 @@ import {
 import type { CustomerTaxStatus, ReturnBoxes, TaxCategory } from "@/domain/fin-invoice";
 import { periodLabel } from "@/domain/fin-ledger";
 import { contactOf, useFinData } from "./data";
-import { Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow, TaxCodePill, taxRateText } from "./parts";
+import { FormFooter, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow, TaxCodePill, taxRateText } from "./parts";
 import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- FIN-011 ---------------------------- */
@@ -56,7 +56,7 @@ export function TaxCodesTab({ context }: { context: ScreenContext }) {
 
       {drifted.length > 0 && (
         <Notice tone="danger" title={`${drifted.length} active code record${drifted.length === 1 ? "" : "s"} disagree${drifted.length === 1 ? "s" : ""} with the engine`}>
-          {drifted.map((item) => `${item.record.title} (${item.code}): ${item.reason}`).join(" ")}
+          {drifted.map((item) => (item.code ? `${item.record.title} (${item.code}): ${item.reason}` : `${item.record.title}: ${item.reason}`)).join(" ")}
         </Notice>
       )}
 
@@ -421,16 +421,17 @@ export { exportReturn };
 
 /* --------------------------- Overlays --------------------------- */
 
-export function TaxConfiguration({ context, close }: { context: ScreenContext; close: () => void }) {
+export function TaxConfiguration({ context }: { context: ScreenContext; close?: () => void }) {
   const data = useFinData();
   const { org } = useWorkspace();
   const engineCodes = taxCodesFor(org.jurisdiction);
   const [busy, setBusy] = useState(false);
 
+  // Same predicate as the Codes tab: a record with no engine rule disagrees too.
   const stale = data.taxCodes.filter((record) => {
-    if (String(record.fields.jurisdiction ?? "") !== org.jurisdiction) return false;
+    if (String(record.fields.jurisdiction ?? "") !== org.jurisdiction || record.status !== "active") return false;
     const engine = engineCodes.find((item) => item.code === String(record.fields.code ?? ""));
-    return record.status === "active" && engine && engine.rateBp !== Number(record.fields.rateBp ?? 0);
+    return engine ? engine.rateBp !== Number(record.fields.rateBp ?? 0) : true;
   });
 
   return (
@@ -438,12 +439,11 @@ export function TaxConfiguration({ context, close }: { context: ScreenContext; c
       <Notice tone="warning" title="Rates are not configurable here, by design">
         A rate comes from the approved rule set in the tax engine, keyed on jurisdiction, line category, customer status and date. If a stored record disagrees, the record is wrong, not the engine.
       </Notice>
-      <Properties rows={[
-        { label: "Jurisdiction", value: org.jurisdiction },
-        { label: "Reporting currency", value: `${org.currency} — it has no bearing on the rate` },
-        { label: "Approved rules", value: String(TAX_RULES.filter((rule) => rule.jurisdiction === org.jurisdiction).length) },
-        { label: "Codes in use", value: engineCodes.map((code) => code.code).join(", ") },
-        { label: "Stored records that disagree", value: String(stale.length) },
+      <FactGrid columns={3} items={[
+        { label: "Jurisdiction", value: org.jurisdiction, mono: true },
+        { label: "Approved rules", value: String(TAX_RULES.filter((rule) => rule.jurisdiction === org.jurisdiction).length), mono: true },
+        { label: "Stored records that disagree", value: String(stale.length), mono: true, tone: stale.length ? "warning" : "success" },
+        { label: "Codes in use", value: engineCodes.map((code) => code.code).join(", "), mono: true, hint: `Reporting currency ${org.currency} has no bearing on the rate` },
       ]} />
       {stale.length > 0 && (
         <Stack gap={3}>
@@ -453,7 +453,7 @@ export function TaxConfiguration({ context, close }: { context: ScreenContext; c
               <Row key={record.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
                 <div className="ds-grow">
                   <strong>{record.title}</strong>
-                  <p className="ds-subtle">Records {(Number(record.fields.rateBp ?? 0) / 100).toFixed(2)}%, the engine applies {((engine?.rateBp ?? 0) / 100).toFixed(2)}%.</p>
+                  <p className="ds-subtle">Records {(Number(record.fields.rateBp ?? 0) / 100).toFixed(2)}%, {engine ? `the engine applies ${(engine.rateBp / 100).toFixed(2)}%.` : "no rule in the engine resolves to this code."}</p>
                 </div>
                 <Button
                   size="sm"
@@ -461,12 +461,18 @@ export function TaxConfiguration({ context, close }: { context: ScreenContext; c
                   busy={busy}
                   onClick={async () => {
                     setBusy(true);
-                    await context.mutate.patch(record.id, {
-                      status: "superseded",
-                      fields: { ...record.fields, supersededBy: "tax engine", supersededAt: clockIso() },
-                    }, { expectRevision: record.revision, event: `Tax code record ${record.title} marked superseded` });
-                    context.toast("Marked superseded", `${record.title} no longer claims to be current. No computed figure changed, because the engine was always the source.`);
-                    setBusy(false);
+                    try {
+                      const saved18 = await context.mutate.patch(record.id, {
+                        status: "superseded",
+                        fields: { ...record.fields, supersededBy: "tax engine", supersededAt: clockIso() },
+                      }, { expectRevision: record.revision, event: `Tax code record ${record.title} marked superseded` });
+                      if (!saved18) return;
+                      context.toast("Marked superseded", `${record.title} no longer claims to be current. No computed figure changed, because the engine was always the source.`);
+                    } catch (error) {
+                      context.toast("Not marked", error instanceof Error ? error.message : "The record changed. Reopen and retry.", "failed");
+                    } finally {
+                      setBusy(false);
+                    }
                   }}
                 >
                   Mark superseded
@@ -476,9 +482,9 @@ export function TaxConfiguration({ context, close }: { context: ScreenContext; c
           })}
         </Stack>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      <DrawerActions>
+        <OverlayActions primary={<OverlayCancel>Close</OverlayCancel>} />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -492,21 +498,6 @@ export function ReturnReview({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Period", value: periodLabel(period, org.locale) },
-        { label: "Jurisdiction", value: org.jurisdiction },
-        { label: "Prepared", value: <span className="ds-num">{context.dateTime(context.now)}</span> },
-        { label: "Filing state", value: <CapabilityPill id="tax.file" /> },
-      ]} />
-      <StatementRow
-        context={context}
-        rows={[
-          { label: "Taxable sales, net", minor: boxes.outputNetMinor },
-          { label: "Tax on sales", minor: boxes.outputTaxMinor, bold: true },
-          { label: "Tax on purchases", minor: boxes.inputTaxMinor, bold: true },
-          { label: "Net payable", minor: boxes.payableMinor, bold: true },
-        ]}
-      />
       {boxes.unknownDocumentIds.length > 0 ? (
         <Notice tone="danger" title="Validation failed">
           {boxes.unknownDocumentIds.length} document{boxes.unknownDocumentIds.length === 1 ? " has" : "s have"} a line with no approved rate. The return cannot be prepared as final while that is true.
@@ -514,7 +505,15 @@ export function ReturnReview({ context }: { context: ScreenContext }) {
       ) : (
         <Notice tone="success" title="Validation passed">Every line in the period resolved to an approved code.</Notice>
       )}
-      <Button variant="secondary" onClick={() => exportReturn(context, boxes, org.jurisdiction)}>Export the figures</Button>
+      <FactGrid columns={4} items={[
+        { label: "Taxable sales, net", value: context.money(boxes.outputNetMinor), mono: true },
+        { label: "Tax on sales", value: context.money(boxes.outputTaxMinor), mono: true },
+        { label: "Tax on purchases", value: context.money(boxes.inputTaxMinor), mono: true },
+        { label: "Net payable", value: context.money(boxes.payableMinor), mono: true, tone: "accent" },
+      ]} />
+      <FormFooter>
+        <Button variant="secondary" onClick={() => exportReturn(context, boxes, org.jurisdiction)}>Export the figures</Button>
+      </FormFooter>
     </Stack>
   );
 }
@@ -535,31 +534,32 @@ export function FilingAuthorization({ context, close }: { context: ScreenContext
 
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={note.trim() !== ""} />
+      <ModalInFlight when={busy} />
       <Notice tone="danger" title="This workspace makes no compliance claim">
         It is not certified by any tax authority, it is not a filing service and nothing here is legal or accounting advice. The figures are arithmetic over the records in this browser. Your accountant files the return.
       </Notice>
       <CapabilityNotice id="tax.file" />
-      <StatementRow
-        context={context}
-        rows={[
-          { label: "Period", minor: undefined, note: periodLabel(period, org.locale) },
-          { label: "Tax on sales", minor: boxes.outputTaxMinor },
-          { label: "Tax on purchases", minor: boxes.inputTaxMinor },
-          { label: "Net payable", minor: boxes.payableMinor, bold: true },
-        ]}
-      />
       {blocked && <Notice tone="warning" title="Preparation is blocked">{blocked}</Notice>}
+      <FactGrid columns={4} items={[
+        { label: "Period", value: periodLabel(period, org.locale) },
+        { label: "Tax on sales", value: context.money(boxes.outputTaxMinor), mono: true },
+        { label: "Tax on purchases", value: context.money(boxes.inputTaxMinor), mono: true },
+        { label: "Net payable", value: context.money(boxes.payableMinor), mono: true, tone: "accent" },
+      ]} />
       <Field label="Note for the file" hint="Kept with the prepared return in this workspace.">
         <TextArea aria-label="Note for the file" value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
       </Field>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("export_data")}
           title={blocked}
           onClick={async () => {
             setBusy(true);
+            try {
             await context.mutate.create({
               collection: "taxCodes",
               title: `Return prepared · ${periodLabel(period, org.locale)}`,
@@ -573,14 +573,19 @@ export function FilingAuthorization({ context, close }: { context: ScreenContext
               },
             }, `Return prepared for ${period}`);
             context.toast("Return prepared", `The figures for ${period} are recorded as prepared. Submission needs an authorised filing connection, which does not exist here.`, "info");
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Return not recorded", error instanceof Error ? error.message : "Try again.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record it as prepared
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
       <SourceNote><ShieldAlert size={13} aria-hidden="true" /> Recording a return as prepared changes a record in this browser and nothing else.</SourceNote>
     </Stack>
   );
@@ -591,7 +596,7 @@ export function TaxStrip({ context }: { context: ScreenContext }) {
   const { org } = useWorkspace();
   const boxes = buildReturn({ period: data.currentPeriod, invoices: data.invoices, bills: data.bills, contacts: data.contacts, jurisdiction: org.jurisdiction, now: context.now });
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <Pill tone="neutral" dot>{org.jurisdiction}</Pill>
       <span>{periodLabel(data.currentPeriod, org.locale)} output <Amount minor={boxes.outputTaxMinor} context={context} bold /></span>
       <span>Input <Amount minor={boxes.inputTaxMinor} context={context} bold /></span>
@@ -599,6 +604,6 @@ export function TaxStrip({ context }: { context: ScreenContext }) {
       {boxes.unknownDocumentIds.length > 0 && <Pill tone="danger" dot>{boxes.unknownDocumentIds.length} unresolved</Pill>}
       <span className="ds-grow" />
       <CapabilityPill id="tax.file" />
-    </Row>
+    </div>
   );
 }

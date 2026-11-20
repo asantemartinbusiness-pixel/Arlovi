@@ -4,6 +4,7 @@ import type { Rec, Role } from "@/domain/types";
 import type { Capability } from "./policy";
 import type { OrgProfile } from "./org";
 import type { Mutations } from "./workspace";
+import type { RecordHeaderProps } from "@/design-system/page-kit";
 
 /* ------------------------------------------------------------------ *
  * Typed screen registry.
@@ -92,6 +93,11 @@ export interface OverlayDef {
   capability?: Capability;
   render: (context: ScreenContext & { close: () => void }) => ReactNode;
   footer?: (context: ScreenContext & { close: () => void }) => ReactNode;
+  /**
+   * Identity block for the overlay head (normally an `OverlaySummary`). When
+   * present it is the only identity block: the generic record chip is not shown.
+   */
+  summary?: (context: ScreenContext & { close: () => void }) => ReactNode;
 }
 
 export interface ScreenDef {
@@ -100,6 +106,13 @@ export interface ScreenDef {
   surface?: (context: ScreenContext) => ReactNode;
   /** Replaces the whole page chrome (editors, consoles, public pages). */
   chrome?: "standard" | "full";
+  /**
+   * Full-chrome screens only. "surface" means the editor's own identity bar
+   * carries the page title (and the h1), so the slim command bar shows its
+   * actions without repeating the screen name. Default: the command bar
+   * shows the title.
+   */
+  chromeTitle?: "command-bar" | "surface";
   /** Extra content beneath the title, e.g. a record header card. */
   header?: (context: ScreenContext) => ReactNode;
   /** Right-hand contextual inspector. */
@@ -113,6 +126,16 @@ export interface ScreenDef {
   /** Override the page title/description from the registry contract. */
   title?: (context: ScreenContext) => string;
   subtitle?: (context: ScreenContext) => ReactNode;
+  /**
+   * Record/detail pages: replaces the generic page head. The returned title
+   * becomes the page h1 (and the route-change focus target), the screen title
+   * becomes the eyebrow, the lede is dropped and the screen actions render in
+   * the header. Breadcrumbs and the ScreenDef tab strip stay as they are.
+   * This is a plain function called during ScreenHost's render, after its
+   * early returns, so it must not call hooks: put live data in small
+   * components passed as the title, status or meta slots instead.
+   */
+  record?: (context: ScreenContext) => RecordHeaderProps | null;
 }
 
 export interface AppNavSection {

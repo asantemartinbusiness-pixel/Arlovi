@@ -1,19 +1,20 @@
 import { useMemo, useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, MoneyInput, Notice, Pill, Properties, Row,
-  Select, Stack, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, ModalActions, ModalUnsavedChanges, MoneyInput, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary,
+  Pill, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { resolveTaxCode, type TaxCategory } from "@/platform/money";
 import { newRecord, revisedRecord } from "@/platform/repo";
 import { RefundHistory } from "./operations";
-import { refundableMinor, refundedMinor, shipmentsOf } from "./fulfilment";
-import { ProviderBoundary, TAX_CATEGORIES, TotalsBlock } from "@/applications/market/kit";
+import { orderRefundSummary, refundableMinor, refundedMinor, shipmentsOf } from "./fulfilment";
+import { CountList, ProcChain, Totals, type ChainStage } from "@/applications/proc/kit";
+import { ProviderBoundary, TAX_CATEGORIES } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import { setStoreLayout, useStorefront } from "./actions";
 import {
-  bodyOf, marginOf, onHandFor, orderTotals, reservedFor,
+  bodyOf, marginOf, onHandFor, orderTotals, paymentLabel, paymentTone, reservedFor,
   statusTone, taxCategoryOfProduct, useCommerceData, type OrderBody, type ProductBody,
 } from "./data";
 import { clockIso } from "@/platform/clock";
@@ -36,7 +37,7 @@ export function KpiExplanation({ context }: { context: ScreenContext }) {
         <Notice tone="warning" title="There is no denominator">
           A conversion rate needs sessions. Nothing records a visit to the storefront preview, so the rate is shown as unavailable rather than computed from orders alone.
         </Notice>
-        <Properties rows={[
+        <FactGrid columns={2} items={[
           { label: "Orders", value: String(live.length) },
           { label: "Sessions", value: <Pill tone="warning">Not recorded</Pill> },
           { label: "Analytics provider", value: <Pill tone="warning">Not connected</Pill> },
@@ -48,7 +49,7 @@ export function KpiExplanation({ context }: { context: ScreenContext }) {
   const rows = metric === "awaiting" ? live.filter((order) => order.status === "awaiting_payment") : live.filter((order) => String(order.fields.payment) === "paid_local");
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Definition", value: metric === "net" ? "Sum of the net figure on each paid order, tax excluded" : metric === "gross" ? "Net plus the tax resolved for each line" : "Orders created but never charged" },
         { label: "Excluded", value: "Cancelled orders. Returns are deducted only in Analytics, and only when completed." },
         { label: "Orders counted", value: String(rows.length) },
@@ -115,11 +116,12 @@ export function ProductEditor({ context, close }: { context: ScreenContext; clos
         if (invalid) return;
         const fields = { sku: sku.trim(), taxCategory: category, unitCostMinor: cost, published, productCollection: String(existing?.fields.productCollection ?? "Lighting"), reorderPoint: Number(existing?.fields.reorderPoint ?? 4), reorderQuantity: Number(existing?.fields.reorderQuantity ?? 20), leadTimeDays: Number(existing?.fields.leadTimeDays ?? 14), seoTitle: String(existing?.fields.seoTitle ?? ""), seoDescription: String(existing?.fields.seoDescription ?? "") };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          const ok15 = await context.mutate.patch(existing.id, {
             title: title.trim(), amountMinor: price, summary: description,
             fields: { ...existing.fields, ...fields },
             body: { ...existingBody, description },
           }, { expectRevision: existing.revision, event: `Product ${title.trim()} edited` });
+          if (!ok15) return; // the platform has already said the record changed elsewhere
         } else {
           await context.mutate.create({
             collection: "products", title: title.trim(), status: published ? "active" : "draft",
@@ -130,23 +132,38 @@ export function ProductEditor({ context, close }: { context: ScreenContext; clos
         close();
       }}
     >
-      <Field label="Product name" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-      <Row gap={3} wrap>
-        <Field label="SKU" required error={duplicateSku ? "That SKU is already used" : undefined}>
-          <TextInput value={sku} invalid={duplicateSku} onChange={(event) => setSku(event.target.value.toUpperCase())} required />
-        </Field>
-        <Field label="List price" hint="Excludes tax"><MoneyInput valueMinor={price} onChangeMinor={setPrice} currency={org.currency} label="List price" /></Field>
-        <Field label="Unit cost" hint={price ? `Margin ${margin}%` : "Needed for any margin figure"}><MoneyInput valueMinor={cost} onChangeMinor={setCost} currency={org.currency} label="Unit cost" /></Field>
-      </Row>
-      <Field label="Tax category" hint={`${taxCode.label} (${taxCode.code}) at ${(taxCode.rateBp / 100).toFixed(2)}% for a domestic ${org.jurisdiction} customer`}>
-        <Select value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
-          {TAX_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </Select>
-      </Field>
-      {taxCode.note && <Notice tone="info">{taxCode.note}</Notice>}
-      <Field label="Description"><TextArea value={description} rows={4} onChange={(event) => setDescription(event.target.value)} /></Field>
-      <Checkbox label="Show in the storefront" checked={published} onChange={(event) => setPublished(event.target.checked)} />
-      {published && price === 0 && <Notice tone="danger" title="A published product needs a price">A visitor cannot buy something priced at zero.</Notice>}
+      <OverlaySection title="Identity">
+        <Stack gap={3}>
+          <Field label="Product name" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+          <Field label="SKU" required error={duplicateSku ? "That SKU is already used" : undefined}>
+            <TextInput value={sku} invalid={duplicateSku} onChange={(event) => setSku(event.target.value.toUpperCase())} required />
+          </Field>
+          <Field label="Description"><TextArea value={description} rows={3} onChange={(event) => setDescription(event.target.value)} /></Field>
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="Price, cost and margin" hint="Margin is what the catalogue is judged on; it needs a recorded unit cost.">
+        <Stack gap={3}>
+          <Row gap={3} wrap>
+            <Field label="List price" hint="Excludes tax"><MoneyInput valueMinor={price} onChangeMinor={setPrice} currency={org.currency} label="List price" /></Field>
+            <Field label="Unit cost" hint="Needed for any margin figure"><MoneyInput valueMinor={cost} onChangeMinor={setCost} currency={org.currency} label="Unit cost" /></Field>
+          </Row>
+          <Field label="Tax category" hint={`${taxCode.label} (${taxCode.code}) at ${(taxCode.rateBp / 100).toFixed(2)}% for a domestic ${org.jurisdiction} customer`}>
+            <Select value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
+              {TAX_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </Select>
+          </Field>
+          <FactGrid columns={3} dense items={[
+            { label: "Margin per unit", value: cost ? context.money(price - cost) : "Unavailable", mono: true },
+            { label: "Margin", value: cost && price ? `${margin}%` : "Unavailable", mono: true },
+            { label: "Price with tax", value: context.money(Math.round(price * (1 + taxCode.rateBp / 10_000))), mono: true },
+          ]} />
+          {taxCode.note && <Notice tone="info">{taxCode.note}</Notice>}
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="Storefront">
+        <Checkbox label="Show in the storefront" checked={published} onChange={(event) => setPublished(event.target.checked)} />
+        {published && price === 0 && <Notice tone="danger" title="A published product needs a price">A visitor cannot buy something priced at zero.</Notice>}
+      </OverlaySection>
     </form>
   );
 }
@@ -177,7 +194,7 @@ export function ImportMapping({ context, close }: { context: ScreenContext; clos
       }}
     >
       <Field label="Paste CSV" hint="Columns: sku, name, price, tax category"><TextArea value={text} rows={6} onChange={(event) => setText(event.target.value)} /></Field>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Rows read", value: String(rows.length) },
         { label: "Valid", value: String(valid.length) },
         { label: "Rejected", value: String(rows.length - valid.length) },
@@ -213,13 +230,17 @@ export function BulkPreview({ context, close }: { context: ScreenContext; close:
               { key: "problems", header: "Checks", cell: (row) => (row.problems.length === 0 ? <Pill tone="success">Ready</Pill> : <Pill tone="danger">{row.problems.join(", ")}</Pill>) },
             ]} />
           {blocked.length > 0 && <Notice tone="danger" title={`${blocked.length} product${blocked.length === 1 ? "" : "s"} cannot be published`}>A bulk publish applies only to rows that pass every check, so nothing is listed without a price or stock.</Notice>}
+          <ModalActions>
+            <OverlayActions
+              primary={
           <Button
             variant="primary"
             disabled={checks.length === blocked.length}
             onClick={async () => {
               const ready = checks.filter((check) => check.problems.length === 0);
               for (const check of ready) {
-                await context.mutate.patch(check.product.id, { status: "active", fields: { ...check.product.fields, published: true } }, { expectRevision: check.product.revision, event: `${check.product.title} published to the storefront` });
+                const ok16 = await context.mutate.patch(check.product.id, { status: "active", fields: { ...check.product.fields, published: true } }, { expectRevision: check.product.revision, event: `${check.product.title} published to the storefront` });
+                if (!ok16) return; // the platform has already said the record changed elsewhere
               }
               context.toast("Published", `${ready.length} product${ready.length === 1 ? "" : "s"} now appear in the storefront. ${blocked.length} were left alone.`);
               close();
@@ -227,6 +248,10 @@ export function BulkPreview({ context, close }: { context: ScreenContext; close:
           >
             Publish {checks.length - blocked.length} of {checks.length}
           </Button>
+              }
+              end={<OverlayCancel>Cancel</OverlayCancel>}
+            />
+          </ModalActions>
         </>
       )}
     </Stack>
@@ -250,14 +275,15 @@ export function VariantEditor({ context, close }: { context: ScreenContext; clos
       onSubmit={async (event) => {
         event.preventDefault();
         if (!name.trim() || !sku.trim() || duplicate) return;
-        await context.mutate.patch(product.id, {
+        const ok17 = await context.mutate.patch(product.id, {
           body: { ...body, variants: [...(body.variants ?? []), { id: `${sku.trim()}-v`, name: name.trim(), sku: sku.trim().toUpperCase(), priceDeltaMinor: delta }] },
         }, { expectRevision: product.revision, event: `Variant ${name.trim()} added to ${product.title}` });
+        if (!ok17) return; // the platform has already said the record changed elsewhere
         context.toast("Variant added", `${name.trim()} sells at ${context.money((product.amountMinor ?? 0) + delta)}.`);
         close();
       }}
     >
-      <Properties rows={[{ label: "Product", value: product.title }, { label: "Base price", value: context.money(product.amountMinor) }, { label: "Existing variants", value: String((body.variants ?? []).length) }]} />
+      <FactGrid columns={2} items={[{ label: "Product", value: product.title }, { label: "Base price", value: context.money(product.amountMinor) }, { label: "Existing variants", value: String((body.variants ?? []).length) }]} />
       <Field label="Variant name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
       <Field label="Variant SKU" required error={duplicate ? "That SKU already exists on this product" : undefined}>
         <TextInput value={sku} invalid={duplicate} onChange={(event) => setSku(event.target.value.toUpperCase())} required />
@@ -283,9 +309,10 @@ export function MediaPicker({ context, close }: { context: ScreenContext; close:
       onSubmit={async (event) => {
         event.preventDefault();
         if (!label.trim()) return;
-        await context.mutate.patch(product.id, {
+        const ok18 = await context.mutate.patch(product.id, {
           body: { ...body, media: [...(body.media ?? []), { id: `m${(body.media ?? []).length + 1}`, label: label.trim(), kind: "placeholder" }] },
         }, { expectRevision: product.revision, event: `Media reference added to ${product.title}` });
+        if (!ok18) return; // the platform has already said the record changed elsewhere
         context.toast("Reference added", "The storefront shows the label until a file store is connected.");
         close();
       }}
@@ -319,12 +346,21 @@ export function MarginImpact({ context }: { context: ScreenContext }) {
   const floorBreached = worst.promotion ? worst.bp < Number(worst.promotion.fields.floorMarginBp ?? 0) : false;
   return (
     <Stack gap={4}>
-      <Field label="Proposed price"><MoneyInput valueMinor={price} onChangeMinor={setPrice} currency={org.currency} label="Proposed price" /></Field>
-      <Properties rows={[
-        { label: "Unit cost", value: current.costMinor ? context.money(current.costMinor) : "Unavailable — no cost recorded" },
-        { label: "Margin now", value: current.costMinor ? `${(current.marginBp / 100).toFixed(1)}%` : "Unavailable" },
-        { label: "Margin at the proposed price", value: current.costMinor ? `${(proposed.marginBp / 100).toFixed(1)}%` : "Unavailable" },
-        { label: "Worst live offer", value: worst.promotion ? `${worst.promotion.title} → ${context.money(worst.discounted)} (${(worst.bp / 100).toFixed(1)}%)` : "No live offer" },
+      <OverlaySummary eyebrow="Margin impact" title={product.title}
+        status={<Pill tone={floorBreached ? "danger" : current.costMinor ? "success" : "warning"} dot>{floorBreached ? "Breaks a margin floor" : current.costMinor ? "Within floors" : "No cost recorded"}</Pill>}
+        meta={[String(product.fields.sku ?? ""), `List price ${context.money(product.amountMinor)}`]} />
+      <OverlaySection title="Try a price" hint="This previews only. Changing the saved price is a separate step on the product.">
+        <div style={{ maxWidth: 220 }}><Field label="Proposed price"><MoneyInput valueMinor={price} onChangeMinor={setPrice} currency={org.currency} label="Proposed price" /></Field></div>
+      </OverlaySection>
+      <FactGrid columns={3} items={[
+        { label: "Unit cost", value: current.costMinor ? context.money(current.costMinor) : "Not recorded", mono: true, tone: current.costMinor ? undefined : "warning" },
+        { label: "Margin now", value: current.costMinor ? `${(current.marginBp / 100).toFixed(1)}%` : "Unavailable", mono: true },
+        { label: "At the proposed price", value: current.costMinor ? `${(proposed.marginBp / 100).toFixed(1)}%` : "Unavailable", mono: true, tone: current.costMinor && proposed.marginBp < current.marginBp ? "warning" : undefined,
+          hint: current.costMinor ? `${proposed.marginBp >= current.marginBp ? "+" : ""}${((proposed.marginBp - current.marginBp) / 100).toFixed(1)} points` : undefined },
+      ]} />
+      <FactGrid columns={2} dense items={[
+        { label: "Worst live offer", value: worst.promotion ? worst.promotion.title : "No live offer" },
+        { label: "Offer price and margin", value: worst.promotion ? `${context.money(worst.discounted)} · ${(worst.bp / 100).toFixed(1)}%` : "—", mono: true, tone: floorBreached ? "danger" : undefined },
       ]} />
       {floorBreached && worst.promotion && (
         <Notice tone="danger" title="This price breaks a live offer's margin floor">
@@ -349,7 +385,7 @@ export function PublishProduct({ context, close }: { context: ScreenContext; clo
   ];
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Product", value: product.title },
         { label: "Price", value: context.money(product.amountMinor) },
         { label: "Available", value: String(available) },
@@ -357,17 +393,25 @@ export function PublishProduct({ context, close }: { context: ScreenContext; clo
         { label: "Current state", value: <Pill tone={statusTone(product.status)}>{product.status}</Pill> },
       ]} />
       {problems.length > 0 && <Notice tone="danger" title="Not ready for the storefront">{problems.join(" ")}</Notice>}
+      <ModalActions>
+        <OverlayActions
+          primary={
       <Button
         variant="primary"
         disabled={problems.length > 0}
         onClick={async () => {
-          await context.mutate.patch(product.id, { status: "active", fields: { ...product.fields, published: true } }, { expectRevision: product.revision, event: `${product.title} published to the storefront` });
+          const ok19 = await context.mutate.patch(product.id, { status: "active", fields: { ...product.fields, published: true } }, { expectRevision: product.revision, event: `${product.title} published to the storefront` });
+          if (!ok19) return; // the platform has already said the record changed elsewhere
           context.toast("Published", `${product.title} is now in the storefront preview.`);
           close();
         }}
       >
         Publish to the storefront
       </Button>
+          }
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -442,15 +486,12 @@ export function CountReconciliation({ context, close }: { context: ScreenContext
         close();
       }}
     >
-      <DataGrid rows={rows} rowId={(row) => row.product.id} label="Count sheet" filterable={false}
-        columns={[
-          { key: "title", header: "Product", primary: true, cell: (row) => row.product.title },
-          { key: "expected", header: "Expected", align: "end", cell: (row) => String(row.expected) },
-          { key: "counted", header: "Counted", align: "end", cell: (row) => (
-            <TextInput aria-label={`Counted ${row.product.title}`} inputMode="numeric" align="end" style={{ maxWidth: 90 }} value={counts[row.product.id] ?? ""} onChange={(event) => setCounts((current) => ({ ...current, [row.product.id]: event.target.value }))} />
-          ) },
-          { key: "variance", header: "Variance", align: "end", cell: (row) => (row.variance === undefined ? <span className="ds-subtle">Not counted</span> : <strong className={row.variance === 0 ? "ds-num" : "ds-field-error"}>{row.variance > 0 ? "+" : ""}{row.variance}</strong>) },
-        ]} />
+      <CountList label="Count sheet" rows={rows.map((row) => ({
+        id: row.product.id, title: row.product.title,
+        facts: [{ label: "Expected", value: String(row.expected) }, { label: "Variance", value: row.variance === undefined ? "Not counted" : `${row.variance > 0 ? "+" : ""}${row.variance}`, tone: row.variance ? "danger" : undefined }],
+        inputHeader: "Counted", inputLabel: `Counted ${row.product.title}`,
+        value: counts[row.product.id] ?? "", onChange: (next) => setCounts((current) => ({ ...current, [row.product.id]: next })),
+      }))} />
       <Notice tone="warning" title="A variance is recorded, not hidden">
         Each difference becomes its own movement with the counted and expected figures in its summary, so the stock ledger explains how it got to today's number.
       </Notice>
@@ -470,22 +511,23 @@ export function OrderQuickView({ context }: { context: ScreenContext }) {
   const totals = orderTotals(order, contact, org.jurisdiction);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Order", value: order.title },
-        { label: "Buyer", value: contact?.title ?? String(order.fields.buyerName || "Guest") },
-        { label: "Placed", value: context.dateTime(order.at) },
-        { label: "Payment", value: <Pill tone={String(order.fields.payment) === "paid_local" ? "success" : "warning"} dot>{String(order.fields.payment).replace(/_/g, " ")}</Pill> },
-        { label: "Fulfilment", value: <Pill tone={statusTone(String(order.fields.fulfilment ?? order.status))}>{String(order.fields.fulfilment ?? order.status).replace("_", " ")}</Pill> },
-      ]} />
+      <OverlaySummary eyebrow="Order" title={<span className="ds-num">{order.title}</span>}
+        status={<Pill tone={statusTone(String(order.fields.fulfilment ?? order.status))} dot>{String(order.fields.fulfilment ?? order.status).replace("_", " ")}</Pill>}
+        meta={[contact?.title ?? String(order.fields.buyerName || "Guest"), `Placed ${context.dateTime(order.at)}`]}
+        actions={<Pill tone={paymentTone(String(order.fields.payment))}>{paymentLabel(order.fields.payment)}</Pill>} />
+      <OverlaySection title="Lines" flush>
       <DataGrid rows={totals.lines} rowId={(row) => row.id} label="Lines" filterable={false}
         columns={[
           { key: "description", header: "Item", primary: true, cell: (row) => row.description },
           { key: "qty", header: "Qty", align: "end", cell: (row) => String(row.quantity) },
           { key: "code", header: "Tax", cell: (row) => <Pill>{row.taxCode.code}</Pill> },
-          { key: "gross", header: "Gross", align: "end", cell: (row) => context.money(row.grossMinor) },
+          { key: "gross", header: "Gross", align: "end", cell: (row) => <span className="ds-num">{context.money(row.grossMinor)}</span> },
         ]} />
-      <TotalsBlock totals={totals} money={context.money} label="Order" />
-      <Button variant="secondary" onClick={() => { context.navigate(`/o/${org.slug}/commerce/orders/${order.id}`); context.closeOverlay(); }}>Open the full order</Button>
+      </OverlaySection>
+      <Totals totals={totals} money={context.money} label="Order" />
+      <DrawerActions>
+        <OverlayActions primary={<Button variant="primary" onClick={() => { context.navigate(`/o/${org.slug}/commerce/orders/${order.id}`); context.closeOverlay(); }}>Open the full order</Button>} end={<OverlayCancel>Close</OverlayCancel>} />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -504,16 +546,17 @@ export function BulkOperation({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         const ready = chosen.filter((order) => order.status !== "awaiting_payment");
         for (const order of ready) {
-          await context.mutate.patch(order.id, {
+          const ok20 = await context.mutate.patch(order.id, {
             status: stage === "shipped" ? "in_transit" : order.status,
             fields: { ...order.fields, fulfilment: stage },
           }, { expectRevision: order.revision, event: `${order.title} moved to ${stage}` });
+          if (!ok20) return; // the platform has already said the record changed elsewhere
         }
         context.toast("Orders moved", `${ready.length} order${ready.length === 1 ? "" : "s"} are now ${stage}. ${blocked.length} unpaid order${blocked.length === 1 ? " was" : "s were"} left alone.`);
         close();
       }}
     >
-      <Properties rows={[{ label: "Selected", value: String(chosen.length) }, { label: "Unpaid, skipped", value: String(blocked.length) }]} />
+      <FactGrid columns={2} items={[{ label: "Selected", value: String(chosen.length) }, { label: "Unpaid, skipped", value: String(blocked.length) }]} />
       <Field label="Move to"><Select value={stage} onChange={(event) => setStage(event.target.value)}>{["picking", "packed", "shipped"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       {blocked.length > 0 && <Notice tone="warning" title="Unpaid orders are not fulfilled in bulk">{blocked.map((order) => order.title).join(", ")} {blocked.length === 1 ? "is" : "are"} awaiting payment. Shipping before payment is a decision for a person, not a bulk action.</Notice>}
       <Notice tone="info">Applying the same change twice is harmless: an order already at this stage simply stays there, so a repeated click cannot ship twice.</Notice>
@@ -528,36 +571,53 @@ export function RefundApproval({ context, close }: { context: ScreenContext; clo
   const order = useRecord(payload?.id ?? context.params.id ?? context.selectedId) ?? data.orders[0];
   const contact = data.contacts.find((item) => item.id === String(order?.fields.contactId ?? ""));
   const totals = orderTotals(order, contact, org.jurisdiction);
-  const [amount, setAmount] = useState(totals.grossMinor);
+  const shipping = Number(order?.fields.shippingMinor ?? 0);
+  const orderTotalMinor = totals.grossMinor + shipping;
+  const summary = order ? orderRefundSummary(order, data.returns) : undefined;
+  const remainingMinor = Math.max(0, orderTotalMinor - (summary?.recordedMinor ?? 0));
+  const [amount, setAmount] = useState<number | undefined>(undefined);
   const [reason, setReason] = useState("");
   if (!order) return <Empty title="No order" />;
-  const tooMuch = amount > totals.grossMinor;
+  if (data.contacts.length === 0 && order.fields.contactId) return <Empty title="Loading the order" />;
+  const value = amount ?? remainingMinor;
+  const tooMuch = value > remainingMinor;
+  const invalid = tooMuch || value <= 0 || !reason.trim();
   return (
     <form
       id="refund-approval"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (tooMuch || !reason.trim()) return;
+        if (invalid) return;
         const body = bodyOf<OrderBody>(order, {});
-        await context.mutate.patch(order.id, {
-          fields: { ...order.fields, refundProposedMinor: amount, refundProposedBy: actor, payment: "refund_proposed" },
-          body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: "Refund proposed", detail: `${context.money(amount)} proposed by ${actor}: ${reason}. No processor is connected, so nothing has been sent.` }] },
-        }, { expectRevision: order.revision, event: `Refund of ${amount} proposed on ${order.title}` });
-        context.toast("Refund proposed", "The proposal is on the order with its reason. The money moves only when someone sends it and records it in the ledger.");
+        const ok21 = await context.mutate.patch(order.id, {
+          fields: { ...order.fields, refundProposedMinor: value, refundProposedBy: actor, payment: "refund_proposed" },
+          body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: "Refund proposed", detail: `${context.money(value)} proposed by ${actor}: ${reason}. No processor is connected, so nothing has been sent.` }] },
+        }, { expectRevision: order.revision, event: `Refund of ${value} proposed on ${order.title}` });
+        if (!ok21) return; // the platform has already said the record changed elsewhere
+        context.toast("Refund proposed", "The proposal is on the order with its reason. Nothing was sent: the money moves only when someone sends it and records it.");
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Order", value: order.title },
-        { label: "Order total", value: context.money(totals.grossMinor) },
-        { label: "Already refunded", value: context.money(Number(order.fields.refundProposedMinor ?? 0)) },
+      <ModalUnsavedChanges when={Boolean(reason.trim()) || amount !== undefined} />
+      <OverlaySummary eyebrow="Refund proposal" title={<span className="ds-num">{order.title}</span>}
+        status={<Pill tone="warning" dot>Not executed</Pill>}
+        meta={[contact?.title ?? String(order.fields.buyerName || "Guest")]} />
+      <FactGrid columns={4} dense items={[
+        { label: "Order total", value: context.money(orderTotalMinor), mono: true },
+        { label: "Refunded and recorded", value: context.money(summary?.recordedMinor ?? 0), mono: true },
+        { label: "Already proposed", value: context.money(summary?.proposedMinor ?? 0), mono: true, tone: summary?.proposedMinor ? "warning" : undefined },
+        { label: "Left to refund", value: context.money(remainingMinor), mono: true },
       ]} />
-      <Field label="Refund amount" error={tooMuch ? "More than the order total" : undefined}>
-        <MoneyInput valueMinor={amount} onChangeMinor={setAmount} currency={org.currency} label="Refund amount" />
-      </Field>
-      <Field label="Reason" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <ProviderBoundary id="payment.capture" title="A refund cannot be executed here" />
+      <OverlaySection title="Proposal">
+        <Stack gap={3}>
+<div style={{ maxWidth: 240 }}><Field label="Refund amount" error={tooMuch ? `More than the ${context.money(remainingMinor)} that remains` : value <= 0 ? "Enter an amount above zero" : undefined}>
+            <MoneyInput valueMinor={value} onChangeMinor={setAmount} currency={org.currency} label="Refund amount" />
+          </Field></div>
+          <Field label="Reason" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
+        </Stack>
+      </OverlaySection>
+      <ProviderBoundary id="payment.capture" title="A refund cannot be executed here" kept="The proposal, its amount and its reason, on this order." />
     </form>
   );
 }
@@ -576,7 +636,7 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
   const inShipments = shipmentsOf(order).length > 0;
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Order", value: order.title },
         { label: "Units", value: String((bodyOf<OrderBody>(order, {}).lines ?? []).reduce((sum, line) => sum + line.quantity, 0)) },
         { label: "Ship to", value: bodyOf<OrderBody>(order, {}).shipTo?.city ?? "Not recorded" },
@@ -596,6 +656,9 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
           A real label comes back from the carrier with a tracking number. Here the carrier and a local reference are recorded against the order so the handover is traceable, and the reference is marked as local.
         </Notice>
       )}
+      <ModalActions>
+        <OverlayActions
+          primary={
       <Button
         variant="primary"
         disabled={Boolean(existing) || awaitingPayment || inShipments}
@@ -623,6 +686,10 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
       >
         Record the handover
       </Button>
+          }
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -635,55 +702,83 @@ export function CancellationImpact({ context, close }: { context: ScreenContext;
   const paid = String(order.fields.payment) === "paid_local";
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Order", value: order.title },
-        { label: "Lines released", value: String(lines.length) },
-        { label: "Units returned to available", value: String(lines.reduce((sum, line) => sum + line.quantity, 0)) },
-        { label: "Payment", value: paid ? <Pill tone="warning">Recorded as paid — a refund is needed</Pill> : <Pill tone="success">Nothing was charged</Pill> },
+      <OverlaySummary eyebrow="Cancel order" title={<span className="ds-num">{order.title}</span>}
+        status={<Pill tone={paid ? "warning" : "success"} dot>{paid ? "Recorded as paid" : "Nothing charged"}</Pill>} />
+      <FactGrid columns={3} items={[
+        { label: "Lines released", value: String(lines.length), mono: true },
+        { label: "Units back to available", value: String(lines.reduce((sum, line) => sum + line.quantity, 0)), mono: true },
+        { label: "Payment", value: paid ? "A refund is needed" : "Nothing to refund", tone: paid ? "warning" : "success" },
       ]} />
       <Notice tone={paid ? "danger" : "warning"} title={paid ? "Cancelling does not refund" : "What cancelling does"}>
         {paid
           ? "This order is recorded as paid in the local ledger. Cancelling releases the stock reservation but does not move money: propose a refund as well, so the financial and physical states stay consistent."
           : "The reservation is released, so the units become available to sell again immediately. No stock movement is written because nothing physically moved."}
       </Notice>
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<OverlayCancel>Keep the order</OverlayCancel>} primary={<Button
         variant="danger"
         onClick={async () => {
           const body = bodyOf<OrderBody>(order, {});
-          await context.mutate.patch(order.id, {
+          const ok22 = await context.mutate.patch(order.id, {
             status: "cancelled",
             fields: { ...order.fields, fulfilment: "cancelled", payment: paid ? String(order.fields.payment) : "void" },
             body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: "Cancelled", detail: `${lines.reduce((sum, line) => sum + line.quantity, 0)} units released back to available.` }] },
           }, { expectRevision: order.revision, event: `${order.title} cancelled` });
+          if (!ok22) return; // the platform has already said the record changed elsewhere
           context.toast("Cancelled", paid ? "Stock is released. The payment still needs a refund proposal." : "Stock is released and nothing was charged.");
           close();
         }}
       >
         Cancel this order
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
 
 export function RefundConfirmation({ context }: { context: ScreenContext }) {
+  const data = useCommerceData();
+  const { org } = useWorkspace();
   const payload = context.overlayPayload as { id?: unknown } | undefined;
   const id = typeof payload?.id === "string" ? payload.id : context.params.id ?? context.selectedId;
   const selected = useRecord(id);
   const order = selected?.organizationId === context.org.id && selected.collection === "orders" ? selected : undefined;
   if (!order) return <Empty title="No order selected">Choose the order whose refund proposal you want to review. Another order will not be substituted.</Empty>;
-  const proposedMinor = Number(order.fields.refundProposedMinor ?? 0);
+  if (data.contacts.length === 0 && order.fields.contactId) return <Empty title="Loading the order" />;
+  const contact = data.contacts.find((item) => item.id === String(order.fields.contactId ?? ""));
+  const summary = orderRefundSummary(order, data.returns);
+  const orderTotalMinor = orderTotals(order, contact, org.jurisdiction).grossMinor + Number(order.fields.shippingMinor ?? 0);
+  const paid = String(order.fields.payment) === "paid_local";
+  const left = Math.max(0, orderTotalMinor - summary.recordedMinor);
+  const stages: ChainStage[] = [
+    { key: "paid", label: "Payment", state: paid ? "done" : "pending", fact: paid ? "Recorded as paid" : "Not recorded as paid", word: paid ? "In the ledger" : "Waiting" },
+    { key: "proposed", label: "Proposal", state: summary.proposedMinor > 0 ? "done" : "pending", fact: summary.proposedMinor > 0 ? `${context.money(summary.proposedMinor)} by ${summary.proposedBy || "someone"}` : "None yet", word: summary.proposedMinor > 0 ? "Proposed" : "Waiting" },
+    { key: "sent", label: "Money sent", state: "blocked", fact: "Outside Arlovi", word: "Not possible here" },
+    { key: "recorded", label: "Recorded", state: summary.recordedMinor >= orderTotalMinor && orderTotalMinor > 0 ? "done" : summary.recordedMinor > 0 ? "partial" : "pending", fact: summary.recordedMinor > 0 ? context.money(summary.recordedMinor) : "Nothing recorded", word: summary.recordedMinor > 0 ? "With reference" : "Waiting" },
+  ];
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Order", value: order.title },
-        { label: "Proposed refund", value: proposedMinor > 0 ? context.money(proposedMinor) : "No amount proposed" },
-        { label: "Proposed by", value: String(order.fields.refundProposedBy ?? "Nobody yet") },
-        { label: "Executed", value: <Pill tone="warning">Not possible here</Pill> },
+      <OverlaySummary eyebrow="Refund state" title={<span className="ds-num">{order.title}</span>}
+        status={<Pill tone={summary.proposedMinor > 0 ? "warning" : "neutral"} dot>{summary.proposedMinor > 0 ? "Proposal awaiting action" : "No proposal"}</Pill>}
+        meta={[contact?.title ?? String(order.fields.buyerName || "Guest"), `Order total ${context.money(orderTotalMinor)}`]}
+        actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("refund approval", { id: order.id })}>Propose a refund</Button>} />
+      <ProcChain stages={stages} label="Refund stages" />
+      <FactGrid columns={4} items={[
+        { label: "Proposed", value: summary.proposedMinor > 0 ? context.money(summary.proposedMinor) : "None", mono: true },
+        { label: "Proposed by", value: summary.proposedBy || "Nobody yet" },
+        { label: "Recorded as refunded", value: context.money(summary.recordedMinor), mono: true },
+        { label: "Left to refund", value: context.money(left), mono: true },
       ]} />
-      {proposedMinor <= 0 && <Notice tone="info" title="No refund proposal to confirm">A proposed amount and an author must be recorded against this order before a payment can be arranged outside Arlovi.</Notice>}
-      <ProviderBoundary id="payment.capture" title="The refund stops at the same boundary as the payment">
-        Money cannot leave this browser. The proposal, its amount and its reason are on the order so the studio can send the refund and record it against the ledger.
-      </ProviderBoundary>
+      <OverlaySection title="Refunds recorded against returns" hint="Each row is a refund the studio made elsewhere and then recorded with its own reference." flush>
+        {summary.recorded.length === 0 ? <span className="ds-subtle">No refund has been recorded. Record one from the return once it is approved and the money has been sent.</span> : (
+          <DataGrid rows={summary.recorded} rowId={(row) => row.id} label="Refunds recorded" filterable={false}
+            columns={[
+              { key: "return", header: "Return", primary: true, cell: (row) => <span className="ds-num">{row.returnTitle}</span> },
+              { key: "amount", header: "Amount", align: "end", cell: (row) => <span className="ds-num">{context.money(row.amountMinor)}</span> },
+              { key: "ref", header: "Reference", cell: (row) => row.reference || "—" },
+              { key: "at", header: "Recorded", cell: (row) => <span className="ds-num">{context.date(row.at)}</span>, hideBelow: 700 },
+            ]} />
+        )}
+      </OverlaySection>
+      <ProviderBoundary id="payment.capture" title="Arlovi cannot send or confirm a refund" kept="The proposal and every refund you record with its reference. No processor receipt exists, so none is shown." />
     </Stack>
   );
 }
@@ -729,7 +824,7 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
         close();
       }}
     >
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "What a processor needs", value: "A server to hold the secret key and receive webhooks" },
         { label: "What this build has", value: "A browser, an IndexedDB database and no server" },
         { label: "Card data", value: <Pill tone="success">Never collected</Pill> },
@@ -783,13 +878,14 @@ export function CarrierSelector({ context, close }: { context: ScreenContext; cl
         event.preventDefault();
         const ready = chosen.filter((order) => !String(order.fields.tracking));
         for (const order of ready) {
-          await context.mutate.patch(order.id, { fields: { ...order.fields, carrier } }, { expectRevision: order.revision, event: `${order.title} assigned to ${carrier}` });
+          const ok23 = await context.mutate.patch(order.id, { fields: { ...order.fields, carrier } }, { expectRevision: order.revision, event: `${order.title} assigned to ${carrier}` });
+          if (!ok23) return; // the platform has already said the record changed elsewhere
         }
         context.toast("Carrier set", `${ready.length} order${ready.length === 1 ? "" : "s"} assigned to ${carrier}. ${already.length} already had a reference and were skipped.`);
         close();
       }}
     >
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Selected", value: String(chosen.length) },
         { label: "Already have a reference", value: String(already.length) },
       ]} />
@@ -837,16 +933,17 @@ export function DeliveryException({ context, close }: { context: ScreenContext; 
         event.preventDefault();
         const body = bodyOf<OrderBody>(order, {});
         const next = decision === "resend" ? "unfulfilled" : decision === "refund" ? "exception" : "exception";
-        await context.mutate.patch(order.id, {
+        const ok24 = await context.mutate.patch(order.id, {
           status: next,
           fields: { ...order.fields, fulfilment: decision === "resend" ? "unfulfilled" : "exception", exceptionDecision: decision },
           body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: `Exception decision: ${decision}`, detail: note || "No note recorded." }] },
         }, { expectRevision: order.revision, event: `Exception on ${order.title} decided: ${decision}` });
+        if (!ok24) return; // the platform has already said the record changed elsewhere
         context.toast("Decision recorded", decision === "resend" ? "The order is back in the pick queue. No second label was created automatically." : "The decision and its note are on the order.");
         close();
       }}
     >
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Order", value: order.title },
         { label: "Carrier", value: String(order.fields.carrier) || "Not recorded" },
         { label: "Tracking", value: String(order.fields.tracking) || "Nothing was scanned" },
@@ -880,15 +977,14 @@ export function ReturnInspector({ context, close }: { context: ScreenContext; cl
   const disputed = item.tags.includes("disputed");
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Return", value: item.title },
-        { label: "Order", value: order?.title ?? "Not linked" },
-        { label: "Product", value: data.products.find((product) => product.id === String(item.fields.productId))?.title ?? "—" },
-        { label: "Reason", value: String(item.fields.reason ?? "").replace("_", " ") },
-        { label: "Quantity", value: String(item.fields.quantity ?? 1) },
-        { label: "Days after the order", value: days === undefined ? "Unknown — no order date" : String(days) },
-        { label: "Policy", value: eligible ? <Pill tone="success">Within the 14 day window</Pill> : <Pill tone="warning">Outside the 14 day window</Pill> },
-        { label: "Photographs", value: String(item.fields.photos ?? 0) },
+      <OverlaySummary eyebrow="Return" title={<span className="ds-num">{item.title}</span>}
+        status={<Pill tone={statusTone(item.status)} dot>{item.status.replace("_", " ")}</Pill>}
+        meta={[order ? `Order ${order.title}` : "Not linked to an order", data.products.find((product) => product.id === String(item.fields.productId))?.title]} />
+      <FactGrid columns={4} items={[
+        { label: "Reason", value: String(item.fields.reason ?? "").replace("_", " ") || "—" },
+        { label: "Quantity", value: String(item.fields.quantity ?? 1), mono: true },
+        { label: "Days after the order", value: days === undefined ? "Unknown" : String(days), mono: true, tone: eligible ? undefined : "warning" },
+        { label: "Photographs", value: String(item.fields.photos ?? 0), mono: true },
       ]} />
       {disputed ? (
         <Notice tone="danger" title="Disputed: this is escalated, not decided here">
@@ -899,25 +995,25 @@ export function ReturnInspector({ context, close }: { context: ScreenContext; cl
           {eligible ? "Within fourteen days of the order date recorded here." : `The order was placed ${days ?? "an unknown number of"} days before the request, outside the fourteen day window. Approving it anyway is a deliberate exception.`}
         </Notice>
       )}
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          disabled={disputed}
-          onClick={async () => {
-            const saved = await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approvedAt: now.toISOString() } }, { expectRevision: item.revision, event: `${item.title} approved` });
-            if (!saved) return;
-            context.toast("Return approved", "The customer can send it back. No refund has moved.");
-            close();
-          }}
-        >
-          Approve the return
-        </Button>
-        <Button variant="ghost" onClick={() => context.openOverlay("restock assessment", { ids: [item.id] })}>Assess restocking</Button>
-        <Button variant="ghost" disabled={disputed || refundableMinor(item) === 0} onClick={() => context.openOverlay("refund authorization", { id: item.id })}>Record a refund</Button>
-      </Row>
-      <Card title="Refunds recorded" subtitle={`${context.money(refundedMinor(item))} of ${context.money(item.amountMinor)} refunded`} flush>
-        <div className="ds-card-body"><RefundHistory context={context} item={item} /></div>
-      </Card>
+      <OverlaySection title="Refunds recorded" hint={`${context.money(refundedMinor(item))} of ${context.money(item.amountMinor)} refunded. Each row is a refund made elsewhere and recorded with its reference.`} flush>
+        <RefundHistory context={context} item={item} />
+      </OverlaySection>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={disputed || item.status === "approved" || item.status === "completed"}
+            onClick={async () => {
+              const saved = await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approvedAt: now.toISOString() } }, { expectRevision: item.revision, event: `${item.title} approved` });
+              if (!saved) return;
+              context.toast("Return approved", "The customer can send it back. No refund has moved.");
+              close();
+            }}>Approve the return</Button>}
+          secondary={<>
+            <Button variant="secondary" onClick={() => context.openOverlay("restock assessment", { ids: [item.id] })}>Assess restocking</Button>
+            <Button variant="secondary" disabled={disputed || refundableMinor(item) === 0} onClick={() => context.openOverlay("refund authorization", { id: item.id })}>Record a refund</Button>
+          </>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1023,7 +1119,8 @@ export function OfferBuilder({ context, close }: { context: ScreenContext; close
         if (invalid) return;
         const fields = { kind, value: Number(value), code: code.trim().toUpperCase(), minQuantity: Number(existing?.fields.minQuantity ?? 1), audience: String(existing?.fields.audience ?? "all"), stackable, floorMarginBp: Math.round(Number(floor) * 100), uses: Number(existing?.fields.uses ?? 0) };
         if (existing) {
-          await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Offer ${title.trim()} edited` });
+          const ok25 = await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Offer ${title.trim()} edited` });
+          if (!ok25) return; // the platform has already said the record changed elsewhere
         } else {
           const end = new Date(now);
           end.setDate(end.getDate() + 30);
@@ -1048,7 +1145,7 @@ export function OfferBuilder({ context, close }: { context: ScreenContext; close
       </Row>
       <Checkbox label="May stack with another offer" checked={stackable} onChange={(event) => setStackable(event.target.checked)} />
       {worst && (
-        <Properties rows={[
+        <FactGrid columns={2} items={[
           { label: "Worst affected product", value: worst.product.title },
           { label: "Price after the offer", value: context.money(worst.discounted) },
           { label: "Margin then", value: `${(worst.bp / 100).toFixed(1)}%` },
@@ -1080,12 +1177,9 @@ export function MarginCheck({ context }: { context: ScreenContext }) {
   const breaching = rows.filter((row) => row.breaches);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Offer", value: promotion.title },
-        { label: "Discount", value: String(promotion.fields.kind) === "amount" ? context.money(Number(promotion.fields.value ?? 0)) : `${promotion.fields.value}%` },
-        { label: "Floor", value: `${(Number(promotion.fields.floorMarginBp ?? 0) / 100).toFixed(0)}%` },
-        { label: "Products below the floor", value: String(breaching.length) },
-      ]} />
+      <OverlaySummary eyebrow="Margin check" title={promotion.title}
+        status={<Pill tone={breaching.length ? "danger" : "success"} dot>{breaching.length ? `${breaching.length} below the floor` : "Every product above the floor"}</Pill>}
+        meta={[String(promotion.fields.kind) === "amount" ? `${context.money(Number(promotion.fields.value ?? 0))} off` : `${String(promotion.fields.value ?? 0)}% off`, `Floor ${(Number(promotion.fields.floorMarginBp ?? 0) / 100).toFixed(0)}% margin`]} />
       <DataGrid rows={rows} rowId={(row) => row.product.id} label="Margin check" filterable={false}
         rowTone={(row) => (row.breaches ? "danger" : undefined)}
         columns={[
@@ -1113,12 +1207,13 @@ export function OfferLaunchApproval({ context, close }: { context: ScreenContext
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(promotion.id, { status: "active", fields: { ...promotion.fields, approvedBy: actor } }, { expectRevision: promotion.revision, event: `Offer ${promotion.title} made live by ${actor}` });
+        const ok26 = await context.mutate.patch(promotion.id, { status: "active", fields: { ...promotion.fields, approvedBy: actor } }, { expectRevision: promotion.revision, event: `Offer ${promotion.title} made live by ${actor}` });
+        if (!ok26) return; // the platform has already said the record changed elsewhere
         context.toast("Offer live", `${promotion.title} now applies in the storefront checkout.`);
         close();
       }}
     >
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Offer", value: promotion.title },
         { label: "Window", value: `${context.date(promotion.startAt)} – ${context.date(promotion.endAt)}` },
         { label: "Floor", value: `${(Number(promotion.fields.floorMarginBp ?? 0) / 100).toFixed(0)}%` },
@@ -1173,7 +1268,7 @@ export function KpiInspector({ context }: { context: ScreenContext }) {
         <Notice tone="warning" title="Fulfilment speed is not computed">
           An average needs two timestamps per order: when it was placed and when it shipped. The order timeline records labels, but the seeded entries share a timestamp and no shipping clock is kept, so an average would be arithmetic on data that does not support it.
         </Notice>
-        <Properties rows={[
+        <FactGrid columns={2} items={[
           { label: "Orders with a shipping entry", value: String(data.orders.filter((order) => (bodyOf<OrderBody>(order, {}).timeline ?? []).some((entry) => entry.label.includes("carrier"))).length) },
           { label: "What is missing", value: "A distinct, trusted timestamp for each state change" },
         ]} />
@@ -1184,7 +1279,7 @@ export function KpiInspector({ context }: { context: ScreenContext }) {
   const open = data.returns.filter((item) => item.status !== "completed");
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Deducted from sales", value: `${completed.length} completed returns · ${context.money(completed.reduce((sum, item) => sum + (item.amountMinor ?? 0), 0))}` },
         { label: "Not deducted", value: `${open.length} requested, in review or approved · ${context.money(open.reduce((sum, item) => sum + (item.amountMinor ?? 0), 0))}` },
         { label: "Why", value: "Until a return completes, the money has not moved and the goods may not come back." },
@@ -1222,7 +1317,7 @@ export function ReportSchedule({ context, close }: { context: ScreenContext; clo
     >
       <Field label="Send on"><Select value={frequency} onChange={(event) => setFrequency(event.target.value)}>{["Monday", "First of the month", "End of quarter"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       <Field label="Recipients" hint="Comma separated"><TextInput value={recipients} onChange={(event) => setRecipients(event.target.value)} /></Field>
-      <ProviderBoundary id="email.send" title="A scheduled report cannot be delivered" />
+      <ProviderBoundary id="email.send" title="A scheduled report cannot be delivered" kept="The schedule itself; no report is delivered." />
     </form>
   );
 }

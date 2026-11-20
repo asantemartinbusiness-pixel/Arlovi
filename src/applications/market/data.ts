@@ -1,4 +1,6 @@
-import { useCollections } from "@/platform/workspace";
+import { useLiveQuery } from "dexie-react-hooks";
+import { useCollections, useWorkspace } from "@/platform/workspace";
+import { listByCollection } from "@/platform/repo";
 import type { Rec } from "@/domain/types";
 
 /* ---------------- Record body shapes used by MARKET ---------------- */
@@ -47,6 +49,30 @@ export function bodyOf<T>(record: Rec | undefined, fallback: T): T {
 
 export function useMarketData() {
   return useCollections(["campaigns", "socialPosts", "audiences", "templates", "sites", "contacts", "leads", "deals", "orders"]);
+}
+
+/** True once the contacts and audiences collections have been read from the database (not merely empty). */
+export function useAudienceDataLoaded(): boolean {
+  const { org } = useWorkspace();
+  const loaded = useLiveQuery(async () => {
+    await Promise.all([listByCollection(org.id, "contacts"), listByCollection(org.id, "audiences")]);
+    return true;
+  }, [org.id]);
+  return loaded === true;
+}
+
+/** A recorded order to campaign link. Claims entered on campaigns do not count as one. */
+export function orderTouch(order: Rec): string {
+  const value = order.fields.campaignId ?? order.fields.campaign ?? order.fields.utmCampaign;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** Orders with no recorded campaign touch, and how far self-reported claims exceed the orders. */
+export function attributionFigures(orders: Rec[], claimed: number) {
+  const live = orders.filter((order) => order.status !== "cancelled");
+  const unattributed = live.filter((order) => !orderTouch(order)).length;
+  const ratio = live.length === 0 ? 0 : claimed / live.length;
+  return { orders: live.length, unattributed, claimed, ratio, overClaim: claimed > live.length };
 }
 
 export const NETWORKS: { id: string; label: string; limit: number; media: string }[] = [

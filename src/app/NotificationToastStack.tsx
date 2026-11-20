@@ -4,6 +4,8 @@ import { Button } from "@/design-system";
 import { useUi, type Toast } from "@/runtime/ui";
 import "./notifications.css";
 
+const MAX_VISIBLE_TOASTS = 3;
+
 function NotificationToast({ toast }: { toast: Toast }) {
   const dismiss = useUi(state => state.dismissToast);
   const [hovered, setHovered] = useState(false);
@@ -35,7 +37,11 @@ function NotificationToast({ toast }: { toast: Toast }) {
 export function NotificationToastStack() {
   const toasts = useUi(state => state.toasts);
   if (!toasts.length) return null;
+  // Newest stays visible at the bottom; older ones collapse into "+N more".
+  const visible = toasts.slice(-MAX_VISIBLE_TOASTS);
+  const hidden = toasts.length - visible.length;
   return <div className="ds-toasts nt-toast-stack" aria-label="Application status messages">
-    {toasts.map(toast => <NotificationToast key={toast.id} toast={toast}/>)}
+    {hidden > 0 && <div className="nt-toast-more" role="status">+{hidden} more</div>}
+    {visible.map(toast => <NotificationToast key={toast.id} toast={toast}/>)}
   </div>;
 }

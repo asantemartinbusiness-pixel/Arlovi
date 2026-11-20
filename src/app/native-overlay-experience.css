@@ -23,9 +23,11 @@
   flex: 0 1 auto;
   gap: var(--space-2);
   align-items: center;
-  max-width: min(42%, 300px);
+  max-width: min(40%, 280px);
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  white-space: nowrap;
+  overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-inset);
@@ -38,6 +40,8 @@
   color: var(--fg-subtle);
 }
 .native-overlay-record-title {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

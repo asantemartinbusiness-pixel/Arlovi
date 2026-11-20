@@ -52,3 +52,34 @@ Per overlay, record: application, screen, overlay ID, variant, invoking action, 
 - Existing deep/contract/a11y tests plus representative dialogs from each native application.
 - Verify local-only payment wording, tax-rate outcomes, stale-revision mutation failures and no fake payment collection.
 - Review the preview before merging. A successful Vercel build is not equivalent to browser QA passing or production deployment.
+
+## Overlay kit (19 Nov 2026)
+
+`src/design-system/overlay-kit.tsx` supplies the information-hierarchy primitives for modal and drawer bodies.
+All are exported from `@/design-system`.
+
+- `OVERLAY_WIDTH = { compact: 440, form: 520, record: 640, wide: 760, modal: 560 }` for the `width` prop. Form drawers
+  default to `form`; use `record`/`wide` only for tabs or tables. Modals no longer force a minimum height.
+- `OverlaySection({ title, hint?, actions?, tone?, flush?, children })` - compact titled section
+  (`.ds-ov-section`, `data-tone`), uppercase eyebrow title.
+- `FactGrid({ items, columns?, dense? })` - label-over-value grid (`.ds-ov-facts[data-columns]`);
+  `mono` values use tabular IBM Plex Mono; collapses 4/3 -> 2 columns at 850px and to 1 at 420px.
+- `OverlaySummary({ eyebrow?, title, status?, meta?, avatar?, actions? })` - record identity block
+  (`.ds-ov-summary`) with dot-separated meta.
+- `OverlayActions({ primary, secondary?, end? })` - footer row `[primary][secondary] ... [end]`.
+
+**Action convention.** Primary first on the left, secondary beside it, destructive or dismiss at the end.
+Confirm dialogs keep `[Cancel] ... [Confirm]`. `MenuEntry` also accepts optional `icon` and `description`.
+
+```tsx
+<Drawer open onOpenChange={close} title="Deal" width={OVERLAY_WIDTH.form}>
+  <OverlaySummary title={deal.title} status={<Pill>Open</Pill>} meta={["Northline", "Due 3 Dec"]} />
+  <OverlaySection title="Terms">
+    <FactGrid items={[{ label: "Value", value: "$12,400", mono: true }, { label: "Stage", value: "Proposal" }]} />
+  </OverlaySection>
+  <DrawerActions>
+    <OverlayActions primary={<Button variant="primary">Save</Button>}
+      secondary={<OverlayCancel>Close</OverlayCancel>} end={<Button variant="danger">Discard</Button>} />
+  </DrawerActions>
+</Drawer>
+```

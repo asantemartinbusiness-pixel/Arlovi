@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import type { DragEndEvent } from "@dnd-kit/core";
 import {
-  Columns3, Image as ImageIcon, LayoutPanelTop, Link2, ListOrdered, PanelBottom,
-  PoundSterling, Rows3, Smartphone, Tablet, Monitor, Type, Undo2,
+  ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, Columns3, Image as ImageIcon, LayoutPanelTop, Link2, ListOrdered, MoreHorizontal, PanelBottom,
+  Plus, PoundSterling, Rows3, SlidersHorizontal, Type, Undo2,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented,
-  Select, Stack, Tabs, TextArea, TextInput, Toolbar, ToolbarSeparator,
+  Button, Card, Checkbox, Empty, Field, Grid, Menu, Notice, Pill, Popover, Properties, Row, Segmented,
+  Select, Stack, Tabs, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
-import { MiniField, PaletteChip, ReorderArea, SortableRow, move, downloadFile } from "@/applications/t6kit/kit";
+import { PaletteChip, ReorderArea, SortableRow, move, downloadFile } from "@/applications/t6kit/kit";
 import {
   BLOCK_HINTS, BLOCK_LABELS, BLOCK_TYPES, contrastRatio, makeBlock, pageHtml, readSite,
   type Block, type BlockType, type SiteModel,
@@ -67,7 +67,7 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
 
   async function writePages(nextPages: SiteModel["pages"], label: string) {
     setBusy(true);
-    try { await saveSite(context, record!, { ...site, pages: nextPages }, label); } finally { setBusy(false); }
+    try { if (!(await saveSite(context, record!, { ...site, pages: nextPages }, label))) return; } finally { setBusy(false); }
   }
 
   function replaceBlocks(blocks: Block[], label: string) {
@@ -111,12 +111,12 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
   }
 
   const blockCanvas = (
-    <div className="t6-pane" data-kind="canvas" key="canvas">
+    <div className="t6-pane web-canvas" data-kind="canvas" key="canvas">
       <div className="t6-device">
         <div style={{ width: "100%", maxWidth: width }}>
           <div className="t6-device-label">
-            <Pill tone="info">{BREAKPOINTS[breakpoint].label} · laid out at {width}px</Pill>
-            <span>{BREAKPOINTS[breakpoint].note} The frame fits the pane; the Responsive tab renders at the true width.</span>
+            <Pill tone="info">{BREAKPOINTS[breakpoint].label} · {width}px</Pill>
+            <span>{BREAKPOINTS[breakpoint].note}</span>
           </div>
           <div className="t6-device-frame">
             <div className="t6-render" style={{ background: site.theme.paper, color: site.theme.ink }}>
@@ -159,55 +159,54 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
   );
 
   const palette = (
-    <div className="t6-pane" key="palette">
-      <Stack gap={4}>
-        <div>
-          <h3 style={{ fontSize: "var(--text-md)" }}>Blocks</h3>
-          <p className="ds-subtle">Press to add after the selection, or drag onto a position. Both paths write the same model.</p>
-        </div>
-        <div className="t6-palette">
-          {BLOCK_TYPES.map((type) => (
-            <PaletteChip key={type} type={type} label={BLOCK_LABELS[type]} hint={BLOCK_HINTS[type]} icon={PALETTE_ICONS[type]} onInsert={() => insertBlock(type)} />
-          ))}
-        </div>
-        <Notice tone="info" title="Keyboard equivalent">
-          Each block has <strong>Move up</strong> and <strong>Move down</strong> buttons, and the grip handle picks the block up with Space and moves it with the arrow keys.
-        </Notice>
-      </Stack>
+    <div className="t6-pane web-palette" key="palette">
+      <h3 className="web-pane-title">Blocks</h3>
+      <div className="t6-palette" role="group" aria-label="Blocks. Press to add after the selection, or drag onto a position.">
+        {BLOCK_TYPES.map((type) => (
+          <PaletteChip key={type} type={type} label={BLOCK_LABELS[type]} hint={BLOCK_HINTS[type]} icon={PALETTE_ICONS[type]} onInsert={() => insertBlock(type)} />
+        ))}
+      </div>
     </div>
   );
 
-  const tree = (
-    <div className="t6-pane" data-kind="inspector" key="tree">
-      <Stack gap={4}>
-        <div>
-          <h3 style={{ fontSize: "var(--text-md)" }}>Element tree</h3>
-          <p className="ds-subtle">{page.blocks.length} blocks on {page.name}</p>
-        </div>
-        <Stack gap={1}>
-          {page.blocks.map((block, index) => (
-            <button
-              key={block.id}
-              type="button"
-              className="ds-record-card"
-              aria-current={block.id === ui.selectedBlockId ? "true" : undefined}
-              onClick={() => ui.select(block.id)}
-            >
-              <Row gap={2}>
-                <span className="ds-subtle ds-num" style={{ width: 18 }}>{index + 1}</span>
-                <span className="ds-grow ds-truncate" style={{ textAlign: "start" }}>{BLOCK_LABELS[block.type]}</span>
-                {block.id === ui.selectedBlockId && <Pill tone="accent">Selected</Pill>}
-              </Row>
-              <span className="ds-subtle ds-truncate">{block.props.title || block.props.body || BLOCK_HINTS[block.type]}</span>
+  const selectedIndex = selected ? page.blocks.findIndex((block) => block.id === selected.id) : -1;
+  const treeList = (
+    <section className="web-tree" aria-label="Element tree">
+      <h3 className="web-pane-title">On {page.name} <span className="ds-subtle ds-num">{page.blocks.length}</span></h3>
+      <ol className="web-tree-list">
+        {page.blocks.map((block, index) => (
+          <li key={block.id}>
+            <button type="button" className="web-tree-row" aria-current={block.id === ui.selectedBlockId ? "true" : undefined} onClick={() => ui.select(block.id)}>
+              <span className="ds-num web-tree-n">{index + 1}</span>
+              <span className="web-tree-type">{BLOCK_LABELS[block.type]}</span>
+              <span className="ds-subtle ds-truncate web-tree-text">{block.props.title || block.props.body || BLOCK_HINTS[block.type]}</span>
             </button>
-          ))}
-        </Stack>
-        {selected ? (
-          <BlockInspector block={selected} site={site} onEdit={(patch) => editProps(selected.id, patch)} onRemove={() => removeBlock(selected.id)} forms={formNames} />
-        ) : (
-          <Notice tone="neutral">Select a block to edit its content.</Notice>
-        )}
-      </Stack>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+
+  const tree = (
+    <div className="t6-pane web-inspector" data-kind="inspector" key="tree">
+      {selected ? (
+        <>
+          <header className="web-insp-head">
+            <div className="ds-grow">
+              <span className="ds-eyebrow">Selected · {selectedIndex + 1} of {page.blocks.length}</span>
+              <strong className="web-insp-title">{BLOCK_LABELS[selected.type]} block</strong>
+            </div>
+            <Pill tone="accent">{page.name}</Pill>
+          </header>
+          <BlockInspector block={selected} site={site} onEdit={(patch) => editProps(selected.id, patch)} onRemove={() => removeBlock(selected.id)} forms={formNames} bare />
+          {treeList}
+        </>
+      ) : (
+        <>
+          <p className="web-insp-hint">Select a block on the canvas or in the list to edit it here.</p>
+          {treeList}
+        </>
+      )}
     </div>
   );
 
@@ -263,66 +262,67 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
 
   return (
     <div className="t6-shell">
-      <section className="web-editor-overview" aria-label="Website editor overview">
-        <div className="web-editor-overview-primary">
-          <span className="web-library-eyebrow">WEBSITES / PAGE EDITOR</span>
-          <strong>{record.title} <span aria-hidden="true">/</span> {page.name}</strong>
-          <p>{page.path} · {page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"} · {BREAKPOINTS[breakpoint].label} preview</p>
+      <section className="web-bar" aria-label="Website editor overview">
+        <div className="web-bar-id">
+          <h1 className="web-bar-h1"><button type="button" className="web-bar-site" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}`)} title="Back to the site dashboard">{record.title}</button></h1>
+          <span aria-hidden="true" className="ds-subtle">/</span>
+          <Select value={page.id} onChange={(event) => ui.setPage(event.target.value)} aria-label="Page being edited" className="web-bar-page">
+            {site.pages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </Select>
+          <span className="web-bar-meta ds-subtle">Route <code className="ds-num">{page.path}</code> · {page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"}</span>
         </div>
-        <div className="web-editor-overview-actions">
-          <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Manage pages")}>Pages</Button>
-          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/navigation`)}>Navigation</Button>
-          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)}>Quality</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/deploy`)}>Publishing</Button>
-        </div>
-      </section>
-      <div className="t6-shell-bar">
-        <Toolbar label="Page builder">
-          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}`)}>Site dashboard</Button>
-          <ToolbarSeparator />
-          <MiniField label="Page">
-            <Select value={page.id} onChange={(event) => ui.setPage(event.target.value)} aria-label="Page being edited">
-              {site.pages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </Select>
-          </MiniField>
-          <ToolbarSeparator />
-          <Segmented
-            label="Breakpoint"
-            value={breakpoint}
-            onChange={(value) => ui.setBreakpoint(value)}
-            options={[
-              { value: "mobile" as Breakpoint, label: "Mobile" },
-              { value: "tablet" as Breakpoint, label: "Tablet" },
-              { value: "desktop" as Breakpoint, label: "Desktop" },
-            ]}
-          />
-          <span aria-hidden="true" style={{ display: "inline-flex", gap: 4, color: "var(--fg-subtle)" }}>
-            {breakpoint === "mobile" ? <Smartphone size={15} /> : breakpoint === "tablet" ? <Tablet size={15} /> : <Monitor size={15} />}
-          </span>
-        </Toolbar>
-        <span className="ds-grow" />
-        <Row gap={2}>
-          <Button size="sm" variant="ghost" icon={<Undo2 size={14} />} disabled={ui.undoDepth(record.id) === 0} busy={busy} onClick={async () => {
-            const done = await undoSite(context, record);
-            context.toast(done ? "Undone" : "Nothing to undo", done ? "The previous structure was written back to the record." : "No builder change is on the undo stack for this site.");
-          }}>Undo{ui.undoDepth(record.id) > 0 ? ` (${ui.undoDepth(record.id)})` : ""}</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.openOverlay("insert panel")}>Insert</Button>
-          <Button size="sm" variant="ghost" disabled={!ui.selectedBlockId} title={ui.selectedBlockId ? undefined : "Select a block first"} onClick={() => context.openOverlay("resize block")}>Resize</Button>
-          <Button size="sm" variant="ghost" disabled={!ui.selectedBlockId} title={ui.selectedBlockId ? undefined : "Select a block first"} onClick={() => context.openOverlay("reorder blocks")}>Move</Button>
-          <Button size="sm" variant="secondary" onClick={() => {
-            downloadFile(`${context.org.slug}-${page.path === "/" ? "index" : page.path.replace(/\//g, "")}.html`, pageHtml(site, page), "text/html");
-            context.toast("Page exported", `${page.name} downloaded as HTML from this browser.`);
-          }}>Export page</Button>
-        </Row>
-      </div>
-      <div className="t6-shell-tabs">
-        <Tabs
+        <div className="web-bar-tabs"><Tabs
           label="Builder views"
           value={context.tab}
           onChange={context.setTab}
           items={[{ id: "Build", label: "Build" }, { id: "Style", label: "Style" }, { id: "Responsive", label: "Responsive" }, { id: "Interactions", label: "Interactions" }]}
+        /></div>
+        <Segmented
+          label="Breakpoint"
+          value={breakpoint}
+          onChange={(value) => ui.setBreakpoint(value)}
+          options={[
+            { value: "mobile" as Breakpoint, label: "Mobile" },
+            { value: "tablet" as Breakpoint, label: "Tablet" },
+            { value: "desktop" as Breakpoint, label: "Desktop" },
+          ]}
         />
-      </div>
+        <div className="web-bar-tools" role="toolbar" aria-label="Page builder">
+          <Button size="sm" variant="ghost" icon={<Undo2 size={14} />} disabled={ui.undoDepth(record.id) === 0} busy={busy} onClick={async () => {
+            const done = await undoSite(context, record);
+            context.toast(done ? "Undone" : "Nothing to undo", done ? "The previous structure was written back to the record." : "No builder change is on the undo stack for this site.");
+          }}><span className="web-bar-label">Undo{ui.undoDepth(record.id) > 0 ? ` (${ui.undoDepth(record.id)})` : ""}</span></Button>
+          <Popover align="end" trigger={<Button size="sm" variant="secondary" icon={<Plus size={14} />} aria-label="Insert a block"><span className="web-bar-label">Insert</span></Button>}>
+            <InsertPopover onPick={(type) => insertBlock(type)} />
+          </Popover>
+          <Popover align="end" trigger={<Button size="sm" variant="ghost" icon={<SlidersHorizontal size={14} />} disabled={!selected} title={selected ? undefined : "Select a block first"} aria-label="Block layout"><span className="web-bar-label">Layout</span></Button>}>
+            {selected && (
+              <LayoutPopover
+                block={selected}
+                index={selectedIndex}
+                count={page.blocks.length}
+                onEdit={(patch) => editProps(selected.id, patch)}
+                onMove={(to) => void replaceBlocks(move(page.blocks, selectedIndex, to), `Moved ${BLOCK_LABELS[selected.type].toLowerCase()} to position ${to + 1} on ${page.name}`)}
+              />
+            )}
+          </Popover>
+          <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Manage pages")}>Pages</Button>
+          <Menu
+            label="Site tools"
+            trigger={<Button size="sm" variant="ghost" icon={<MoreHorizontal size={14} />} aria-label="More site tools"><span className="web-bar-label">More</span></Button>}
+            items={[
+              { label: "Site dashboard", onSelect: () => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}`) },
+              { label: "Navigation", onSelect: () => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/navigation`) },
+              { label: "Quality", onSelect: () => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`) },
+              { label: "Domains & publishing", onSelect: () => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/deploy`), separatorBefore: true },
+              { label: "Export this page as HTML", onSelect: () => {
+                downloadFile(`${context.org.slug}-${page.path === "/" ? "index" : page.path.replace(/\//g, "")}.html`, pageHtml(site, page), "text/html");
+                context.toast("Page exported", `${page.name} downloaded as HTML from this browser.`);
+              } },
+            ]}
+          />
+        </div>
+      </section>
       <div className="t6-shell-body" data-panes={panes.length === 1 ? "1" : panes.length === 2 ? "2" : undefined}>
         {panes}
       </div>
@@ -333,12 +333,12 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
 /* ------------------------------ Inspectors ------------------------------ */
 
 export function BlockInspector({
-  block, site, onEdit, onRemove, forms,
-}: { block: Block; site: SiteModel; onEdit: (patch: Partial<Block["props"]>) => void; onRemove?: () => void; forms: Record<string, string> }) {
+  block, site, onEdit, onRemove, forms, bare,
+}: { block: Block; site: SiteModel; onEdit: (patch: Partial<Block["props"]>) => void; onRemove?: () => void; forms: Record<string, string>; bare?: boolean }) {
   const needsItems = block.type === "columns" || block.type === "gallery" || block.type === "footer" || block.type === "form";
   return (
     <Stack gap={3}>
-      <Row gap={2}><strong className="ds-grow">{BLOCK_LABELS[block.type]} block</strong><Pill tone="neutral">{block.id}</Pill></Row>
+      {!bare && <Row gap={2}><strong className="ds-grow">{BLOCK_LABELS[block.type]} block</strong><Pill tone="neutral">{block.id}</Pill></Row>}
       {block.type !== "footer" && (
         <Field label="Heading"><TextInput value={block.props.title} onChange={(event) => onEdit({ title: event.target.value })} /></Field>
       )}
@@ -400,10 +400,7 @@ export function BlockInspector({
 export function BlockStyleInspector({ block, onEdit }: { block: Block; onEdit: (patch: Partial<Block["props"]>) => void }) {
   return (
     <Stack gap={4}>
-      <div>
-        <h3 style={{ fontSize: "var(--text-md)" }}>{BLOCK_LABELS[block.type]} style</h3>
-        <p className="ds-subtle">These three properties are the whole style surface of a block, so nothing is set that the export cannot carry.</p>
-      </div>
+      <h3 className="web-pane-title">{BLOCK_LABELS[block.type]} style</h3>
       <Field label="Tone">
         <Segmented
           label="Block tone"
@@ -428,7 +425,7 @@ export function BlockStyleInspector({ block, onEdit }: { block: Block; onEdit: (
           options={[{ value: "tight" as const, label: "Tight" }, { value: "normal" as const, label: "Normal" }, { value: "roomy" as const, label: "Roomy" }]}
         />
       </Field>
-      <Notice tone="info">Padding and type size are reduced automatically under 640px; the canvas shows the reduced values when the mobile breakpoint is selected.</Notice>
+      <p className="ds-subtle">Padding and type size step down under 640px; the mobile breakpoint shows the reduced values.</p>
     </Stack>
   );
 }
@@ -439,10 +436,7 @@ export function ThemeEditor({ site, onChange }: { site: SiteModel; onChange: (th
   const accentContrast = contrastRatio("#ffffff", theme.accent);
   return (
     <Stack gap={4}>
-      <div>
-        <h3 style={{ fontSize: "var(--text-md)" }}>Theme</h3>
-        <p className="ds-subtle">One set of tokens drives the canvas, the responsive frames and the HTML export.</p>
-      </div>
+      <h3 className="web-pane-title">Theme</h3>
       <Field label="Typeface">
         <Select value={theme.font} onChange={(event) => onChange({ ...theme, font: event.target.value as SiteModel["theme"]["font"] })}>
           {["Inter", "Source Serif", "IBM Plex Mono"].map((font) => <option key={font} value={font}>{font}</option>)}
@@ -463,8 +457,53 @@ export function ThemeEditor({ site, onChange }: { site: SiteModel; onChange: (th
         { label: "Body contrast", value: bodyContrast === null ? "Unavailable" : <Pill tone={bodyContrast >= 4.5 ? "success" : bodyContrast >= 3 ? "warning" : "danger"}>{bodyContrast.toFixed(2)}:1</Pill> },
         { label: "White on accent", value: accentContrast === null ? "Unavailable" : <Pill tone={accentContrast >= 4.5 ? "success" : accentContrast >= 3 ? "warning" : "danger"}>{accentContrast.toFixed(2)}:1</Pill> },
       ]} />
-      <p className="ds-subtle">Ratios are computed from the WCAG 2.1 relative luminance of the chosen colours, not estimated.</p>
+      <p className="ds-subtle">Ratios are computed from the colours&rsquo; WCAG 2.1 relative luminance.</p>
     </Stack>
+  );
+}
+
+/* --------------------------- Lightweight tools --------------------------- */
+
+function InsertPopover({ onPick }: { onPick: (type: BlockType) => void }) {
+  return (
+    <div className="web-pop" role="group" aria-label="Insert a block after the selection">
+      <p className="web-pop-title">Insert after the selection</p>
+      <div className="web-pop-grid">
+        {BLOCK_TYPES.map((type) => (
+          <button key={type} type="button" className="web-pop-item" onClick={() => onPick(type)}>
+            <span className="t6-palette-icon" aria-hidden="true">{PALETTE_ICONS[type]}</span>
+            <span><strong>{BLOCK_LABELS[type]}</strong><small>{BLOCK_HINTS[type]}</small></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LayoutPopover({
+  block, index, count, onEdit, onMove,
+}: { block: Block; index: number; count: number; onEdit: (patch: Partial<Block["props"]>) => void; onMove: (to: number) => void }) {
+  const hasColumns = block.type === "columns" || block.type === "gallery";
+  return (
+    <div className="web-pop" role="group" aria-label={`Layout of the ${BLOCK_LABELS[block.type]} block`}>
+      <p className="web-pop-title">{BLOCK_LABELS[block.type]} · position {index + 1} of {count}</p>
+      <div className="web-pop-move">
+        <Button size="sm" variant="secondary" icon={<ChevronsUp size={14} />} disabled={index === 0} onClick={() => onMove(0)}>Top</Button>
+        <Button size="sm" variant="secondary" icon={<ArrowUp size={14} />} disabled={index === 0} onClick={() => onMove(index - 1)}>Up</Button>
+        <Button size="sm" variant="secondary" icon={<ArrowDown size={14} />} disabled={index >= count - 1} onClick={() => onMove(index + 1)}>Down</Button>
+        <Button size="sm" variant="secondary" icon={<ChevronsDown size={14} />} disabled={index >= count - 1} onClick={() => onMove(count - 1)}>End</Button>
+      </div>
+      <Field label="Height">
+        <Segmented label="Block padding" value={block.props.padding} onChange={(padding) => onEdit({ padding })}
+          options={[{ value: "tight" as const, label: "Tight" }, { value: "normal" as const, label: "Normal" }, { value: "roomy" as const, label: "Roomy" }]} />
+      </Field>
+      {hasColumns && (
+        <Field label="Columns on desktop" hint="One on a phone, two on a tablet.">
+          <Segmented label="Columns" value={String(block.props.columns)} onChange={(value) => onEdit({ columns: Number(value) })}
+            options={[1, 2, 3, 4].map((count) => ({ value: String(count), label: String(count) }))} />
+        </Field>
+      )}
+    </div>
   );
 }
 

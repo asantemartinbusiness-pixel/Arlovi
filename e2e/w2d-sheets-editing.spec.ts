@@ -114,3 +114,36 @@ test("the grid and its suggestions fit a phone-sized screen", async ({ page }) =
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test("a range edit that overwrites values is previewed first, and only Apply writes it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const id = await newWorkbook(page, { A1: "Stage", B1: "Net", A2: "won", B2: "100", A3: "open", B3: "250", A4: "won", B4: "40" });
+  await page.goto(`/o/northline/sheets/workbooks/${id}`);
+  await expect(cell(page, "B3")).toContainText("250");
+
+  // Select A2:B4 with the keyboard and clear it.
+  await cell(page, "A2").click();
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Delete");
+  const preview = page.getByRole("region", { name: "Change preview" });
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText("6 cells change");
+  // Nothing has been written yet.
+  await expect(cell(page, "B3")).toContainText("250");
+
+  await preview.getByRole("button", { name: "Cancel" }).click();
+  await expect(preview).toHaveCount(0);
+  await expect(cell(page, "B3")).toContainText("250");
+
+  await cell(page, "A2").click();
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Delete");
+  await preview.getByRole("button", { name: /^Apply to 6 cells/ }).click();
+  await expect(cell(page, "B3")).not.toContainText("250");
+  await page.getByRole("button", { name: "Undo", exact: true }).first().click();
+  await expect(cell(page, "B3")).toContainText("250");
+});

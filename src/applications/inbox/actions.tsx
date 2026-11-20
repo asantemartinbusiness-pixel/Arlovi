@@ -7,6 +7,7 @@ import { can as roleCan, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
 import { useInboxData } from "./engine";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/platform/commit";
 
 /* ====================================================================== *
  * Inbox contract actions that change the record they name.
@@ -73,12 +74,15 @@ export function DelegateApproval({ context, close }: { context: ScreenContext; c
           disabled={Boolean(blocked)}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(record.id, {
-              fields: { ...record.fields, delegatedTo: to, delegatedBy: context.actor, delegatedAt: clockIso(), assignee: to, delegationNote: note },
-            }, { expectRevision: record.revision, event: `${record.title} delegated by ${context.actor} to ${to}` });
-            if (saved) context.toast("Delegated", `${to} now holds ${record.title}. It shows under Delegated.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(record.id, {
+                fields: { ...record.fields, delegatedTo: to, delegatedBy: context.actor, delegatedAt: clockIso(), assignee: to, delegationNote: note },
+              }, { expectRevision: record.revision, event: `${record.title} delegated by ${context.actor} to ${to}` });
+              if (saved) context.toast("Delegated", `${to} now holds ${record.title}. It shows under Delegated.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Delegate
@@ -114,18 +118,24 @@ export function FollowSource({ context, close }: { context: ScreenContext; close
         {already ? (
           <Button variant="secondary" busy={busy} onClick={async () => {
             setBusy(true);
-            await context.mutate.remove(already.id, `Stopped following the ${source} source`);
-            context.toast("Unfollowed", `${source} events are no longer pinned to the feed.`);
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.remove(already.id, `Stopped following the ${source} source`);
+              context.toast("Unfollowed", `${source} events are no longer pinned to the feed.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}>Stop following {source}</Button>
         ) : (
           <Button variant="primary" busy={busy} disabled={!source} onClick={async () => {
             setBusy(true);
-            await context.mutate.create({ collection: "preferences", title: `Following ${source}`, status: "active", summary: `Every event from ${source} stays in the feed.`, fields: { kind: "followedSource", source, followedBy: context.actor } }, `Followed the ${source} source`);
-            context.toast("Following", `Every event from ${source} stays in the feed.`);
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.create({ collection: "preferences", title: `Following ${source}`, status: "active", summary: `Every event from ${source} stays in the feed.`, fields: { kind: "followedSource", source, followedBy: context.actor } }, `Followed the ${source} source`);
+              context.toast("Following", `Every event from ${source} stays in the feed.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}>Follow {source}</Button>
         )}
         <Button variant="ghost" onClick={close}>Cancel</Button>
@@ -160,13 +170,16 @@ export function AcknowledgeIncident({ context, close }: { context: ScreenContext
           disabled={done || record.status === "resolved"}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(record.id, {
-              status: record.status === "urgent" ? "waiting" : record.status,
-              fields: { ...record.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() },
-            }, { expectRevision: record.revision, event: `Incident acknowledged by ${context.actor}: ${record.title}` });
-            if (saved) context.toast("Acknowledged", `${record.title} is acknowledged by ${context.actor}. It is still open.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(record.id, {
+                status: record.status === "urgent" ? "waiting" : record.status,
+                fields: { ...record.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() },
+              }, { expectRevision: record.revision, event: `Incident acknowledged by ${context.actor}: ${record.title}` });
+              if (saved) context.toast("Acknowledged", `${record.title} is acknowledged by ${context.actor}. It is still open.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Acknowledge
@@ -219,17 +232,20 @@ export function EscalateIncident({ context, close }: { context: ScreenContext; c
           disabled={Boolean(blocked)}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(record.id, {
-              status: record.status === "waiting" ? "urgent" : record.status,
-              fields: {
-                ...record.fields, owner: to, previousOwner: owner, escalatedBy: context.actor, escalatedAt: clockIso(),
-                escalationLevel: Number(record.fields.escalationLevel ?? 0) + 1, escalationReason: reason.trim(), pageState: "not_connected",
-              },
-            }, { expectRevision: record.revision, event: `Incident escalated by ${context.actor} from ${owner || "nobody"} to ${to}: ${reason.trim()}` });
-            await context.mutate.log(`Page to ${to} for ${record.title} not sent: no telephony provider is connected`, { entityId: record.id, type: "incident.page", capability: "not_connected" });
-            if (saved) context.toast("Escalated, not paged", `${to} now owns ${record.title}. No page or call left this browser.`, "info");
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(record.id, {
+                status: record.status === "waiting" ? "urgent" : record.status,
+                fields: {
+                  ...record.fields, owner: to, previousOwner: owner, escalatedBy: context.actor, escalatedAt: clockIso(),
+                  escalationLevel: Number(record.fields.escalationLevel ?? 0) + 1, escalationReason: reason.trim(), pageState: "not_connected",
+                },
+              }, { expectRevision: record.revision, event: `Incident escalated by ${context.actor} from ${owner || "nobody"} to ${to}: ${reason.trim()}` });
+              await context.mutate.log(`Page to ${to} for ${record.title} not sent: no telephony provider is connected`, { entityId: record.id, type: "incident.page", capability: "not_connected" });
+              if (saved) context.toast("Escalated, not paged", `${to} now owns ${record.title}. No page or call left this browser.`, "info");
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Escalate to {to || "…"}
@@ -274,10 +290,13 @@ export function ToggleChannel({ context, close }: { context: ScreenContext; clos
           onClick={async () => {
             if (!channel) return;
             setBusy(true);
-            const saved = await context.mutate.patch(channel.id, { fields: { ...channel.fields, enabled: !on, toggledBy: context.actor } }, { expectRevision: channel.revision, event: `${channel.title} ${on ? "disabled" : "enabled"} by ${context.actor}` });
-            if (saved) context.toast(on ? "Channel off" : "Channel on", `${channel.title} is ${on ? "off" : "on"} for this workspace.`);
-            setBusy(false);
-            close();
+            try {
+              const saved = await context.mutate.patch(channel.id, { fields: { ...channel.fields, enabled: !on, toggledBy: context.actor } }, { expectRevision: channel.revision, event: `${channel.title} ${on ? "disabled" : "enabled"} by ${context.actor}` });
+              if (saved) context.toast(on ? "Channel off" : "Channel on", `${channel.title} is ${on ? "off" : "on"} for this workspace.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Turn {on ? "off" : "on"}
@@ -315,12 +334,15 @@ export function SetDigest({ context, close }: { context: ScreenContext; close: (
           busy={busy}
           onClick={async () => {
             setBusy(true);
-            const fields = { kind: "digestDelivery", cadence, sendAt, setBy: context.actor, timezone: context.org.timezone };
-            if (existing) await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Digest set to ${cadence} at ${sendAt}` });
-            else await context.mutate.create({ collection: "preferences", title: "Digest delivery", status: "active", summary: `Routine items collected ${cadence}.`, fields }, `Digest set to ${cadence} at ${sendAt}`);
-            context.toast("Digest set", cadence === "off" ? "Routine items arrive as they happen." : `Routine items are collected ${cadence} at ${sendAt}.`);
-            setBusy(false);
-            close();
+            try {
+              const fields = { kind: "digestDelivery", cadence, sendAt, setBy: context.actor, timezone: context.org.timezone };
+              if (existing) { if (!(await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Digest set to ${cadence} at ${sendAt}` }))) return; }
+              else await context.mutate.create({ collection: "preferences", title: "Digest delivery", status: "active", summary: `Routine items collected ${cadence}.`, fields }, `Digest set to ${cadence} at ${sendAt}`);
+              context.toast("Digest set", cadence === "off" ? "Routine items arrive as they happen." : `Routine items are collected ${cadence} at ${sendAt}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save the digest
@@ -352,18 +374,23 @@ export function RevokeRule({ context, close }: { context: ScreenContext; close: 
           disabled={rule.status === "revoked" || !context.can("manage_policy")}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(rule.id, {
-              status: "revoked",
-              fields: { ...rule.fields, enabled: false, revokedBy: context.actor, revokedAt: clockIso() },
-            }, { expectRevision: rule.revision, event: `Escalation rule revoked by ${context.actor}: ${String(rule.fields.condition)} → ${String(rule.fields.backup)}` });
-            for (const row of covering) {
-              const fields = { ...row.fields, assignee: String(rule.fields.owner ?? row.fields.assignee ?? "") };
-              delete (fields as Record<string, unknown>).delegatedTo;
-              await context.mutate.patch(row.id, { fields }, { event: `${row.title} returned from ${String(rule.fields.backup)} when the delegation was revoked` });
+            try {
+              // The rule and every item it covered change together or not at all.
+              const returned = covering.map((row) => {
+                const fields = { ...row.fields, assignee: String(rule.fields.owner ?? row.fields.assignee ?? "") };
+                delete (fields as Record<string, unknown>).delegatedTo;
+                return { record: row, patch: { fields }, event: `${row.title} returned from ${String(rule.fields.backup)} when the delegation was revoked` };
+              });
+              const saved = await commitTogether(context, [
+                { record: rule, patch: { status: "revoked", fields: { ...rule.fields, enabled: false, revokedBy: context.actor, revokedAt: clockIso() } }, event: `Escalation rule revoked by ${context.actor}: ${String(rule.fields.condition)} → ${String(rule.fields.backup)}` },
+                ...returned,
+              ]);
+              if (!saved) return;
+              context.toast("Revoked", `${String(rule.fields.backup)} no longer covers ${String(rule.fields.condition)}.`, "blocked");
+              close();
+            } finally {
+              setBusy(false);
             }
-            if (saved) context.toast("Revoked", `${String(rule.fields.backup)} no longer covers ${String(rule.fields.condition)}.`, "blocked");
-            setBusy(false);
-            close();
           }}
         >
           Revoke the delegation

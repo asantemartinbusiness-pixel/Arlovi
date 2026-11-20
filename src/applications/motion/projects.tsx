@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import { Clapperboard, FileUp, Link2, Unlink } from "lucide-react";
-import {
-  Button, Card, DataGrid, Empty, Grid, Notice, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
-} from "@/design-system";
+import { Button, Card, DataGrid, Empty, Grid, Notice, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions, OverlayCancel } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -262,11 +260,7 @@ export function CompositionSetup({ context, close }: { context: ScreenContext; c
           )}
         </Row>
       )}
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" type="submit" busy={busy}>Create and open</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" type="submit" form="motion-setup" busy={busy}>Create and open</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </form>
   );
 }
@@ -354,10 +348,7 @@ export function ImportComposition({ context, close }: { context: ScreenContext; 
           <Stage doc={preview.doc} time={preview.doc.duration} height={160} label={`${preview.name} preview`} />
         </Card>
       )}
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           icon={<FileUp size={14} />}
           disabled={!preview}
@@ -377,8 +368,7 @@ export function ImportComposition({ context, close }: { context: ScreenContext; 
           }}
         >
           Import as a new composition
-        </Button>
-      </Row>
+        </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -397,7 +387,7 @@ export function AssetLibrary({ context }: { context: ScreenContext }) {
   if (!record) return <Notice tone="warning" title="Select a composition first">The asset library lists the assets linked from one composition.</Notice>;
   const doc = parseMotion(record.body);
   const save = async (assets: MotionAsset[], event: string) => {
-    await context.mutate.patch(record.id, { body: { ...doc, assets } }, { expectRevision: record.revision, event });
+    if (!(await context.mutate.patch(record.id, { body: { ...doc, assets } }, { expectRevision: record.revision, event }))) return;
   };
   const linked = new Set(doc.assets.map((asset) => asset.recordId));
   const candidates = lookup.candidates.filter((item) => item.id !== record.id && !linked.has(item.id));
@@ -474,10 +464,7 @@ export function PublishTemplate({ context, close }: { context: ScreenContext; cl
       <FormField label="Note for people using the template">
         <TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Use for product launches; keep the accent bar papaya." />
       </FormField>
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={already}
@@ -493,8 +480,7 @@ export function PublishTemplate({ context, close }: { context: ScreenContext; cl
           }}
         >
           {already ? "Already a template" : "Publish as a template"}
-        </Button>
-      </Row>
+        </Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

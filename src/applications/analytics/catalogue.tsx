@@ -3,8 +3,7 @@ import {
   AlertTriangle, CheckCircle2, Database, GitMerge, Ruler, Table2,
 } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties, Row,
-  Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, Empty, FactGrid, OverlaySummary, Field, Grid, KeyValueList, Meter, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, ModalActions, OverlayActions,
 } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
@@ -15,7 +14,7 @@ import {
   ANALYTICS_COLLECTIONS, DIMENSIONS, allMeasures, formatMeasure, joinCheck,
   measureById, provenanceFor, qualityChecks, runQuery, type MeasureDef,
 } from "./metrics";
-import { MetricLineage, UnavailableList, useAnalytics } from "./panels";
+import { MetricLineage, UnavailableList, useAnalytics, useAnalyticsReady } from "./panels";
 import { readDashboard } from "./dashboards";
 import { readReport } from "./reports";
 
@@ -193,6 +192,20 @@ export function DatasetCatalogue({ context, tab }: { context: ScreenContext; tab
   );
 }
 
+export function DatasetSummary({ context }: { context: ScreenContext }) {
+  const datasets = useDatasets();
+  const dataset = datasets.find((row) => row.collection === context.selectedId) ?? datasets[0];
+  if (!dataset) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Dataset"
+      title={dataset.collection}
+      status={<Pill tone={dataset.retired ? "neutral" : dataset.stale ? "warning" : "success"} dot>{dataset.retired ? "retired" : dataset.stale ? "stale" : "current"}</Pill>}
+      meta={[`${dataset.records.length} records`, dataset.owner, dataset.known ? `newest ${dataset.ageDays} day${dataset.ageDays === 1 ? "" : "s"} old` : "age unknown"]}
+    />
+  );
+}
+
 export function DatasetDetails({ context }: { context: ScreenContext }) {
   const datasets = useDatasets();
   const dataset = datasets.find((row) => row.collection === context.selectedId) ?? datasets[0];
@@ -202,13 +215,10 @@ export function DatasetDetails({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Dataset", value: dataset.collection },
-        { label: "Records", value: <span className="ds-num">{dataset.records.length}</span> },
-        { label: "Owner", value: dataset.owner },
-        { label: "Newest record", value: dataset.known ? `${context.date(dataset.asOf)} (${dataset.ageDays} day${dataset.ageDays === 1 ? "" : "s"} old)` : "Unknown" },
-        { label: "Measures reading it", value: dataset.measures.map((measure) => measure.name).join(", ") || "none" },
-        { label: "Permissions", value: `Visible to the ${context.role} view in ${context.org.shortName}` },
+      <FactGrid columns={2} items={[
+        { label: "Newest record", value: dataset.known ? context.date(dataset.asOf) : "Unknown", mono: true, tone: dataset.stale ? "warning" : undefined },
+        { label: "Visible to", value: `${context.role} view` },
+        { label: "Measures reading it", value: dataset.measures.map((measure) => measure.name).join(", ") || "None" },
       ]} />
       {dataset.documented && <p>{dataset.documented.summary}</p>}
       <Stack gap={2}>
@@ -272,7 +282,7 @@ export function QualityPanel({ context }: { context: ScreenContext }) {
   );
 }
 
-export function GrantReview({ context }: { context: ScreenContext }) {
+export function GrantReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const datasets = useDatasets();
   const dataset = datasets.find((row) => row.collection === context.selectedId) ?? datasets[0];
   return (
@@ -289,6 +299,9 @@ export function GrantReview({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="Privacy constraints that are respected">
         A contact without a recorded consent cannot be added to a report audience, and a dashboard marked sensitive does not show its figures in a preview to anyone but its owner.
       </Notice>
+      <ModalActions>
+        <OverlayActions primary={<Button variant="primary" onClick={close}>Close</Button>} />
+      </ModalActions>
     </Stack>
   );
 }
@@ -311,15 +324,15 @@ export function DocumentDataset({ context, close }: { context: ScreenContext; cl
         <TextArea aria-label="What this dataset holds" rows={4} value={text} onChange={(event) => setText(event.target.value)} required />
       </Field>
       <Field label="Owner"><TextInput aria-label="Owner" value={owner} onChange={(event) => setOwner(event.target.value)} /></Field>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={text.trim() === ""}
         onClick={async () => {
           const existing = dataset?.documented;
-          if (existing) {
-            await context.mutate.patch(existing.id, { summary: text.trim(), ownerName: owner, status: "documented" }, { expectRevision: existing.revision, event: `Dataset ${collection} documented` });
-          } else {
-            await context.mutate.create({
+          const saved = existing
+            ? await context.mutate.patch(existing.id, { summary: text.trim(), ownerName: owner, status: "documented" }, { expectRevision: existing.revision, event: `Dataset ${collection} documented` })
+            : await context.mutate.create({
               collection: "datasets",
               title: collection,
               status: "documented",
@@ -327,13 +340,14 @@ export function DocumentDataset({ context, close }: { context: ScreenContext; cl
               ownerName: owner,
               fields: { collection, kind: "native" },
             }, `Dataset ${collection} documented`);
-          }
+          if (!saved) return;
           context.toast("Documented", `${collection} now carries a description and an owner on its catalogue record.`);
           close();
         }}
       >
         Save the documentation
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -495,14 +509,15 @@ export function MetricDefinitions({ context, tab }: { context: ScreenContext; ta
   }
 
   /* Metrics */
+  const shown = computed.filter((row) => row.measure.id === context.selectedId);
   return (
     <Grid>
-      <Card span={12} eyebrow="CANONICAL" title="Metric catalogue" subtitle={`${computed.length} measures, each naming the collection it comes from`} prov="posted" flush>
+      <Card span={12} title="Metric catalogue" subtitle={`${computed.length} measures. Select one to read its definition and source.`} prov="posted" flush>
         <DataGrid
           rows={computed.map((row) => ({ ...row, id: row.measure.id }))}
           rowId={(row) => row.id}
           label="Metric catalogue"
-          selectedId={context.selectedId}
+          selectedId={context.selectedId ?? shown[0]?.measure.id}
           onSelect={(id) => context.select(id)}
           onOpen={() => context.openOverlay("metric QA")}
           rowTone={(row) => (row.measure.unavailable ? "warning" : undefined)}
@@ -512,21 +527,74 @@ export function MetricDefinitions({ context, tab }: { context: ScreenContext; ta
               cell: (row) => (
                 <div>
                   <strong>{row.measure.name}</strong>
-                  <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{row.measure.description}</p>
+                  <p className="ds-subtle an-clamp">{row.measure.description}</p>
                 </div>
               ),
               filterValue: (row) => `${row.measure.name} ${row.measure.formula} ${row.measure.collection}`,
               sortValue: (row) => row.measure.name,
             },
-            { key: "formula", header: "Formula", cell: (row) => <code className="ds-num" style={{ fontSize: "var(--text-xs)" }}>{row.measure.formula}</code>, hideBelow: 1200 },
-            { key: "unit", header: "Unit", cell: (row) => row.measure.unit },
-            { key: "owner", header: "Owner", cell: (row) => row.measure.owner, hideBelow: 1000 },
-            { key: "version", header: "Version", align: "end", cell: (row) => <span className="ds-num">v{row.measure.version}</span> },
+            {
+              key: "source", header: "Source",
+              cell: (row) => {
+                const age = freshness(row.asOf, context.now, 7);
+                return (
+                  <div>
+                    <span>{row.measure.collection}</span>
+                    <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
+                      {row.measure.unavailable ? "No source here" : `${row.records} record${row.records === 1 ? "" : "s"}${age.known ? `, ${age.days}d old${age.stale ? " (stale)" : ""}` : ", age unknown"}`}
+                    </p>
+                  </div>
+                );
+              },
+              sortValue: (row) => row.measure.collection,
+              filterValue: (row) => row.measure.collection,
+            },
+            { key: "unit", header: "Unit", cell: (row) => row.measure.unit, hideBelow: 900 },
+            { key: "version", header: "Version", align: "end", cell: (row) => <span className="ds-num">v{row.measure.version}</span>, hideBelow: 900 },
             { key: "value", header: "Now", align: "end", cell: (row) => (row.measure.unavailable ? <Pill tone="warning">unavailable</Pill> : <span className="ds-num">{formatMeasure(row.measure, row.value, context.money)}</span>) },
           ]}
         />
       </Card>
     </Grid>
+  );
+}
+
+/** The selected measure's definition and source: what it computes, what it reads and how current that is. */
+export function MetricDefinitionInspector({ context }: { context: ScreenContext }) {
+  const { context: queryContext } = useAnalytics();
+  const dashboards = useCollection("dashboards");
+  const reports = useCollection("reports");
+  const measure = (context.selectedId ? measureById(context.selectedId) : undefined) ?? allMeasures()[0];
+  const result = useMemo(() => (measure ? runQuery({ measureIds: [measure.id], filters: [] }, queryContext) : undefined), [measure, queryContext]);
+  if (!measure || !result) {
+    return <Empty title="No measure selected">Select a measure to read its formula, its source and what depends on it.</Empty>;
+  }
+  const age = freshness(result.asOf, context.now, 7);
+  const users = dashboards.filter((dashboard) => readDashboard(dashboard).tiles.some((tile) => tile.measureId === measure.id));
+  const cited = reports.filter((report) => readReport(report).blocks.some((block) => block.measureId === measure.id));
+  return (
+    <Stack gap={4}>
+      <div>
+        <Pill tone={measure.unavailable ? "warning" : "success"} dot>{measure.unavailable ? "No source here" : "Computed from records"}</Pill>
+        <h4 style={{ margin: "var(--space-2) 0 0" }}>{measure.name}</h4>
+        <p className="ds-subtle">{measure.description}</p>
+      </div>
+      <KeyValueList items={[
+        { label: "Formula", value: measure.formula, mono: true },
+        { label: "Reads", value: measure.collection },
+        { label: "Figure now", value: measure.unavailable ? "Unavailable" : formatMeasure(measure, result.totals[0] ?? null, context.money), mono: true },
+        { label: "Records", value: String(result.recordCount), mono: true },
+        { label: "Newest record", value: age.known ? `${context.date(result.asOf)}, ${age.days} day${age.days === 1 ? "" : "s"} old` : "Unknown", tone: age.known && age.stale ? "warning" : undefined },
+        { label: "Unit and version", value: `${measure.unit}, v${measure.version}`, mono: true },
+        { label: "Owner", value: measure.owner },
+        { label: "Used by", value: `${users.length} dashboard${users.length === 1 ? "" : "s"}, ${cited.length} report${cited.length === 1 ? "" : "s"}` },
+      ]} />
+      {measure.unavailable && <Notice tone="warning" title="Reported as unavailable everywhere">{measure.unavailable}</Notice>}
+      <Row gap={2} wrap>
+        <Button size="sm" variant="primary" onClick={() => context.openOverlay("metric QA")}>Read the lineage</Button>
+        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("test measure")}>Test it</Button>
+      </Row>
+    </Stack>
   );
 }
 
@@ -601,7 +669,8 @@ export function FormulaEditor({ context, close }: { context: ScreenContext; clos
           : `${preview.count} record${preview.count === 1 ? "" : "s"} match. The measure computes ${unit === "money" ? context.money(Math.round(preview.value ?? 0)) : String(Math.round((preview.value ?? 0) * 10) / 10)} right now.`}
       </Notice>
 
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={name.trim() === ""}
         onClick={async () => {
@@ -618,12 +687,13 @@ export function FormulaEditor({ context, close }: { context: ScreenContext; clos
         }}
       >
         Define the measure
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
 
-export function ImpactReview({ context }: { context: ScreenContext }) {
+export function ImpactReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const definitions = useCollection("metricDefinitions");
   const dashboards = useCollection("dashboards");
   const reports = useCollection("reports");
@@ -660,8 +730,8 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
           ? "Nothing reads this measure yet, so a change has no historical effect."
           : `${[...affectedDashboards, ...affectedReports].map((item) => item.title).join(", ")} would recompute under the new definition. The figures they showed before were computed under v${String(definition.fields.version ?? 1)}; the version record keeps what that meant.`}
       </Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           disabled={definition.status === "approved" || !context.can("manage_policy")}
           title={!context.can("manage_policy") ? "Approving a definition needs the Owner view" : undefined}
@@ -674,21 +744,21 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
           }}
         >
           Approve this version
-        </Button>
-        <Button
+        </Button>} secondary={<Button
           variant="secondary"
           onClick={async () => {
             const next = Number(definition.fields.version ?? 1) + 1;
-            await context.mutate.patch(definition.id, {
+            const saved = await context.mutate.patch(definition.id, {
               status: "proposed",
               fields: { ...definition.fields, version: next },
             }, { expectRevision: definition.revision, event: `Measure ${definition.title} versioned to v${next}` });
+            if (!saved) return;
             context.toast("Versioned", `${definition.title} is now v${next}, proposed. Everything reading it recomputes under the new definition.`);
           }}
         >
           Record a new version
-        </Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Close</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -899,7 +969,9 @@ export function JoinProperties({ context }: { context: ScreenContext }) {
   const models = useCollection("dataModels");
   const relations = readRelations(models[0]);
   const { records } = useAnalytics();
+  const ready = useAnalyticsReady();
   const relation = relations.find((item) => item.id === context.selectedId) ?? relations[0];
+  if (!ready) return <Empty title="Reading the records">No verdict is shown until every collection the join uses has loaded.</Empty>;
   if (!relation) return <Empty title="No relation" />;
   const check = joinCheck(relation.from, relation.to, relation.key, records);
   return (
@@ -963,28 +1035,29 @@ export function TransformEditor({ context, close }: { context: ScreenContext; cl
             ? `One ${from} reaches up to ${preview.maxFanOut} ${to} records, so a sum across the join would read ${context.money(preview.sumAfter)} instead of ${context.money(preview.sumBefore)}.`
             : `Each ${from} reaches at most one ${to}, so totals are safe across this join.`}
       </Notice>
-      <Button
+      <ModalActions>
+<OverlayActions primary={<Button
         variant="primary"
         disabled={preview.matched === 0}
         onClick={async () => {
           const relation: Relation = { id: `r${relations.length + 1}-${wallMs().toString(36)}`, from, to, key, kind: preview.fanOut ? "one-to-many" : "many-to-one" };
-          if (model) {
-            await context.mutate.patch(model.id, { body: { relations: [...relations, relation] } }, { event: `Relation ${from} → ${to} added` });
-          } else {
-            await context.mutate.create({
+          const saved = model
+            ? await context.mutate.patch(model.id, { body: { relations: [...relations, relation] } }, { expectRevision: model.revision, event: `Relation ${from} → ${to} added` })
+            : await context.mutate.create({
               collection: "dataModels",
               title: "Northline data model",
               status: "active",
               summary: "Relationships between the collections, tested against the records.",
               body: { relations: [...relations, relation] },
             }, `Relation ${from} → ${to} added`);
-          }
+          if (!saved) return;
           context.toast("Relation added", `${from} → ${to} is tested against the records every time this screen renders.`);
           close();
         }}
       >
         Add the relation
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -993,7 +1066,9 @@ export function ModelTest({ context: _context }: { context: ScreenContext }) {
   const models = useCollection("dataModels");
   const relations = readRelations(models[0]);
   const { records } = useAnalytics();
+  const ready = useAnalyticsReady();
   const { now } = useWorkspace();
+  if (!ready) return <Empty title="Reading the records">No verdict is shown until every collection the joins use has loaded.</Empty>;
   const results = relations.map((relation) => ({ relation, check: joinCheck(relation.from, relation.to, relation.key, records) }));
   const quality = ANALYTICS_COLLECTIONS.flatMap((collection) => qualityChecks(collection, records, now).filter((check) => check.failing.length > 0).map((check) => ({ collection, check })));
 

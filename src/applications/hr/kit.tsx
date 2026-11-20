@@ -1,14 +1,14 @@
-import { Button, Notice, Pill } from "@/design-system";
+import { useId, type ReactNode } from "react";
+import { Button, Notice, OverlayActions, Pill } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
 
-/** Shared footer for a modal that submits an owned form. */
+/** Shared footer for an overlay that submits an owned form: primary first, dismiss at the end. */
 export const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 /**
@@ -58,4 +58,27 @@ export function leaveBalance(record: Rec): LeaveBalance {
   const allowance = Number(record.fields.leaveAllowance ?? 0);
   const taken = Number(record.fields.leaveTaken ?? 0);
   return { allowance, taken, left: Math.max(0, allowance - taken), known };
+}
+
+/**
+ * The strip above a People workspace: this screen's own actions and the one
+ * honest boundary sentence. The page already names itself in its h1, so the
+ * old restating headline and description are gone; `title` stays as the
+ * strip's accessible name.
+ */
+export function PeopleHeader({ title, actions, note }: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+  note?: ReactNode;
+}) {
+  const noteId = useId();
+  if (!actions && !note) return null;
+  return (
+    <section className="hr-bar" aria-labelledby={note ? noteId : undefined} aria-label={note ? undefined : title}>
+      {note && <p className="hr-bar-note" id={noteId}>{note}</p>}
+      {actions && <div className="hr-bar-actions">{actions}</div>}
+    </section>
+  );
 }

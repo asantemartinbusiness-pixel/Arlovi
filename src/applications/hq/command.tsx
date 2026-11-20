@@ -322,9 +322,6 @@ export function KeyResultsEditor({ context, close }: { context: ScreenContext; c
         </div>
       </Row>
       <Row gap={2}>
-        <span className="ds-subtle">Progress after saving: <strong className="ds-num">{Math.round(preview.ratio * 100)}%</strong></span>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
         <Button
           variant="primary"
           busy={busy}
@@ -348,6 +345,9 @@ export function KeyResultsEditor({ context, close }: { context: ScreenContext; c
         >
           Save check-in
         </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <span className="ds-grow" />
+        <span className="ds-subtle">Progress after saving: <strong className="ds-num">{Math.round(preview.ratio * 100)}%</strong></span>
       </Row>
     </Stack>
   );
@@ -526,8 +526,6 @@ export function DecisionEditor({ context, close }: { context: ScreenContext; clo
         </Select>
       </Field>
       <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
         <Button
           variant="primary"
           busy={busy}
@@ -556,6 +554,7 @@ export function DecisionEditor({ context, close }: { context: ScreenContext; clo
         >
           Record decision
         </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
   );

@@ -5,7 +5,8 @@ test("Websites library exposes work, release context and recoverable search", as
   const main = page.locator("#main");
   await expect(main.getByLabel("Website library overview")).toBeVisible();
   await expect(main.getByLabel("Website summary")).toBeVisible();
-  await expect(main.getByRole("heading", { name: "Build, manage and prepare your websites." })).toBeVisible();
+  await expect(main.getByLabel("Website summary")).toContainText("Verified domains");
+  await expect(main.getByLabel(/^Routes of /).first()).toBeVisible();
   await expect(main.getByRole("button", { name: "Card view" })).toHaveAttribute("aria-pressed", "true");
   await expect(main.locator(".web-library-card").first()).toBeVisible();
   await main.getByRole("searchbox", { name: "Find a website" }).fill("qa-websites-unfindable-query-2026");
@@ -65,9 +66,10 @@ test("Website editor exposes the current page and routes back into its connected
   const main = page.locator("#main");
   const editor = main.getByLabel("Website editor overview");
   await expect(editor).toBeVisible();
-  await expect(editor).toContainText("PAGE EDITOR");
+  await expect(editor.getByLabel("Page being edited")).toBeVisible();
   await expect(editor).toContainText("blocks");
-  await editor.getByRole("button", { name: "Quality" }).click();
+  await editor.getByRole("button", { name: "More site tools" }).click();
+  await page.getByRole("menuitem", { name: "Quality" }).click();
   await expect(page).toHaveURL(new RegExp(editorPath!.replace(/\/builder$/, "") + "/quality$"));
   await expect(main).not.toContainText("Record not found");
 });
@@ -97,4 +99,51 @@ test("Website quality review filters long check lists and returns to the same ed
   await review.getByRole("button", { name: "Open editor" }).click();
   await expect(page).toHaveURL(new RegExp(dashboard + "/builder$"));
   await expect(main.getByLabel("Website editor overview")).toBeVisible();
+});
+
+async function newSite(page: import("@playwright/test").Page, title: string) {
+  await page.goto("/o/northline/web/sites");
+  return page.evaluate(async (name) => {
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "sites", currency: "GBP", title: name, status: "draft", fields: {},
+      body: {
+        pages: [{ id: "home", name: "Home", path: "/", blocks: [
+          { id: "b1", type: "hero", props: { title: "First block" } },
+          { id: "b2", type: "text", props: { title: "Second block", body: "Body copy" } },
+          { id: "b3", type: "text", props: { title: "Third block", body: "More copy" } },
+        ] }],
+      },
+    } as Parameters<typeof repo.newRecord>[0], ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  }, title);
+}
+
+test("Builder inspector follows the selection and the layout popover moves the block", async ({ page }) => {
+  const id = await newSite(page, "QA Builder Inspector");
+  await page.goto(`/o/northline/web/sites/${id}/builder`);
+  const main = page.locator("#main");
+  await expect(main.getByText("Select a block on the canvas or in the list to edit it here.")).toBeVisible();
+  await main.getByRole("button", { name: /^2\s*Text/ }).click();
+  await expect(main.getByText("Selected · 2 of 3")).toBeVisible();
+  await expect(main.getByLabel("Heading")).toHaveValue("Second block");
+  await main.getByRole("button", { name: "Block layout" }).click();
+  await page.getByRole("button", { name: "Up", exact: true }).click();
+  await expect(main.getByText("Selected · 1 of 3")).toBeVisible();
+});
+
+test("Publish review says nothing is uploaded and records a blocked attempt", async ({ page }) => {
+  const id = await newSite(page, "QA Publish Review");
+  await page.goto(`/o/northline/web/sites/${id}/deploy`);
+  await page.getByRole("button", { name: "Publish", exact: true }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Nothing is uploaded and no address changes.");
+  await expect(dialog).toContainText("Hosting connection · not connected");
+  await dialog.getByRole("button", { name: "Record a blocked attempt" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("tab", { name: "Deployments" }).click();
+  await expect(page.locator("#main").getByRole("table", { name: "Deployments" })).toContainText(/blocked/i);
 });

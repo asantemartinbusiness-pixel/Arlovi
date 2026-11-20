@@ -1,10 +1,11 @@
+import { AnalyticsReady } from "@/applications/analytics/ready";
+import { Link } from "react-router-dom";
 import { CalendarDays, Images, LayoutTemplate, Mail, Megaphone, MousePointerClick, Search, Target, TrendingUp, Users } from "lucide-react";
-import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Empty, Notice, OVERLAY_WIDTH, Pill, Properties, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
-import { CampaignDetailContext } from "./CampaignDetailContext";
 import { MarketingWorkAreaHeader } from "./MarketingWorkAreaHeader";
-import { useRecord } from "@/platform/workspace";
+import { useRecord, useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
   archiveCampaign, AttributionFilter, CompareCampaigns, exportChannelTable, forkTemplate, pauseAdCampaign,
@@ -21,7 +22,7 @@ import {
   AccountAuthorization, AdPreview, AttributionModelExplainer, AudiencePreview, AuditIssue,
   BudgetInspector, CampaignDiagnostics, CampaignTemplatePicker, CampaignWizard, ConsentInspector,
   CreativePreview, DeliveryReceipt, DuplicateRules, EmailBuilder, ExportPermission, GlobalUpdateImpact,
-  LaunchApproval, MetricNotes, MetricSource, PageMetadataEditor, PageTemplatePicker, PauseConsequence,
+  LaunchApproval, LaunchApprovalFooter, LaunchApprovalSummary, DeliveryReceiptFooter, SuppressionCheckSummary, MetricNotes, MetricSource, PageMetadataEditor, PageTemplatePicker, PauseConsequence,
   PlanApproval, PostComposer, PostEditor, PublishConfirm, PublishPreview, SegmentBuilder, SendReview,
   SourceInspector, SpendApproval, SuppressionCheck, TechnicalRecommendation, TemplateApproval,
   TemplateEditor, VersionCompare, AssetPicker,
@@ -119,19 +120,22 @@ export const marketApp = registerApp({
     /* ------------------------------ 003 ------------------------------ */
     "ARL-MARKET-003": {
       id: "ARL-MARKET-003",
-      header: (context: ScreenContext) => <CampaignDetailContext context={context} />,
       title: () => "Campaign",
-      subtitle: () => "Objectives, audience, creative, channel plan and the budget committed against it.",
+      record: (context) => ({
+        title: <CampaignHeading id={context.params.id} part="title" />,
+        status: <CampaignHeading id={context.params.id} part="status" />,
+        subtitle: <CampaignHeading id={context.params.id} part="subtitle" />,
+        meta: [
+          <Link key="back" to={context.path("/o/:org/market/campaigns")}>All campaigns</Link>,
+          <CampaignHeading key="owner" id={context.params.id} part="owner" />,
+          <CampaignHeading key="window" id={context.params.id} part="window" />,
+          <CampaignHeading key="budget" id={context.params.id} part="budget" />,
+        ],
+      }),
       tabs: ["Overview", "Plan", "Assets", "Channels", "Results", "Activity"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <CampaignDetail context={context} lens={lens} />,
       })),
-      statusStrip: () => (
-        <Row gap={2} wrap>
-          <Pill tone="warning" dot>Delivery not connected</Pill>
-          <span className="ds-subtle">Scheduling, approvals and spend are records in this browser. Nothing is sent to an advertising or mail provider.</span>
-        </Row>
-      ),
       actions: [
         { id: "approve", label: "Approve plan", placement: "primary", capability: "publish_campaign", run: (context) => context.openOverlay("plan approval", { id: campaignOf(context) }) },
         { id: "launch", label: "Launch locally", placement: "primary", capability: "publish_campaign", run: (context) => context.openOverlay("launch approval") },
@@ -141,7 +145,7 @@ export const marketApp = registerApp({
       ],
       overlays: [
         { id: "Creative preview", kind: "drawer", title: "Creative preview", width: 520, render: ({ ...context }) => <CreativePreview context={context} /> },
-        { id: "launch approval", kind: "modal", title: "Launch approval", width: 560, render: ({ close, ...context }) => <LaunchApproval context={context} close={close} />, footer: submitFooter("launch-approval", "Record launch") },
+        { id: "launch approval", kind: "modal", title: "Launch approval", width: 560, summary: (context) => <LaunchApprovalSummary context={context} />, render: ({ close, ...context }) => <LaunchApproval context={context} close={close} />, footer: ({ close, ...context }) => <LaunchApprovalFooter context={context} close={close} /> },
         { id: "pause consequence", kind: "modal", title: "What pausing does", tone: "danger", width: 560, render: ({ close, ...context }) => <PauseConsequence context={context} close={close} /> },
         { id: "email builder", kind: "modal", title: "Campaign brief and email", width: 620, render: ({ close, ...context }) => <EmailBuilder context={context} close={close} />, footer: submitFooter("email-builder", "Save draft") },
         { id: "Metric source", kind: "drawer", title: "Where this figure comes from", width: 560, render: ({ ...context }) => <MetricSource context={context} /> },
@@ -168,7 +172,7 @@ export const marketApp = registerApp({
         { id: "attach media", label: "Attach media", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("asset picker", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Post editor", kind: "modal", title: "Scheduled item", width: 620, render: ({ close, ...context }) => <PostEditor context={context} close={close} />, footer: submitFooter("post-editor", "Save schedule") },
+        { id: "Post editor", kind: "modal", title: "Scheduled item", width: 620, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <PostEditor context={context} close={close} />, footer: submitFooter("post-editor", "Save schedule") },
         { id: "asset picker", kind: "modal", title: "Attach media", width: 560, render: ({ close, ...context }) => <AssetPicker context={context} close={close} /> },
         { id: "publish preview", kind: "drawer", title: "Publish preview", width: 560, render: ({ close, ...context }) => <PublishPreview context={context} close={close} /> },
       ],
@@ -194,7 +198,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Account authorization", kind: "modal", title: "Connect an account", width: 560, render: ({ close, ...context }) => <AccountAuthorization context={context} close={close} />, footer: submitFooter("account-auth", "Record the request") },
         { id: "post composer", kind: "drawer", title: "Composer", width: 640, render: ({ close, ...context }) => <PostComposer context={context} close={close} />, footer: submitFooter("post-composer", "Save draft") },
-        { id: "delivery receipt", kind: "modal", title: "Delivery receipt", width: 560, render: ({ ...context }) => <DeliveryReceipt context={context} /> },
+        { id: "delivery receipt", kind: "modal", title: "Delivery receipt", width: 560, render: ({ ...context }) => <DeliveryReceipt context={context} />, footer: ({ close, ...context }) => <DeliveryReceiptFooter context={context} close={close} /> },
         confirmOverlay,
       ],
     },
@@ -219,7 +223,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Audience preview", kind: "drawer", title: "Audience preview", width: 620, render: ({ ...context }) => <AudiencePreview context={context} /> },
         { id: "send review", kind: "modal", title: "Send review", width: 620, render: ({ close, ...context }) => <SendReview context={context} close={close} />, footer: submitFooter("send-review", "Record recipients") },
-        { id: "suppression check", kind: "drawer", title: "Suppression check", width: 620, render: () => <SuppressionCheck /> },
+        { id: "suppression check", kind: "drawer", title: "Suppression check", width: 620, summary: () => <SuppressionCheckSummary />, render: ({ ...context }) => <SuppressionCheck context={context} /> },
         { id: "email builder", kind: "drawer", title: "Email builder", width: 640, render: ({ close, ...context }) => <EmailBuilder context={context} close={close} />, footer: submitFooter("email-builder", "Save draft") },
         confirmOverlay,
       ],
@@ -315,7 +319,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Page template", kind: "modal", title: "New landing page", width: 600, render: ({ close, ...context }) => <PageTemplatePicker context={context} close={close} />, footer: submitFooter("page-template", "Create page") },
         { id: "publish confirm", kind: "modal", title: "Export this page", width: 560, render: ({ close, ...context }) => <PublishConfirm context={context} close={close} /> },
-        { id: "version compare", kind: "drawer", title: "Versions", width: 720, render: ({ ...context }) => <VersionCompare context={context} /> },
+        { id: "version compare", kind: "drawer", title: "Versions", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <VersionCompare context={context} /> },
         { id: "visual editor", kind: "drawer", title: "Visual editor", width: 720, render: ({ close, ...context }) => <VisualEditor context={context} close={close} />, footer: submitFooter("visual-editor", "Save page") },
         confirmOverlay,
       ],
@@ -327,7 +331,8 @@ export const marketApp = registerApp({
       subtitle: () => "Which channel gets the credit is a choice of model. The unattributed share is published, not hidden.",
       tabs: ["Channels", "Funnels", "Revenue", "Cohorts", "Models"].map((lens) => ({
         id: lens,
-        render: (context: ScreenContext) => <Attribution context={context} lens={lens} />,
+        // Attribution counts orders from Commerce; never count from a partial read.
+        render: (context: ScreenContext) => <AnalyticsReady><Attribution context={context} lens={lens} /></AnalyticsReady>,
       })),
       actions: [
         { id: "compare", label: "Compare models", placement: "primary", run: (context) => context.setTab("Models") },
@@ -340,7 +345,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Attribution model", kind: "modal", title: "About this model", width: 560, render: ({ ...context }) => <AttributionModelExplainer context={context} /> },
         { id: "source inspector", kind: "drawer", title: "Source", width: 620, render: ({ ...context }) => <SourceInspector context={context} /> },
-        { id: "metric notes", kind: "drawer", title: "Metric notes", width: 560, render: ({ ...context }) => <MetricNotes context={context} /> },
+        { id: "metric notes", kind: "drawer", title: "Metric notes", width: 560, render: ({ ...context }) => <AnalyticsReady><MetricNotes context={context} /></AnalyticsReady> },
         { id: "channel filter", kind: "modal", title: "Filter channels", width: 520, render: ({ close }) => <AttributionFilter close={close} />, footer: submitFooter("attribution-filter", "Apply filter") },
       ],
     },
@@ -362,13 +367,27 @@ export const marketApp = registerApp({
       ],
       overlays: [
         { id: "Template editor", kind: "drawer", title: "Template", width: 600, render: ({ close, ...context }) => <TemplateEditor context={context} close={close} />, footer: submitFooter("template-editor", "Save version") },
-        { id: "approval", kind: "modal", title: "Template approval", width: 560, render: ({ close, ...context }) => <TemplateApproval context={context} close={close} />, footer: submitFooter("template-approval", "Approve template") },
+        { id: "approval", kind: "modal", title: "Template approval", width: 560, presentation: { selectedRecord: true, noRecordContext: true }, render: ({ close, ...context }) => <TemplateApproval context={context} close={close} />, footer: submitFooter("template-approval", "Approve template") },
         { id: "global update impact", kind: "drawer", title: "What a change affects", width: 620, render: ({ ...context }) => <GlobalUpdateImpact context={context} /> },
         confirmOverlay,
       ],
     },
   },
 });
+
+function CampaignHeading({ id, part }: { id: string | undefined; part: "title" | "status" | "subtitle" | "owner" | "window" | "budget" }) {
+  const campaign = useRecord(id);
+  const { money, date } = useWorkspace();
+  if (!campaign) return part === "title" ? <>Campaign</> : null;
+  switch (part) {
+    case "title": return <>{campaign.title}</>;
+    case "status": return <Pill tone={campaign.status === "active" || campaign.status === "approved" ? "success" : campaign.status === "approval" ? "warning" : "neutral"} dot>{campaign.status === "approval" ? "Awaiting approval" : campaign.status.replaceAll("_", " ")}</Pill>;
+    case "subtitle": return <>{campaign.summary}</>;
+    case "owner": return <>Owner {campaign.ownerName}</>;
+    case "window": return <span className="ds-num">{campaign.startAt && campaign.endAt ? `${date(campaign.startAt)} to ${date(campaign.endAt)}` : "Not scheduled"}</span>;
+    default: return <span className="ds-num">{money(Number(campaign.fields.budgetMinor ?? campaign.amountMinor ?? 0))} budget</span>;
+  }
+}
 
 function CampaignInspector({ context }: { context: ScreenContext }) {
   const campaign = useRecord(context.params.id);

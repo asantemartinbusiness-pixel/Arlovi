@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
-import { useCollections } from "@/platform/workspace";
-import { listByCollection } from "@/platform/repo";
+import { useCollections, useRecord } from "@/platform/workspace";
+import { getRecordInOrg, listByCollection } from "@/platform/repo";
 import {
   evaluateAssertions, readGraph, runWorkflow,
   type PendingWrite, type RunResult, type StoredRun, type WorkflowGraph,
@@ -82,6 +82,34 @@ async function applyWrites(writes: PendingWrite[], context: ScreenContext, pool:
   return applied;
 }
 
+/** Why a live run may not start: a paused automation or a paused organisation (HANDOFF rule 8). */
+export function liveRunBlocker(workflow: Rec | undefined, org: Rec | undefined): string | undefined {
+  if (org?.fields.executionPaused === true) return "Execution is paused for this organisation. Resume it in the Admin autonomy centre first.";
+  if (workflow?.status === "paused") return "This automation is paused. Resume it from the activation review before a live run.";
+  if (workflow?.status === "archived") return "This automation is archived and cannot start a run.";
+  return undefined;
+}
+
+export function useLiveRunBlocker(context: ScreenContext, workflow: Rec | undefined): string | undefined {
+  const org = useRecord(context.org.id);
+  return liveRunBlocker(workflow, org);
+}
+
+/** Reads the stored records, so a stale screen cannot start a run the data forbids. */
+export async function storedLiveRunBlocker(context: ScreenContext, workflowId: string): Promise<string | undefined> {
+  const [workflow, org] = await Promise.all([getRecordInOrg(context.org.id, workflowId), getRecordInOrg(context.org.id, context.org.id)]);
+  return liveRunBlocker(workflow, org);
+}
+
+/** A field edit whose result is read: when the write is refused the input shows the stored value again. */
+export async function patchChecked(context: ScreenContext, id: string, patch: Partial<Rec>, options?: Parameters<ScreenContext["mutate"]["patch"]>[2]): Promise<Rec | null> {
+  const saved = await context.mutate.patch(id, patch, options);
+  if (!saved) context.toast("Change not saved", "The field shows the stored value again.", "blocked");
+  return saved;
+}
+
+export class LiveRunRefused extends Error {}
+
 export interface ExecuteOptions {
   context: ScreenContext;
   workflow: Rec;
@@ -109,6 +137,23 @@ export interface ExecuteOutcome {
 export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcome> {
   const { context, workflow, graph, pool, mode, trigger } = options;
   const resumeStored = options.resumeRun ? readRun(options.resumeRun) : undefined;
+  if (options.resumeRun) {
+    /* A run continued elsewhere since this view loaded must not be resumed
+       twice: its writes would be applied again. */
+    const current = await getRecordInOrg(context.org.id, options.resumeRun.id);
+    if (!current || current.revision !== options.resumeRun.revision) {
+      const reason = "This run changed elsewhere since it was opened. Reload it before deciding.";
+      context.toast("Run not continued", reason, "blocked");
+      throw new LiveRunRefused(reason);
+    }
+  }
+  if (mode === "live") {
+    const reason = await storedLiveRunBlocker(context, workflow.id);
+    if (reason) {
+      context.toast("Run not started", reason, "blocked");
+      throw new LiveRunRefused(reason);
+    }
+  }
 
   const run = runWorkflow({
     graph,
@@ -157,12 +202,17 @@ export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcom
   let runId: string;
   if (options.resumeRun) {
     runId = options.resumeRun.id;
-    await context.mutate.patch(options.resumeRun.id, {
+    const saved = await context.mutate.patch(options.resumeRun.id, {
       status: run.status,
       summary: run.message,
       fields: { ...options.resumeRun.fields, ...fields },
       body: stored,
     }, { expectRevision: options.resumeRun.revision, event: `Run resumed and finished as ${run.status}` });
+    if (!saved) {
+      const reason = "The run record changed while it was continuing, so its outcome was not stored. Reload the run and check its writes before acting again.";
+      context.toast("Run outcome not stored", reason, "blocked");
+      throw new LiveRunRefused(reason);
+    }
   } else {
     const created = await context.mutate.create({
       collection: "workflowRuns",
@@ -178,7 +228,7 @@ export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcom
   }
 
   if (mode === "live") {
-    await context.mutate.patch(workflow.id, {
+    const noted = await context.mutate.patch(workflow.id, {
       fields: {
         ...workflow.fields,
         lastRunAt: run.startedAt,
@@ -186,6 +236,7 @@ export async function executeRun(options: ExecuteOptions): Promise<ExecuteOutcom
         lastRunId: runId,
       },
     }, { event: `Last run recorded as ${run.status}` });
+    if (!noted) context.toast("Workflow summary not updated", "The run is stored, but the workflow's last-run fields were not changed.", "info");
   }
 
   return { run, runId, writesApplied };

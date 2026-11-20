@@ -77,6 +77,21 @@ These each closed a real defect. Keep them.
 - Headings have zero margin by design; components own their spacing.
 - `base.css` carries a zero-specificity default for plain `<table>`s. Classed tables
   (`.ds-table`, `.dx-table`, matrices) override it.
+- **Type hierarchy (six steps, documented in `base.css`)**: page title `--text-title`
+  (light), section title `--text-lg`, card title `--text-md` (medium), body `--text-base`,
+  label `--text-xs` caps, metadata `--text-sm`. Stat figures use `--text-stat`. Applications
+  inherit these through `h1-h4`, `.ds-card-head`, `.ds-stat-*`, `.ds-eyebrow`, `.ds-subtle`; never size by hand.
+- **Density**: component spacing comes from `--card-pad`, `--card-head-pad-*`, `--stat-pad-*`, `--row-pad-y`,
+  `--pg-head-top`, `--pg-body-top` (tokens.css). Default is compact (page head ~120px, table rows ~36px);
+  `data-density="comfortable"` restores the roomier values. Never change `--interface-scale`.
+- **Selection** is one pink `--selection-pop` pill for tabs, rail and nav; declared once per selector in
+  `components.css` / `shell.css` (no override layers, no underlines).
+- **Page kit** (`page-kit.tsx`, `.pk-*`): `RecordHeader` (single identity block; set `ScreenDef.record` and it
+  replaces the page head, title becomes the h1), `PageSection`, `SectionNav` (segmented pills, `?section=` in the URL),
+  `KeyValueList` (uses overlay-kit `Fact`). Add to these APIs; do not change them.
+- **Notification toasts**: arrivals are ignored during a ~4s hydration grace, never toasted twice per session,
+  and coalesced within 1.5s into one toast. The page `h1` takes programmatic focus after navigation without a ring.
+- The execution tray is a slim bar and renders only while a mission runs or waits on a decision.
 
 ## Known limits
 

@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { ArrowLeft, ArrowRight, GripVertical, Kanban } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, Empty, Field, Grid, Kbd, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  BarChart, Button, Card, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, Kbd, MoneyInput, Notice, OverlayActions, OverlaySection,
+  OverlaySummary, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -12,8 +13,8 @@ import {
   LOST_REASONS, OPEN_STAGES, STAGES, activitiesFor, probabilityOf, stageGuard, stageIndex, stageOf,
 } from "@/domain/crm-pipeline";
 import type { Stage } from "@/domain/crm-pipeline";
-import { companyOfDeal, contactOfDeal, quotesOfDeal, stagesWithDeals, useCrmData } from "./data";
-import { ForecastNote, Money, ProbabilityPill, StagePill } from "./parts";
+import { companyById, companyOfDeal, contactById, contactOfDeal, dealsOfCompany, quotesOfDeal, stagesWithDeals, useCrmData } from "./data";
+import { ActivityPill, ConsentPill, ForecastNote, Money, ProbabilityPill, StagePill } from "./parts";
 import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- CRM-006 ---------------------------- *
@@ -41,10 +42,11 @@ export function useStageMove(context: ScreenContext) {
       context.openOverlay("lost reason", { id: deal.id });
       return { ok: false, reason: "A lost deal needs a reason." };
     }
-    await context.mutate.patch(deal.id, {
+    const saved = await context.mutate.patch(deal.id, {
       status: target.id,
       fields: { ...deal.fields, stage: target.id, probability: target.probability },
     }, { expectRevision: deal.revision, event: `${deal.title} moved from ${stageOf(deal).label} to ${target.label}` });
+    if (!saved) return { ok: false, reason: "The deal changed elsewhere. Reload it and move it again." };
     context.toast(
       "Stage changed",
       `${deal.title} is now in ${target.label}. Its weighting moved to ${target.probability}%, so the forecast changed by ${context.money(Math.round((Number(deal.amountMinor ?? 0) * (target.probability - probabilityOf(deal))) / 100))}.`,
@@ -264,7 +266,7 @@ export function PipelineList({ context }: { context: ScreenContext }) {
           label: "Assign to me",
           onRun: async (selected) => {
             for (const deal of selected) {
-              await context.mutate.patch(deal.id, { fields: { ...deal.fields, owner: context.actor } }, { event: `${deal.title} assigned to ${context.actor}` });
+              if (!(await context.mutate.patch(deal.id, { fields: { ...deal.fields, owner: context.actor } }, { event: `${deal.title} assigned to ${context.actor}` }))) return;
             }
             context.toast("Owner changed", `${selected.length} ${selected.length === 1 ? "deal" : "deals"} now belong to ${context.actor}.`);
           },
@@ -362,6 +364,27 @@ export function PipelineTeam({ context }: { context: ScreenContext }) {
 
 /* --------------------------- Overlays --------------------------- */
 
+/** Head of the Deal drawer: the saved deal (or a new one) and a link to the full record. */
+export function DealDrawerSummary({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useCrmData();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const existing = data.deals.find((deal) => deal.id === (payload?.id ?? context.selectedId));
+  const company = companyOfDeal(data, existing);
+  return (
+    <OverlaySummary
+      eyebrow={existing ? "Deal" : "New deal"}
+      title={existing ? existing.title : "New deal"}
+      status={existing ? <StagePill deal={existing} /> : undefined}
+      meta={[
+        company?.title ?? "No account yet",
+        `Owner ${existing ? String(existing.fields.owner ?? existing.ownerName) : context.actor}`,
+        existing ? `${quotesOfDeal(data, existing.id).length} quote(s)` : undefined,
+      ]}
+      actions={existing ? <Button size="sm" variant="ghost" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button> : undefined}
+    />
+  );
+}
+
 export function DealDrawer({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const { org, now } = useWorkspace();
@@ -388,98 +411,171 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
 
   const stage = STAGES.find((item) => item.id === stageId)!;
   const guard = existing && stageId !== stageOf(existing).id ? stageGuard(existing, stage) : undefined;
+  const contact = contactById(data, contactId);
+  const company = companyById(data, companyId) ?? companyById(data, String(contact?.fields.companyId ?? ""));
+  const weighted = Math.round((amount * stage.probability) / 100);
+  const weightedBefore = existing ? Math.round((Number(existing.amountMinor ?? 0) * probabilityOf(existing)) / 100) : undefined;
+  const accountDeals = dealsOfCompany(data, company?.id).filter((deal) => deal.id !== existing?.id && stageOf(deal).kind === "open");
+  const accountOpenMinor = accountDeals.reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0);
+  // The account's own history, then the chosen contact's, newest first and without repeats.
+  const recent = [...new Map([...activitiesFor(data.activities, company?.id), ...activitiesFor(data.activities, contactId)]
+    .map((activity) => [activity.id, activity])).values()]
+    .sort((a, b) => (b.startAt ?? b.at ?? b.updatedAt).localeCompare(a.startAt ?? a.at ?? a.updatedAt))
+    .slice(0, 4);
+  const closeAt = closeDate ? `${closeDate}T12:00:00.000Z` : undefined;
+  const overdue = Boolean(closeAt && new Date(closeAt) < now && stage.kind === "open");
+  const editable = context.can("edit_pipeline");
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const fields: Record<string, string | number | boolean> = {
+        stage: stageId,
+        probability: stage.probability,
+        owner: existing ? String(existing.fields.owner ?? context.actor) : context.actor,
+      };
+      if (contactId) fields.contactId = contactId;
+      if (companyId) fields.companyId = companyId;
+      if (closeDate) fields.closeDate = closeDate;
+      if (existing) {
+        const saved = await context.mutate.patch(existing.id, {
+          title: title.trim(), summary, amountMinor: amount, status: stageId,
+          dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : existing.dueAt,
+          fields: { ...existing.fields, ...fields },
+        }, { expectRevision: existing.revision, event: `Deal ${title.trim()} updated` });
+        if (!saved) { setBusy(false); return; }
+        context.toast("Deal saved", `${title.trim()} is in ${stage.label} at ${stage.probability}%.`);
+      } else {
+        const created = await context.mutate.create({
+          collection: "deals", title: title.trim(), status: stageId, summary,
+          amountMinor: amount,
+          at: now.toISOString(),
+          dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : undefined,
+          parentId: companyId || undefined,
+          fields,
+        }, `Deal ${title.trim()} created`);
+        context.select(created.id);
+        context.toast("Deal created", `${created.title} is in ${stage.label}. Its weighted value is ${context.money(weighted)}.`);
+      }
+      clearWorkingDraft(draftScope);
+      close();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Stack gap={4}>
-      {existing && (
-        <Properties rows={[
-          { label: "Current stage", value: <StagePill deal={existing} /> },
-          { label: "Weighting", value: <ProbabilityPill deal={existing} /> },
-          { label: "Quotes", value: String(quotesOfDeal(data, existing.id).length) },
-          { label: "Activities", value: String(activitiesFor(data.activities, existing.id).length) },
-          { label: "Owner", value: String(existing.fields.owner ?? existing.ownerName) },
-        ]} />
-      )}
-      <Field label="Deal" required><TextInput aria-label="Deal" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-      <Row gap={3} wrap>
-        <Field label="Amount" hint="A deal with no amount is excluded from every forecast figure.">
-          <MoneyInput label="Deal amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} />
+      <Stack gap={3}>
+        <Field label="Deal" required><TextInput aria-label="Deal" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+        <div className="crm-deal-pair">
+          <Field label="Amount" hint="No amount, no forecast figure.">
+            <MoneyInput label="Deal amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} />
+          </Field>
+          <Field label="Stage">
+            <Select aria-label="Stage" value={stageId} onChange={(event) => setStageId(event.target.value)}>
+              {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </Select>
+          </Field>
+        </div>
+        <Field label="Expected close" hint={closeAt ? (overdue ? `${context.relative(closeAt)}: past due while still open` : context.relative(closeAt)) : "Negotiation needs a close date."}>
+          <TextInput aria-label="Expected close" type="date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} />
         </Field>
-        <Field label="Stage">
-          <Select aria-label="Stage" value={stageId} onChange={(event) => setStageId(event.target.value)}>
-            {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Expected close"><TextInput aria-label="Expected close" type="date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} /></Field>
-      </Row>
-      <Row gap={3} wrap>
-        <Field label="Account">
-          <Select aria-label="Account" value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
-            <option value="">None</option>
-            {data.companies.map((company) => <option key={company.id} value={company.id}>{company.title}</option>)}
-          </Select>
-        </Field>
-        <Field label="Contact">
-          <Select aria-label="Contact" value={contactId} onChange={(event) => setContactId(event.target.value)}>
-            <option value="">None</option>
-            {data.contacts.filter((contact) => !companyId || String(contact.fields.companyId ?? "") === companyId).map((contact) => <option key={contact.id} value={contact.id}>{contact.title}</option>)}
-          </Select>
-        </Field>
-      </Row>
-      <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
+        <div className="crm-deal-pair">
+          <Field label="Account">
+            <Select aria-label="Account" value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
+              <option value="">None</option>
+              {data.companies.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Contact">
+            <Select aria-label="Contact" value={contactId} onChange={(event) => setContactId(event.target.value)}>
+              <option value="">None</option>
+              {data.contacts.filter((item) => !companyId || String(item.fields.companyId ?? "") === companyId).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </Select>
+          </Field>
+        </div>
+        <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={2} onChange={(event) => setSummary(event.target.value)} /></Field>
+      </Stack>
+
       {guard && <Notice tone="warning" title="That stage change will be refused">{guard}</Notice>}
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!title.trim() || Boolean(guard) || !context.can("edit_pipeline")}
-          title={!context.can("edit_pipeline") ? "Editing the pipeline needs the Sales or Owner role view" : guard}
-          onClick={async () => {
-            setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              stage: stageId,
-              probability: STAGES.find((item) => item.id === stageId)?.probability ?? 0,
-              owner: existing ? String(existing.fields.owner ?? context.actor) : context.actor,
-            };
-            if (contactId) fields.contactId = contactId;
-            if (companyId) fields.companyId = companyId;
-            if (closeDate) fields.closeDate = closeDate;
-            if (existing) {
-              const saved = await context.mutate.patch(existing.id, {
-                title: title.trim(), summary, amountMinor: amount, status: stageId,
-                dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : existing.dueAt,
-                fields: { ...existing.fields, ...fields },
-              }, { expectRevision: existing.revision, event: `Deal ${title.trim()} updated` });
-              if (!saved) { setBusy(false); return; }
-              context.toast("Deal saved", `${title.trim()} is in ${stage.label} at ${stage.probability}%.`);
-            } else {
-              const created = await context.mutate.create({
-                collection: "deals", title: title.trim(), status: stageId, summary,
-                amountMinor: amount,
-                at: now.toISOString(),
-                dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : undefined,
-                parentId: companyId || undefined,
-                fields,
-              }, `Deal ${title.trim()} created`);
-              context.select(created.id);
-              context.toast("Deal created", `${created.title} is in ${stage.label}. Its weighted value is ${context.money(Math.round((amount * stage.probability) / 100))}.`);
-            }
-            clearWorkingDraft(draftScope);
-            setBusy(false);
-            close();
-          }}
-        >
-          {existing ? "Save the deal" : "Create the deal"}
-        </Button>
-        {existing && (
-          <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button>
+
+      <OverlaySection title="What it is worth" hint="Amount x stage probability. A prediction, not revenue.">
+        <FactGrid columns={2} items={[
+          { label: "Probability", value: `${stage.probability}%`, mono: true, hint: stage.label },
+          { label: "Weighted value", value: context.money(weighted), mono: true, tone: stage.kind === "lost" ? "danger" : undefined,
+            hint: weightedBefore !== undefined && weightedBefore !== weighted ? `was ${context.money(weightedBefore)}` : undefined },
+          { label: "Expected close", value: closeAt ? context.relative(closeAt) : "Not set", tone: overdue ? "warning" : undefined },
+          { label: "To leave this stage", value: stage.requires?.length ? stage.requires.map((item) => item.label).join(", ") : stage.kind === "open" ? "Nothing more" : "Closed",
+            tone: stage.requires?.some((item) => !(existing && String(existing.fields[item.field] ?? "") !== "" && existing.fields[item.field] !== false)) ? "warning" : undefined },
+        ]} />
+      </OverlaySection>
+
+      <OverlaySection title="Account and contact" hint={company ? undefined : "Pick an account to see what else is open there."}>
+        {company ? (
+          <FactGrid columns={2} dense items={[
+            { label: "Account owner", value: String(company.fields.owner ?? company.ownerName) },
+            { label: "Other open deals", value: accountDeals.length ? `${accountDeals.length} worth ${context.money(accountOpenMinor)}` : "None", mono: accountDeals.length > 0 },
+            { label: "Contact", value: contact?.title ?? "Not named", hint: contact ? String(contact.fields.role ?? "") : "Discovery needs a named contact." },
+            { label: "Email consent", value: contact ? <ConsentPill contact={contact} /> : "Unknown" },
+          ]} />
+        ) : null}
+      </OverlaySection>
+
+      <OverlaySection title="Recent activity" hint={recent.length ? "Calls, meetings and notes on this account and contact." : undefined}>
+        {recent.length === 0 ? (
+          <p className="ds-subtle">Nothing logged yet. A first call or note starts the history.</p>
+        ) : (
+          <ul className="crm-deal-activity">
+            {recent.map((activity) => (
+              <li key={activity.id}>
+                <ActivityPill activity={activity} />
+                <span className="crm-deal-activity-title">{activity.title}</span>
+                <span className="ds-subtle ds-num">{context.relative(activity.startAt ?? activity.at ?? activity.updatedAt)}</span>
+              </li>
+            ))}
+          </ul>
         )}
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
-        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
-      </Row>
+      </OverlaySection>
+
       <WorkingDraftStatus scope={draftScope} />
+      <DrawerActions>
+        <OverlayActions
+          busy={busy}
+          primary={
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!title.trim() || Boolean(guard) || !editable}
+              title={!editable ? "Editing the pipeline needs the Sales or Owner role view" : guard}
+              onClick={() => { void save(); }}
+            >
+              {existing ? "Save the deal" : "Create the deal"}
+            </Button>
+          }
+          end={<>
+            <Button variant="ghost" onClick={close}>Close & keep draft</Button>
+            <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
+          </>}
+        />
+      </DrawerActions>
     </Stack>
+  );
+}
+
+/** Head for the deal-scoped dialogs (stage change, lost reason, assign owner): the one place the deal is named. */
+export function DealContextSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useCrmData();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const deal = data.deals.find((item) => item.id === (payload?.id ?? context.selectedId ?? context.params.id));
+  if (!deal) return null;
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={deal.title}
+      status={<StagePill deal={deal} />}
+      meta={[<span className="ds-num" key="a">{context.money(Number(deal.amountMinor ?? 0))}</span>, companyOfDeal(data, deal)?.title, `Owner ${String(deal.fields.owner ?? deal.ownerName)}`]}
+    />
   );
 }
 
@@ -488,22 +584,19 @@ export function StageChangeValidation({ context, close }: { context: ScreenConte
   const move = useStageMove(context);
   const payload = context.overlayPayload as { id?: string } | undefined;
   const deal = data.deals.find((item) => item.id === (payload?.id ?? context.selectedId ?? context.params.id));
-  const [target, setTarget] = useState(deal ? stageOf(deal).id : "discovery");
+  // Start on the next stage, so the first verdict answers "can it advance?" rather than "can it stay?".
+  const [target, setTarget] = useState(() => (deal ? STAGES[Math.min(STAGES.length - 1, stageIndex(stageOf(deal).id) + 1)].id : "discovery"));
   const [busy, setBusy] = useState(false);
   if (!deal) return <Empty title="Select a deal first">Choose a card on the board, then validate a stage change.</Empty>;
 
   const stage = STAGES.find((item) => item.id === target)!;
-  const guard = stageGuard(deal, stage);
+  const unchanged = stage.id === stageOf(deal).id;
+  const guard = unchanged ? undefined : stageGuard(deal, stage);
   const current = stageOf(deal);
   const requirements = current.requires ?? [];
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Deal", value: deal.title },
-        { label: "Current stage", value: current.label },
-        { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
-      ]} />
       <Field label="Move to">
         <Select aria-label="Move to" value={target} onChange={(event) => setTarget(event.target.value)}>
           {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -525,18 +618,21 @@ export function StageChangeValidation({ context, close }: { context: ScreenConte
           {requirements.length === 0 && <span className="ds-subtle">This stage has no extra requirement.</span>}
         </Stack>
       </Card>
-      {guard
+      {unchanged
+        ? <p className="ds-subtle">Choose a different stage to see whether the move is allowed.</p>
+        : guard
         ? <Notice tone="danger" title="This move will be refused">{guard}</Notice>
         : <Notice tone="success" title="This move is allowed">The weighting will change from {probabilityOf(deal)}% to {stage.probability}%.</Notice>}
       <Row gap={2}>
         <Button
           variant="primary"
           busy={busy}
-          disabled={Boolean(guard)}
+          disabled={Boolean(guard) || unchanged}
           onClick={async () => { setBusy(true); await move(deal, stage); setBusy(false); close(); }}
         >
           Move to {stage.label}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -557,37 +653,33 @@ export function LostReason({ context, close }: { context: ScreenContext; close: 
       <Notice tone="warning" title="Closing a deal as lost is recorded, not deleted">
         {deal.title} stays in the pipeline with its reason, which is what makes a win and loss analysis possible later.
       </Notice>
-      <Properties rows={[
-        { label: "Deal", value: deal.title },
-        { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
-        { label: "Current stage", value: stageOf(deal).label },
-      ]} />
       <Field label="Reason" required>
         <Select aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)}>
           {LOST_REASONS.map((item) => <option key={item}>{item}</option>)}
         </Select>
       </Field>
       <Field label="What happened"><TextArea aria-label="What happened" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
-      <Row gap={2}>
+      <OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={
         <Button
           variant="danger"
           busy={busy}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(deal.id, {
-              status: "lost",
-              summary: note || deal.summary,
-              fields: { ...deal.fields, stage: "lost", probability: 0, lostReason: reason, lostAt: clockIso(), lostBy: context.actor },
-            }, { expectRevision: deal.revision, event: `${deal.title} closed lost: ${reason}` });
-            context.toast("Deal closed lost", `${deal.title} is recorded as lost for ${reason.toLowerCase()}. The weighted forecast fell by ${context.money(Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100))}.`);
-            setBusy(false);
-            close();
+            try {
+              if (!(await context.mutate.patch(deal.id, {
+                status: "lost",
+                summary: note || deal.summary,
+                fields: { ...deal.fields, stage: "lost", probability: 0, lostReason: reason, lostAt: clockIso(), lostBy: context.actor },
+              }, { expectRevision: deal.revision, event: `${deal.title} closed lost: ${reason}` }))) return;
+              context.toast("Deal closed lost", `${deal.title} is recorded as lost for ${reason.toLowerCase()}. The weighted forecast fell by ${context.money(Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100))}.`);
+              close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Close as lost
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} />
     </Stack>
   );
 }

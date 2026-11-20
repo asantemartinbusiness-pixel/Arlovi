@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Eye, EyeOff, FilePenLine, KeyRound, LockKeyhole, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, FilePenLine, KeyRound, LockKeyhole, Search, UserCog, Users } from "lucide-react";
 import { applications } from "@/app/catalog";
 import { NAV_GROUPS } from "@/app/nav";
 import { useWorkspace } from "@/platform/workspace";
@@ -17,7 +17,7 @@ type Lens = "applications" | "pages" | "simulation" | "permissions";
 const ACTIONS:AccessAction[]=["discover","open","view","create","edit","comment","assign","approve","publish","export","share","delete","manage"];
 const SCOPES:AccessScope[]=["none","own","assigned","team","department","business_unit","organization","explicit"];
 const CLASSES:ResourceClassification[]=["public","internal","confidential","restricted"];
-const PERMISSION_HELP = "Preview only. Your signed-in identity, actual data permissions and backend authorisation are not configured in this browser-local product.";
+const PERMISSION_HELP = "No sign-in service or server enforces these views, so nothing on this screen authenticates or authorises anyone.";
 
 export function AccessWorkspace({ detailed = false, context }: { detailed?: boolean; context: ScreenContext }) {
   const { org, role } = useWorkspace();
@@ -56,19 +56,8 @@ export function AccessWorkspace({ detailed = false, context }: { detailed?: bool
   const legacyApps=applications.filter(app=>canOpen(role,app.code)).length;
   const members=ROLE_TEMPLATES.filter(t=>t.family!=="automation").length;
   return <section className="aw-root" aria-label="Roles and application access workspace">
-    <div className="aw-intro">
-      <div><span className="aw-kicker"><ShieldCheck size={13}/> IDENTITY / ACCESS DESIGN</span>
-        <h2>Understand who can access what.</h2>
-        <p>Explore recommended role templates, review application and screen coverage, and simulate resource-level decisions without changing employee access.</p>
-      </div>
-      <div className="aw-metrics">
-        <span><strong>{applications.length}</strong><small>Native apps</small></span>
-        <span><strong>{catalogue.length}</strong><small>Screens</small></span>
-        <span><strong>{ROLE_TEMPLATES.length}</strong><small>Templates</small></span>
-      </div>
-    </div>
-    <div className="aw-boundary"><LockKeyhole size={17}/><div><strong>Access-design preview, not an active security policy</strong>
-      <p>{PERMISSION_HELP} The current {ROLE_LABELS[role]} view offers {legacyApps} applications. Proposed roles do not grant real access.</p>
+    <div className="aw-boundary"><LockKeyhole size={17}/><div><strong>Access preview, not authentication</strong>
+      <p>{PERMISSION_HELP} The {ROLE_LABELS[role]} view you are in offers {legacyApps} applications.</p>
     </div></div>
     <div className="aw-selector">
       <label htmlFor="aw-role">Inspect role template</label>
@@ -110,7 +99,7 @@ export function AccessWorkspace({ detailed = false, context }: { detailed?: bool
       })}
     </div>}
     {lens==="pages"&&<div className="aw-pages">
-      <div className="aw-page-heading"><div><strong>Application screens</strong><span>Select an application to inspect its registered pages and sensitive areas.</span></div>
+      <div className="aw-page-heading"><div><strong>Application screens</strong></div>
         <select aria-label="Application to inspect" value={selectedApp} onChange={e=>setSelectedApp(e.target.value)}>
           {applications.map(app=><option key={app.code} value={app.code}>{app.name}</option>)}
         </select></div>
@@ -122,7 +111,7 @@ export function AccessWorkspace({ detailed = false, context }: { detailed?: bool
         </div>)}
         {!screenRows.length&&<div className="aw-empty">No matching screens in this application.</div>}
       </div>
-      <p className="aw-note">Sensitive classifications are proposed for policy design. They are not enforced by the current frontend or an authenticated backend.</p>
+      
     </div>}
     {lens==="simulation"&&<div className="aw-simulation">
       <div className="aw-simulation-fields">
@@ -142,7 +131,7 @@ export function AccessWorkspace({ detailed = false, context }: { detailed?: bool
       <div className="aw-decision" data-allowed={outcome.allowed}>
         {outcome.allowed?<CheckCircle2 size={22}/>:<LockKeyhole size={22}/>}
         <div><strong>{outcome.allowed?"Would be allowed":"Would be refused"}</strong>
-          <p>Reason: {outcome.reason.replaceAll("_"," ")}{outcome.source?` · ${outcome.source}`:""}. This is an illustrative policy evaluation, not authorisation to access real data.</p>
+          <p>Reason: {outcome.reason.replaceAll("_"," ")}{outcome.source?` · ${outcome.source}`:""}.</p>
         </div>
       </div>
       <div className="aw-crosschecks"><strong>Policy characteristics</strong>
@@ -150,6 +139,6 @@ export function AccessWorkspace({ detailed = false, context }: { detailed?: bool
         <span>Confidential records need an explicit grant</span><span>AI identities receive no default tools</span>
       </div>
     </div>}
-    <div className="aw-footer"><span>Role templates are a proposed target model; current legacy role policies remain unchanged.</span><span>{members} human/external templates · {isSensitiveScreen(selectedApp,screenRows[0]?.title??"")?"Sensitive page selected":appNames.get(selectedApp)}</span></div>
+    <div className="aw-footer"><span>Templates are a proposed model; the current role policies are unchanged.</span><span>{members} human/external templates · {isSensitiveScreen(selectedApp,screenRows[0]?.title??"")?"Sensitive page selected":appNames.get(selectedApp)}</span></div>
   </section>;
 }

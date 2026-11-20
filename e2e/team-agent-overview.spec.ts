@@ -6,9 +6,10 @@ test("AI employee overview uses real contract data and separates active from exe
   await page.goto(AGENT);
   const profile = page.getByRole("region", { name: "AI employee profile: Tomas Reiner" });
   await expect(profile).toBeVisible();
-  await expect(profile.getByRole("heading", { name: "Tomas Reiner" })).toBeVisible();
+  /* One identity block: the page head carries the name, role and contract state. */
+  await expect(page.getByRole("heading", { level: 1, name: "Tomas Reiner" })).toBeVisible();
+  await expect(page.locator(".pk-rh-subtitle")).toContainText(/\bactive\b/);
   await expect(profile.getByText("Prepares purchase orders and supplier comparisons from recorded terms.")).toBeVisible();
-  await expect(profile.getByText("Contract active")).toBeVisible();
 
   const limits = profile.getByRole("region", { name: "Operating limits" });
   await expect(limits.getByText("Spend ceiling")).toBeVisible();

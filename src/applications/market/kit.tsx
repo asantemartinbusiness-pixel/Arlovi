@@ -1,5 +1,5 @@
 import { useCallback, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Button, Notice, Pill, Properties, Row, Stack, type Tone } from "@/design-system";
+import { Button, Notice, OverlayActions, Pill, Properties, Row, Stack, type Tone } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import { addDays, sameDay, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { InvoiceTotals, TaxCategory } from "@/platform/money";
@@ -14,21 +14,37 @@ import type { Rec } from "@/domain/types";
  * application's folder so each app keeps its own information architecture.
  * ====================================================================== */
 
-/** Standard modal footer for a form rendered inside an overlay. */
-export const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+/**
+ * Standard modal footer for a form rendered inside an overlay.
+ * Default: [Primary] ... [Cancel]. With `tone: "danger"` the primary is a
+ * danger button and the order is the confirm convention: [Cancel] ... [Confirm].
+ */
+export const submitFooter = (formId: string, label: string, options?: { tone?: "danger" }) => ({ close }: { close: () => void }) => (
+  options?.tone === "danger" ? (
+    <OverlayActions
+      variant="confirm"
+      end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      primary={<Button variant="danger" type="submit" form={formId}>{label}</Button>}
+    />
+  ) : (
+    <OverlayActions
+      primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+      end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    />
+  )
 );
 
 /**
  * The honest provider boundary. Never claims a remote action happened: it
  * names the provider, the capability state and what was kept locally instead.
  */
-export function ProviderBoundary({ id, title, children }: { id: string; title?: string; children?: ReactNode }) {
+export function ProviderBoundary({ id, title, children, custom, kept }: { id: string; title?: string; children?: ReactNode; custom?: boolean; /** What is kept locally for this use; defaults to the capability's generic local equivalent. */ kept?: string }) {
   const capability = capabilityById(id);
+  if (custom) {
+    return (
+      <Notice tone="warning" title={title ?? "Not connected"} actions={<Pill tone="warning">Not connected</Pill>}>{children}</Notice>
+    );
+  }
   if (!capability) {
     return <Notice tone="warning" title={title ?? "No provider is connected"}>{children}</Notice>;
   }
@@ -40,7 +56,7 @@ export function ProviderBoundary({ id, title, children }: { id: string; title?: 
     >
       <Stack gap={1}>
         <span>{capability.note}</span>
-        <span><strong>Kept locally:</strong> {capability.localEquivalent}</span>
+        <span><strong>Kept locally:</strong> {kept ?? capability.localEquivalent}</span>
         {children}
       </Stack>
     </Notice>

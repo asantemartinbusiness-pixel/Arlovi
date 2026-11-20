@@ -11,7 +11,7 @@ const dialog = (page: Page) => page.getByRole("dialog");
 async function action(page: Page, label: string) {
   const bar = page.locator(".pg-actions");
   const direct = bar.getByRole("button", { name: label, exact: true });
-  await direct.first().waitFor({ state: "visible", timeout: 1500 }).catch(() => undefined);
+  await direct.first().waitFor({ state: "visible", timeout: 15000 }).catch(() => undefined);
   if (await direct.count()) { await direct.first().click(); return; }
   await bar.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: label, exact: true }).click();

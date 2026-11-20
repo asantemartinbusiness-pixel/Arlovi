@@ -10,7 +10,9 @@ for (const width of [390, 820, 1440]) {
     await menu.getByRole("menuitem", { name: /Preview as/ }).click();
     await expect(menu.getByRole("menuitemradio", { name: "Client", exact: true })).toBeVisible();
     await menu.getByRole("menuitemradio", { name: "Client", exact: true }).click();
-    await expect(page).toHaveURL(/\/o\/northline\/portal\//);
+    // The role view re-scopes the current page instead of ejecting the user (apps-directory.spec asserts the Client list).
+    await expect(page).toHaveURL(/\/o\/northline\/workspace\/apps/);
+    await expect(menu).toHaveCount(0);
     await expect(page.locator("#main")).toBeVisible();
   });
 }

@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { Link } from "react-router-dom";
 import { FileText, Plus, Printer, Send, Trash2 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, Field, FactGrid, Grid, KeyValueList, DrawerActions, DrawerUnsavedChanges, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
+import type { RecordHeaderProps } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { downloadFile } from "@/runtime/db";
@@ -14,16 +15,17 @@ import {
   CUSTOMER_TAX_STATUSES, TAX_CATEGORIES, blankLine, documentDate, documentTotals, readLines, statusFor, taxCategoryLabel, writeLines,
 } from "@/domain/fin-invoice";
 import type { CustomerTaxStatus, DocumentTotals, InvoiceLine, TaxCategory } from "@/domain/fin-invoice";
-import { accountCode, accountType, ageBuckets, checkPosting, daysOverdue } from "@/domain/fin-ledger";
+import { accountCode, accountType, ageBuckets, checkPosting, daysOverdue, journalDate } from "@/domain/fin-ledger";
 import type { JLine } from "@/domain/fin-ledger";
 import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
 import { Amount, BooksLoading, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
 import { CollectionsByCustomer } from "./collectionsView";
 import { clockIso } from "@/platform/clock";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
 import { assessTimeBilling } from "./timeBilling";
-import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
+import { OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
 
 /* ------------------------------------------------------------------ *
  * FIN-004 Invoice list and FIN-005 Invoice detail.
@@ -64,6 +66,7 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
   const total = rows.reduce((sum, invoice) => sum + Number(invoice.amountMinor ?? 0), 0);
   const outstanding = rows.reduce((sum, invoice) => sum + outstandingMinor(invoice), 0);
   const unresolved = rows.filter((invoice) => invoice.fields.taxUnresolved === true);
+  const open = rows.filter((row) => ["awaiting_payment", "part_paid"].includes(row.status));
 
   if (rows.length === 0) {
     return (
@@ -81,8 +84,10 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
     <Stack gap={4}>
       <StatRow>
         <Stat prov="posted" label={`${tab} invoices`} value={String(rows.length)} meta={`of ${data.invoices.length} in total`} />
-        <Stat prov="posted" label="Gross value" value={context.money(total)} meta="Net plus resolved tax" />
-        <Stat prov="posted" label="Outstanding" value={context.money(outstanding)} meta="Gross less payments recorded" />
+        <Stat prov={tab === "Draft" ? "human" : "posted"} label={tab === "Draft" ? "Draft value" : "Gross value"} value={context.money(total)} meta="Net plus resolved tax" />
+        {tab === "Draft"
+          ? <Stat prov="human" label="On the ledger" value={context.money(0)} meta="Drafts post nothing until approved" />
+          : <Stat prov="posted" label="Outstanding" value={context.money(outstanding)} meta="Gross less payments recorded" />}
         <Stat prov="unknown"
           label="Unresolved tax"
           value={String(unresolved.length)}
@@ -123,7 +128,7 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
               ? <Pill tone="danger">UNKNOWN</Pill>
               : <Amount minor={Number(row.fields.taxMinor ?? 0)} context={context} /> },
           { key: "amount", header: "Gross", align: "end", cell: (row) => <Amount minor={row.amountMinor} context={context} bold />, sortValue: (row) => Number(row.amountMinor ?? 0) },
-          { key: "outstanding", header: "Outstanding", align: "end", hideBelow: 1400, cell: (row) => <Amount minor={outstandingMinor(row)} context={context} />, sortValue: (row) => outstandingMinor(row) },
+          ...(tab === "Draft" ? [] : [{ key: "outstanding", header: "Outstanding", align: "end" as const, hideBelow: 1400, cell: (row: Rec) => <Amount minor={outstandingMinor(row)} context={context} />, sortValue: (row: Rec) => outstandingMinor(row) }]),
         ]}
         onOpen={(id) => context.navigate(`/o/${org.slug}/fin/invoices/${id}`)}
         bulkActions={[
@@ -138,28 +143,25 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
           },
         ]}
         summary={<>
-          <span className="ds-subtle">Outstanding</span>
-          <Amount minor={outstanding} context={context} bold />
+          <span className="ds-subtle">{tab === "Draft" ? "Draft value, not on the ledger" : "Outstanding"}</span>
+          <Amount minor={tab === "Draft" ? total : outstanding} context={context} bold />
         </>}
       />
 
-      <Grid>
-        <Card prov="posted" span={6} title="Ageing in this view" subtitle="Days past the due date">
+      {open.length > 0 && (
+        <Card prov="posted" title="Ageing in this view" subtitle="Open invoices by days past the due date">
           <Stack gap={2}>
-            {ageBuckets(rows.filter((row) => ["awaiting_payment", "part_paid"].includes(row.status)), now).map((bucket) => (
+            {ageBuckets(open, now).map((bucket) => (
               <Row key={bucket.bucket} gap={3}>
                 <span className="ds-grow">{bucket.bucket}</span>
-                <span className="ds-subtle">{bucket.count}</span>
+                <span className="ds-subtle ds-num">{bucket.count}</span>
                 <Amount minor={bucket.amountMinor} context={context} />
               </Row>
             ))}
           </Stack>
         </Card>
-        <Card prov="posted" span={6} title="Sending" subtitle="What happens when you press Send" actions={<CapabilityPill id="email.send" />}>
-          <CapabilityNotice id="email.send" />
-          <SourceNote>A reminder is written as a draft against the invoice with its recipient and body, and the invoice records that a reminder exists. Nothing leaves this browser, so a duplicate send is impossible.</SourceNote>
-        </Card>
-      </Grid>
+      )}
+      <CapabilityNotice id="email.send" title="Reminders are drafts: no mail provider is connected" />
     </Stack>
   );
 }
@@ -186,15 +188,6 @@ export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
   if (!booksReady) return <BooksLoading what="invoices and time inputs" />;
   return (
     <Stack gap={4}>
-      <OpsHeader
-        eyebrow="Finance / Invoices / Time inputs"
-        title="From recorded time to accountable billing."
-        description="An evidence-led review surface for approved project work. See what's ready, what's missing and what Finance has already reviewed before preparing an invoice."
-        actions={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices?tab=Draft`)}>
-          Open draft invoices
-        </Button>}
-        note="Illustrative amounts are exclusive of tax and are not posted revenue."
-      />
       <OpsMetrics label="Finance time input review">
         <OpsMetric label="Time inputs" value={sourceRows.length} detail="Marked potentially billable" />
         <OpsMetric label="Needs source work" value={needsWork.length} detail="Approvals, links, rates or hours" emphasis={needsWork.length ? "attention" : "neutral"} />
@@ -203,15 +196,16 @@ export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
           detail={`${reviewed.length} reviewed records · before tax`} emphasis={reviewed.length ? "positive" : "neutral"} />
       </OpsMetrics>
       <div className="ops-toolbar" aria-label="Filter time inputs">
-        <strong className="ops-toolbar-heading">Time input queue</strong>
+        <strong className="ops-toolbar-heading">Billable time queue</strong>
         <Button size="sm" variant={view === "all" ? "secondary" : "ghost"} aria-pressed={view === "all"} onClick={() => setView("all")}>All ({sourceRows.length})</Button>
         <Button size="sm" variant={view === "attention" ? "secondary" : "ghost"} aria-pressed={view === "attention"} onClick={() => setView("attention")}>Needs work ({needsWork.length})</Button>
         <Button size="sm" variant={view === "ready" ? "secondary" : "ghost"} aria-pressed={view === "ready"} onClick={() => setView("ready")}>Ready ({ready.length})</Button>
         <Button size="sm" variant={view === "reviewed" ? "secondary" : "ghost"} aria-pressed={view === "reviewed"} onClick={() => setView("reviewed")}>Reviewed ({reviewed.length})</Button>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices?tab=Draft`)}>Open draft invoices</Button>
       </div>
       <Notice tone="info" title="Source records, not an invoice or revenue">
-        These entries come from People and Projects. A recorded time approval does not prove a contractual rate, tax status, customer
-        or invoice. Finance must independently prepare and approve the invoice; nothing here posts to the ledger or sends a bill.
+        These entries come from People and Projects. A time approval does not prove a contractual rate, tax status or customer, and estimates
+        are before tax. Unpriced or unapproved entries are never valued at zero. Nothing here posts to the ledger or sends a bill.
       </Notice>
       {rows.length === 0 ? (
         <Empty title={sourceRows.length ? "Nothing in this review filter" : "No billable time submitted"}>
@@ -260,14 +254,10 @@ export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
           ]}
           summary={<>
             <span className="ds-subtle">Reviewed-only illustrative net subtotal, excluding tax</span>
-            <strong>{reviewed.length ? context.money(approvedEstimate) : "No reviewed rated time"}</strong>
+            <strong className="ds-num">{reviewed.length ? context.money(approvedEstimate) : "No reviewed rated time"}</strong>
           </>}
         />
       )}
-      <Notice tone="warning" title="Amounts are not invoice totals">
-        Estimates include only recorded positive rates and valid approved hours; customer rates and applicable tax must be checked on the actual invoice.
-        Unpriced or unapproved entries are never silently valued at zero.
-      </Notice>
     </Stack>
   );
 }
@@ -284,47 +274,54 @@ export function FinanceTimeReview({ context, close }: { context: ScreenContext; 
   const project = data.projects.find((row) => row.id === entry.fields.projectId);
   const assessment = assessTimeBilling(entry, data.employees, data.projects, data.invoices);
   const canReview = context.can("post_journal");
+  const approvedByPeople = entry.status === "approved" && entry.fields.approved === true;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Employee", value: person?.title ?? "No linked employee" },
-        { label: "Project", value: project?.title ?? "No linked Project" },
-        { label: "Hours", value: String(entry.fields.hours ?? "Not recorded") },
-        { label: "Recorded rate", value: entry.fields.rateMinor !== undefined ? context.money(Number(entry.fields.rateMinor)) : "Not recorded" },
-        { label: "Illustrative net", value: assessment.netEstimateMinor !== undefined ? context.money(assessment.netEstimateMinor) : "Unavailable" },
-        { label: "People approval", value: entry.status === "approved" && entry.fields.approved === true
-          ? `Approved by ${String(entry.fields.approvedBy ?? "Unknown")}`
-          : "Not approved" },
-        { label: "Finance review", value: assessment.label },
-        { label: "Reviewed by", value: String(entry.fields.billingReviewedBy || "No Finance review yet") },
+      <OverlaySummary
+        eyebrow="Billable time"
+        title={person?.title ?? "No linked employee"}
+        status={<Pill tone={assessment.state === "reviewed" ? "success" : assessment.state === "ready" ? "info" : "warning"} dot>{assessment.label}</Pill>}
+        meta={[project?.title ?? "No linked project", <span className="ds-num" key="h">{String(entry.fields.hours ?? "No")} h</span>]}
+      />
+      <FactGrid columns={3} items={[
+        { label: "Hours", value: String(entry.fields.hours ?? "Not recorded"), mono: true },
+        { label: "Recorded rate", value: entry.fields.rateMinor !== undefined ? context.money(Number(entry.fields.rateMinor)) : "Not recorded", mono: true },
+        { label: "Illustrative net, before tax", value: assessment.netEstimateMinor !== undefined ? context.money(assessment.netEstimateMinor) : "Unavailable", mono: true, tone: "accent" },
       ]} />
+      <OverlaySection title="Two separate approvals" hint="People approves the time. Finance decides whether it can be billed.">
+        <FactGrid columns={2} items={[
+          { label: "People approval", value: approvedByPeople ? `Approved by ${String(entry.fields.approvedBy ?? "Unknown")}` : "Not approved", tone: approvedByPeople ? "success" : "warning" },
+          { label: "Finance review", value: String(entry.fields.billingReviewedBy || "No Finance review yet"), hint: assessment.label },
+        ]} />
+      </OverlaySection>
       <Notice tone={assessment.eligible || assessment.state === "reviewed" ? "info" : "warning"} title={assessment.label}>
         {assessment.eligible
           ? "This record can be marked reviewed locally. That does not set a customer, tax code or invoice number."
           : "Resolve the underlying source record in People or Projects before using this time for Finance invoicing."}
       </Notice>
-      <Row gap={2} wrap>
-        {context.role === "owner" && <Button variant="secondary" onClick={() => {
-          close(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Timesheets`);
-        }}>Open People timesheets</Button>}
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-        {assessment.eligible && <Button variant="primary" disabled={!canReview} onClick={async () => {
-          const updated = await context.mutate.patch(entry.id, {
-            fields: {
-              ...entry.fields,
-              billingReviewStatus: "ready",
-              billingReviewedBy: context.actor,
-              billingReviewedAt: clockIso(),
-            },
-          }, { expectRevision: entry.revision,
-            event: `Approved billable time reviewed by Finance: ${entry.title}. No invoice created.` });
-          if (!updated) return;
-          context.toast("Finance review saved", "This time input is ready for manual invoice preparation. No ledger entry or invoice was created.");
-          close();
-        }}>Mark reviewed for billing</Button>}
-      </Row>
       {!canReview && <Notice tone="warning">Only an owner or Finance role with journal-review capability can record this Finance decision in the local workspace.</Notice>}
+      <DrawerActions>
+        <OverlayActions
+          primary={assessment.eligible ? <Button variant="primary" disabled={!canReview} onClick={async () => {
+            const updated = await context.mutate.patch(entry.id, {
+              fields: {
+                ...entry.fields,
+                billingReviewStatus: "ready",
+                billingReviewedBy: context.actor,
+                billingReviewedAt: clockIso(),
+              },
+            }, { expectRevision: entry.revision,
+              event: `Approved billable time reviewed by Finance: ${entry.title}. No invoice created.` });
+            if (!updated) return;
+            context.toast("Finance review saved", "This time input is ready for manual invoice preparation. No ledger entry or invoice was created.");
+            close();
+          }}>Mark reviewed for billing</Button> : <Button variant="secondary" onClick={close}>Close</Button>}
+          secondary={context.role === "owner" ? <Button variant="secondary" onClick={() => {
+            close(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Timesheets`);
+          }}>Open People timesheets</Button> : undefined}
+          end={assessment.eligible ? <Button variant="ghost" onClick={close}>Close</Button> : undefined}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -367,37 +364,48 @@ export function useInvoice(context: ScreenContext): { invoice?: Rec; data: FinDa
   return { invoice, data, totals, customer };
 }
 
-export function InvoiceHeader({ context }: { context: ScreenContext }) {
-  const { invoice, totals, customer } = useInvoice(context);
-  if (!invoice) return null;
+type InvoicePart = "numberMono" | "number" | "status" | "summary" | "customer" | "issued" | "due" | "gross" | "split";
+
+/** One piece of the invoice record header. Each reads the invoice itself so the header props can stay plain nodes. */
+function InvoiceHeaderPart({ context, part }: { context: ScreenContext; part: InvoicePart }) {
+  const { invoice, totals, customer, data } = useInvoice(context);
+  const { org } = useWorkspace();
+  if (!invoice) return part === "number" ? <>Invoice</> : null;
   const late = daysOverdue(invoice, context.now);
-  return (
-    <Card prov="posted" flush>
-      <div className="ds-card-body">
-        <Row gap={4} wrap>
-          <div className="ds-grow">
-            <Row gap={2}>
-              <h2 style={{ fontSize: "var(--text-xl)" }}>{invoice.title}</h2>
-              <StatusPill status={invoice.status} />
-              {late && <Pill tone="danger" dot>{late} days late</Pill>}
-              {totals.hasUnknownRate && <Pill tone="danger" dot>Tax unresolved</Pill>}
-            </Row>
-            <p className="ds-subtle">{invoice.summary}</p>
-          </div>
-          <Properties rows={[
-            { label: "Customer", value: customer?.title ?? "Not linked" },
-            { label: "Issued", value: <span className="ds-num">{context.date(invoice.at)}</span> },
-            { label: "Due", value: <span className="ds-num">{context.date(invoice.dueAt)}</span> },
-          ]} />
-          <div style={{ textAlign: "end" }}>
-            <span className="ds-stat-label">Gross</span>
-            <div className="ds-stat-value">{context.money(totals.grossMinor)}</div>
-            <span className="ds-subtle">{context.money(totals.netMinor)} net + {context.money(totals.taxMinor)} tax</span>
-          </div>
-        </Row>
-      </div>
-    </Card>
-  );
+  const posted = Boolean(invoice.fields.journalId);
+  switch (part) {
+    case "number": return <>{invoice.title}</>;
+    case "status": return (
+      <>
+        <StatusPill status={invoice.status} />
+        {posted
+          ? <Pill tone="success">On the ledger</Pill>
+          : invoice.status === "void" ? null : <Pill tone="warning">Draft, not on the ledger</Pill>}
+        {late && invoice.status !== "paid" && <Pill tone="danger" dot>{late} days late</Pill>}
+        {totals.hasUnknownRate && <Pill tone="danger" dot>Tax unresolved</Pill>}
+      </>
+    );
+    case "numberMono": return <span className="ds-num">{invoice.title}</span>;
+    case "summary": return invoice.summary ? <>{invoice.summary}</> : null;
+    case "customer": return customer
+      ? <Link to={`/o/${org.slug}/crm/contacts/${customer.id}`}>{customer.title}</Link>
+      : <>No customer linked</>;
+    case "issued": return <span className="ds-num">Issued {context.date(issueDate(data, invoice))}</span>;
+    case "due": return <span className="ds-num">Due {context.date(invoice.dueAt)}</span>;
+    case "gross": return <span className="ds-num"><strong>{context.money(totals.grossMinor)}</strong> gross</span>;
+    case "split": return <span className="ds-num">{context.money(totals.netMinor)} net + {context.money(totals.taxMinor)} tax</span>;
+  }
+}
+
+/** `ScreenDef.record` for the invoice page: the one identity block, with the money beside it. */
+export function invoiceRecord(context: ScreenContext): RecordHeaderProps {
+  const part = (name: InvoicePart) => <InvoiceHeaderPart context={context} part={name} />;
+  return {
+    title: part("number"),
+    status: part("status"),
+    subtitle: part("summary"),
+    meta: [part("customer"), part("gross"), part("split"), part("issued"), part("due")],
+  };
 }
 
 export function InvoiceOverview({ context }: { context: ScreenContext }) {
@@ -439,7 +447,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
         <StatementRow
           context={context}
           rows={[
-            { label: "Lines", minor: undefined, note: `${totals.lines.length} line${totals.lines.length === 1 ? "" : "s"}` },
+            { label: "Lines", text: String(totals.lines.length) },
             { label: "Discount given", minor: -totals.discountMinor },
             { label: "Net", minor: totals.netMinor },
             { label: "Tax", minor: totals.taxMinor },
@@ -478,7 +486,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
 function InvoiceVersions({ invoice, context }: { invoice: Rec; context: ScreenContext }) {
   const versions = ((invoice.body as { versions?: { at: string; by: string; note: string; grossMinor: number }[] })?.versions) ?? [];
   if (versions.length === 0 && invoice.history.length === 0) {
-    return <span className="ds-subtle">No version has been frozen yet. The invoice is still a draft.</span>;
+    return <span className="ds-subtle">{invoice.status === "draft" ? "No version has been frozen yet. The invoice is still a draft." : `No separate version snapshots exist for this invoice. It is at revision ${invoice.revision}.`}</span>;
   }
   return (
     <Stack gap={2}>
@@ -550,7 +558,7 @@ interface EditorState {
  * The line editor. Each keystroke recomputes the line's tax through the engine,
  * so the per-line code, the summary by code and the totals move together.
  */
-export function LineEditor({ context, close }: { context: ScreenContext; close?: () => void }) {
+export function LineEditor({ context, close, withApproval }: { context: ScreenContext; close?: () => void; withApproval?: boolean }) {
   const { invoice, data, customer } = useInvoice(context);
   const { org, now } = useWorkspace();
   const [state, setState] = useState<EditorState>({ lines: [], status: "domestic" });
@@ -589,170 +597,160 @@ export function LineEditor({ context, close }: { context: ScreenContext; close?:
     );
   }
 
+  const unsaved = dirty;
+  const canSave = dirty && !state.lines.some((line) => !line.description.trim());
+  const save = async () => {
+    setBusy(true);
+    try {
+      const saved25 = await context.mutate.patch(invoice.id, {
+        amountMinor: totals.grossMinor,
+        body: { ...(invoice.body as object ?? {}), ...writeLines(state.lines) },
+        fields: {
+          ...invoice.fields,
+          netMinor: totals.netMinor,
+          taxMinor: totals.taxMinor,
+          customerTaxStatus: state.status,
+          taxUnresolved: totals.hasUnknownRate,
+        },
+      }, { expectRevision: invoice.revision, event: `Lines edited on ${invoice.title}` });
+      if (!saved25) return;
+      context.toast("Lines saved", `${state.lines.length} lines, ${context.money(totals.netMinor)} net and ${context.money(totals.taxMinor)} tax across ${totals.byCode.length} tax ${totals.byCode.length === 1 ? "code" : "codes"}.`);
+      setDirty(false);
+      close?.();
+    } catch (error) {
+      context.toast("Lines were not saved", error instanceof Error ? error.message : "This invoice changed. Reopen it and retry.", "failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Stack gap={4}>
-      <Row gap={3} wrap>
+      <DrawerUnsavedChanges when={dirty} />
+      {close && (
+        <OverlaySummary
+          eyebrow="Draft invoice"
+          title={<span className="ds-num">{invoice.title}</span>}
+          status={<Pill tone="warning">Draft, not on the ledger</Pill>}
+          meta={[customer?.title ?? "No customer linked", `Due ${context.date(invoice.dueAt)}`]}
+        />
+      )}
+      <FactGrid columns={3} items={[
+        { label: "Net", value: context.money(totals.netMinor), mono: true },
+        { label: "Tax", value: context.money(totals.taxMinor), mono: true, tone: totals.hasUnknownRate ? "danger" : undefined },
+        { label: "Gross, recomputed live", value: context.money(totals.grossMinor), mono: true, tone: "accent",
+          hint: unsaved ? `Record still holds ${context.money(Number(invoice.amountMinor ?? 0))}` : undefined },
+      ]} />
+
+      <OverlaySection title="Tax treatment">
         <Field label="Customer tax status" hint="Overrides the status on the contact record for this document only.">
           <Select aria-label="Customer tax status" value={state.status} onChange={(event) => { setDirty(true); setState((current) => ({ ...current, status: event.target.value as CustomerTaxStatus })); }}>
             {CUSTOMER_TAX_STATUSES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
-        <div className="ds-grow" />
-        <Stack gap={1}>
-          <span className="ds-stat-label">Recomputed live</span>
-          <Row gap={3}>
-            <span>Net <Amount minor={totals.netMinor} context={context} bold /></span>
-            <span>Tax <Amount minor={totals.taxMinor} context={context} bold /></span>
-            <span>Gross <Amount minor={totals.grossMinor} context={context} bold /></span>
-          </Row>
-        </Stack>
-      </Row>
+      </OverlaySection>
 
-      <div className="ds-grid-wrap">
-        <div className="ds-grid-scroll">
-          <table className="ds-table">
-            <caption className="ds-sr-only">Invoice lines</caption>
-            <thead>
-              <tr>
-                <th style={{ minWidth: 200 }}>Description</th>
-                <th data-align="end" style={{ width: 90 }}>Qty</th>
-                <th data-align="end" style={{ width: 150 }}>Unit price</th>
-                <th data-align="end" style={{ width: 96 }}>Disc %</th>
-                <th style={{ width: 170 }}>Tax category</th>
-                <th style={{ width: 160 }}>Revenue account</th>
-                <th style={{ width: 118 }}>Code</th>
-                <th data-align="end" style={{ width: 120 }}>Net</th>
-                <th data-align="end" style={{ width: 110 }}>Tax</th>
-                <th style={{ width: 44 }}><span className="ds-sr-only">Remove</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {totals.lines.map((computed, index) => (
-                <tr key={computed.id} data-tone={computed.taxCode.code === "UNKNOWN" ? "danger" : undefined}>
-                  <td>
-                    <TextInput
-                      aria-label={`Description for line ${index + 1}`}
-                      value={computed.description}
-                      onChange={(event) => update(computed.id, { description: event.target.value })}
-                    />
-                  </td>
-                  <td data-align="end">
-                    <TextInput
-                      aria-label={`Quantity for line ${index + 1}`}
-                      align="end"
-                      inputMode="decimal"
-                      value={String(computed.quantity)}
-                      onChange={(event) => update(computed.id, { quantity: Number(event.target.value.replace(/[^0-9.]/g, "")) || 0 })}
-                    />
-                  </td>
-                  <td data-align="end">
-                    <MoneyInput
-                      label={`Unit price for line ${index + 1}`}
-                      currency={org.currency}
-                      valueMinor={computed.unitPriceMinor}
-                      onChangeMinor={(minor) => update(computed.id, { unitPriceMinor: minor })}
-                    />
-                  </td>
-                  <td data-align="end">
-                    <TextInput
-                      aria-label={`Discount percent for line ${index + 1}`}
-                      align="end"
-                      inputMode="decimal"
-                      value={String((computed.discountBp ?? 0) / 100)}
-                      onChange={(event) => update(computed.id, { discountBp: Math.round((Number(event.target.value.replace(/[^0-9.]/g, "")) || 0) * 100) })}
-                    />
-                  </td>
-                  <td>
-                    <Select
-                      aria-label={`Tax category for line ${index + 1}`}
-                      value={computed.taxCategory}
-                      onChange={(event) => update(computed.id, { taxCategory: event.target.value as TaxCategory })}
-                    >
-                      {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
-                    </Select>
-                  </td>
-                  <td>
-                    <Select
-                      aria-label={`Revenue account for line ${index + 1}`}
-                      value={computed.accountCode ?? ""}
-                      onChange={(event) => update(computed.id, { accountCode: event.target.value || undefined })}
-                    >
-                      <option value="">Not set</option>
-                      {revenueAccounts.map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
-                    </Select>
-                  </td>
-                  <td><TaxCodePill code={computed.taxCode} /></td>
-                  <td data-align="end"><Amount minor={computed.netMinor} context={context} /></td>
-                  <td data-align="end"><Amount minor={computed.taxMinor} context={context} /></td>
-                  <td>
-                    <Button
-                      size="sm" variant="ghost" iconOnly
-                      aria-label={`Remove line ${index + 1}`}
-                      disabled={totals.lines.length <= 1}
-                      onClick={() => { setDirty(true); setState((current) => ({ ...current, lines: current.lines.filter((line) => line.id !== computed.id) })); }}
-                    >
-                      <Trash2 size={15} />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row" colSpan={7} style={{ textAlign: "start" }}>Totals</th>
-                <td data-align="end"><Amount minor={totals.netMinor} context={context} bold /></td>
-                <td data-align="end"><Amount minor={totals.taxMinor} context={context} bold /></td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        <div className="ds-grid-foot">
+      <OverlaySection
+        title={`Lines (${totals.lines.length})`}
+        actions={totals.hasUnknownRate ? <Pill tone="danger" dot>Unresolved rate</Pill> : <Pill tone="success" dot>All lines resolved</Pill>}
+      >
+        <ol className="fin-lines" aria-label="Invoice lines">
+          {totals.lines.map((computed, index) => (
+            <li key={computed.id} className="fin-line" data-tone={computed.taxCode.code === "UNKNOWN" ? "danger" : undefined}>
+              <div className="fin-line-desc">
+                <TextInput
+                  aria-label={`Description for line ${index + 1}`}
+                  placeholder={`Line ${index + 1} description`}
+                  value={computed.description}
+                  onChange={(event) => update(computed.id, { description: event.target.value })}
+                />
+              </div>
+              <label className="fin-line-qty"><span aria-hidden="true">Qty</span>
+                <TextInput
+                  aria-label={`Quantity for line ${index + 1}`}
+                  align="end"
+                  inputMode="decimal"
+                  value={String(computed.quantity)}
+                  onChange={(event) => update(computed.id, { quantity: Number(event.target.value.replace(/[^0-9.]/g, "")) || 0 })}
+                />
+              </label>
+              <div className="fin-line-unit"><span aria-hidden="true">Unit price</span>
+                <MoneyInput
+                  label={`Unit price for line ${index + 1}`}
+                  currency={org.currency}
+                  valueMinor={computed.unitPriceMinor}
+                  onChangeMinor={(minor) => update(computed.id, { unitPriceMinor: minor })}
+                />
+              </div>
+              <label className="fin-line-disc"><span aria-hidden="true">Disc %</span>
+                <TextInput
+                  aria-label={`Discount percent for line ${index + 1}`}
+                  align="end"
+                  inputMode="decimal"
+                  value={String((computed.discountBp ?? 0) / 100)}
+                  onChange={(event) => update(computed.id, { discountBp: Math.round((Number(event.target.value.replace(/[^0-9.]/g, "")) || 0) * 100) })}
+                />
+              </label>
+              <label className="fin-line-cat"><span aria-hidden="true">Tax category</span>
+                <Select
+                  aria-label={`Tax category for line ${index + 1}`}
+                  value={computed.taxCategory}
+                  onChange={(event) => update(computed.id, { taxCategory: event.target.value as TaxCategory })}
+                >
+                  {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+                </Select>
+              </label>
+              <label className="fin-line-acct"><span aria-hidden="true">Revenue account</span>
+                <Select
+                  aria-label={`Revenue account for line ${index + 1}`}
+                  value={computed.accountCode ?? ""}
+                  onChange={(event) => update(computed.id, { accountCode: event.target.value || undefined })}
+                >
+                  <option value="">Not set</option>
+                  {revenueAccounts.map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
+                </Select>
+              </label>
+              <div className="fin-line-result">
+                <TaxCodePill code={computed.taxCode} />
+                <span className="fin-figure"><span className="ds-subtle">Net</span> <Amount minor={computed.netMinor} context={context} /></span>
+                <span className="fin-figure"><span className="ds-subtle">Tax</span> <Amount minor={computed.taxMinor} context={context} /></span>
+                <Button
+                  size="sm" variant="ghost" iconOnly
+                  aria-label={`Remove line ${index + 1}`}
+                  disabled={totals.lines.length <= 1}
+                  onClick={() => { setDirty(true); setState((current) => ({ ...current, lines: current.lines.filter((line) => line.id !== computed.id) })); }}
+                >
+                  <Trash2 size={15} />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="fin-lines-foot">
           <Button
             size="sm" variant="secondary" icon={<Plus size={14} />}
             onClick={() => { setDirty(true); setState((current) => ({ ...current, lines: [...current.lines, blankLine(current.lines.length)] })); }}
           >
             Add line
           </Button>
-          <span className="ds-row ds-gap-3">
-            {totals.discountMinor > 0 && <span className="ds-subtle">Discount {context.money(totals.discountMinor)}</span>}
-            {totals.hasUnknownRate ? <Pill tone="danger" dot>Unresolved rate</Pill> : <Pill tone="success" dot>All lines resolved</Pill>}
-          </span>
+          {totals.discountMinor > 0 && <span className="ds-subtle fin-figure">Discount {context.money(totals.discountMinor)}</span>}
         </div>
-      </div>
+      </OverlaySection>
 
-      <TaxSummary totals={totals} context={context} />
+      <OverlaySection title="Tax by code"><TaxSummary totals={totals} context={context} /></OverlaySection>
 
-      <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!dirty || state.lines.some((line) => !line.description.trim())}
-          onClick={async () => {
-            setBusy(true);
-            await context.mutate.patch(invoice.id, {
-              amountMinor: totals.grossMinor,
-              body: { ...(invoice.body as object ?? {}), ...writeLines(state.lines) },
-              fields: {
-                ...invoice.fields,
-                netMinor: totals.netMinor,
-                taxMinor: totals.taxMinor,
-                customerTaxStatus: state.status,
-                taxUnresolved: totals.hasUnknownRate,
-              },
-            }, { expectRevision: invoice.revision, event: `Lines edited on ${invoice.title}` });
-            context.toast("Lines saved", `${state.lines.length} lines, ${context.money(totals.netMinor)} net and ${context.money(totals.taxMinor)} tax across ${totals.byCode.length} tax ${totals.byCode.length === 1 ? "code" : "codes"}.`);
-            setDirty(false);
-            setBusy(false);
-            close?.();
-          }}
-        >
-          Save lines
-        </Button>
-        {dirty && <span className="ds-subtle">Unsaved. The totals above are recomputed, the record still holds {context.money(Number(invoice.amountMinor ?? 0))}.</span>}
-        <span className="ds-grow" />
-        {close && <Button variant="ghost" onClick={close}>Close</Button>}
-      </Row>
+      {withApproval && (
+        <OverlaySection title="Approve and post" hint="Posting freezes this version. Save any line changes first; approval posts what is saved.">
+          <ApproveInvoice context={context} close={close ?? (() => undefined)} inline blockedReason={unsaved ? "Save the lines before approving; approval posts the saved version." : undefined} />
+        </OverlaySection>
+      )}
+
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" busy={busy} disabled={!canSave} onClick={save}>Save lines</Button>}
+          end={close ? <Button variant="ghost" onClick={close}>Close</Button> : undefined}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -865,31 +863,27 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
       </Card>
       <Card prov="posted" span={5} title="Settlement">
         <Stack gap={3}>
-          <StatementRow
-            context={context}
-            rows={[
-              { label: "Gross invoiced", minor: totals.grossMinor },
-              { label: "Paid", minor: paid },
-              { label: "Outstanding", minor: outstanding, bold: true },
-            ]}
-          />
+          <FactGrid columns={3} items={[
+            { label: "Gross invoiced", value: context.money(totals.grossMinor), mono: true },
+            { label: "Paid", value: paid ? context.money(paid) : "\u2014", mono: true },
+            { label: "Outstanding", value: outstanding ? context.money(outstanding) : "\u2014", mono: true, tone: outstanding > 0 ? "accent" : "success" },
+          ]} />
+          {paid > 0 && outstanding > 0 && <Pill tone="info" dot>Part paid</Pill>}
           {unlinkedHistoricPayment && (
             <Notice tone="warning" title="Paid status has no linked posted receipt">
               This historical invoice is marked paid, but no receipt journal is linked to it.
               Its zero outstanding amount follows the recorded status; verify the ledger before reconciliation.
             </Notice>
           )}
-          <CapabilityNotice id="payment.capture" />
           <Button
             variant="primary"
             disabled={outstanding <= 0 || invoice.status === "draft" || invoice.status === "void"}
-            title={invoice.status === "draft" ? "Approve the invoice first so receivables exist" : undefined}
+            title={invoice.status === "draft" ? "Approve the invoice first so receivables exist" : outstanding <= 0 ? "Nothing is outstanding" : undefined}
             onClick={() => context.openOverlay("payment form")}
           >
             Record a payment
           </Button>
-          {paid > 0 && outstanding > 0 && <Pill tone="info" dot>Part paid</Pill>}
-          <SourceNote>Current receipts update the invoice allocation and post a journal together. Historical paid records without a linked journal are flagged for ledger review; no bank feed is connected.</SourceNote>
+          <CapabilityNotice id="payment.capture" />
         </Stack>
       </Card>
       <Card prov="human" span={12} title="Receivables ageing for this customer" subtitle="Every open invoice on the same contact">
@@ -1090,14 +1084,14 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
         context.navigate(`/o/${org.slug}/fin/invoices/${created.id}`);
       }}
     >
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="Invoice number" required hint={numbersKnown ? `Next free number is ${suggested}` : "Reading the numbers already used…"}>
           <TextInput aria-label="Invoice number" value={number} invalid={duplicate} onChange={(event) => setNumber(event.target.value)} required />
         </Field>
         <Field label="Payment terms" hint="Days from today">
           <TextInput aria-label="Payment terms" align="end" inputMode="numeric" value={String(dueDays)} onChange={(event) => setDueDays(Number(event.target.value.replace(/\D/g, "")) || 0)} />
         </Field>
-      </Row>
+      </div>
       {duplicate && <Notice tone="danger" title="That number is already used">Two invoices with the same number make a payment allocation ambiguous.</Notice>}
       <Field label="Customer" required hint="The tax status on the contact decides which rate the engine can resolve.">
         <Select aria-label="Customer" value={contactId} onChange={(event) => setContactId(event.target.value)} required>
@@ -1105,8 +1099,9 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
           {data.contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.title}{contact.fields.taxStatus ? ` · ${String(contact.fields.taxStatus)}` : " · no tax status"}</option>)}
         </Select>
       </Field>
-      <Row gap={3} wrap>
-        <Field label="First line"><TextInput aria-label="First line" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Arc Lamp, brushed brass" /></Field>
+      <OverlaySection title="First line" hint="More lines are added in the line editor once the draft exists.">
+      <div className="fin-form-grid">
+        <div data-span="full"><Field label="First line"><TextInput aria-label="First line" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Arc Lamp, brushed brass" /></Field></div>
         <Field label="Qty"><TextInput aria-label="Qty" align="end" inputMode="decimal" value={String(quantity)} onChange={(event) => setQuantity(Number(event.target.value.replace(/[^0-9.]/g, "")) || 0)} /></Field>
         <Field label="Unit price"><MoneyInput label="Unit price" currency={org.currency} valueMinor={unit} onChangeMinor={setUnit} /></Field>
         <Field label="Tax category">
@@ -1114,17 +1109,18 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
             {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
-      </Row>
+      </div>
+      </OverlaySection>
 
-      <Card prov="posted" title="Resolved before you save" subtitle={`${org.jurisdiction} · ${CUSTOMER_TAX_STATUSES.find((entry) => entry.value === status)?.label} · ${context.date(date)}`}>
+      <Card prov="human" title="Resolved before you save" subtitle={`${org.jurisdiction} · ${CUSTOMER_TAX_STATUSES.find((entry) => entry.value === status)?.label} · ${context.date(date)}`}>
         <TaxSummary totals={preview} context={context} />
       </Card>
 
       <WorkingDraftStatus scope={draftScope} />
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={!numbersKnown || duplicate || !number.trim()}>Create draft</Button>
-        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button type="submit" variant="primary" busy={busy} disabled={!numbersKnown || duplicate || !number.trim()}>Create draft</Button>}
+        end={<Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>}
+      />
     </form>
   );
 }
@@ -1140,38 +1136,60 @@ export function EmailPreview({ context, close }: { context: ScreenContext; close
 
   return (
     <Stack gap={4}>
+      <DrawerUnsavedChanges when={body !== ""} />
+      <OverlaySummary
+        eyebrow="Message about"
+        title={<span className="ds-num">{invoice.title}</span>}
+        status={<StatusPill status={invoice.status} />}
+        meta={[customer?.title, <span className="ds-num" key="g">{context.money(totals.grossMinor)} gross</span>, `Due ${context.date(invoice.dueAt)}`]}
+      />
       <CapabilityNotice id="email.send" title="This message cannot be sent from here" />
-      <Properties rows={[
-        { label: "To", value: to || "No email on the contact record" },
-        { label: "Subject", value: `${org.name} · invoice ${invoice.title}` },
-        { label: "Attachment", value: "The document preview below, rendered in this browser" },
-      ]} />
-      <Field label="Message" hint="Edit it before it is kept as a draft against the invoice.">
-        <TextArea aria-label="Message" value={drafted} rows={10} onChange={(event) => setBody(event.target.value)} />
-      </Field>
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          busy={busy}
-          icon={<Send size={15} />}
-          disabled={!to}
-          title={!to ? "The contact record has no email address" : undefined}
-          onClick={async () => {
-            setBusy(true);
-            const existing = ((invoice.body as { reminders?: unknown[] })?.reminders ?? []) as unknown[];
-            await context.mutate.patch(invoice.id, {
-              body: { ...(invoice.body as object ?? {}), reminders: [...existing, { at: clockIso(), by: context.actor, to, body: drafted }] },
-              fields: { ...invoice.fields, lastReminderAt: clockIso(), reminderCount: existing.length + 1 },
-            }, { expectRevision: invoice.revision, event: `Reminder drafted for ${invoice.title}` });
-            context.toast("Kept as a draft", `The message for ${to} is stored on the invoice. No mail provider is connected, so nothing was sent.`, "info");
-            setBusy(false);
-            close();
-          }}
-        >
-          Keep as a draft
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <OverlaySection title="Message" hint="Edit it before it is kept as a draft against the invoice.">
+        <Stack gap={3}>
+          <FactGrid columns={2} items={[
+            { label: "To", value: to || "No email on the contact record", tone: to ? undefined : "danger" },
+            { label: "Subject", value: `${org.name} · invoice ${invoice.title}` },
+          ]} />
+          <Field label="Message">
+            <TextArea aria-label="Message" value={drafted} rows={9} onChange={(event) => setBody(event.target.value)} />
+          </Field>
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="Attached document" hint="Rendered from the invoice record in this browser. There is no PDF service and nothing is uploaded.">
+        <DocumentPreview context={context} />
+      </OverlaySection>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
+            variant="primary"
+            busy={busy}
+            icon={<Send size={15} />}
+            disabled={!to}
+            title={!to ? "The contact record has no email address" : undefined}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const existing = ((invoice.body as { reminders?: unknown[] })?.reminders ?? []) as unknown[];
+                const saved26 = await context.mutate.patch(invoice.id, {
+                  body: { ...(invoice.body as object ?? {}), reminders: [...existing, { at: clockIso(), by: context.actor, to, body: drafted }] },
+                  fields: { ...invoice.fields, lastReminderAt: clockIso(), reminderCount: existing.length + 1 },
+                }, { expectRevision: invoice.revision, event: `Reminder drafted for ${invoice.title}` });
+                if (!saved26) return;
+                context.toast("Kept as a draft", `The message for ${to} is stored on the invoice. No mail provider is connected, so nothing was sent.`, "info");
+                close();
+              } catch (error) {
+                context.toast("Draft was not kept", error instanceof Error ? error.message : "This invoice changed. Reopen it and retry.", "failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Keep as a draft
+          </Button>}
+          secondary={<Button variant="secondary" icon={<Printer size={15} />} onClick={() => window.print()}>Print the document</Button>}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1184,7 +1202,7 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)", padding: "var(--space-6)" }}>
+      <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)", padding: "var(--space-4)" }}>
         <Row gap={4} wrap>
           <div className="ds-grow">
             <strong style={{ fontSize: "var(--text-lg)" }}>{entity?.title ?? org.name}</strong>
@@ -1192,7 +1210,7 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
           </div>
           <div style={{ textAlign: "end" }}>
             <strong style={{ fontSize: "var(--text-lg)" }}>{invoice.status === "void" ? "VOID · " : ""}Invoice {invoice.title}</strong>
-            <p className="ds-subtle">Issued {context.date(invoice.at)} · due {context.date(invoice.dueAt)}</p>
+            <p className="ds-subtle">Issued {context.date(issueDate(data, invoice))} · due {context.date(invoice.dueAt)}</p>
           </div>
         </Row>
         <hr className="ds-divider" />
@@ -1237,10 +1255,6 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
           </div>
         </Row>
       </div>
-      <Row gap={2}>
-        <Button variant="secondary" icon={<Printer size={15} />} onClick={() => window.print()}>Print this preview</Button>
-        <SourceNote>The preview is rendered from the invoice record in this browser. There is no PDF service and nothing is uploaded.</SourceNote>
-      </Row>
     </Stack>
   );
 }
@@ -1248,8 +1262,9 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
 export function PaymentForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const { invoice, data, totals } = useInvoice(context);
   const { now } = useWorkspace();
-  const paid = Number(invoice?.fields.paidMinor ?? 0);
-  const outstanding = Math.max(0, totals.grossMinor - paid);
+  const settled = invoice?.status === "paid" || invoice?.status === "void";
+  const paid = invoice?.status === "paid" ? totals.grossMinor : Number(invoice?.fields.paidMinor ?? 0);
+  const outstanding = settled ? 0 : Math.max(0, totals.grossMinor - paid);
   const [amount, setAmount] = useState(outstanding);
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState("");
@@ -1269,54 +1284,85 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
   if (!invoice) return <Empty title="No invoice selected" />;
   const ar = data.accounts.find((account) => accountCode(account) === "1100");
   const tooMuch = amount > outstanding;
-  const blocked = !["awaiting_payment", "part_paid"].includes(invoice.status)
-    ? "Only an issued invoice with an outstanding balance can receive a payment."
-    : !ar
-      ? "The chart of accounts has no 1100 receivables account."
-    : !accountId
-      ? "Choose the account the money arrived in."
-      : amount <= 0
-        ? "Enter an amount above zero."
-        : tooMuch
-          ? `That is more than the ${context.money(outstanding)} outstanding. Record an overpayment as a separate journal.`
-          : data.locked.includes(date.slice(0, 7))
-            ? `${date.slice(0, 7)} is a closed period.`
-            : undefined;
+  // Whether the invoice can take a payment at all is decided before any field is shown.
+  const invoiceBlock = invoice.status === "void"
+    ? "This invoice is void. A void invoice cannot receive a payment."
+    : invoice.status === "paid"
+      ? "This invoice is already paid in full. Nothing is outstanding."
+      : !["awaiting_payment", "part_paid"].includes(invoice.status)
+        ? "Only an issued invoice with an outstanding balance can receive a payment. Approve and post this invoice first."
+        : !ar
+          ? "The chart of accounts has no 1100 receivables account, so the receipt has nowhere to post."
+          : undefined;
+  const amountIssue = amount <= 0
+    ? "Enter an amount above zero."
+    : tooMuch
+      ? `That is more than the ${context.money(outstanding)} outstanding. Record an overpayment as a separate journal.`
+      : undefined;
+  const dateIssue = data.locked.includes(date.slice(0, 7)) ? `${date.slice(0, 7)} is a closed period.` : undefined;
+  const blocked = invoiceBlock
+    ?? (!accountId ? "Choose the account the money arrived in." : undefined)
+    ?? amountIssue ?? dateIssue;
+
+  const summary = (
+    <OverlaySummary
+      eyebrow="Receipt against"
+      title={<span className="ds-num">{invoice.title}</span>}
+      status={<StatusPill status={invoice.status} />}
+      meta={[context.date(invoice.dueAt) ? `Due ${context.date(invoice.dueAt)}` : undefined]}
+    />
+  );
+  const figures = (
+    <FactGrid columns={3} items={[
+      { label: "Gross invoiced", value: context.money(totals.grossMinor), mono: true },
+      { label: "Already paid", value: paid ? context.money(paid) : "\u2014", mono: true },
+      { label: "Outstanding", value: context.money(outstanding), mono: true, tone: outstanding > 0 ? "accent" : undefined },
+    ]} />
+  );
+
+  if (invoiceBlock) {
+    return (
+      <Stack gap={4}>
+        {summary}
+        <Notice tone="warning" title="This payment cannot be recorded">{invoiceBlock}</Notice>
+        {figures}
+        <ModalActions>
+          <OverlayActions primary={<OverlayCancel>Close</OverlayCancel>} />
+        </ModalActions>
+      </Stack>
+    );
+  }
 
   return (
     <Stack gap={4}>
       <ModalUnsavedChanges when={amountEdited || date !== now.toISOString().slice(0, 10) || method !== "Bank transfer"} />
       <ModalInFlight when={busy} />
-      <StatementRow
-        context={context}
-        rows={[
-          { label: "Gross invoiced", minor: totals.grossMinor },
-          { label: "Already paid", minor: paid },
-          { label: "Outstanding", minor: outstanding, bold: true },
-        ]}
-      />
-      <Row gap={3} wrap>
-        <Field label="Amount received" required>
-          <MoneyInput label="Amount received" currency={context.org.currency} valueMinor={amount} onChangeMinor={(minor) => { setAmountEdited(true); setAmount(minor); }} />
-        </Field>
-        <Field label="Date received" required>
-          <TextInput aria-label="Date received" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
-        </Field>
-        <Field label="Into" required>
-          <Select aria-label="Into" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-            {cashAccounts.map((account) => <option key={account.id} value={account.id}>{accountCode(account)} {account.title}</option>)}
-          </Select>
-        </Field>
-        <Field label="Method">
-          <Select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)}>
-            {["Bank transfer", "Card, taken elsewhere", "Cash", "Cheque", "Offset"].map((item) => <option key={item}>{item}</option>)}
-          </Select>
-        </Field>
-      </Row>
+      {summary}
+      {figures}
+      <OverlaySection title="Receipt">
+        <div className="fin-form-grid">
+          <Field label="Amount received" required error={amountIssue}>
+            <MoneyInput label="Amount received" currency={context.org.currency} valueMinor={amount} onChangeMinor={(minor) => { setAmountEdited(true); setAmount(minor); }} />
+          </Field>
+          <Field label="Date received" required error={dateIssue}>
+            <TextInput aria-label="Date received" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+          </Field>
+          <Field label="Into" required>
+            <Select aria-label="Into" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+              {cashAccounts.map((account) => <option key={account.id} value={account.id}>{accountCode(account)} {account.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Method">
+            <Select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)}>
+              {["Bank transfer", "Card, taken elsewhere", "Cash", "Cheque", "Offset"].map((item) => <option key={item}>{item}</option>)}
+            </Select>
+          </Field>
+        </div>
+      </OverlaySection>
       <CapabilityNotice id="payment.capture" />
-      {blocked && <Notice tone="warning" title="This payment cannot be recorded yet">{blocked}</Notice>}
       <ModalActions>
-        <Button
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("post_journal")}
@@ -1363,8 +1409,9 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
           }}
         >
           Post the receipt
-        </Button>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </ModalActions>
     </Stack>
   );
@@ -1375,10 +1422,15 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
   const { now } = useWorkspace();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  // Revisions as they were when this dialog opened: a change made after that is a conflict, not something to overwrite.
+  const openedRevisions = useRef<Record<string, number>>({});
   if (!invoice) return <Empty title="No invoice selected" />;
 
   const journal = data.journals.find((item) => item.id === String(invoice.fields.journalId ?? ""));
-  const paid = Number(invoice.fields.paidMinor ?? 0);
+  for (const record of [invoice, journal]) {
+    if (record && openedRevisions.current[record.id] === undefined) openedRevisions.current[record.id] = record.revision;
+  }
+  const paid = invoice.status === "paid" ? totals.grossMinor : Number(invoice.fields.paidMinor ?? 0);
   const creditNoteNeeded = invoice.status === "paid" || paid > 0;
 
   if (invoice.status === "void") {
@@ -1387,6 +1439,14 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
 
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={reason.trim() !== ""} />
+      <ModalInFlight when={busy} />
+      <OverlaySummary
+        eyebrow={creditNoteNeeded ? "Credit" : "Void"}
+        title={<span className="ds-num">{invoice.title}</span>}
+        status={<StatusPill status={invoice.status} />}
+        meta={[<span className="ds-num" key="g">{context.money(totals.grossMinor)} gross</span>, paid ? <span className="ds-num" key="p">{context.money(paid)} received</span> : "Nothing received", journal ? "On the ledger" : "Draft, not on the ledger"]}
+      />
       {creditNoteNeeded ? (
         <Notice tone="warning" title="A settled invoice is corrected with a credit note">
           {context.money(paid)} has been received against {invoice.title}. Voiding it in place would leave the receipt without an invoice. A credit note is raised instead: a linked document with the lines reversed, which keeps both on the record.
@@ -1399,15 +1459,21 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
       <Field label="Reason" required hint="Recorded on the document and in the audit trail.">
         <TextArea aria-label="Reason" value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required />
       </Field>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="danger"
           busy={busy}
           disabled={!reason.trim()}
           onClick={async () => {
             setBusy(true);
+            try {
+            const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+            const openedInvoice = openedRevisions.current[invoice.id] ?? invoice.revision;
             if (creditNoteNeeded) {
-              const credited = await context.mutate.create({
+              const credited = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
                 collection: "invoices",
                 title: `CN-${invoice.title}`,
                 status: "draft",
@@ -1427,15 +1493,25 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
                   reason,
                 },
                 body: writeLines(totals.lines.map((line) => ({ ...line, quantity: -line.quantity }))),
-              }, `Credit note raised against ${invoice.title}`);
-              await context.mutate.patch(invoice.id, {
-                fields: { ...invoice.fields, creditNoteId: credited.id },
-              }, { expectRevision: invoice.revision, event: `${invoice.title} credited by ${credited.title}` });
+              }, ctx);
+              const linked = revisedRecord(invoice, { fields: { ...invoice.fields, creditNoteId: credited.id } }, ctx);
+              // The credit note and the link to it commit together, or neither does.
+              await context.mutate.putMany(
+                [credited, linked],
+                [`Credit note raised against ${invoice.title}`, `${invoice.title} credited by ${credited.title}`],
+                { [invoice.id]: openedInvoice }, ["create", "update"],
+              );
               context.toast("Credit note drafted", `${credited.title} reverses the lines of ${invoice.title}. Approve it to post the correction.`);
             } else {
+              const records: Rec[] = [];
+              const messages: string[] = [];
+              const types: ("create" | "update")[] = [];
+              const expected: Record<string, number> = { [invoice.id]: openedInvoice };
               if (journal && journal.status === "posted") {
                 const reversal = journalLinesFor(journal);
-                const created = await context.mutate.create({
+                const created = newRecord({
+                  organizationId: context.org.id,
+                  currency: context.org.currency,
                   collection: "journals",
                   title: `Reversal · ${journal.title}`,
                   status: "posted",
@@ -1446,23 +1522,35 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
                   tags: ["ledger", "reversal"],
                   fields: { date: now.toISOString().slice(0, 10), source: "reversal", reversesId: journal.id, reason },
                   body: { date: now.toISOString().slice(0, 10), memo: `Reversal of ${journal.title}`, lines: reversal, reversesId: journal.id },
-                }, `Reversed ${journal.title}`);
-                await context.mutate.patch(journal.id, { status: "reversed", fields: { ...journal.fields, reversedBy: created.id } }, { event: `${journal.title} marked reversed` });
+                }, ctx);
+                records.push(created, revisedRecord(journal, { status: "reversed", fields: { ...journal.fields, reversedBy: created.id } }, ctx));
+                messages.push(`Reversed ${journal.title}`, `${journal.title} marked reversed`);
+                types.push("create", "update");
+                expected[journal.id] = openedRevisions.current[journal.id] ?? journal.revision;
               }
-              await context.mutate.patch(invoice.id, {
+              records.push(revisedRecord(invoice, {
                 status: "void",
                 fields: { ...invoice.fields, voidReason: reason, voidedBy: context.actor, voidedAt: now.toISOString() },
-              }, { expectRevision: invoice.revision, event: `${invoice.title} voided` });
+              }, ctx));
+              messages.push(`${invoice.title} voided`);
+              types.push("update");
+              // Reversal, original journal and invoice commit together; a stale revision writes nothing.
+              await context.mutate.putMany(records, messages, expected, types);
               context.toast("Invoice voided", journal ? "Its journal was reversed, so the ledger still balances." : "Nothing was posted, so no ledger entry changed.");
             }
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Nothing was changed", error instanceof Error ? error.message : "This invoice changed. Reopen it and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           {creditNoteNeeded ? "Raise a credit note" : "Void the invoice"}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1491,11 +1579,13 @@ export function BulkActionPreview({ context, close }: { context: ScreenContext; 
 
   return (
     <Stack gap={4}>
+      <ModalInFlight when={busy} />
       <CapabilityNotice id="email.send" title="Reminders are drafted, never sent" />
-      <Properties rows={[
-        { label: "Selected", value: String(rows.length) },
-        { label: "Will be drafted", value: String(eligible.length) },
-        { label: "Skipped", value: String(skipped.length) },
+      <FactGrid columns={4} items={[
+        { label: "Selected", value: String(rows.length), mono: true },
+        { label: "Will be drafted", value: String(eligible.length), mono: true, tone: eligible.length ? "accent" : undefined },
+        { label: "Skipped", value: String(skipped.length), mono: true, tone: skipped.length ? "warning" : undefined },
+        { label: "Outstanding", value: context.money(eligible.reduce((sum, invoice) => sum + outstandingMinor(invoice), 0)), mono: true },
       ]} />
       {skipped.length > 0 && (
         <Notice tone="warning" title={`${skipped.length} invoice${skipped.length === 1 ? "" : "s"} skipped`}>
@@ -1514,17 +1604,19 @@ export function BulkActionPreview({ context, close }: { context: ScreenContext; 
           { key: "amount", header: "Outstanding", align: "end", cell: (row) => <Amount minor={outstandingMinor(row)} context={context} /> },
         ]}
       />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={eligible.length === 0}
           onClick={async () => {
             setBusy(true);
+            try {
             for (const invoice of eligible) {
               const to = String(contactOf(data, invoice)?.fields.email ?? "");
               const existing = ((invoice.body as { reminders?: unknown[] })?.reminders ?? []) as unknown[];
-              await context.mutate.patch(invoice.id, {
+              const saved27 = await context.mutate.patch(invoice.id, {
                 body: {
                   ...(invoice.body as object ?? {}),
                   reminders: [...existing, {
@@ -1536,32 +1628,46 @@ export function BulkActionPreview({ context, close }: { context: ScreenContext; 
                 },
                 fields: { ...invoice.fields, lastReminderAt: clockIso(), reminderCount: existing.length + 1 },
               }, { event: `Reminder drafted for ${invoice.title}` });
+              if (!saved27) return;
             }
             context.toast("Reminders drafted", `${eligible.length} drafts are stored on their invoices. Nothing has been sent.`, "info");
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Reminders were not all drafted", error instanceof Error ? error.message : "An invoice changed. Reopen the list and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Draft {eligible.length} reminder{eligible.length === 1 ? "" : "s"}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
-export function ReminderApproval({ context, close }: { context: ScreenContext; close: () => void }) {
+export function ReminderApproval({ context }: { context: ScreenContext; close?: () => void }) {
   const data = useFinData();
   const { now } = useWorkspace();
   const candidates = openInvoices(data.invoices).filter((invoice) => invoice.dueAt && new Date(invoice.dueAt) < now);
-  const [chosen, setChosen] = useState<string[]>(candidates.map((invoice) => invoice.id));
+  const [chosen, setChosenState] = useState<string[]>(candidates.map((invoice) => invoice.id));
+  const [touched, setTouched] = useState(false);
+  const setChosen = (next: string[] | ((current: string[]) => string[])) => { setTouched(true); setChosenState(next); };
+  const candidateKey = candidates.map((invoice) => invoice.id).join("|");
+  // The books load after the dialog opens; until the person chooses, everything overdue is selected.
+  useEffect(() => { if (!touched) setChosenState(candidates.map((invoice) => invoice.id)); }, [candidateKey, touched]);
 
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Approving a reminder writes a draft, not a message">
-        Each approved invoice gets a reminder record with its recipient and body. No mail provider is connected, so the same reminder cannot be sent twice by mistake.
-      </Notice>
-      {candidates.length === 0 ? <Empty title="Nothing is overdue" /> : (
+      <CapabilityNotice id="email.send" title="Approving writes a draft, not a message" />
+      {candidates.length === 0 ? <Empty title="Nothing is overdue">No open invoice is past its due date.</Empty> : (
+        <OverlaySection
+          title={`Overdue invoices (${candidates.length})`}
+          hint={`${chosen.length} chosen · ${context.money(candidates.filter((invoice) => chosen.includes(invoice.id)).reduce((sum, invoice) => sum + outstandingMinor(invoice), 0))} outstanding`}
+          actions={<Button size="sm" variant="ghost" onClick={() => setChosen(chosen.length === candidates.length ? [] : candidates.map((invoice) => invoice.id))}>{chosen.length === candidates.length ? "Clear all" : "Choose all"}</Button>}
+        >
         <Stack gap={2}>
           {candidates.map((invoice) => (
             <Row key={invoice.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
@@ -1571,40 +1677,41 @@ export function ReminderApproval({ context, close }: { context: ScreenContext; c
                 onChange={(event) => setChosen((current) => (event.target.checked ? [...current, invoice.id] : current.filter((id) => id !== invoice.id)))}
               />
               <span className="ds-grow" />
-              <span className="ds-subtle">{daysOverdue(invoice, now)} days late</span>
+              <span className="ds-subtle ds-num">{daysOverdue(invoice, now)} days late</span>
               <Amount minor={outstandingMinor(invoice)} context={context} />
             </Row>
           ))}
         </Stack>
+        </OverlaySection>
       )}
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          disabled={chosen.length === 0}
-          onClick={() => { context.openOverlay("bulk action preview", { ids: chosen, action: "reminder" }); }}
-        >
-          Review {chosen.length} reminder{chosen.length === 1 ? "" : "s"}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
+            variant="primary"
+            disabled={chosen.length === 0}
+            onClick={() => { context.openOverlay("bulk action preview", { ids: chosen, action: "reminder" }); }}
+          >
+            Review {chosen.length} reminder{chosen.length === 1 ? "" : "s"}
+          </Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 export function InvoiceInspector({ context }: { context: ScreenContext }) {
-  const { invoice, totals, customer, data } = useInvoice(context);
+  const { invoice, totals, data } = useInvoice(context);
   const { org } = useWorkspace();
   if (!invoice) return <Empty title="No invoice" />;
   const deal = String(invoice.fields.dealId ?? "");
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Status", value: <StatusPill status={invoice.status} /> },
-        { label: "Revision", value: String(invoice.revision) },
+      <KeyValueList items={[
+        { label: "Revision", value: String(invoice.revision), mono: true },
         { label: "Owner", value: invoice.ownerName },
-        { label: "Customer", value: customer?.title ?? "Not linked" },
         { label: "Jurisdiction", value: org.jurisdiction },
-        { label: "Tax codes", value: totals.byCode.map((group) => group.code.code).join(", ") || "None" },
+        { label: "Tax codes", value: totals.byCode.map((group) => group.code.code).join(", ") || "None", mono: true },
       ]} />
       {totals.hasUnknownRate && (
         <Notice tone="danger" title="Unresolved rate">
@@ -1621,14 +1728,14 @@ export function InvoiceInspector({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/fin/invoices/${String(invoice.fields.creditsInvoiceId)}`)}>Open the invoice this credits</Button>
       )}
       <SourceNote>
-        {data.journals.filter((journal) => String(journal.fields.invoiceId ?? "") === invoice.id).length} ledger journals reference this invoice.
+        {data.journals.filter((journal) => String(journal.fields.invoiceId ?? "") === invoice.id || journal.id === String(invoice.fields.journalId ?? "") || journal.id === String(invoice.fields.paymentJournalId ?? "")).length} ledger journals reference this invoice.
       </SourceNote>
     </Stack>
   );
 }
 
 /** Approving a draft invoice freezes a version and posts the balanced journal. */
-export function ApproveInvoice({ context, close }: { context: ScreenContext; close: () => void }) {
+export function ApproveInvoice({ context, close, blockedReason, inline }: { context: ScreenContext; close: () => void; blockedReason?: string; inline?: boolean }) {
   const { invoice, data, totals } = useInvoice(context);
   const [busy, setBusy] = useState(false);
   if (!invoice) return <Empty title="No invoice selected" />;
@@ -1644,12 +1751,21 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
   const posting = issueLines(data, totals, invoice);
   const period = (invoice.at ?? context.now.toISOString()).slice(0, 7);
   const gate = posting.problem ? undefined : checkPosting({ lines: posting.lines, period, locked: data.locked, accounts: data.accounts });
-  const blocked = posting.problem
+  const blocked = blockedReason ?? posting.problem
     ?? (totals.grossMinor <= 0 ? "The invoice has no positive value to post." : undefined)
     ?? gate?.reason;
 
   return (
     <Stack gap={4}>
+      {!inline && <ModalInFlight when={busy} />}
+      {!inline && (
+        <OverlaySummary
+          eyebrow="Approve and post"
+          title={<span className="ds-num">{invoice.title}</span>}
+          status={<StatusPill status={invoice.status} />}
+          meta={[customerName(data, invoice), <span className="ds-num" key="g">{context.money(totals.grossMinor)} gross</span>]}
+        />
+      )}
       <Notice tone={blocked ? "danger" : "info"} title={blocked ? "This invoice cannot be approved" : "Approving posts a balanced journal"}>
         {blocked ?? "Receivables are debited with the gross, each revenue account is credited with its net, and the tax control account takes the resolved tax. The invoice then becomes immutable."}
       </Notice>
@@ -1682,7 +1798,7 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
           </div>
         </div>
       )}
-      <Button
+      {(() => { const action = (<Button
         variant="primary"
         busy={busy}
         disabled={Boolean(blocked) || !context.can("post_journal")}
@@ -1726,7 +1842,18 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
         }}
       >
         Approve and post {context.money(totals.grossMinor)}
-      </Button>
+      </Button>);
+      return inline ? action : <ModalActions><OverlayActions primary={action} end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>} /></ModalActions>; })()}
     </Stack>
   );
+}
+
+function customerName(data: FinData, invoice: Rec): string {
+  return contactOf(data, invoice)?.title ?? "No customer linked";
+}
+
+/** The date an invoice was issued: the issue journal's ledger date when it is posted, else the record date. */
+function issueDate(data: FinData, invoice: Rec): string | undefined {
+  const journal = data.journals.find((item) => item.id === String(invoice.fields.journalId ?? ""));
+  return journal ? journalDate(journal) : invoice.at;
 }

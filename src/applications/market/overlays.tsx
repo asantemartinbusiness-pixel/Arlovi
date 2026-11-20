@@ -1,19 +1,21 @@
 import { useMemo, useState } from "react";
+import { commitTogether } from "@/platform/commit";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Meter, Notice, Pill, Properties, Row, Select,
-  Stack, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Meter, Notice, OverlayActions, OverlayCancel,
+  ModalActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
+import { LaunchChecklist, launchBlocked, launchRows } from "./readiness";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { ProviderBoundary } from "@/applications/market/kit";
 import { capabilityById } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, evaluateSegment, networkOf, NETWORKS, rollUp, useMarketData,
+  attributionFigures, bodyOf, evaluateSegment, networkOf, NETWORKS, rollUp, useAudienceDataLoaded, useMarketData,
   type AudienceBody, type CampaignBody, type PostBody, type SegmentRule, type SiteBody,
 } from "./data";
 import { NetworkPreview } from "./panels";
-import { pageChecks, retryState, VersionRestoreGrid } from "./actions";
+import { pageChecks, retryPost, retryState, VersionRestoreGrid } from "./actions";
 
 /* ====================================================================== *
  * MARKET overlays. One component per overlay in the approved contract.
@@ -292,21 +294,21 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
         if (decision === "changes") {
           if (alreadyApproved) { setError("An approved plan is not sent back here; duplicate it as a draft to change it."); return; }
           if (reason.trim().length < 5) { setError("Say what needs to change so the owner can act on it."); return; }
-          await context.mutate.patch(campaign.id, {
+          if (!(await context.mutate.patch(campaign.id, {
             status: campaign.status === "active" ? "active" : "draft",
             fields: { ...campaign.fields, approval: "changes_requested", changesRequestedBy: actor, changesRequestedAt: now.toISOString() },
             body: nextBody,
-          }, { expectRevision: campaign.revision, event: `Changes requested on ${campaign.title} by ${actor}: ${reason.trim()}` });
+          }, { expectRevision: campaign.revision, event: `Changes requested on ${campaign.title} by ${actor}: ${reason.trim()}` }))) return;
           context.toast("Changes requested", `${campaign.title} is back with ${campaign.ownerName || "its owner"} as a draft, with your note.`);
           close();
           return;
         }
         if (blocked) return;
-        await context.mutate.patch(campaign.id, {
+        if (!(await context.mutate.patch(campaign.id, {
           status: campaign.status === "active" ? "active" : "approved",
           fields: { ...campaign.fields, approval: "approved", approvedBy: actor, approvedAt: now.toISOString() },
           body: nextBody,
-        }, { expectRevision: campaign.revision, event: `Plan approved for ${campaign.title} by ${actor}` });
+        }, { expectRevision: campaign.revision, event: `Plan approved for ${campaign.title} by ${actor}` }))) return;
         context.toast("Plan approved", `${campaign.title} is recorded as approved by ${actor}. It is not live until a launch is recorded. No provider was told.`);
         close();
       }}
@@ -376,7 +378,8 @@ export function DuplicateRules({ context, close }: { context: ScreenContext; clo
       <Notice tone="warning" title="A copy must not inherit permission to spend">
         If an ad account were connected, duplicating a live campaign would otherwise create a second authorised spender with the same budget. The copy therefore always lands as a draft with zero committed spend.
       </Notice>
-      <Button
+      <OverlayActions
+        primary={<Button
         variant="primary"
         onClick={async () => {
           await context.mutate.create({
@@ -395,7 +398,9 @@ export function DuplicateRules({ context, close }: { context: ScreenContext; clo
         }}
       >
         Duplicate as draft
-      </Button>
+      </Button>}
+        end={<OverlayCancel>Cancel</OverlayCancel>}
+      />
     </Stack>
   );
 }
@@ -431,34 +436,75 @@ export function CreativePreview({ context }: { context: ScreenContext }) {
   );
 }
 
-export function LaunchApproval({ context, close }: { context: ScreenContext; close: () => void }) {
+function useLaunchState(context: ScreenContext) {
   const data = useMarketData();
-  const { actor, now } = useWorkspace();
+  const { now } = useWorkspace();
   const campaign = useRecord(context.params.id) ?? data.campaigns[0];
-  const body = bodyOf<CampaignBody>(campaign, {});
-  if (!campaign) return <Empty title="No campaign" />;
-  const approvalReady = String(campaign.fields.approval) === "approved";
-  const creativeReady = (body.creatives ?? []).length > 0 && (body.creatives ?? []).every((creative) => creative.status === "approved");
-  const blocked = !approvalReady || !creativeReady;
+  if (!campaign) return undefined;
+  const audience = data.audiences.find((item) => item.id === String(campaign.fields.audienceId ?? ""));
+  const rows = launchRows(context, campaign, audience, data.contacts, now);
+  const attention = rows.filter((row) => row.state === "blocked").length;
+  return { campaign, rows, blocked: launchBlocked(campaign), attention };
+}
+
+const LAUNCH_REASON_ID = "launch-blocked-reason";
+
+export function LaunchApprovalSummary({ context }: { context: ScreenContext }) {
+  const state = useLaunchState(context);
+  if (!state) return null;
+  const { campaign } = state;
+  return (
+    <OverlaySummary
+      eyebrow="Campaign"
+      title={campaign.title}
+      status={<Pill tone={campaign.status === "active" ? "success" : "neutral"} dot>{campaign.status.replaceAll("_", " ")}</Pill>}
+      meta={[`Owner ${campaign.ownerName}`]}
+    />
+  );
+}
+
+export function LaunchApprovalFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const state = useLaunchState(context);
+  const blocked = state?.blocked ?? true;
+  const count = Math.max(state?.attention ?? 1, 1);
+  const reason = `Launch blocked: ${count} ${count === 1 ? "check needs" : "checks need"} attention.`;
+  return (
+    <OverlayActions
+      primary={<Button variant="primary" type="submit" form="launch-approval" disabled={blocked} aria-describedby={blocked ? LAUNCH_REASON_ID : undefined}>Record launch</Button>}
+      secondary={blocked ? <span id={LAUNCH_REASON_ID} className="ds-subtle">{reason}</span> : undefined}
+      end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    />
+  );
+}
+
+export function LaunchApproval({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { actor, now } = useWorkspace();
+  const state = useLaunchState(context);
+  if (!state) return <Empty title="No campaign" />;
+  const { campaign, rows, blocked, attention } = state;
   return (
     <form
       id="launch-approval"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (blocked) return;
-        await context.mutate.patch(campaign.id, { status: "active", fields: { ...campaign.fields, launchedBy: actor, launchedAt: now.toISOString() } }, { expectRevision: campaign.revision, event: `${campaign.title} launched locally by ${actor}` });
-        context.toast("Launched locally", `${campaign.title} is active in this workspace. Scheduled content is queued locally; nothing was published.`);
+        if (blocked) {
+          context.toast(`Launch blocked: ${attention} ${attention === 1 ? "check needs" : "checks need"} attention`, "Record a plan approval and approve every creative first.", "blocked");
+          return;
+        }
+        if (!(await context.mutate.patch(campaign.id, { status: "active", fields: { ...campaign.fields, launchedBy: actor, launchedAt: now.toISOString() } }, { expectRevision: campaign.revision, event: `${campaign.title} launched locally by ${actor}` }))) return;
+        context.toast("Launch recorded", `${campaign.title} is active in this workspace. Nothing was published.`);
         close();
       }}
     >
-      <Stack gap={2}>
-        <Row gap={2}><Pill tone={approvalReady ? "success" : "danger"} dot>{approvalReady ? "Ready" : "Blocked"}</Pill><span className="ds-grow">Plan approval recorded</span></Row>
-        <Row gap={2}><Pill tone={creativeReady ? "success" : "danger"} dot>{creativeReady ? "Ready" : "Blocked"}</Pill><span className="ds-grow">Creative approved</span></Row>
-        <Row gap={2}><Pill tone="warning" dot>Not connected</Pill><span className="ds-grow">Delivery provider</span></Row>
-      </Stack>
-      {blocked && <Notice tone="danger" title="Launch is blocked">Record a plan approval and approve every creative first.</Notice>}
-      <ProviderBoundary id="site.publish" title="Launching changes this record only" />
+      <OverlaySection title="Launch checklist" hint={blocked ? `${attention} to fix before this can be recorded` : "Everything this launch depends on"}>
+        <LaunchChecklist rows={rows} />
+      </OverlaySection>
+      <Notice tone={blocked ? "danger" : "warning"} title={blocked ? "Launch is blocked" : "Recording a launch publishes nothing"}>
+        {blocked
+          ? "Record a plan approval and approve every creative first."
+          : "It marks the campaign active here and queues its content locally. No advertising or mail provider is connected, so nothing leaves this workspace."}
+      </Notice>
     </form>
   );
 }
@@ -470,27 +516,34 @@ export function PauseConsequence({ context, close }: { context: ScreenContext; c
   if (!campaign) return <Empty title="No campaign" />;
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="What pausing can and cannot do">
-        Pausing sets this campaign to paused and holds its {posts.length} queued item{posts.length === 1 ? "" : "s"} in this browser. It cannot stop spend at an advertising platform: no account is connected, so no spend was ever authorised from here. If an account were connected, a pause would still take minutes to take effect and late-reported spend could still arrive.
-      </Notice>
-      <Properties rows={[
-        { label: "Queued items held", value: String(posts.length) },
-        { label: "Committed spend so far", value: context.money(Number(campaign.fields.spentMinor ?? 0)) },
-        { label: "Provider spend stopped", value: <Pill tone="warning">Cannot be confirmed</Pill> },
+      <FactGrid columns={3} items={[
+        { label: "Queued items held", value: String(posts.length), mono: true },
+        { label: "Committed spend", value: context.money(Number(campaign.fields.spentMinor ?? 0)), mono: true },
+        { label: "Provider spend stopped", value: "Cannot be confirmed", tone: "warning" },
       ]} />
-      <Button
-        variant="danger"
-        onClick={async () => {
-          await context.mutate.patch(campaign.id, { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, { expectRevision: campaign.revision, event: `${campaign.title} paused` });
-          for (const post of posts) {
-            await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, { event: `${post.title} held because its campaign was paused` });
-          }
-          context.toast("Paused", `${campaign.title} is paused and ${posts.length} queued item${posts.length === 1 ? " was" : "s were"} returned to drafts.`);
-          close();
-        }}
-      >
-        Pause and hold queued items
-      </Button>
+      <Notice tone="warning" title="Pausing stops this workspace's schedule only">
+        It holds {posts.length} queued item{posts.length === 1 ? "" : "s"} here. No advertising account is connected, so no spend was authorised from Arlovi and none can be stopped from it.
+      </Notice>
+      <OverlayActions
+        variant="confirm"
+        end={<OverlayCancel>Cancel</OverlayCancel>}
+        primary={(
+          <Button
+            variant="danger"
+            onClick={async () => {
+              // The campaign and its queued posts change together or not at all.
+              if (!(await commitTogether(context, [
+                { record: campaign, patch: { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, event: `${campaign.title} paused` },
+                ...posts.map((post) => ({ record: post, patch: { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, event: `${post.title} held because its campaign was paused` })),
+              ]))) return;
+              context.toast("Paused", `${campaign.title} is paused and ${posts.length} queued item${posts.length === 1 ? " was" : "s were"} returned to drafts.`);
+              close();
+            }}
+          >
+            Pause and hold queued items
+          </Button>
+        )}
+      />
     </Stack>
   );
 }
@@ -518,12 +571,12 @@ export function PostEditor({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         if (over || !when) return;
         const iso = new Date(when).toISOString();
-        await context.mutate.patch(post.id, {
+        if (!(await context.mutate.patch(post.id, {
           startAt: iso,
           at: iso,
           fields: { ...post.fields, network },
           body: { ...body, caption },
-        }, { expectRevision: post.revision, event: `${post.title} edited` });
+        }, { expectRevision: post.revision, event: `${post.title} edited` }))) return;
         context.toast("Saved", `${post.title} is queued for ${context.dateTime(iso)} in ${org.timezone}.`);
         close();
       }}
@@ -565,7 +618,7 @@ export function AssetPicker({ context, close }: { context: ScreenContext; close:
             onClick={async () => {
               if (!post) return;
               const body = bodyOf<PostBody>(post, {});
-              await context.mutate.patch(post.id, { fields: { ...post.fields, mediaName: chosen }, body: { ...body, media: [{ name: chosen, kind: "image" }] } }, { expectRevision: post.revision, event: `Media attached to ${post.title}` });
+              if (!(await context.mutate.patch(post.id, { fields: { ...post.fields, mediaName: chosen }, body: { ...body, media: [{ name: chosen, kind: "image" }] } }, { expectRevision: post.revision, event: `Media attached to ${post.title}` }))) return;
               context.toast("Attached", `${chosen} is referenced by ${post.title}.`);
               close();
             }}
@@ -596,23 +649,26 @@ export function PublishPreview({ context, close }: { context: ScreenContext; clo
         { label: "Media", value: body.media?.[0]?.name ?? "None attached" },
         { label: "Account", value: <Pill tone="warning">Not connected</Pill> },
       ]} />
-      <ProviderBoundary id="site.publish" title="Publishing is not available" >
-        Pressing publish would normally hand this caption and media to the network. With no account authorised, the only honest action is to queue it here.
+      <ProviderBoundary custom id="social.publish" title="No social account is connected">
+        Publishing would hand this caption and media to the network. Nothing is sent: the post is queued here until an account is authorised.
       </ProviderBoundary>
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          disabled={over}
-          onClick={async () => {
-            await context.mutate.patch(post.id, { status: "scheduled", fields: { ...post.fields, delivery: "queued_local", approval: "approved", error: "" } }, { expectRevision: post.revision, event: `${post.title} queued locally for ${post.startAt}` });
-            context.toast("Queued locally", "The item is approved and queued in this browser. It has not been published.");
-            close();
-          }}
-        >
-          Approve and queue locally
-        </Button>
-        <Button variant="secondary" disabled>Publish now — needs a connected account</Button>
-      </Row>
+      <OverlayActions
+        primary={(
+          <Button
+            variant="primary"
+            disabled={over}
+            onClick={async () => {
+              if (!(await context.mutate.patch(post.id, { status: "scheduled", fields: { ...post.fields, delivery: "queued_local", approval: "approved", error: "" } }, { expectRevision: post.revision, event: `${post.title} queued locally for ${post.startAt}` }))) return;
+              context.toast("Queued locally", "The item is approved and queued in this browser. It has not been published.");
+              close();
+            }}
+          >
+            Approve and queue locally
+          </Button>
+        )}
+        secondary={<Button variant="secondary" disabled>Publish now (needs an account)</Button>}
+        end={<OverlayCancel>Cancel</OverlayCancel>}
+      />
     </Stack>
   );
 }
@@ -669,11 +725,11 @@ export function PostComposer({ context, close }: { context: ScreenContext; close
         if (invalid) return;
         const iso = new Date(when).toISOString();
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: title.trim(), startAt: iso, at: iso,
             fields: { ...existing.fields, network: networks[0], campaignId },
             body: { ...existingBody, caption },
-          }, { expectRevision: existing.revision, event: `${title.trim()} edited in the composer` });
+          }, { expectRevision: existing.revision, event: `${title.trim()} edited in the composer` }))) return;
         } else {
           for (const network of networks) {
             await context.mutate.create({
@@ -721,8 +777,20 @@ export function PostComposer({ context, close }: { context: ScreenContext; close
       <Stack gap={4}>
         {networks.map((network) => <NetworkPreview key={network} network={network} caption={caption} />)}
       </Stack>
-      <ProviderBoundary id="site.publish" title="This composer stops at the publish boundary" />
+      <ProviderBoundary custom id="social.publish" title="Nothing is published from here">No social account is connected. Saving keeps the post in this workspace.</ProviderBoundary>
     </form>
+  );
+}
+
+export function DeliveryReceiptFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const post = useRecord(payload?.id ?? context.selectedId);
+  const safe = Boolean(post && post.status === "failed" && retryState(post).safe);
+  return (
+    <OverlayActions
+      primary={safe && post ? <Button variant="primary" onClick={() => { void retryPost({ ...context, selectedId: post.id }); }}>Retry safely</Button> : undefined}
+      end={<Button variant="ghost" onClick={close}>Close</Button>}
+    />
   );
 }
 
@@ -746,7 +814,7 @@ export function DeliveryReceipt({ context }: { context: ScreenContext }) {
       {unknown ? (
         <Notice tone="danger" title="The publication state is unknown, so a retry is blocked">{retry.reason}</Notice>
       ) : post.status === "failed" ? (
-        <Notice tone="warning" title="Known not to have been published">{retry.reason} Use "Retry safely" to re-queue it.</Notice>
+        <Notice tone="warning" title="Known not to have been published">{retry.reason} The footer action, Retry safely, re-queues it after a confirmation.</Notice>
       ) : (
         <Notice tone="info" title="Recorded locally">
           The reference above is a local identifier, not a provider URL. It records that someone marked this item published in this workspace.
@@ -792,11 +860,11 @@ function EmailBuilderForm({ context, close, campaign, templateId }: { context: S
         event.preventDefault();
         if (invalid) return;
         if (campaign) {
-          await context.mutate.patch(campaign.id, {
+          if (!(await context.mutate.patch(campaign.id, {
             startAt: new Date(when).toISOString(),
             fields: { ...campaign.fields, audienceId, emailSubject: subject },
             body: { ...bodyOf<CampaignBody>(campaign, {}), brief: bodyText || campaign.summary },
-          }, { expectRevision: campaign.revision, event: `Email content saved for ${campaign.title}` });
+          }, { expectRevision: campaign.revision, event: `Email content saved for ${campaign.title}` }))) return;
         } else {
           await context.mutate.create({
             collection: "campaigns",
@@ -887,17 +955,17 @@ export function SendReview({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         if (!confirmed) return;
         if (testMode) {
-          await context.mutate.patch(campaign.id, {
+          if (!(await context.mutate.patch(campaign.id, {
             fields: { ...campaign.fields, testSendState: "queued_local", testSendTo: actor, testSendAt: now.toISOString() },
-          }, { expectRevision: campaign.revision, event: `Test send of ${campaign.title} to ${actor} held locally` });
+          }, { expectRevision: campaign.revision, event: `Test send of ${campaign.title} to ${actor} held locally` }))) return;
           await context.mutate.log(`Test send of ${campaign.title} to ${actor} queued locally; no mail provider is connected.`, { entityId: campaign.id, type: "email.test_queued_local", capability: "queued_local" });
           context.toast("Test send held locally", `The test to ${actor} is recorded against ${campaign.title}. It was not delivered: no mail provider is connected.`);
           close();
           return;
         }
-        await context.mutate.patch(campaign.id, {
+        if (!(await context.mutate.patch(campaign.id, {
           fields: { ...campaign.fields, recipientsApprovedBy: actor, recipientsApprovedAt: now.toISOString(), recipientCount: result.members.length },
-        }, { expectRevision: campaign.revision, event: `Recipients approved for ${campaign.title}: ${result.members.length} contacts` });
+        }, { expectRevision: campaign.revision, event: `Recipients approved for ${campaign.title}: ${result.members.length} contacts` }))) return;
         await context.mutate.log(`Send held locally for ${campaign.title}: ${result.members.length} recipients, ${result.excluded.length} held back.`, { entityId: campaign.id, type: "email.queued_local", capability: "queued_local" });
         context.toast("Recipients approved", `${result.members.length} recipients recorded against ${campaign.title}. Nothing was sent: no mail provider is connected.`);
         close();
@@ -925,32 +993,59 @@ export function SendReview({ context, close }: { context: ScreenContext; close: 
   );
 }
 
-export function SuppressionCheck() {
+function useSuppressionState() {
   const data = useMarketData();
   const { now } = useWorkspace();
+  const loaded = useAudienceDataLoaded();
   const suppressed = data.contacts.filter((contact) => contact.fields.suppressed === true);
-  const wouldHaveMatched = data.audiences.map((audience) => {
+  const rows = data.audiences.map((audience) => {
     const result = evaluateSegment(audience, data.contacts, now);
     const caught = result.excluded.filter((item) => item.contact.fields.suppressed === true).length;
-    return { audience, held: result.excluded.length, caught };
+    const ruled = (bodyOf<AudienceBody>(audience, {}).exclusions ?? []).includes("suppressed");
+    return { audience, held: result.excluded.length, caught, ruled };
   });
+  return { loaded, suppressed, rows, missing: rows.filter((row) => !row.ruled) };
+}
+
+export function SuppressionCheckSummary() {
+  const { loaded, suppressed, missing } = useSuppressionState();
+  if (!loaded) {
+    return <OverlaySummary eyebrow="Email send safety" title="Reading contacts" status={<Pill tone="neutral">Loading</Pill>} meta={["Counts appear once the contact records are read"]} />;
+  }
+  return (
+    <OverlaySummary
+      eyebrow="Email send safety"
+      title={`${suppressed.length} suppressed ${suppressed.length === 1 ? "contact" : "contacts"}`}
+      status={missing.length === 0 ? <Pill tone="success" dot>Every segment excludes them</Pill> : <Pill tone="danger" dot>{missing.length} {missing.length === 1 ? "segment does" : "segments do"} not</Pill>}
+      meta={["Read from the suppressed field on each contact", "Applied before every count, preview and send review"]}
+    />
+  );
+}
+
+export function SuppressionCheck({ context }: { context: ScreenContext }) {
+  const { loaded, rows, missing } = useSuppressionState();
+  async function addRule(audience: Rec) {
+    const body = bodyOf<AudienceBody>(audience, {});
+    if (!(await context.mutate.patch(audience.id, { body: { ...body, exclusions: [...new Set([...(body.exclusions ?? []), "suppressed"])] } }, { expectRevision: audience.revision, event: `Suppression rule added to ${audience.title} by ${context.actor}` }))) return;
+    context.toast("Suppression rule added", `${audience.title} now holds back suppressed contacts.`);
+  }
+  if (!loaded) return <div role="status" aria-live="polite"><Empty title="Reading contacts" /></div>;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Suppression list", value: `${suppressed.length} contacts` },
-        { label: "Applied", value: "Before every count, preview and send review" },
-        { label: "Source", value: "The suppressed field on each contact record" },
-      ]} />
-      <DataGrid rows={wouldHaveMatched} rowId={(row) => row.audience.id} label="Suppression by segment" filterable={false}
+      <DataGrid rows={rows} rowId={(row) => row.audience.id} label="Suppression by segment" filterable={false}
         columns={[
           { key: "segment", header: "Segment", primary: true, cell: (row) => row.audience.title },
-          { key: "held", header: "Held back", align: "end", cell: (row) => String(row.held) },
-          { key: "caught", header: "Suppressed, caught", align: "end", cell: (row) => String(row.caught) },
-          { key: "rule", header: "Exclusion rule", cell: (row) => ((bodyOf<AudienceBody>(row.audience, {}).exclusions ?? []).includes("suppressed") ? <Pill tone="success">Suppression excluded</Pill> : <Pill tone="danger">No suppression rule</Pill>) },
+          { key: "held", header: "Held back", align: "end", cell: (row) => <span className="ds-num">{row.held}</span> },
+          { key: "caught", header: "Suppressed, caught", align: "end", cell: (row) => <span className="ds-num">{row.caught}</span> },
+          { key: "rule", header: "Exclusion rule", cell: (row) => (row.ruled
+            ? <Pill tone="success">Excluded</Pill>
+            : <Button size="sm" variant="secondary" onClick={() => void addRule(row.audience)}>Add the rule</Button>) },
         ]} />
-      <Notice tone="danger" title="A segment without the suppression rule cannot be approved for sending">
-        The send review refuses to record recipients for a segment that does not exclude suppressed contacts.
-      </Notice>
+      {missing.length > 0 && (
+        <Notice tone="danger" title="These segments cannot be approved for sending">
+          {missing.map((row) => row.audience.title).join(", ")}: the send review refuses to record recipients for a segment that does not exclude suppressed contacts.
+        </Notice>
+      )}
     </Stack>
   );
 }
@@ -982,12 +1077,12 @@ export function SegmentBuilder({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         if (invalid) return;
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: title.trim(),
             summary: `${rules.length} rule${rules.length === 1 ? "" : "s"} over contact records.`,
             fields: { ...existing.fields, lastCountedAt: now.toISOString() },
             body: { rules, exclusions },
-          }, { expectRevision: existing.revision, event: `Segment ${title.trim()} rules changed` });
+          }, { expectRevision: existing.revision, event: `Segment ${title.trim()} rules changed` }))) return;
         } else {
           await context.mutate.create({
             collection: "audiences",
@@ -1086,15 +1181,21 @@ export function ExportPermission({ context, close }: { context: ScreenContext; c
         { label: "Your role view", value: allowed ? <Pill tone="success">May export</Pill> : <Pill tone="danger">May not export</Pill> },
       ]} />
       {!allowed ? (
-        <Notice tone="danger" title="This role view does not export contact data">
-          Exporting personal data is limited to the roles that hold the export capability. Role views shape what the interface offers here; they are not an account security boundary.
-        </Notice>
+        <>
+          <Notice tone="danger" title="This role view does not export contact data">
+            Exporting personal data is limited to the roles that hold the export capability. Role views shape what the interface offers here; they are not an account security boundary.
+          </Notice>
+          <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Close</Button>} /></ModalActions>
+        </>
       ) : (
         <>
           <Field label="Why is this export needed?" required hint="Recorded in the activity log with the row count."><TextInput value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
           <Notice tone="warning" title="The file is written by this browser">
             A CSV of {result.members.length} contacts downloads from here. Suppressed and non-consenting contacts are never written to it.
           </Notice>
+          <ModalActions>
+          <OverlayActions
+            primary={(
           <Button
             variant="primary"
             disabled={!reason.trim()}
@@ -1116,6 +1217,10 @@ export function ExportPermission({ context, close }: { context: ScreenContext; c
           >
             Download {result.members.length} rows
           </Button>
+            )}
+            end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+          />
+          </ModalActions>
         </>
       )}
     </Stack>
@@ -1175,11 +1280,11 @@ export function SpendApproval({ context, close }: { context: ScreenContext; clos
       onSubmit={async (event) => {
         event.preventDefault();
         if (invalid) return;
-        await context.mutate.patch(campaign.id, {
+        if (!(await context.mutate.patch(campaign.id, {
           amountMinor: total,
           fields: { ...campaign.fields, budgetMinor: total, allocationApprovedBy: actor },
           body: { ...body, channels: (body.channels ?? []).map((channel) => ({ ...channel, budgetMinor: Number(allocations[channel.network]) || 0 })) },
-        }, { expectRevision: campaign.revision, event: `Budget allocation changed on ${campaign.title} to ${total}` });
+        }, { expectRevision: campaign.revision, event: `Budget allocation changed on ${campaign.title} to ${total}` }))) return;
         context.toast("Allocation saved", `${context.money(total)} planned with ${context.money(reserve)} held in reserve. No authorisation was issued.`);
         close();
       }}
@@ -1259,9 +1364,9 @@ export function AuditIssue({ context, close }: { context: ScreenContext; close: 
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(audit.id, {
+        if (!(await context.mutate.patch(audit.id, {
           body: { ...body, issues: (body.issues ?? []).map((item) => (item.id === issue.id ? { ...item, assignee } : item)) },
-        }, { expectRevision: audit.revision, event: `Audit issue "${issue.title}" assigned to ${assignee || "nobody"}` });
+        }, { expectRevision: audit.revision, event: `Audit issue "${issue.title}" assigned to ${assignee || "nobody"}` }))) return;
         context.toast("Issue assigned", `${issue.title} is now owned by ${assignee || "nobody"}.`);
         close();
       }}
@@ -1300,7 +1405,7 @@ export function PageMetadataEditor({ context, close }: { context: ScreenContext;
       onSubmit={async (event) => {
         event.preventDefault();
         if (!page) return;
-        await context.mutate.patch(page.id, { fields: { ...page.fields, metaTitle, metaDescription } }, { expectRevision: page.revision, event: `Metadata edited for ${page.title}` });
+        if (!(await context.mutate.patch(page.id, { fields: { ...page.fields, metaTitle, metaDescription } }, { expectRevision: page.revision, event: `Metadata edited for ${page.title}` }))) return;
         context.toast("Metadata saved", `${page.title} has a ${metaTitle.length} character title. Search engines may still rewrite it.`);
         close();
       }}
@@ -1430,10 +1535,10 @@ export function PublishConfirm({ context, close }: { context: ScreenContext; clo
         variant="primary"
         disabled={failing.length > 0}
         onClick={async () => {
-          await context.mutate.patch(page.id, {
+          if (!(await context.mutate.patch(page.id, {
             status: "published",
             fields: { ...page.fields, published: true, exportedAt: context.now.toISOString(), publishedBy: context.actor },
-          }, { expectRevision: page.revision, event: `${page.title} exported as HTML from this browser` });
+          }, { expectRevision: page.revision, event: `${page.title} exported as HTML from this browser` }))) return;
           context.toast("Exported", `${page.title} is marked exported. No hosting provider was contacted, so no public URL exists.`);
           close();
         }}
@@ -1451,10 +1556,10 @@ export function VersionCompare({ context }: { context: ScreenContext }) {
   if (!page) return <Empty title="No page selected" />;
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Page", value: page.title },
-        { label: "Current revision", value: String(page.revision) },
-        { label: "Stored versions", value: String(page.history.length) },
+        { label: "Current revision", value: String(page.revision), mono: true },
+        { label: "Stored versions", value: String(page.history.length), mono: true },
         { label: "Last change", value: `${context.dateTime(page.updatedAt)} by ${page.updatedBy}` },
       ]} />
       {page.history.length === 0 ? (
@@ -1537,6 +1642,7 @@ export function MetricNotes({ context }: { context: ScreenContext }) {
   const { now } = useWorkspace();
   const orders = data.orders.filter((order) => order.status !== "cancelled");
   const conversions = rollUp(data.campaigns).reduce((sum, channel) => sum + channel.conversions, 0);
+  const figures = attributionFigures(orders, conversions);
   const [note, setNote] = useState("");
   return (
     <form
@@ -1550,13 +1656,14 @@ export function MetricNotes({ context }: { context: ScreenContext }) {
     >
       <Properties rows={[
         { label: "Orders", value: String(orders.length) },
-        { label: "Claimed conversions", value: String(conversions) },
-        { label: "Unattributed", value: String(Math.max(0, orders.length - conversions)) },
+        { label: "Conversions claimed (self-reported)", value: String(conversions) },
+        { label: "Claims per order", value: <span><span className="ds-num">{figures.ratio.toFixed(1)} to 1</span>{figures.overClaim ? " · more claims than orders" : ""}</span> },
+        { label: "Unattributed orders", value: `${figures.unattributed} of ${figures.orders}` },
         { label: "As at", value: context.dateTime(now) },
         { label: "Consent records", value: <Pill tone="warning">None stored</Pill> },
       ]} />
-      <Notice tone="warning" title="Why the unattributed figure is large">
-        Nothing in this workspace links a click to an order. There are no click identifiers, no analytics consent records and no provider reports. The gap is published rather than filled.
+      <Notice tone="warning" title={figures.overClaim ? "Claims outnumber orders" : "How unattributed is counted"}>
+        Unattributed orders are orders with no campaign recorded on them; campaign claims are typed figures and never offset it. Nothing in this workspace links a click to an order. There are no click identifiers, no analytics consent records and no provider reports. The gap is published rather than filled.
       </Notice>
       <Field label="Add a note for whoever reads this next"><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
       <Button type="submit" variant="primary" disabled={!note.trim()}>Record note</Button>
@@ -1583,12 +1690,12 @@ export function TemplateEditor({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         if (invalid) return;
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          if (!(await context.mutate.patch(existing.id, {
             title: title.trim(), summary,
             status: "review",
             fields: { ...existing.fields, kind, approval: "awaiting_approval", version: Number(existing.fields.version ?? 1) + 1, brandChecked: false },
             body: { ...existingBody, ...(kind === "email" ? { subject } : { caption: subject }) },
-          }, { expectRevision: existing.revision, event: `Template ${title.trim()} edited to version ${Number(existing.fields.version ?? 1) + 1}` });
+          }, { expectRevision: existing.revision, event: `Template ${title.trim()} edited to version ${Number(existing.fields.version ?? 1) + 1}` }))) return;
           context.toast("Template saved for review", "A new version needs approval before anything uses it. Live items keep the version they were built with.");
         } else {
           await context.mutate.create({
@@ -1633,10 +1740,10 @@ export function TemplateApproval({ context, close }: { context: ScreenContext; c
       onSubmit={async (event) => {
         event.preventDefault();
         if (!brandChecked) return;
-        await context.mutate.patch(template.id, {
+        if (!(await context.mutate.patch(template.id, {
           status: "approved",
           fields: { ...template.fields, approval: "approved", brandChecked: true, approvedBy: actor },
-        }, { expectRevision: template.revision, event: `Template ${template.title} approved by ${actor}` });
+        }, { expectRevision: template.revision, event: `Template ${template.title} approved by ${actor}` }))) return;
         context.toast("Template approved", `${template.title} version ${template.fields.version ?? 1} is available to use.`);
         close();
       }}

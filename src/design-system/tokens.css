@@ -95,7 +95,7 @@
   --paper-200: #e7ebe8;
   --paper-300: #cbd5cf;
   --paper-400: #a1aaa4;
-  --graphite-500: #6d7871;
+  --graphite-500: #68736c;
   --graphite-600: #626c66;
   --graphite-700: #434f47;
   --graphite-800: #29372e;
@@ -239,6 +239,8 @@
   --text-2xl: 30px;
   --text-3xl: 40px;
   --text-display: 54px;
+  --text-title: 32px;
+  --text-stat: 34px;
   --leading-tight: 1.1;
   --leading-normal: 1.5;
   --tracking-tight: -0.01em;
@@ -425,6 +427,29 @@
   --accent-soft: rgb(231 235 232 / 10%); --accent-soft-fg: #e7ebe8;
   --accent-border: #6c756e; --selected-bg: rgb(231 235 232 / 10%);
   --selected-fg: #e7ebe8; --fg-link: #e7ebe8;
+}
+
+/* Component density. Default is the compact premium rhythm; the comfortable
+   density is the escape hatch that restores the previous roomier values. */
+:root {
+  --card-pad: var(--space-4);
+  --card-head-pad-y: var(--space-3);
+  --card-head-pad-x: var(--space-4);
+  --stat-pad-y: var(--space-3);
+  --stat-pad-x: var(--space-4);
+  --row-pad-y: calc(var(--space-2) - 1px);
+  --pg-head-top: var(--space-4);
+  --pg-body-top: var(--space-4);
+}
+:root[data-density="comfortable"] {
+  --card-pad: var(--space-5);
+  --card-head-pad-y: var(--space-4);
+  --card-head-pad-x: var(--space-5);
+  --stat-pad-y: var(--space-5);
+  --stat-pad-x: var(--space-6);
+  --row-pad-y: var(--space-3);
+  --pg-head-top: var(--space-7);
+  --pg-body-top: var(--space-6);
 }
 
 :root[data-density="compact"] {

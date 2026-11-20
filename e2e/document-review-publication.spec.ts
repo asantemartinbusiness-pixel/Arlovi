@@ -58,7 +58,7 @@ test("a document cannot publish with unresolved mandatory reviews or tracked cha
   await expect(review).toBeEnabled();
   await review.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "Approve and publish locally" })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Approve the document" })).toBeVisible();
   await expect(dialog).toContainText("Approver");
   await dialog.getByRole("checkbox", { name: /reviewed this version and confirm/ }).check();
   await dialog.getByRole("button", { name: "Approve", exact: true }).click();

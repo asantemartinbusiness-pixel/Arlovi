@@ -205,7 +205,7 @@ export async function writeTriage(
   };
 
   if (item.record) {
-    await mutate.patch(item.record.id, {
+    if (!(await mutate.patch(item.record.id, {
       status: next.resolved ? "resolved" : item.record.status === "resolved" ? "open" : item.record.status,
       fields: {
         ...item.record.fields,
@@ -215,15 +215,15 @@ export async function writeTriage(
         snoozeUntil: next.snoozedUntil,
         assignee: next.assignee,
       },
-    }, { event: note, expectRevision: item.record.revision });
+    }, { event: note, expectRevision: item.record.revision }))) return;
     return;
   }
 
   if (item.state) {
-    await mutate.patch(item.state.id, {
+    if (!(await mutate.patch(item.state.id, {
       status: next.resolved ? "resolved" : "triaged",
       fields: { ...item.state.fields, ...next },
-    }, { event: note, expectRevision: item.state.revision });
+    }, { event: note, expectRevision: item.state.revision }))) return;
     return;
   }
 

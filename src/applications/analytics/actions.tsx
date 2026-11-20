@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Button, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput,
+  Button, DataGrid, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -60,8 +60,8 @@ export function ResizeTile({ context, close }: { context: ScreenContext; close: 
           </Select>
         </Field>
       </Row>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={w === tile.w && h === tile.h}
@@ -71,13 +71,12 @@ export function ResizeTile({ context, close }: { context: ScreenContext; close: 
             const saved = await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: `${tile.title} resized to ${w}×${h}` });
             if (saved) context.toast("Tile resized", `${tile.title} is ${w} of 12 columns wide and ${h} row${h === 1 ? "" : "s"} tall.`);
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Resize
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -96,8 +95,8 @@ export function SetFilter({ context, close }: { context: ScreenContext; close: (
       </Notice>
       <FilterRows filters={working} onChange={setFilters} context={context} />
       <CrossWidgetCheck body={{ ...body, filters: working }} />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!filters}
@@ -106,13 +105,12 @@ export function SetFilter({ context, close }: { context: ScreenContext; close: (
             const saved = await context.mutate.patch(record.id, { body: { ...body, filters: working } }, { expectRevision: record.revision, event: `Dashboard filters set (${working.length})` });
             if (saved) context.toast("Filters applied", `${working.length} filter${working.length === 1 ? "" : "s"} now apply to every tile.`);
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Apply the filters
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -146,8 +144,8 @@ export function CiteFigures({ context, close }: { context: ScreenContext; close:
           { key: "why", header: "Source", cell: (row) => <span className="ds-subtle">{row.reason}</span> },
         ]}
       />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={citable.length === 0}
@@ -168,13 +166,12 @@ export function CiteFigures({ context, close }: { context: ScreenContext; close:
             }, { expectRevision: record.revision, event: `${citable.length} of ${checks.length} figures cited by ${context.actor}` });
             if (saved) context.toast("Citations recorded", `${citable.length} of ${checks.length} figures are cited.${checks.length > citable.length ? " The rest are refused and block publishing." : ""}`, checks.length > citable.length ? "blocked" : "ok");
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Cite {citable.length} figure{citable.length === 1 ? "" : "s"}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -222,8 +219,8 @@ export function GrantDataset({ context, close }: { context: ScreenContext; close
         { label: "Current grants", value: grants.length ? grants.map((grant) => `${ROLE_LABELS[grant.role]} ${grant.access}`).join(", ") : "None recorded" },
       ]} />
       {blocked && <Notice tone="danger" title="This grant cannot be recorded">{blocked}</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("manage_policy")}
@@ -231,20 +228,18 @@ export function GrantDataset({ context, close }: { context: ScreenContext; close
           onClick={async () => {
             setBusy(true);
             const next = [...grants, { role, access, by: context.actor, at: clockIso() }];
-            if (existing) {
-              await context.mutate.patch(existing.id, { body: { ...(existing.body as object ?? {}), grants: next } }, { expectRevision: existing.revision, event: `${ROLE_LABELS[role]} granted ${access} on ${collection}` });
-            } else {
-              await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Access recorded for ${collection}.`, fields: { collection, kind: "native" }, body: { grants: next } }, `${ROLE_LABELS[role]} granted ${access} on ${collection}`);
-            }
+            const saved = existing
+              ? await context.mutate.patch(existing.id, { body: { ...(existing.body as object ?? {}), grants: next } }, { expectRevision: existing.revision, event: `${ROLE_LABELS[role]} granted ${access} on ${collection}` })
+              : await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Access recorded for ${collection}.`, fields: { collection, kind: "native" }, body: { grants: next } }, `${ROLE_LABELS[role]} granted ${access} on ${collection}`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Grant recorded", `${ROLE_LABELS[role]} may ${access} ${collection}, granted by ${context.actor}.`);
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Grant {access}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -277,25 +272,26 @@ export function RefreshDataset({ context, close }: { context: ScreenContext; clo
         { label: "Last refreshed", value: existing?.fields.refreshedAt ? context.dateTime(String(existing.fields.refreshedAt)) : "Never" },
       ]} />
       {age.stale && <Notice tone="warning" title="Stale source">The newest record is {age.days} days old. Figures built on it are marked stale.</Notice>}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={existing?.status === "retired"}
           onClick={async () => {
             setBusy(true);
             const fields = { collection, kind: "native", refreshedAt: clockIso(), refreshedBy: context.actor, recordCount: rows.length, newestAt: asOf ?? "", failing };
-            if (existing) await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Dataset ${collection} refreshed: ${rows.length} records` });
-            else await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Catalogue entry for ${collection}.`, fields }, `Dataset ${collection} refreshed: ${rows.length} records`);
+            const saved = existing
+              ? await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Dataset ${collection} refreshed: ${rows.length} records` })
+              : await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Catalogue entry for ${collection}.`, fields }, `Dataset ${collection} refreshed: ${rows.length} records`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Refreshed", `${collection}: ${rows.length} records re-read, ${failing} quality failure${failing === 1 ? "" : "s"}.`);
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Refresh {collection}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -425,24 +421,25 @@ export function ValidateModel({ context, close }: { context: ScreenContext; clos
           <span className="ds-num ds-subtle">{item.check.matched}/{item.check.matched + item.check.unmatched} · fan-out {item.check.maxFanOut}</span>
         </Row>
       ))}
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
             setBusy(true);
             const fields = { lastValidatedAt: clockIso(), lastValidatedBy: context.actor, passing: results.length - failing.length, failing: failing.length };
-            if (model) await context.mutate.patch(model.id, { fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model validated: ${fields.passing} pass, ${fields.failing} fail` });
-            else await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations: results.map((item) => item.relation) } }, `Data model validated: ${fields.passing} pass, ${fields.failing} fail`);
+            const saved = model
+              ? await context.mutate.patch(model.id, { fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model validated: ${fields.passing} pass, ${fields.failing} fail` })
+              : await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations: results.map((item) => item.relation) } }, `Data model validated: ${fields.passing} pass, ${fields.failing} fail`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Validation recorded", `${fields.passing} pass, ${fields.failing} fail.`, failing.length ? "blocked" : "ok");
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Record the validation
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -468,25 +465,26 @@ export function RefreshModel({ context, close }: { context: ScreenContext; close
           { key: "fan", header: "Max fan-out", align: "end", cell: (row) => <span className="ds-num">{row.check.maxFanOut}</span> },
         ]}
       />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
             setBusy(true);
             const relations = results.map((item) => ({ ...item.relation, kind: (item.check.fanOut ? "one-to-many" : "many-to-one") as "one-to-many" | "many-to-one" }));
             const fields = { refreshedAt: clockIso(), refreshedBy: context.actor };
-            if (model) await context.mutate.patch(model.id, { body: { ...(model.body as object ?? {}), relations }, fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model refreshed: ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected` });
-            else await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations } }, `Data model refreshed: ${changed.length} corrected`);
+            const saved = model
+              ? await context.mutate.patch(model.id, { body: { ...(model.body as object ?? {}), relations }, fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model refreshed: ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected` })
+              : await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations } }, `Data model refreshed: ${changed.length} corrected`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Model refreshed", `${results.length} joins re-measured; ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected.`);
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Refresh the model
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -507,8 +505,8 @@ export function DeployModel({ context, close }: { context: ScreenContext; close:
         { label: "Relations", value: String(relations.length) },
         { label: "Currently deployed", value: model?.fields.deployedVersion ? `v${String(model.fields.deployedVersion)} by ${String(model.fields.deployedBy ?? "")}` : "Nothing deployed" },
       ]} />
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={failing.length > 0 || !model}
@@ -524,13 +522,12 @@ export function DeployModel({ context, close }: { context: ScreenContext; close:
             }, { expectRevision: model.revision, event: `Data model v${version} deployed by ${context.actor}` });
             if (saved) context.toast("Deployed", `Version ${version} is the model every measure reads.`);
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Deploy v{version}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }
@@ -576,8 +573,8 @@ export function AdjustInputs({ context, close }: { context: ScreenContext; close
       <Notice tone={model.usable ? "info" : "warning"} title={model.usable ? "The projection moves, the actuals do not" : "No projection can be drawn"}>
         {model.usable && last ? `Three months out: ${context.money(Math.round(last.value))}, band ${context.money(Math.round(last.low))} to ${context.money(Math.round(last.high))}.` : model.reason}
       </Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+<OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={!scenario || !model.usable}
@@ -592,13 +589,12 @@ export function AdjustInputs({ context, close }: { context: ScreenContext; close
             }, { expectRevision: scenario.revision, event: `Scenario ${scenario.title} inputs adjusted to ${adjustment}%` });
             if (saved) context.toast("Inputs adjusted", `${scenario.title} now uses ${adjustment}% on the slope. It is back to proposed for review.`);
             setBusy(false);
-            close();
+            if (saved) close();
           }}
         >
           Save the inputs
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} />
+</ModalActions>
     </Stack>
   );
 }

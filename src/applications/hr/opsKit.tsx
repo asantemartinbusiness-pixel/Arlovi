@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Button, Empty, Notice, Pill, Properties, Row, Stack, TextInput } from "@/design-system";
+import { Button, Empty, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Stack, TextInput } from "@/design-system";
 import type { OverlayDef, ScreenContext } from "@/platform/registry";
 import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
 import { getRecord } from "@/platform/repo";
@@ -109,10 +109,11 @@ function ConfirmBody({ context, close }: { context: ScreenContext; close: () => 
       {request.rows && request.rows.length > 0 && <Properties rows={request.rows} />}
       {request.boundary && <Boundary id={request.boundary} />}
       {error && <Notice tone="danger" title="Nothing was changed">{error}</Notice>}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close} disabled={busy}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          end={<Button variant="ghost" onClick={close} disabled={busy}>Cancel</Button>}
+          primary={<Button
           variant={request.tone === "danger" ? "danger" : "primary"}
           busy={busy}
           onClick={async () => {
@@ -128,8 +129,9 @@ function ConfirmBody({ context, close }: { context: ScreenContext; close: () => 
           }}
         >
           {request.confirm}
-        </Button>
-      </Row>
+        </Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

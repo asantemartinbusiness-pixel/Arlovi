@@ -2,14 +2,14 @@ import { expect, test } from "@playwright/test";
 
 test("Recruitment has distinct, functional Positions, Candidates, Interviews and Offers pages", async ({ page }) => {
   const main = page.locator("#main");
-  for (const [tab, heading] of [
+  for (const [tab] of [
     ["Positions", "Roles with a clear owner."],
     ["Candidates", "A pipeline for human decisions."],
     ["Interviews", "Interviews, scheduled and unscheduled."],
     ["Offers", "Offers, with evidence attached."],
   ]) {
     await page.goto(`/o/northline/hr/recruitment?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
     await expect(main.getByRole("textbox", { name: "Search recruitment" })).toBeVisible();
   }
@@ -31,14 +31,14 @@ test("Recruitment has distinct, functional Positions, Candidates, Interviews and
 
 test("Onboarding has clearly distinct Incoming, In progress, Waiting and Completed states", async ({ page }) => {
   const main = page.locator("#main");
-  for (const [tab, heading] of [
+  for (const [tab] of [
     ["Incoming", "Give every starter a clear first step."],
     ["In progress", "Keep the handoffs moving."],
     ["Waiting", "Know exactly what is holding things up."],
     ["Completed", "A record of work actually completed."],
   ]) {
     await page.goto(`/o/northline/hr/onboarding?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
     await expect(main.getByRole("textbox", { name: "Search onboarding starters" })).toBeVisible();
   }
@@ -50,14 +50,14 @@ test("Onboarding has clearly distinct Incoming, In progress, Waiting and Complet
 
 test("Leave page has separate My leave, Team calendar, Approvals and Policy experiences", async ({ page }) => {
   const main = page.locator("#main");
-  for (const [tab, heading] of [
+  for (const [tab] of [
     ["My leave", "Time away, clearly recorded."],
     ["Team calendar", "Leave in the context of the team."],
     ["Approvals", "Leave decisions with an accountable owner."],
     ["Policy", "Know what the recorded policy says."],
   ]) {
     await page.goto(`/o/northline/hr/leave?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
     await expect(main.getByRole("button", { name: "Request leave" }).first()).toBeVisible();
   }
@@ -94,5 +94,5 @@ test("Leave approval drawer enforces real decision scope and keeps source status
     await review.click();
     await expect(page.getByRole("dialog")).toBeVisible();
   }
-  await expect(main.getByRole("heading", { name: "Leave decisions with an accountable owner." })).toBeVisible();
+  await expect(main.locator(".hr-bar")).toBeVisible();
 });

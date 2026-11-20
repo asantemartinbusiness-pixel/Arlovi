@@ -74,7 +74,7 @@ test("Budget variance: drill into the posted lines and keep an explanation", asy
   await expect(dialog(page).getByText("What makes up the actual", { exact: false })).toBeVisible();
   await expect(dialog(page).getByText("Adverse").first()).toBeVisible();
   await dialog(page).getByLabel("Variance explanation").fill("Year-end audit fee billed in November.");
-  await dialog(page).getByRole("button", { name: "Save the explanation" }).click();
+  await dialog(page).getByRole("button", { name: "Save explanation" }).click();
   await expect(dialog(page).getByText(/Last explained by/)).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Budgets & Forecasts" })).toBeVisible();

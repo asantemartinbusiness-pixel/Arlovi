@@ -20,7 +20,7 @@ export interface BatchJob {
   id: string;
   recordId: string;
   title: string;
-  state: "queued" | "running" | "done" | "failed";
+  state: "queued" | "running" | "done" | "failed" | "skipped";
   outName?: string;
   bytes?: number;
   width?: number;
@@ -37,11 +37,41 @@ export interface BatchState {
   pattern: string;
   running: boolean;
   done: number;
+  /** What to do when an output name is already taken: keep both (counter) or skip the duplicate. The page never overwrites a file. */
+  onCollision: "counter" | "skip";
 }
 
 export const batchUi = createStore<BatchState>({
-  jobs: [], chosen: [], format: "jpeg", quality: 0.82, longEdge: 1600, pattern: "{name}-{w}x{h}", running: false, done: 0,
+  jobs: [], chosen: [], format: "jpeg", quality: 0.82, longEdge: 1600, pattern: "{name}-{w}x{h}", running: false, done: 0, onCollision: "counter",
 });
+
+/** File names this browser has already offered for download in this session; a repeat run would collide with them. */
+const WRITTEN = new Set<string>();
+
+export interface PlannedName { jobId: string; title: string; width: number; height: number; root: string; name: string; collision?: "batch" | "session" }
+
+/** The names a run would write with today's settings, before anything is written. Pure of side effects. */
+export async function planBatch(): Promise<PlannedName[]> {
+  const { db } = await import("@/runtime/db");
+  const state = batchUi.get();
+  const taken = new Set<string>(state.jobs.filter((job) => job.state === "done" && job.outName).map((job) => job.outName!));
+  const plan: PlannedName[] = [];
+  for (const job of state.jobs) {
+    if (job.state === "done") continue;
+    const record = await db.records.get(job.recordId);
+    if (!record) { plan.push({ jobId: job.id, title: job.title, width: 0, height: 0, root: "", name: "record missing" }); continue; }
+    const doc = parsePhoto(record.body);
+    const scale = state.longEdge / Math.max(doc.width, doc.height);
+    const width = Math.max(1, Math.round(doc.width * Math.min(1, scale)));
+    const height = Math.max(1, Math.round(doc.height * Math.min(1, scale)));
+    const root = `${state.pattern.replace("{name}", slug(record.title)).replace("{w}", String(width)).replace("{h}", String(height))}.${extension(state.format)}`;
+    const collision: PlannedName["collision"] = taken.has(root) ? "batch" : WRITTEN.has(root) ? "session" : undefined;
+    const name = nameFor(record.title, width, height, new Set([...taken, ...WRITTEN]));
+    taken.add(name);
+    plan.push({ jobId: job.id, title: record.title, width, height, root, name, collision });
+  }
+  return plan;
+}
 
 const HELD = new Map<string, { name: string; blob: Blob }>();
 
@@ -88,23 +118,31 @@ export function buildBatch(context: ScreenContext, titles: Map<string, string>):
 }
 
 async function runOne(job: BatchJob, taken: Set<string>): Promise<BatchJob> {
+  const skipDuplicates = batchUi.get().onCollision === "skip";
   const { db } = await import("@/runtime/db");
   const record = await db.records.get(job.recordId);
   if (!record) return { ...job, state: "failed", reason: "The record is no longer in this workspace." };
   try {
     const doc = parsePhoto(record.body);
-    const { images, masks } = await loadBank(doc);
     const state = batchUi.get();
     const scale = state.longEdge / Math.max(doc.width, doc.height);
     const width = Math.max(1, Math.round(doc.width * Math.min(1, scale)));
     const height = Math.max(1, Math.round(doc.height * Math.min(1, scale)));
+    /* The output name is known before any pixels are rendered, so a job that
+       will be skipped is decided first and never pays for an encode. */
+    const root = `${state.pattern.replace("{name}", slug(record.title)).replace("{w}", String(width)).replace("{h}", String(height))}.${extension(state.format)}`;
+    if (skipDuplicates && (taken.has(root) || WRITTEN.has(root))) {
+      return { ...job, state: "skipped", reason: `${root} was already written in this session; skipped as chosen.` };
+    }
+    const { images, masks } = await loadBank(doc);
     const result = await exportComposite(doc, images, masks, {
       format: state.format, quality: state.quality, width, height,
       background: state.format === "jpeg" ? "#ffffff" : undefined,
     });
     if (result.blob.size === 0) return { ...job, state: "failed", reason: "The encoder produced an empty file." };
-    const outName = nameFor(record.title, width, height, taken);
+    const outName = nameFor(record.title, width, height, new Set([...taken, ...WRITTEN]));
     taken.add(outName);
+    WRITTEN.add(outName);
     HELD.set(job.id, { name: outName, blob: result.blob });
     downloadBlob(outName, result.blob);
     return { ...job, state: "done", outName, bytes: result.blob.size, width, height, reason: undefined };
@@ -123,18 +161,19 @@ export async function runBatch(context: ScreenContext, onlyFailed = false): Prom
   batchUi.set((current) => ({ ...current, running: true }));
   let written = 0;
   let failed = 0;
+  let skipped = 0;
   try {
     for (const job of queue) {
       batchUi.set((current) => ({ ...current, jobs: current.jobs.map((item) => (item.id === job.id ? { ...item, state: "running" } : item)) }));
       const result = await runOne(job, taken);
-      if (result.state === "done") written += 1; else failed += 1;
+      if (result.state === "done") written += 1; else if (result.state === "skipped") skipped += 1; else failed += 1;
       batchUi.set((current) => ({ ...current, done: current.done + 1, jobs: current.jobs.map((item) => (item.id === job.id ? result : item)) }));
     }
   } finally {
     batchUi.set((current) => ({ ...current, running: false }));
   }
-  await context.mutate.log(`Photo batch: ${written} files written, ${failed} failed`, { type: "export" });
-  context.toast(failed ? "Batch finished with failures" : "Batch finished", `${written} file${written === 1 ? "" : "s"} written from this browser${failed ? `; ${failed} failed and are on the Failed tab` : ""}.`, failed ? "failed" : "ok");
+  await context.mutate.log(`Photo batch: ${written} files written, ${skipped} skipped, ${failed} failed`, { type: "export" });
+  context.toast(failed ? "Batch finished with failures" : "Batch finished", `${written} file${written === 1 ? "" : "s"} written from this browser${skipped ? `; ${skipped} skipped because the name was taken` : ""}${failed ? `; ${failed} failed and are on the Failed tab` : ""}.`, failed ? "failed" : "ok");
 }
 
 export async function testSample(context: ScreenContext): Promise<void> {

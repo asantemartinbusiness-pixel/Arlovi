@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AtSign, CalendarDays, Hash, Mail, Megaphone, MessageSquare, Phone, Settings2, Video } from "lucide-react";
 import {
-  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, Empty, FactGrid, Field, ModalActions, Notice, OverlayActions, OverlaySummary, OVERLAY_WIDTH, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -11,7 +11,7 @@ import {
   MemberManagement, Preferences, PhishingReport, QuickSwitcher, useCommsData,
 } from "./panels";
 import { DraftComposer } from "./mail";
-import { EmailExperience, type EmailArea } from "./EmailExperience";
+import { EmailExperience, mailTabCount, type EmailArea } from "./EmailExperience";
 import { EventForm, MeetingWorkspace } from "./meetings";
 import "./comms.css";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
@@ -25,12 +25,22 @@ import {
 import { clockIso } from "@/platform/clock";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
+
+function ChannelHeading({ id, part }: { id: string | undefined; part: "title" | "status" | "meta" }) {
+  const channel = useRecord(id);
+  if (!channel) return part === "title" ? <>Channel</> : null;
+  if (part === "title") return <>{channel.fields.kind === "group" ? channel.title : `#${channel.title}`}</>;
+  if (part === "status") return <Pill tone={channel.fields.visibility === "private" ? "warning" : "neutral"} dot>{String(channel.fields.visibility ?? "public")}</Pill>;
+  const declared = Number(channel.fields.memberCount ?? 0);
+  const listed = String(channel.fields.members ?? "").split(",").filter(Boolean).length;
+  const count = declared > 0 ? declared : listed;
+  return <>{channel.summary}{count > 0 ? ` · ${count} ${count === 1 ? "member" : "members"}` : " · Membership not recorded"}</>;
+}
 
 function ChannelArchive({ context, close }: { context: ScreenContext; close: () => void }) {
   const channel = useRecord(context.params.id ?? context.selectedId);
@@ -41,15 +51,15 @@ function ChannelArchive({ context, close }: { context: ScreenContext; close: () 
         Archiving #{channel.title} takes it out of the channel list. Every message stays on the record, so decisions made there can
         still be read.
       </p>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="danger" onClick={async () => {
-          await context.mutate.patch(channel.id, { status: "archived" }, { expectRevision: channel.revision, event: `${channel.title} archived by ${context.actor}` });
+      <OverlayActions
+        variant="confirm"
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        primary={<Button variant="danger" onClick={async () => {
+          if (!(await context.mutate.patch(channel.id, { status: "archived" }, { expectRevision: channel.revision, event: `${channel.title} archived by ${context.actor}` }))) return;
           context.toast("Channel archived", "The messages are kept and the channel is out of the list.");
           close();
-        }}>Archive the channel</Button>
-      </Row>
+        }}>Archive the channel</Button>}
+      />
     </Stack>
   );
 }
@@ -207,12 +217,12 @@ function ReplyEditor({ context, close }: { context: ScreenContext; close: () => 
           body: String(form.get("body") ?? ""),
           external: false,
         };
-        await context.mutate.patch(thread.id, {
+        if (!(await context.mutate.patch(thread.id, {
           status: "draft",
           summary: reply.body.slice(0, 160),
           body: { ...(thread.body as object ?? {}), messages: [...existing, reply] },
           fields: { ...thread.fields, folder: "drafts", messageCount: existing.length + 1 },
-        }, { expectRevision: thread.revision, event: `Reply drafted on ${thread.title} by ${context.actor}` });
+        }, { expectRevision: thread.revision, event: `Reply drafted on ${thread.title} by ${context.actor}` }))) return;
         context.toast("Reply saved as a draft", "It is on the thread with your name and the time. Nothing was sent.");
         close();
       }}
@@ -284,9 +294,9 @@ function AudienceSelector({ context, close }: { context: ScreenContext; close: (
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(post.id, {
+        if (!(await context.mutate.patch(post.id, {
           fields: { ...post.fields, audience: String(form.get("audience") ?? "Everyone"), requiresAck: form.get("ack") === "on" },
-        }, { expectRevision: post.revision, event: `Audience set on ${post.title}` });
+        }, { expectRevision: post.revision, event: `Audience set on ${post.title}` }))) return;
         context.toast("Audience saved", "It is on the announcement record.");
         close();
       }}
@@ -297,9 +307,9 @@ function AudienceSelector({ context, close }: { context: ScreenContext; close: (
         </Select>
       </Field>
       <Checkbox name="ack" label="Require an acknowledgement" defaultChecked={post.fields.requiresAck === true} />
-      <Properties rows={[
-        { label: "People employed", value: String(staff.length) },
-        { label: "Reaches", value: String(post.fields.audience ?? "Everyone") === "Everyone" ? String(staff.length) : "The people in that group" },
+      <FactGrid columns={2} items={[
+        { label: "People employed", value: String(staff.length), mono: true },
+        { label: "Reaches", value: String(post.fields.audience ?? "Everyone") === "Everyone" ? String(staff.length) : "The people in that group", mono: String(post.fields.audience ?? "Everyone") === "Everyone" },
       ]} />
     </form>
   );
@@ -319,45 +329,70 @@ function PostPreview({ context }: { context: ScreenContext }) {
         <p className="ds-subtle">{String(chosen.fields.audience ?? "Everyone")} · {context.date(chosen.at)}</p>
         <p className="ds-prose">{html ? html.replace(/<[^>]+>/g, "") : chosen.summary}</p>
       </div>
-      <Notice tone="info">This is exactly what a reader sees. Nothing is reformatted when it is published.</Notice>
+      <p className="ds-subtle">This is what a reader sees. Nothing is reformatted on publish.</p>
     </Stack>
+  );
+}
+
+function PublishReviewSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const post = useRecord(payload?.id ?? context.selectedId);
+  if (!post) return null;
+  const published = post.status === "published";
+  return (
+    <OverlaySummary
+      eyebrow="Announcement"
+      title={post.title}
+      status={<Pill tone={published ? "success" : post.status === "scheduled" ? "info" : "neutral"} dot>{post.status}</Pill>}
+      meta={[String(post.fields.audience ?? "Everyone"), post.at ? context.date(post.at) : undefined]}
+    />
   );
 }
 
 function PublishReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const [reviewed, setReviewed] = useState(false);
+  const [busy, setBusy] = useState(false);
   const payload = context.overlayPayload as { id?: string } | undefined;
   const post = useRecord(payload?.id ?? context.selectedId);
   const data = useCommsData();
   const staff = data.employees.filter((employee) => employee.status !== "alumni").length;
   if (!post) return <Empty title="Select an announcement" />;
-  const wide = String(post.fields.audience ?? "") === "Everyone";
+  const audience = String(post.fields.audience ?? "Everyone");
+  const wide = audience === "Everyone";
   const needsReview = wide || post.fields.sensitive === true;
+  const published = post.status === "published";
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        Publishing {post.title} makes it visible to {wide ? `all ${staff} people in this workspace` : String(post.fields.audience)}.
-      </p>
-      <Properties rows={[
-        { label: "Audience", value: String(post.fields.audience ?? "Everyone") },
+      <FactGrid columns={3} items={[
+        { label: "Reaches", value: wide ? `${staff} people` : audience },
         { label: "Acknowledgement", value: post.fields.requiresAck === true ? "Required" : "Not required" },
-        { label: "Delivery outside this workspace", value: <Pill tone="warning">Not connected</Pill> },
+        { label: "On the board", value: "Visible in Arlovi at once" },
       ]} />
-      {wide && (
-        <Notice tone="warning" title="This goes to everyone">
-          A company-wide announcement is read by people who cannot reply to it in private. Check the wording before publishing.
-        </Notice>
-      )}
+      <Notice tone="info" title="Not emailed">No mail or push service is connected, so only people who open Arlovi see this.</Notice>
+      {wide && <Notice tone="warning" title="This goes to everyone">Readers cannot reply to it in private. Check the wording before publishing.</Notice>}
       {needsReview && <Checkbox label={`I have reviewed the wording and the audience${post.fields.sensitive === true ? " of this sensitive post" : ""}`} checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} />}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={needsReview && !reviewed} onClick={async () => {
-          await context.mutate.patch(post.id, { status: "published", at: clockIso(), fields: { ...post.fields, publishedBy: context.actor, reviewedBy: needsReview ? context.actor : "" } }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}${needsReview ? " after review" : ""}` });
-          context.toast("Published", "It is on the announcement board in this workspace.");
-          close();
-        }}>Publish</Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          busy={busy}
+          primary={(
+            <Button variant="primary" disabled={published || (needsReview && !reviewed)} onClick={async () => {
+              setBusy(true);
+              try {
+                const saved = await context.mutate.patch(post.id, { status: "published", at: clockIso(), fields: { ...post.fields, publishedBy: context.actor, reviewedBy: needsReview ? context.actor : "" } }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}${needsReview ? " after review" : ""}` });
+                if (!saved) {
+                  context.toast("Not published", "The announcement changed after this was opened. Close, check the latest version and try again.", "failed");
+                  return;
+                }
+                context.toast("Published to the board", "People see it in Arlovi. Nothing was emailed.");
+                close();
+              } catch (error) {
+                context.toast("Not published", error instanceof Error ? error.message : "The announcement changed after this was opened. Close, check the latest version and try again.", "failed");
+              } finally { setBusy(false); }
+            }}>{published ? "Already published" : "Publish to the board"}</Button>
+          )}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -373,7 +408,7 @@ function SignatureEditor({ context, close }: { context: ScreenContext; close: ()
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(record.id, { fields: { ...record.fields, signature: String(form.get("signature") ?? "") } }, { expectRevision: record.revision, event: `Signature updated by ${context.actor}` });
+        if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, signature: String(form.get("signature") ?? "") } }, { expectRevision: record.revision, event: `Signature updated by ${context.actor}` }))) return;
         context.toast("Signature saved", "It is on your preference record in this browser.");
         close();
       }}
@@ -387,18 +422,16 @@ function SignatureEditor({ context, close }: { context: ScreenContext; close: ()
 function AccountSetup({ context, close }: { context: ScreenContext; close: () => void }) {
   return (
     <Stack gap={4}>
-      <MailBoundary what="Connecting a mailbox" />
+      <Notice tone="warning" title="No mail service is connected">A connection request is recorded for an administrator. No credential is asked for here.</Notice>
       <Properties rows={[
         { label: "Provider", value: "None configured" },
         { label: "What a connection would add", value: "Sending, receiving and real delivery status" },
         { label: "What already works", value: "Threads, drafts, labels, rules and links to records" },
       ]} />
-      <Notice tone="info">No credential is asked for here, because there is nothing to authenticate against.</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={!context.can("manage_connectors")} onClick={async () => { await requestMailboxConnection(context); close(); }}>Record the connection request</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button variant="primary" disabled={!context.can("manage_connectors")} onClick={async () => { await requestMailboxConnection(context); close(); }}>Record the connection request</Button>}
+        end={<Button variant="ghost" onClick={close}>Close</Button>}
+      />
     </Stack>
   );
 }
@@ -487,7 +520,11 @@ export const commsApp = registerApp({
     "ARL-COMMS-003": {
       id: "ARL-COMMS-003",
       title: () => "Channel",
-      subtitle: () => "Threads, reactions, mentions and the files a message points at.",
+      record: (context) => ({
+        title: <ChannelHeading id={context.params.id} part="title" />,
+        status: <ChannelHeading id={context.params.id} part="status" />,
+        meta: [<ChannelHeading key="m" id={context.params.id} part="meta" />],
+      }),
       tabs: (["Conversation", "Files", "Pinned", "Tasks"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <ChannelConversation context={context} lens={lens} />,
       })),
@@ -539,9 +576,10 @@ export const commsApp = registerApp({
 
     "ARL-COMMS-005": {
       id: "ARL-COMMS-005",
-      subtitle: () => "One place for conversations, sender identities, and provider setup. External delivery requires a connection.",
+      title: () => "Email",
+      subtitle: () => "Mail is kept in this browser. No mail service is connected, so nothing is delivered.",
       tabs: (["Inbox", "Sent", "Drafts", "Archive", "Spam", "Shared inboxes", "Accounts & domains", "Sender identities"] as EmailArea[]).map((lens) => ({
-        id: lens, render: (context: ScreenContext) => <EmailExperience context={context} lens={lens} />,
+        id: lens, render: (context: ScreenContext) => <EmailExperience context={context} lens={lens} />, count: () => mailTabCount(lens),
       })),
       actions: [
         { id: "Compose", label: "Compose", placement: "primary", run: (context) => context.openOverlay("Compose window") },
@@ -582,7 +620,7 @@ export const commsApp = registerApp({
             summary: `Raised from the email thread “${thread.title}” by ${context.actor}.`,
             fields: { stage: "ready", assignee: context.actor, priority: "normal", estimateHours: 1, loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false, sourceThreadId: thread.id },
           }, `Task raised from ${thread.title} by ${context.actor}`);
-          await context.mutate.patch(thread.id, { fields: { ...thread.fields, taskId: task.id } }, { event: `Thread linked to task ${task.title}` });
+          if (!(await context.mutate.patch(thread.id, { fields: { ...thread.fields, taskId: task.id } }, { event: `Thread linked to task ${task.title}` }))) return;
           context.toast("Task created", "It is in Projects, assigned to you, with a link back to this thread.");
         } },
         { id: "add CC", label: "Add a CC", placement: "overflow", run: (context) => context.openOverlay("add cc") },
@@ -678,7 +716,7 @@ export const commsApp = registerApp({
 
     "ARL-COMMS-010": {
       id: "ARL-COMMS-010",
-      subtitle: () => "Company posts, who they are for and who has acknowledged them.",
+      subtitle: () => "Posts appear on the announcement board in Arlovi. Nothing is emailed: no mail service is connected.",
       tabs: (["All", "Draft", "Scheduled", "Published"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <Announcements context={context} lens={lens} />,
       })),
@@ -690,9 +728,9 @@ export const commsApp = registerApp({
       ],
       overlays: [
         { id: "draft announcement", kind: "modal", title: "Draft an announcement", width: 600, render: ({ close, ...context }) => <DraftAnnouncement context={context} close={close} />, footer: submitFooter("cm-draft", "Save the draft") },
-        { id: "Audience selector", kind: "modal", title: "Audience", width: 520, render: ({ close, ...context }) => <AudienceSelector context={context} close={close} />, footer: submitFooter("cm-audience", "Save audience") },
+        { id: "Audience selector", kind: "modal", title: "Audience", width: 520, presentation: { selectedRecord: true, collection: "announcements", noRecordContext: true }, render: ({ close, ...context }) => <AudienceSelector context={context} close={close} />, footer: submitFooter("cm-audience", "Save audience") },
         { id: "post preview", kind: "modal", title: "Preview", width: 620, render: ({ ...context }) => <PostPreview context={context} /> },
-        { id: "publish review", kind: "modal", title: "Publish this announcement", tone: "danger", width: 560, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
+        { id: "publish review", kind: "modal", title: "Publish this announcement", width: OVERLAY_WIDTH.form, summary: (context) => <PublishReviewSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
       ],
     },
 

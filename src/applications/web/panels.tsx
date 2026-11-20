@@ -94,17 +94,21 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Overview") {
     return (
       <Stack gap={5}>
-        <section className="web-site-workspace" aria-label="Website working area">
-          <div className="web-site-workspace-head">
-            <div>
-              <span className="web-library-eyebrow">WEBSITES / SITE WORKSPACE</span>
-              <h2>{record.title}</h2>
-              <p>Continue editing, review quality and prepare a release without leaving this site.</p>
-            </div>
-            <div className="web-site-workspace-actions">
-              <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`)}>Edit website</Button>
-              <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)}>Quality checks</Button>
-            </div>
+        <section className="web-site-workspace" data-compact aria-label="Website working area">
+          <div className="web-routes" role="group" aria-label="Route tree">
+            <h3 className="web-pane-title">Route tree <span className="ds-subtle ds-num">{site.pages.length}</span></h3>
+            <ul>
+              {site.pages.map((page) => (
+                <li key={page.id}>
+                  <button type="button" className="web-route" aria-label={`Edit ${page.name} at ${page.path}`}
+                    onClick={() => { ui.setPage(page.id); context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`); }}>
+                    <code>{page.path}</code>
+                    <span className="web-route-name">{page.name}</span>
+                    <span className="ds-subtle ds-num">{page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
           <nav className="web-site-workflow" aria-label="Site work areas">
             {([
@@ -325,9 +329,9 @@ export function ComponentLibrary({ context, lens }: { context: ScreenContext; le
   }
 
   if (lens === "Variants") {
+    if (rows.length === 0) return <Empty title="No variants recorded" icon={<Layers size={20} />}>A variant is a named alternative of a component, for example a hero with the image on the right.</Empty>;
     return (
       <Grid>
-        {rows.length === 0 && <Empty title="No variants recorded" icon={<Layers size={20} />}>A variant is a named alternative of a component, for example a hero with the image on the right.</Empty>}
         {rows.map((component) => (
           <Card key={component.id} span={6} title={component.name} subtitle={`${component.variants.length} variants`}
             footer={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("Component property", { id: component.id })}>Properties</Button>}>
@@ -341,14 +345,16 @@ export function ComponentLibrary({ context, lens }: { context: ScreenContext; le
     );
   }
 
+  if (rows.length === 0) {
+    return (
+      <Empty title={lens === "Shared" ? "Nothing is shared yet" : "No local components"} icon={<Shapes size={20} />}
+        action={<Button variant="primary" onClick={() => context.openOverlay("Component property")}>Extract a section</Button>}>
+        Extract repeated blocks into a component so one edit reaches every page that uses it.
+      </Empty>
+    );
+  }
   return (
     <Grid>
-      {rows.length === 0 && (
-        <Empty title={lens === "Shared" ? "Nothing is shared yet" : "No local components"} icon={<Shapes size={20} />}
-          action={<Button variant="primary" onClick={() => context.openOverlay("Component property")}>Extract a section</Button>}>
-          Extract repeated blocks into a component so one edit reaches every page that uses it.
-        </Empty>
-      )}
       {rows.map((component) => (
         <Card key={component.id} span={4} title={component.name}
           subtitle={component.blocks.map((block) => BLOCK_LABELS[block.type]).join(" · ")}
@@ -380,7 +386,7 @@ export function CmsEditor({ context, lens }: { context: ScreenContext; lens: "Co
   const active = collections.find((item) => item.id === collectionId) ?? collections[0];
 
   async function write(next: SiteModel["cms"], label: string) {
-    await saveSite(context, record!, { ...site, cms: next }, label);
+    if (!(await saveSite(context, record!, { ...site, cms: next }, label))) return;
   }
 
   if (lens === "Collections") {
@@ -571,7 +577,7 @@ export function SiteNavigation({ context, lens }: { context: ScreenContext; lens
   const links = which === "footer" ? site.nav.footer : site.nav.header;
 
   async function writeNav(next: SiteModel["nav"], label: string) {
-    await saveSite(context, record!, { ...site, nav: next }, label);
+    if (!(await saveSite(context, record!, { ...site, nav: next }, label))) return;
   }
 
   function setLinks(nextLinks: NavLink[], label: string) {
@@ -736,7 +742,7 @@ export function SiteForms({ context, lens }: { context: ScreenContext; lens: "Fo
   const active = siteForms.find((form) => form.id === selectedFormId) ?? siteForms[0];
 
   async function writeForms(next: SiteModel["forms"], label: string) {
-    await saveSite(context, record!, { ...site, forms: next }, label);
+    if (!(await saveSite(context, record!, { ...site, forms: next }, label))) return;
   }
 
   if (lens === "Forms") {
@@ -1055,7 +1061,7 @@ export function LinkPickerForm({ context, close }: { context: ScreenContext; clo
         const next: NavLink = { id: existing?.id ?? `n-${wallMs().toString(36)}`, label: label.trim(), kind, target: target.trim(), children: existing?.children ?? [] };
         const updated = placeLink(links, next, parentId);
         const under = parentId ? links.find((link) => link.id === parentId)?.label : "";
-        await saveSite(context, record, { ...site, nav: { ...site.nav, [which]: updated } }, existing ? `Menu link ${next.label} updated` : `Menu link ${next.label} added${under ? ` under ${under}` : ""}`);
+        if (!(await saveSite(context, record, { ...site, nav: { ...site.nav, [which]: updated } }, existing ? `Menu link ${next.label} updated` : `Menu link ${next.label} added${under ? ` under ${under}` : ""}`))) return;
         context.toast("Menu saved", `${next.label} points at ${next.target}${under ? `, in the ${under} submenu` : ""}.`);
         close();
       }}
@@ -1105,10 +1111,10 @@ export function RedirectForm({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         if (!from.trim() || loop) return;
-        await saveSite(context, record, {
+        if (!(await saveSite(context, record, {
           ...site,
           nav: { ...site.nav, redirects: [...site.nav.redirects, { id: redirectId(), from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
-        }, `Redirect ${from.trim()} added`);
+        }, `Redirect ${from.trim()} added`))) return;
         context.toast("Redirect added", `${from.trim()} will answer with a ${code}.`);
         close();
       }}
@@ -1192,7 +1198,7 @@ export function SchemaEditorForm({ context, close }: { context: ScreenContext; c
         const collections = existing
           ? site.cms.collections.map((item) => (item.id === existing.id ? collection : item))
           : [...site.cms.collections, collection];
-        await saveSite(context, record, { ...site, cms: { ...site.cms, collections } }, existing ? `Schema of ${collection.name} changed` : `Collection ${collection.name} created`);
+        if (!(await saveSite(context, record, { ...site, cms: { ...site.cms, collections } }, existing ? `Schema of ${collection.name} changed` : `Collection ${collection.name} created`))) return;
         context.toast("Schema saved", `${collection.name} has ${parsed.length} fields.`);
         close();
       }}
@@ -1282,7 +1288,7 @@ export function EntryDetailForm({ context, close }: { context: ScreenContext; cl
           values,
         };
         const entries = existing ? site.cms.entries.map((item) => (item.id === existing.id ? entry : item)) : [...site.cms.entries, entry];
-        await saveSite(context, record, { ...site, cms: { ...site.cms, entries } }, existing ? `Entry ${entry.title} edited` : `Entry ${entry.title} created`);
+        if (!(await saveSite(context, record, { ...site, cms: { ...site.cms, entries } }, existing ? `Entry ${entry.title} edited` : `Entry ${entry.title} created`))) return;
         context.toast("Entry saved", `${entry.title} is ${entry.status} in ${collection.name}.`);
         close();
       }}
@@ -1333,7 +1339,7 @@ export function ComponentPropertyForm({ context, close }: { context: ScreenConte
           blocks: existing?.blocks ?? (source ? source.blocks.slice(0, 2) : []),
         };
         const components = existing ? site.components.map((item) => (item.id === existing.id ? component : item)) : [...site.components, component];
-        await saveSite(context, record, { ...site, components }, existing ? `Component ${component.name} updated` : `Component ${component.name} extracted from ${source?.name ?? "the site"}`);
+        if (!(await saveSite(context, record, { ...site, components }, existing ? `Component ${component.name} updated` : `Component ${component.name} extracted from ${source?.name ?? "the site"}`))) return;
         context.toast("Component saved", `${component.name} holds ${component.blocks.length} blocks.`);
         close();
       }}

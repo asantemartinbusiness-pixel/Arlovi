@@ -85,12 +85,14 @@ export function ChannelList({
 }
 
 export function Conversation({
-  context, channel, messages, onCreateTask,
+  context, channel, messages, onCreateTask, showHeader = true,
 }: {
   context: ScreenContext;
   channel: Rec;
   messages: Rec[];
   onCreateTask?: (message: Rec) => void;
+  /** False when the page head (RecordHeader) already names the conversation. */
+  showHeader?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -128,9 +130,9 @@ export function Conversation({
     const reactions = parseReactions(message.fields.reactions);
     const names = reactions[emoji] ?? [];
     reactions[emoji] = names.includes(context.actor) ? names.filter((name) => name !== context.actor) : [...names, context.actor];
-    await context.mutate.patch(message.id, {
+    if (!(await context.mutate.patch(message.id, {
       fields: { ...message.fields, reactions: formatReactions(reactions) },
-    }, { event: `${context.actor} reacted ${emoji} to ${message.title}` });
+    }, { event: `${context.actor} reacted ${emoji} to ${message.title}` }))) return;
   }
 
   async function send() {
@@ -214,10 +216,10 @@ export function Conversation({
               size="sm"
               variant="ghost"
               onClick={async () => {
-                await context.mutate.patch(message.id, {
+                if (!(await context.mutate.patch(message.id, {
                   status: message.fields.pinned === true ? "sent" : "pinned",
                   fields: { ...message.fields, pinned: message.fields.pinned !== true },
-                }, { event: `${message.title} ${message.fields.pinned === true ? "unpinned" : "pinned"} by ${context.actor}` });
+                }, { event: `${message.title} ${message.fields.pinned === true ? "unpinned" : "pinned"} by ${context.actor}` }))) return;
               }}
             >
               {message.fields.pinned === true ? "Unpin" : "Pin"}
@@ -231,18 +233,20 @@ export function Conversation({
 
   return (
     <Stack gap={4}>
-      <Row gap={2} wrap>
-        <strong style={{ fontSize: "var(--text-lg)" }}>
-          {channel.fields.kind === "group" ? channel.title : `#${channel.title}`}
-        </strong>
-        <Pill tone={channel.fields.visibility === "private" ? "warning" : "neutral"} dot>{String(channel.fields.visibility ?? "public")}</Pill>
-        <span className="ds-subtle ds-grow">{channel.summary}</span>
-        <span className="ds-subtle">
-          {memberCount === null
-            ? "Membership not recorded"
-            : <><span className="ds-num">{memberCount}</span> {memberCount === 1 ? "member" : "members"}</>}
-        </span>
-      </Row>
+      {showHeader && (
+        <Row gap={2} wrap>
+          <strong style={{ fontSize: "var(--text-lg)" }}>
+            {channel.fields.kind === "group" ? channel.title : `#${channel.title}`}
+          </strong>
+          <Pill tone={channel.fields.visibility === "private" ? "warning" : "neutral"} dot>{String(channel.fields.visibility ?? "public")}</Pill>
+          <span className="ds-subtle ds-grow">{channel.summary}</span>
+          <span className="ds-subtle">
+            {memberCount === null
+              ? "Membership not recorded"
+              : <><span className="ds-num">{memberCount}</span> {memberCount === 1 ? "member" : "members"}</>}
+          </span>
+        </Row>
+      )}
 
       {channel.fields.visibility === "private" && (
         <Notice tone="warning" title="This channel is private">
@@ -297,7 +301,7 @@ export function Conversation({
           onChange={(event) => setDraft(event.target.value)}
           rows={3}
           aria-label={`Message ${channel.title}`}
-          placeholder={`Message ${channel.fields.kind === "group" ? channel.title : `#${channel.title}`}. Type a full name after @ to mention someone.`}
+          placeholder={`Message ${channel.fields.kind === "group" ? channel.title : `#${channel.title}`}. Type @ and a full name to mention someone.`}
           onKeyDown={(event) => {
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send(); return; }
             if ((event.key === "Tab" || event.key === "Enter") && suggestions.length > 0) { event.preventDefault(); setDraft(completeMention(draft, suggestions[0])); }
@@ -315,7 +319,7 @@ export function Conversation({
           </div>
         )}
         <Row gap={2}>
-          <span className="ds-subtle ds-grow">Posted to this workspace only: no email, push or chat provider is connected, so nothing is delivered elsewhere. A mention lists the message on that person&rsquo;s Communications home and grants them nothing.</span>
+          <span className="ds-subtle ds-grow">Posted in Arlovi only. No email or push service is connected, so nothing is delivered elsewhere.</span>
           <Button type="submit" variant="primary" busy={busy} disabled={!draft.trim()}>Send</Button>
         </Row>
       </form>

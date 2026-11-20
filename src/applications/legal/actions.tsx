@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { clausesOf, lifecycleLabel, type Clause } from "./panels";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/platform/commit";
 export { RecordReview } from "./review";
 
 /* ------------------------------------------------------------------ *
@@ -61,7 +62,7 @@ export function AssignOwnerForm({ context, close, collections, label }: { contex
         event.preventDefault();
         const owner = String(new FormData(event.currentTarget).get("owner") ?? "");
         if (!item || !owner) return;
-        await context.mutate.patch(item.id, { fields: { ...item.fields, owner, previousOwner: String(item.fields.owner ?? item.ownerName), assignedBy: context.actor } }, { expectRevision: item.revision, event: `${item.title} assigned to ${owner} by ${context.actor}` });
+        if (!(await context.mutate.patch(item.id, { fields: { ...item.fields, owner, previousOwner: String(item.fields.owner ?? item.ownerName), assignedBy: context.actor } }, { expectRevision: item.revision, event: `${item.title} assigned to ${owner} by ${context.actor}` }))) return;
         context.toast("Assigned", `${owner} owns ${item.title}.`);
         close();
       }}
@@ -157,7 +158,7 @@ export async function approveLegalStep(context: ScreenContext): Promise<void> {
     rows: [{ label: "Flagged clauses", value: flagged.length ? `${flagged.length} — ${flagged.map((clause) => clause.title).join(", ")}` : "None" }],
     confirm: `Approve and move to ${lifecycleLabel(next)}`,
     run: async () => {
-      await context.mutate.patch(contract.id, { status: next, fields: { ...contract.fields, [`${next}By`]: context.actor, [`${next}At`]: clockIso() } }, { expectRevision: contract.revision, event: `${contract.title}: ${lifecycleLabel(contract.status)} approved by ${context.actor}; now ${lifecycleLabel(next)}` });
+      if (!(await context.mutate.patch(contract.id, { status: next, fields: { ...contract.fields, [`${next}By`]: context.actor, [`${next}At`]: clockIso() } }, { expectRevision: contract.revision, event: `${contract.title}: ${lifecycleLabel(contract.status)} approved by ${context.actor}; now ${lifecycleLabel(next)}` }))) return;
       context.toast("Step approved", `${contract.title} is ${lifecycleLabel(next)}.`);
     },
   });
@@ -178,7 +179,7 @@ export function CommentOnContract({ context, close }: { context: ScreenContext; 
         event.preventDefault();
         if (!text.trim()) return;
         const comment: Comment = { id: crypto.randomUUID(), clauseId, by: context.actor, at: clockIso(), text: text.trim() };
-        await context.mutate.patch(contract.id, { body: { ...(contract.body as object ?? {}), comments: [...existing, comment] } }, { expectRevision: contract.revision, event: `${context.actor} commented on ${contract.title}${clauseId ? ` clause ${clauseId}` : ""}` });
+        if (!(await context.mutate.patch(contract.id, { body: { ...(contract.body as object ?? {}), comments: [...existing, comment] } }, { expectRevision: contract.revision, event: `${context.actor} commented on ${contract.title}${clauseId ? ` clause ${clauseId}` : ""}` }))) return;
         context.toast("Comment added", contract.fields.immutableSigned === true ? "The comment sits beside the signed text; the signed version is unchanged." : "It is on the contract with your name.");
         close();
       }}
@@ -208,11 +209,12 @@ export async function publishPolicy(context: ScreenContext, policy: Rec): Promis
     run: async () => {
       const due = new Date(context.now);
       due.setUTCFullYear(due.getUTCFullYear() + 1);
-      await context.mutate.patch(policy.id, { status: "published", at: clockIso(), dueAt: due.toISOString(), fields: { ...policy.fields, publishedBy: context.actor, acknowledged: 0 } }, { expectRevision: policy.revision, event: `${policy.title} v${String(policy.fields.version ?? "")} published by ${context.actor}` });
       const old = await recordOf(context, supersededId, "policies");
-      if (old && old.status !== "superseded") {
-        await context.mutate.patch(old.id, { status: "superseded", fields: { ...old.fields, supersededBy: policy.id } }, { expectRevision: old.revision, event: `${old.title} v${String(old.fields.version ?? "")} superseded by v${String(policy.fields.version ?? "")}; kept for history` });
-      }
+      // The new version and the one it replaces change together or not at all.
+      if (!(await commitTogether(context, [
+        { record: policy, patch: { status: "published", at: clockIso(), dueAt: due.toISOString(), fields: { ...policy.fields, publishedBy: context.actor, acknowledged: 0 } }, event: `${policy.title} v${String(policy.fields.version ?? "")} published by ${context.actor}` },
+        ...(old && old.status !== "superseded" ? [{ record: old, patch: { status: "superseded", fields: { ...old.fields, supersededBy: policy.id } }, event: `${old.title} v${String(old.fields.version ?? "")} superseded by v${String(policy.fields.version ?? "")}; kept for history` }] : []),
+      ]))) return;
       context.toast("Policy published", old ? `v${String(old.fields.version ?? "")} is kept as superseded.` : "It is live for its audience.");
     },
   });
@@ -228,7 +230,7 @@ export async function requestAcknowledgment(context: ScreenContext, reach: numbe
     boundary: "email.send",
     confirm: "Request acknowledgement",
     run: async () => {
-      await context.mutate.patch(policy.id, { fields: { ...policy.fields, acknowledgementRequired: true, ackRequestedBy: context.actor, ackRequestedAt: clockIso(), ackRequestedOf: reach } }, { expectRevision: policy.revision, event: `Acknowledgement of ${policy.title} v${String(policy.fields.version ?? "")} requested from ${reach} people by ${context.actor}` });
+      if (!(await context.mutate.patch(policy.id, { fields: { ...policy.fields, acknowledgementRequired: true, ackRequestedBy: context.actor, ackRequestedAt: clockIso(), ackRequestedOf: reach } }, { expectRevision: policy.revision, event: `Acknowledgement of ${policy.title} v${String(policy.fields.version ?? "")} requested from ${reach} people by ${context.actor}` }))) return;
       await logBoundary(context, "email.send", `Acknowledgement request for ${policy.title} kept locally`, policy.id);
       context.toast("Acknowledgement requested", `${reach} people are asked in this workspace. No email left the browser.`);
     },
@@ -257,7 +259,7 @@ export function Reminder({ context, close }: { context: ScreenContext; close: ()
         if (invalid) return;
         const owner = String(obligation.fields.owner ?? obligation.ownerName);
         await context.mutate.create({ collection: "tasks", title: `Reminder: ${obligation.title}`, status: "ready", summary: `Due ${obligation.dueAt} (${zone}, ${String(obligation.fields.jurisdiction ?? org.jurisdiction)}).`, parentId: obligation.id, dueAt: remindAt.toISOString(), startAt: remindAt.toISOString(), endAt: remindAt.toISOString(), fields: { kind: "legalReminder", assignee: owner, stage: "ready", obligationId: obligation.id, timezone: zone } }, `Reminder for ${obligation.title} set for ${remindAt.toISOString()} by ${context.actor}`);
-        await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, reminderDays: value, reminderAt: remindAt.toISOString() } }, { expectRevision: obligation.revision, event: `${obligation.title} reminder ${value} days before` });
+        if (!(await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, reminderDays: value, reminderAt: remindAt.toISOString() } }, { expectRevision: obligation.revision, event: `${obligation.title} reminder ${value} days before` }))) return;
         context.toast("Reminder set", `${owner} is reminded ${context.dateTime(remindAt)} (${zone}). It appears as a task here; nothing is emailed.`);
         close();
       }}
@@ -291,7 +293,7 @@ export function RiskReview({ context, close }: { context: ScreenContext; close: 
         if (ai && !ownerConfirms) return;
         const form = new FormData(event.currentTarget);
         const next = String(form.get("next") ?? "");
-        await context.mutate.patch(risk.id, { status: String(form.get("status") ?? risk.status), dueAt: next ? new Date(`${next}T09:00:00.000Z`).toISOString() : risk.dueAt, fields: { ...risk.fields, reviewedAt: clockIso().slice(0, 10), reviewedBy: context.actor, reviewNote: String(form.get("note") ?? ""), aiSuggested: false } }, { expectRevision: risk.revision, event: `${risk.title} reviewed by ${context.actor}` });
+        if (!(await context.mutate.patch(risk.id, { status: String(form.get("status") ?? risk.status), dueAt: next ? new Date(`${next}T09:00:00.000Z`).toISOString() : risk.dueAt, fields: { ...risk.fields, reviewedAt: clockIso().slice(0, 10), reviewedBy: context.actor, reviewNote: String(form.get("note") ?? ""), aiSuggested: false } }, { expectRevision: risk.revision, event: `${risk.title} reviewed by ${context.actor}` }))) return;
         context.toast("Review recorded", `${risk.title} was reviewed by ${context.actor}; the score is theirs to own.`);
         close();
       }}
@@ -377,18 +379,14 @@ export function SharePack({ context, close }: { context: ScreenContext; close: (
       <Field label="Or an external address (auditor, solicitor)"><TextInput type="email" value={external} onChange={(event) => setExternal(event.target.value)} /></Field>
       {refused && <Notice tone="danger" title="Sharing outside is refused">{held ? "A legal hold is on. " : ""}{restricted ? "The pack holds restricted records. " : ""}{!context.can("export_data") ? "This role view may not export. " : ""}Inside sharing is still possible.</Notice>}
       {outside && !refused && <Boundary id="email.send" />}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={(!to && !outside) || refused} onClick={async () => {
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button variant="primary" disabled={(!to && !outside) || refused} onClick={async () => {
           const recipients = [to, external.trim()].filter(Boolean);
           const shared = [...new Set([...String(pack.fields.sharedWith ?? "").split(",").filter(Boolean), ...recipients])];
-          await context.mutate.patch(pack.id, { fields: { ...pack.fields, sharedWith: shared.join(","), sharedBy: context.actor } }, { expectRevision: pack.revision, event: `${pack.title} shared with ${recipients.join(", ")} by ${context.actor}` });
+          if (!(await context.mutate.patch(pack.id, { fields: { ...pack.fields, sharedWith: shared.join(","), sharedBy: context.actor } }, { expectRevision: pack.revision, event: `${pack.title} shared with ${recipients.join(", ")} by ${context.actor}` }))) return;
           if (outside) await logBoundary(context, "email.send", `Share of ${pack.title} with ${external.trim()} queued locally`, pack.id);
           context.toast("Shared", outside ? `Recorded. ${external.trim()} has not been sent anything: no mail provider is connected.` : `${to} can see ${pack.title} in this workspace.`);
           close();
-        }}>Share the pack</Button>
-      </Row>
+        }}>Share the pack</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -405,6 +403,6 @@ export async function hashPack(context: ScreenContext): Promise<void> {
   const stored = String(pack.fields.hash ?? "");
   const comparable = pack.fields.hashMethod === "sha256-members" || pack.fields.hashMethod === "sha256-record";
   const matches = comparable && stored === fresh;
-  await context.mutate.patch(pack.id, { fields: { ...pack.fields, hash: comparable ? stored : fresh, hashMethod: comparable ? String(pack.fields.hashMethod) : "sha256-record", previousHash: comparable ? String(pack.fields.previousHash ?? "") : stored, lastHashCheck: clockIso(), lastHashResult: comparable ? (matches ? "unchanged" : "changed") : "first computed", lastHashBy: context.actor } }, { expectRevision: pack.revision, event: comparable ? `${pack.title} hash checked by ${context.actor}: ${matches ? "unchanged" : `changed (now ${fresh})`}` : `${pack.title} hashed with SHA-256 by ${context.actor}; earlier value ${stored} kept` });
+  if (!(await context.mutate.patch(pack.id, { fields: { ...pack.fields, hash: comparable ? stored : fresh, hashMethod: comparable ? String(pack.fields.hashMethod) : "sha256-record", previousHash: comparable ? String(pack.fields.previousHash ?? "") : stored, lastHashCheck: clockIso(), lastHashResult: comparable ? (matches ? "unchanged" : "changed") : "first computed", lastHashBy: context.actor } }, { expectRevision: pack.revision, event: comparable ? `${pack.title} hash checked by ${context.actor}: ${matches ? "unchanged" : `changed (now ${fresh})`}` : `${pack.title} hashed with SHA-256 by ${context.actor}; earlier value ${stored} kept` }))) return;
   context.toast(comparable ? (matches ? "Hash unchanged" : "Contents changed") : "Hash computed", comparable ? (matches ? "The pack's contents match the stored hash." : `The recomputed hash ${fresh.slice(0, 20)}… differs from the stored one.`) : `SHA-256 ${fresh.slice(0, 20)}… is stored; the earlier value is kept as previous.`, comparable && !matches ? "blocked" : "ok");
 }

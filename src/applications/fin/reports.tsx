@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BarChart3, FileDown } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextInput,
+  BarChart, Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, Pill, OverlaySummary, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -400,27 +400,31 @@ export function ReportDesigner({ context, close }: { context: ScreenContext; clo
   const [busy, setBusy] = useState(false);
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={title.trim() !== ""} />
+      <ModalInFlight when={busy} />
       <Field label="Report name" required><TextInput aria-label="Report name" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Based on">
         <Select aria-label="Based on" value={statement} onChange={(event) => setStatement(event.target.value as Statement)}>
           {(Object.keys(STATEMENT_LABEL) as Statement[]).map((key) => <option key={key} value={key}>{STATEMENT_LABEL[key]}</option>)}
         </Select>
       </Field>
-      <Properties rows={[
-        { label: "Source", value: "Posted journals in this workspace" },
-        { label: "Accounts available", value: String(data.accounts.length) },
-        { label: "Periods available", value: data.periods.length ? data.periods.join(", ") : "None" },
+      <FactGrid columns={3} items={[
+        { label: "Source", value: "Posted journals" },
+        { label: "Accounts available", value: String(data.accounts.length), mono: true },
+        { label: "Periods available", value: data.periods.length ? data.periods.join(", ") : "None", mono: true },
       ]} />
       <Notice tone="info" title="A definition is a record, not a file">
-        Saving stores which statement and period you chose. Exporting still writes the CSV from live records.
+        Saving stores which statement you chose. Exporting still writes the CSV from live records.
       </Notice>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!title.trim()}
           onClick={async () => {
             setBusy(true);
+            try {
             await context.mutate.create({
               collection: "budgets",
               title: title.trim(),
@@ -429,14 +433,19 @@ export function ReportDesigner({ context, close }: { context: ScreenContext; clo
               fields: { kind: "reportSchedule", statement, cadence: "monthly", recipient: context.actor },
             }, `Report definition ${title.trim()} saved`);
             context.toast("Definition saved", "It appears under Scheduled. Nothing will be sent, because no mail provider is connected.");
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Definition not saved", error instanceof Error ? error.message : "Try again.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save the definition
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -447,14 +456,15 @@ export function SourceNoteOverlay({ context }: { context: ScreenContext }) {
   const consolidation = consolidate(data.entities, data.journals);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Source", value: "Posted journals and the chart of accounts in this browser" },
-        { label: "Posted journals", value: String(data.postedCount) },
-        { label: "Drafts excluded", value: String(data.draftJournals.length) },
+      <OverlaySummary eyebrow="Statement source" title="Posted journals in this browser" status={<Pill tone="success" dot>Posted only</Pill>}
+        meta={["Chart of accounts and journals; no external source"]} />
+      <FactGrid columns={3} items={[
+        { label: "Posted journals", value: String(data.postedCount), mono: true },
+        { label: "Drafts excluded", value: String(data.draftJournals.length), mono: true },
+        { label: "Entities with postings", value: String(consolidation.columns.filter((column) => column.debitMinor > 0).length), mono: true },
         { label: "Earliest posting", value: data.periods.length ? periodLabel(data.periods[data.periods.length - 1], org.locale) : "None" },
         { label: "Latest posting", value: data.periods.length ? periodLabel(data.periods[0], org.locale) : "None" },
-        { label: "Bank feed", value: <Pill tone="warning">Not connected</Pill> },
-        { label: "Entities with postings", value: String(consolidation.columns.filter((column) => column.debitMinor > 0).length) },
+        { label: "Bank feed", value: "Not connected", tone: "warning" },
       ]} />
       <Notice tone="info" title="What is never mixed in">
         A draft journal, a forecast assumption and an imported statement line are all excluded from these statements. Only a posted journal moves a reported figure.
@@ -495,20 +505,24 @@ export function ReportSchedule({ context, close }: { context: ScreenContext; clo
       <Notice tone="warning" title="Nothing will be delivered">
         No mail provider is connected and nothing in this workspace runs while the tab is closed. A schedule is a note of intent.
       </Notice>
-      <Row gap={3} wrap>
+      <ModalUnsavedChanges when={cadence !== "monthly" || recipient !== context.actor} />
+      <ModalInFlight when={busy} />
+      <div className="fin-form-grid">
         <Field label="Cadence">
           <Select aria-label="Cadence" value={cadence} onChange={(event) => setCadence(event.target.value)}>
             {["weekly", "monthly", "quarterly"].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
         <Field label="For"><TextInput aria-label="For" value={recipient} onChange={(event) => setRecipient(event.target.value)} /></Field>
-      </Row>
-      <Row gap={2}>
-        <Button
+      </div>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           onClick={async () => {
             setBusy(true);
+            try {
             await context.mutate.create({
               collection: "budgets",
               title: `${cadence} statements for ${recipient}`,
@@ -517,14 +531,19 @@ export function ReportSchedule({ context, close }: { context: ScreenContext; clo
               fields: { kind: "reportSchedule", cadence, recipient, delivery: "not_connected" },
             }, `Report schedule recorded for ${recipient}`);
             context.toast("Schedule recorded", "It is a local reminder. Nothing will be sent.", "info");
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Schedule not recorded", error instanceof Error ? error.message : "Try again.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record the schedule
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

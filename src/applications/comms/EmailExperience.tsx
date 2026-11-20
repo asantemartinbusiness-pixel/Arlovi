@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Archive, ArrowLeft, ArrowRight, AtSign, CheckCheck, ChevronRight, CircleAlert,
-  FilePenLine, Inbox, Mail, MailOpen, Plus, Search, Send, Settings2, ShieldCheck,
-  ShieldAlert, Users, X,
+  Archive, ArrowLeft, ArrowRight, CheckCheck, CircleAlert,
+  Mail, MailOpen, Search, ShieldCheck,
+  Users, X,
 } from "lucide-react";
 import { Avatar, Button, Notice, Pill, Row, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -10,26 +10,21 @@ import { useCollections, useWorkspace } from "@/platform/workspace";
 import { useCommsData } from "./panels";
 import { MAIL_FOLDERS, folderCounts, folderOf, searchThreads, type MailFolder } from "./mailbox";
 import { filterMailView, relatedMailContext, type MailView } from "./mailViews";
-import { MailConnectionSetup, MailIdentityManager, NotSentNotice } from "./mail";
+import { MailConnectionSetup, MailIdentityManager } from "./mail";
 import type { Rec } from "@/domain/types";
 
 export type EmailArea = MailFolder | "Accounts & domains" | "Sender identities" | "Shared inboxes";
 
-const NAV = [
-  { label: "Inbox", Icon: Inbox },
-  { label: "Sent", Icon: Send },
-  { label: "Drafts", Icon: FilePenLine },
-  { label: "Archive", Icon: Archive },
-  { label: "Spam", Icon: ShieldAlert },
-] as const;
-const CONFIG = [
-  { label: "Shared inboxes", Icon: Users },
-  { label: "Accounts & domains", Icon: Settings2 },
-  { label: "Sender identities", Icon: AtSign },
-] as const;
-
-function remoteStatus() {
-  return <span className="cmx-connection"><span className="cmx-status-dot" /> Provider not connected</span>;
+/**
+ * Counts shown on the registry tabs. The tab strip is the only folder
+ * navigation on this page, so the unread inbox and the draft total live
+ * there. EmailExperience publishes them; the tab strip reads them when the
+ * page header renders.
+ */
+let tabCounts: Record<string, number> = {};
+export function mailTabCount(area: EmailArea): number | undefined {
+  const value = tabCounts[area];
+  return value && value > 0 ? value : undefined;
 }
 
 function addressOf(row: Rec): string {
@@ -123,55 +118,39 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
   const config = !MAIL_FOLDERS.some(f => f === lens);
   const rows = config ? [] : filterMailView(searchThreads(data.emailThreads, query, folder), view);
   const counts = folderCounts(data.emailThreads);
+  const unreadInbox = data.emailThreads.filter((row) => folderOf(row) === "inbox" && row.fields.unread === true).length;
+  const draftTotal = counts.drafts ?? 0;
+  useEffect(() => {
+    if (tabCounts.Inbox === unreadInbox && tabCounts.Drafts === draftTotal) return;
+    tabCounts = { Inbox: unreadInbox, Drafts: draftTotal };
+    /* The tab strip is rendered by the page host and reads the counts when it
+       renders; re-selecting the current tab (a replace navigation) refreshes it. */
+    context.setTab(lens);
+  }, [unreadInbox, draftTotal]);
   const selected = rows.find(row => row.id === selectedId) ?? null;
   const related = selected ? relatedMailContext(selected, data.contacts, tasks) : null;
   const messages = (selected?.body as { messages?: { from?: string; body?: string; at?: string; external?: boolean }[] } | undefined)?.messages ?? [];
   const compose = (id?: string) => context.openOverlay("Compose window", id ? { id } : undefined);
   const changeFolder = (next: EmailArea) => { setSelectedId(null); setShowReader(false); setQuery(""); setView("all"); context.setTab(next); };
   const archive = async (row: Rec) => {
-    await context.mutate.patch(row.id, { status: "archive", fields: { ...row.fields, folder: "archive" } }, { event: `Email “${row.title}” archived by ${context.actor}` });
+    if (!(await context.mutate.patch(row.id, { status: "archive", fields: { ...row.fields, folder: "archive" } }, { event: `Email “${row.title}” archived by ${context.actor}` }))) return;
     setSelectedId(null); setShowReader(false);
   };
   const markRead = async (row: Rec) => {
-    await context.mutate.patch(row.id, { fields: { ...row.fields, unread: false } }, { event: `Email “${row.title}” marked read by ${context.actor}` });
+    if (!(await context.mutate.patch(row.id, { fields: { ...row.fields, unread: false } }, { event: `Email “${row.title}” marked read by ${context.actor}` }))) return;
   };
-  const displayName = lens === "Inbox" ? "Inbox" : lens;
 
   return (
     <section className="cmx-shell" aria-label="Communications email workspace">
-      <aside className="cmx-rail" aria-label="Email navigation">
-        <div className="cmx-rail-heading"><span>MAILBOXES</span>{remoteStatus()}</div>
-        <nav aria-label="Mail folders">
-          {NAV.map(({label, Icon}) => (
-            <button className="cmx-rail-link" data-active={label === lens} aria-current={label === lens ? "page" : undefined} type="button" key={label} onClick={() => changeFolder(label)}>
-              <Icon size={16}/><span>{label}</span><small>{counts[label.toLowerCase()] ?? 0}</small>
-            </button>
-          ))}
-        </nav>
-        <div className="cmx-rail-heading cmx-rail-separator"><span>WORKSPACE</span></div>
-        <nav aria-label="Email management">
-          {CONFIG.map(({label, Icon}) => (
-            <button className="cmx-rail-link" data-active={label === lens} aria-current={label === lens ? "page" : undefined} type="button" key={label} onClick={() => changeFolder(label)}>
-              <Icon size={16}/><span>{label}</span><ChevronRight size={13}/>
-            </button>
-          ))}
-        </nav>
-        <div className="cmx-rail-foot"><p>Mail is currently stored in this browser. External delivery requires a provider.</p><Button variant="primary" size="sm" onClick={() => compose()}><Plus size={14}/> New draft</Button></div>
-      </aside>
       <main className="cmx-main">
         {config ? (
           <div className="cmx-settings">
-            <div className="cmx-header"><div><span className="cmx-eyebrow">COMMUNICATIONS / SETTINGS</span><h2>{lens}</h2><p>Manage the email experience for your workspace.</p></div>{remoteStatus()}</div>
             {lens === "Accounts & domains" ? <MailConnectionSetup context={context}/> :
               lens === "Sender identities" ? <MailIdentityManager context={context}/> :
               <SharedInboxWorkspace context={context}/>}
           </div>
         ) : (
           <>
-            <div className="cmx-header">
-              <div><span className="cmx-eyebrow">COMMUNICATIONS / MAIL</span><h2>{displayName}</h2><p>{lens === "Inbox" ? "Conversations and correspondence in one place." : `Your ${folder} messages and local records.`}</p></div>
-              <div className="cmx-head-actions">{remoteStatus()}<Button size="sm" variant="primary" onClick={() => compose()}><Plus size={14}/> Compose</Button></div>
-            </div>
             <div className="cmx-toolbar">
               <label className="cmx-search"><Search size={16}/><TextInput type="search" aria-label="Search email conversations" placeholder="Search messages, people, subjects…" value={query} onChange={e => setQuery(e.target.value)} />{query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={14}/></button>}</label>
               <div className="cmx-filter-group" aria-label="Mail filters">
@@ -181,10 +160,9 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
               </div>
               <span className="cmx-count">{rows.length} {rows.length===1?"conversation":"conversations"}</span>
             </div>
-            {lens === "Drafts" && <div className="cmx-draft-banner"><NotSentNotice context={context}/></div>}
             <div className="cmx-workspace">
               <section className="cmx-list" aria-label={`${lens} conversations`}>
-                <div className="cmx-list-heading"><span>{lens}</span><span>{rows.length} total</span></div>
+                <div className="cmx-list-heading"><span>Conversations</span><span>{rows.length} total</span></div>
                 {rows.length ? rows.map(row => (
                   <button type="button" key={row.id} data-active={selectedId === row.id} data-unread={row.fields.unread === true} className="cmx-message" onClick={() => { setSelectedId(row.id); setShowReader(true); context.select(row.id); }}>
                     <Avatar size="sm" name={addressOf(row) || "Unknown"}/>
@@ -192,7 +170,7 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
                       <span className="cmx-message-line"><strong>{addressOf(row)||"Unknown sender"}</strong><time>{context.relative(row.at)}</time></span>
                       <span className="cmx-message-subject">{row.title}{row.fields.risk === "phishing" && <CircleAlert size={14}/>}</span>
                       <span className="cmx-message-preview">{row.summary || "No preview available"}</span>
-                      <span className="cmx-message-tags">{String(row.fields.labels ?? "").split(",").filter(Boolean).slice(0,2).map(label=><em key={label}>{label}</em>)}{folderOf(row)==="drafts"&&<em>Not sent</em>}</span>
+                      <span className="cmx-message-tags">{String(row.fields.labels ?? "").split(",").filter(Boolean).slice(0,2).map(label=><em key={label}>{label}</em>)}{(folderOf(row)==="drafts"||folderOf(row)==="sent")&&<em className="cmx-notdelivered">Not delivered</em>}</span>
                     </span>
                     {row.fields.unread === true && <span className="cmx-unread" aria-label="Unread"/>}
                   </button>
@@ -210,6 +188,7 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
                       </div>
                     </div>
                     <h3>{selected.title}</h3>
+                    {(folderOf(selected)==="drafts"||folderOf(selected)==="sent") && <p className="cmx-meta"><Pill tone="warning" dot>Local draft, not delivered</Pill></p>}
                     <p className="cmx-meta"><strong>From</strong> {String(selected.fields.from??"Unknown")}</p>
                     <p className="cmx-meta"><strong>To</strong> {String(selected.fields.to??"Not specified")}</p>
                     <div className="cmx-thread-body">
@@ -230,7 +209,7 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
                 ) : rows.length === 0 ? (
                   <MailEmpty lens={lens} query={query || (view==="all"?"":"filtered")} onCompose={()=>compose()} onSetup={()=>changeFolder("Accounts & domains")}/>
                 ) : (
-                  <div className="cmx-select-state"><div><Mail size={28}/></div><h3>Select a conversation</h3><p>Read messages, review linked business records and take action without leaving the inbox.</p></div>
+                  <div className="cmx-select-state"><div><Mail size={28}/></div><h3>Select a conversation</h3><p>Read messages, review linked business records and take action without leaving the mailbox.</p></div>
                 )}
               </section>
             </div>

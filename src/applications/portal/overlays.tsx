@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row,
+  Button, Card, Checkbox, DataGrid, Empty, Field, FactGrid, Notice, OverlayActions, OverlaySection, OverlaySummary, Pill, Properties, Row,
   Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -8,7 +8,7 @@ import { useRecord, useWorkspace } from "@/platform/workspace";
 import { ProviderBoundary } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, expiryState, listedPortals, portalDocuments, portalUsers, resolvePortal, sharedRecords, sharedWithPortal, statusTone,
+  bodyOf, expiryState, GATE_LABELS, listedPortals, portalDocuments, portalUsers, resolvePortal, sharedRecords, sharedWithPortal, statusTone,
   usePortalData, type PortalBody,
 } from "./data";
 import { InvoiceTotalsCard, usePortal } from "./panels";
@@ -116,9 +116,10 @@ export function PortalBranding({ context, close }: { context: ScreenContext; clo
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(portal.id, {
+        const saved1 = await context.mutate.patch(portal.id, {
           fields: { ...portal.fields, accent, customDomain: domain.trim(), domainVerified: false },
         }, { expectRevision: portal.revision, event: `Branding changed on ${portal.title}` });
+        if (!saved1) return;
         context.toast("Branding saved", domain.trim() ? "The domain is recorded. It cannot be verified from a browser, so the portal still opens through the workspace." : "The accent is saved.");
         close();
       }}
@@ -152,9 +153,10 @@ export function AccessSetup({ context, close }: { context: ScreenContext; close:
       onSubmit={async (event) => {
         event.preventDefault();
         if (inherits) return;
-        await context.mutate.patch(portal.id, {
+        const saved2 = await context.mutate.patch(portal.id, {
           fields: { ...portal.fields, linkExpiryDays: Number(expiry) || 30, inheritsInternalAccess: false },
         }, { expectRevision: portal.revision, event: `Access settings changed on ${portal.title}` });
+        if (!saved2) return;
         context.toast("Access saved", `Links on ${portal.title} expire after ${expiry} days.`);
         close();
       }}
@@ -209,9 +211,10 @@ export function DataGrant({ context, close }: { context: ScreenContext; close: (
         const existing = shared.find((scope) => scope.collection === collection);
         if (existing) existing.ids = [...existing.ids, recordId];
         else shared.push({ collection, ids: [recordId] });
-        await context.mutate.patch(portal.id, {
+        const saved3 = await context.mutate.patch(portal.id, {
           body: { ...body, shared, activity: [{ at: clockIso(), actor: context.actor, detail: `Shared ${chosen?.title} with the portal.` }, ...(body.activity ?? [])] },
         }, { expectRevision: portal.revision, event: `${chosen?.title} shared with ${portal.title}` });
+        if (!saved3) return;
         context.toast("Shared", `${chosen?.title} is now visible in ${portal.title}. Nothing else was shared.`);
         close();
       }}
@@ -239,42 +242,89 @@ export function DataGrant({ context, close }: { context: ScreenContext; close: (
   );
 }
 
-export function PublishReview({ context, close }: { context: ScreenContext; close: () => void }) {
+interface PublishCheck { id: string; label: string; ok: boolean; blocking: boolean; detail: string }
+
+/** What must be true before a portal reads as live; blocking checks disable the action. */
+function usePublishChecks(portal: Rec | undefined): PublishCheck[] {
   const data = usePortalData();
-  const { portal } = usePortal(context);
-  if (!portal) return <Empty title="No portal" />;
+  const { now } = useWorkspace();
+  if (!portal) return [];
   const body = bodyOf<PortalBody>(portal, {});
-  const shared = sharedRecords(portal, data);
-  const problems = [
-    ...((body.pages ?? []).length ? [] : ["The portal has no pages."]),
-    ...(shared.length + portalDocuments(portal, data.documents).length ? [] : ["Nothing is shared, so the portal would be empty."]),
-    ...((body.users ?? []).length ? [] : ["Nobody has been invited, so nobody can sign in."]),
+  const pages = body.pages ?? [];
+  const users = body.users ?? [];
+  const shared = sharedWithPortal(portal, data);
+  const expiredLinks = portalDocuments(portal, data.documents).filter((document) => expiryState(document.fields.linkExpiresAt, now).expired);
+  const lapsed = users.filter((user) => expiryState(user.expiresAt, now).expired);
+  const unplaced = sharedRecords(portal, data).filter((entry) => !["orders", "invoices", "bookings", "documents"].includes(entry.collection));
+  return [
+    { id: "pages", label: "Pages", ok: pages.length > 0, blocking: true, detail: pages.length ? `${pages.length} ${pages.length === 1 ? "page" : "pages"} defined` : "No pages: the portal has nothing to open." },
+    { id: "shared", label: "Shared records", ok: shared.length > 0, blocking: true, detail: shared.length ? `${shared.length} named, nothing inherited` : "Nothing is shared, so the portal would be empty." },
+    { id: "users", label: "External users", ok: users.length > 0 || Number(portal.fields.invitesPending ?? 0) > 0, blocking: true, detail: users.length ? `${users.length} can sign in${Number(portal.fields.invitesPending ?? 0) ? `, ${String(portal.fields.invitesPending)} invitation${Number(portal.fields.invitesPending) === 1 ? "" : "s"} pending` : ""}` : Number(portal.fields.invitesPending ?? 0) ? `${String(portal.fields.invitesPending)} invitation${Number(portal.fields.invitesPending) === 1 ? "" : "s"} pending; nobody can sign in until one is accepted.` : "Nobody is invited, so nobody can sign in." },
+    { id: "inherit", label: "Internal access", ok: portal.fields.inheritsInternalAccess !== true, blocking: true, detail: portal.fields.inheritsInternalAccess === true ? "The portal inherits internal permissions. Turn that off in Access." : "Nothing inherited from the workspace." },
+    { id: "lapsed", label: "Access dates", ok: lapsed.length === 0, blocking: false, detail: lapsed.length ? `${lapsed.map((user) => user.name).join(", ")} ${lapsed.length === 1 ? "has" : "have"} expired access.` : "Every user's access is current." },
+    { id: "links", label: "Document links", ok: expiredLinks.length === 0, blocking: false, detail: expiredLinks.length ? `${expiredLinks.length} shared ${expiredLinks.length === 1 ? "link has" : "links have"} expired and will not open.` : "No shared link has expired." },
+    { id: "unplaced", label: "Placement", ok: unplaced.length === 0, blocking: false, detail: unplaced.length ? `${unplaced.length} named ${unplaced.length === 1 ? "record is" : "records are"} on no page, so the client will not see ${unplaced.length === 1 ? "it" : "them"}.` : "Every named record sits on a page." },
   ];
+}
+
+export function PublishSummary({ context }: { context: ScreenContext }) {
+  const { portal } = usePortal(context);
+  if (!portal) return null;
+  return <OverlaySummary eyebrow="Publish review" title={portal.title} status={<Pill tone={statusTone(portal.status)} dot>{portal.status}</Pill>} meta={[String(portal.fields.audience ?? "")]} />;
+}
+
+export function PublishReview({ context }: { context: ScreenContext; close: () => void }) {
+  const { portal } = usePortal(context);
+  const checks = usePublishChecks(portal);
+  if (!portal) return <Empty title="No portal" />;
+  const blockers = checks.filter((check) => check.blocking && !check.ok);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Portal", value: portal.title },
-        { label: "Pages", value: <span className="ds-num">{String((body.pages ?? []).length)}</span> },
-        { label: "Records shared", value: <span className="ds-num">{String(shared.length)}</span> },
-        { label: "Documents", value: <span className="ds-num">{String(portalDocuments(portal, data.documents).length)}</span> },
-        { label: "External users", value: <span className="ds-num">{String((body.users ?? []).length)}</span> },
-      ]} />
-      {problems.length > 0 && <Notice tone="warning" title="Before publishing">{problems.join(" ")}</Notice>}
+      <OverlaySection title="Before it reads as live" tone={blockers.length ? "danger" : "success"}>
+        <ul className="ds-stack ds-gap-2" aria-label="Publish checks">
+          {checks.map((check) => (
+            <li key={check.id}>
+              <Row gap={2} wrap>
+                <Pill tone={check.ok ? "success" : check.blocking ? "danger" : "warning"} dot>{check.ok ? "Ready" : check.blocking ? "Blocks" : "Check"}</Pill>
+                <strong>{check.label}</strong>
+                <span className="ds-subtle">{check.detail}</span>
+              </Row>
+            </li>
+          ))}
+        </ul>
+      </OverlaySection>
       <ProviderBoundary id="site.publish" title="A portal is not hosted from here" />
-      <Button
-        variant="primary"
-        onClick={async () => {
-          await context.mutate.patch(portal.id, {
-            status: "live",
-            fields: { ...portal.fields, publishedAt: clockIso() },
-          }, { expectRevision: portal.revision, event: `${portal.title} marked live` });
-          context.toast("Marked live", "The portal reads as live in this workspace. Reaching it from outside needs hosting.");
-          close();
-        }}
-      >
-        Mark the portal live
-      </Button>
     </Stack>
+  );
+}
+
+export function PublishFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { portal } = usePortal(context);
+  const checks = usePublishChecks(portal);
+  const blocked = checks.some((check) => check.blocking && !check.ok);
+  if (!portal) return <OverlayActions end={<Button variant="ghost" onClick={close}>Close</Button>} />;
+  return (
+    <OverlayActions
+      primary={
+        <Button
+          variant="primary"
+          disabled={blocked || portal.status === "live"}
+          title={blocked ? "Fix the blocking checks first" : undefined}
+          onClick={async () => {
+            const saved4 = await context.mutate.patch(portal.id, {
+              status: "live",
+              fields: { ...portal.fields, publishedAt: clockIso() },
+            }, { expectRevision: portal.revision, event: `${portal.title} marked live` });
+            if (!saved4) return;
+            context.toast("Marked live", "The portal reads as live in this workspace. Reaching it from outside needs hosting.");
+            close();
+          }}
+        >
+          {portal.status === "live" ? "Already live" : "Mark the portal live"}
+        </Button>
+      }
+      end={<Button variant="ghost" onClick={close}>Close</Button>}
+    />
   );
 }
 
@@ -457,10 +507,11 @@ export function SignatureRequest({ context, close }: { context: ScreenContext; c
       onSubmit={async (event) => {
         event.preventDefault();
         if (!accepted) return;
-        await context.mutate.patch(document.id, {
+        const saved5 = await context.mutate.patch(document.id, {
           status: "signed",
           fields: { ...document.fields, signature: "signed_local", signedBy: actor, signedAt: now.toISOString() },
         }, { expectRevision: document.revision, event: `${document.title} accepted by ${actor}` });
+        if (!saved5) return;
         context.toast("Acceptance recorded", "This is a local record of acceptance, not a qualified electronic signature.");
         close();
       }}
@@ -614,7 +665,8 @@ export function DisputeForm({ context, close }: { context: ScreenContext; close:
           body: { text: reason.trim() },
         }, `${isRequest ? "Request" : "Dispute"} recorded on ${portal.title}`);
         if (invoice && !isRequest) {
-          await context.mutate.patch(invoice.id, { status: "disputed", fields: { ...invoice.fields, payment: "disputed" } }, { expectRevision: invoice.revision, event: `${invoice.title} disputed by ${actor}` });
+          const saved6 = await context.mutate.patch(invoice.id, { status: "disputed", fields: { ...invoice.fields, payment: "disputed" } }, { expectRevision: invoice.revision, event: `${invoice.title} disputed by ${actor}` });
+          if (!saved6) return;
         }
         context.toast(isRequest ? "Request recorded" : "Dispute recorded", isRequest ? "The studio will respond on the portal thread." : "The invoice is marked disputed and is not pursued while it is open.");
         close();
@@ -692,7 +744,7 @@ export function ExternalInvite({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         if (invalid) return;
         const expires = new Date(now.getTime() + (Number(days) || 30) * 86_400_000).toISOString();
-        await context.mutate.patch(portal.id, {
+        const saved7 = await context.mutate.patch(portal.id, {
           fields: { ...portal.fields, invitesPending: Number(portal.fields.invitesPending ?? 0) + 1, externalUsers: (body.users ?? []).length + 1 },
           body: {
             ...body,
@@ -700,6 +752,7 @@ export function ExternalInvite({ context, close }: { context: ScreenContext; clo
             activity: [{ at: now.toISOString(), actor: context.actor, detail: `Invited ${email.trim()} as ${portalRole.replace("_", " ")}.` }, ...(body.activity ?? [])],
           },
         }, { expectRevision: portal.revision, event: `${email.trim()} invited to ${portal.title}` });
+        if (!saved7) return;
         context.toast("Invitation recorded", "It is held locally with its scope and expiry. No email could be sent, so nobody has been told yet.");
         close();
       }}
@@ -726,31 +779,104 @@ export function ExternalInvite({ context, close }: { context: ScreenContext; clo
   );
 }
 
+const KIND_LABEL: Record<string, string> = { purchaseOrders: "purchase order", orders: "order", invoices: "invoice", bookings: "booking", documents: "document", returns: "return" };
+/** The page module that renders each record kind; a kind with no module is named but never drawn. */
+const KIND_MODULE: Record<string, string> = { orders: "orders", invoices: "invoices", bookings: "bookings", documents: "documents" };
+
+function gateAllows(gate: string, role: string): boolean {
+  if (gate === "admin_only") return role === "portal_admin";
+  if (gate === "billing_contact") return role === "portal_admin" || role === "billing_contact";
+  return true;
+}
+
+/** Overlay head for the scope preview: which portal, in what state, for whom. */
+export function ScopeSummary({ context }: { context: ScreenContext }) {
+  const { portal } = usePortal(context);
+  if (!portal) return null;
+  const users = portalUsers(portal);
+  return (
+    <OverlaySummary
+      eyebrow="Scope preview"
+      title={portal.title}
+      status={<Pill tone={statusTone(portal.status)} dot>{portal.status}</Pill>}
+      meta={[String(portal.fields.audience ?? ""), `${users.length} external ${users.length === 1 ? "user" : "users"}`, `links last ${String(portal.fields.linkExpiryDays ?? 0)} days`]}
+    />
+  );
+}
+
+/**
+ * What one external user would see, record by record, and until when. Every
+ * row is a record the portal names; a record is hidden from this person when
+ * the page that renders it is gated above their role, when no page renders
+ * it, or when their access or the document link has expired.
+ */
 export function ScopePreview({ context }: { context: ScreenContext }) {
   const data = usePortalData();
+  const { now } = useWorkspace();
   const { portal } = usePortal(context);
+  const users = portalUsers(portal);
+  const [userId, setUserId] = useState((context.overlayPayload as { userId?: string } | undefined)?.userId ?? "");
   if (!portal) return <Empty title="No portal" />;
+  const user = users.find((item) => item.id === userId) ?? users[0];
+  const body = bodyOf<PortalBody>(portal, {});
+  const pages = body.pages ?? [];
   const reach = sharedWithPortal(portal, data);
+  const accessEnds = user ? expiryState(user.expiresAt, now) : { expired: false, days: 0, known: false };
   const everything = data.orders.length + data.invoices.length + data.bookings.length + data.documents.length
     + data.purchaseOrders.length + data.returns.length;
+  const rows = reach.map((record) => {
+    const module = KIND_MODULE[record.collection];
+    const page = module ? pages.find((candidate) => candidate.modules.includes(module)) : undefined;
+    const link = expiryState(record.fields.linkExpiresAt, now);
+    let verdict: { tone: "success" | "warning" | "danger" | "neutral"; text: string };
+    if (!user) verdict = { tone: "neutral", text: "No external user yet" };
+    else if (accessEnds.expired) verdict = { tone: "danger", text: "Their access has expired" };
+    else if (!module) verdict = { tone: "warning", text: "No page renders it" };
+    else if (!page) verdict = { tone: "warning", text: "No page renders it" };
+    else if (!gateAllows(page.gate, user.role)) verdict = { tone: "warning", text: `Hidden: ${GATE_LABELS[page.gate] ?? page.gate}` };
+    else if (link.known && link.expired) verdict = { tone: "danger", text: "Link expired" };
+    else verdict = { tone: "success", text: `Seen on ${page.name}` };
+    const until = link.known ? record.fields.linkExpiresAt : user?.expiresAt;
+    return { id: record.id, kind: KIND_LABEL[record.collection] ?? record.collection, title: record.title, status: record.status, until: typeof until === "string" ? until : "", verdict };
+  });
+  const seen = rows.filter((row) => row.verdict.tone === "success").length;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Visible to this portal", value: <strong className="ds-num">{String(reach.length)}</strong> },
-        { label: "Records in the workspace", value: <span className="ds-num">{String(everything)}</span> },
-        { label: "Share of the workspace", value: <span className="ds-num">{everything === 0 ? "0%" : `${Math.round((reach.length / everything) * 100)}%`}</span> },
-        { label: "Other portals", value: <span className="ds-num">{String(listedPortals(data.portals).length - 1)}</span> },
-      ]} />
-      <DataGrid rows={reach.map((record) => ({ id: record.id, kind: record.collection === "purchaseOrders" ? "purchase order" : record.collection.replace(/s$/, ""), title: record.title }))}
-        rowId={(row) => row.id} label="Everything this portal can reach" filterable={false}
-        columns={[
-          { key: "kind", header: "Kind", primary: true, cell: (row) => <Pill>{row.kind}</Pill> },
-          { key: "title", header: "Record", cell: (row) => row.title },
-        ]}
-        empty={<Empty title="This portal can reach nothing" />} />
-      <Notice tone="success" title="Nothing else is reachable">
-        No aggregate across clients is rendered anywhere in a portal. A total that mixed clients would leak one client's volume to another, so every figure a portal shows is computed from this list alone.
-      </Notice>
+      {users.length > 0 ? (
+        <Field label="Preview as">
+          <Select value={user?.id ?? ""} onChange={(event) => setUserId(event.target.value)}>
+            {users.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.role.replace("_", " ")}</option>)}
+          </Select>
+        </Field>
+      ) : (
+        <Notice tone="warning" title="Nobody can sign in yet">No external user is invited, so this portal shows nothing to anyone.</Notice>
+      )}
+      {user && (
+        <FactGrid columns={3} items={[
+          { label: "Sees", value: accessEnds.expired ? "0 records" : `${seen} of ${rows.length} named`, mono: true, tone: accessEnds.expired ? "danger" : undefined },
+          { label: "Access until", value: accessEnds.known ? context.date(user.expiresAt) : "No expiry set", mono: true, tone: accessEnds.expired ? "danger" : accessEnds.known && accessEnds.days < 7 ? "warning" : undefined, hint: accessEnds.expired ? "Expired" : accessEnds.known ? `${accessEnds.days} days left` : undefined },
+          { label: "Last seen", value: user.lastSeenAt ? context.date(user.lastSeenAt) : "Never", mono: true },
+        ]} />
+      )}
+      <OverlaySection title="Record by record" hint="Only records this portal names. Nothing is inherited from the workspace.">
+        <DataGrid rows={rows}
+          rowId={(row) => row.id} label="Records this portal names" filterable={false}
+          columns={[
+            { key: "kind", header: "Kind", cell: (row) => <Pill>{row.kind}</Pill> },
+            { key: "title", header: "Record", primary: true, cell: (row) => row.title },
+            { key: "verdict", header: "For this person", cell: (row) => <Pill tone={row.verdict.tone} dot>{row.verdict.text}</Pill> },
+            { key: "until", header: "Until", align: "end", cell: (row) => <span className="ds-num">{row.until ? context.date(row.until) : "Access ends"}</span> },
+          ]}
+          empty={<Empty title="This portal can reach nothing" />} />
+      </OverlaySection>
+      <OverlaySection title="Not reachable" tone="success">
+        <FactGrid columns={3} dense items={[
+          { label: "Workspace records", value: String(everything), mono: true },
+          { label: "Named by this portal", value: String(reach.length), mono: true },
+          { label: "Not named, so hidden", value: String(Math.max(0, everything - reach.length)), mono: true, hint: "Includes other clients' records" },
+        ]} />
+        <p className="ds-subtle">No total across clients is drawn anywhere in a portal: every figure comes from the records above.</p>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -775,7 +901,7 @@ export function AccountRecovery({ context, close }: { context: ScreenContext; cl
           if (action === "revoke") return [];
           return [{ ...item, expiresAt: new Date(now.getTime() + 30 * 86_400_000).toISOString() }];
         });
-        await context.mutate.patch(portal.id, {
+        const saved8 = await context.mutate.patch(portal.id, {
           fields: { ...portal.fields, externalUsers: users.length },
           body: {
             ...body,
@@ -783,6 +909,7 @@ export function AccountRecovery({ context, close }: { context: ScreenContext; cl
             activity: [{ at: now.toISOString(), actor: context.actor, detail: `${action === "revoke" ? "Revoked" : "Extended"} access for ${user.email}.` }, ...(body.activity ?? [])],
           },
         }, { expectRevision: portal.revision, event: `${action === "revoke" ? "Revoked" : "Extended"} portal access for ${user.email}` });
+        if (!saved8) return;
         context.toast(action === "revoke" ? "Access revoked" : "Access extended", action === "revoke" ? "Their links stop resolving immediately." : "They have another thirty days.");
         close();
       }}

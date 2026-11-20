@@ -53,7 +53,7 @@ test("LEGAL contract workspace: obligations, review cycle, key dates, links and 
   // Projects are loaded with the Projects application; open it once so the contract can link one.
   await open(page, "/project/projects");
   await expect(main(page).getByText("Clerkenwell showroom refit").first()).toBeVisible();
-  await open(page, "/legal/contracts/nl-contracts-020", "Contract");
+  await open(page, "/legal/contracts/nl-contracts-020", "Thames Timber");
 
   // Obligations: add one, complete it.
   const obligations = card(page, "Obligations from this contract");
@@ -100,7 +100,7 @@ test("LEGAL contract workspace: obligations, review cycle, key dates, links and 
   await expect(page).toHaveURL(/\/project\/projects\/nl-projects-020/);
 
   // A stored version appears in History and survives a reload.
-  await open(page, "/legal/contracts/nl-contracts-020", "Contract");
+  await open(page, "/legal/contracts/nl-contracts-020", "Thames Timber");
   await page.getByRole("tab", { name: "History" }).click();
   await main(page).getByRole("button", { name: "Store a new version" }).click();
   const versionForm = main(page).getByRole("form", { name: "Store a new version" });
@@ -138,7 +138,9 @@ test("CARE triage: SLA view, saved draft, unsent reply, triage moves and resolut
   await open(page, "/legal/contracts", "Contract Library");
   await page.getByRole("tab", { name: "Active" }).click();
   await expect(main(page).getByText("Mutual NDA — Delacroix").first()).toBeVisible();
-  await open(page, "/care/tickets/nl-tickets-041", "Case");
+  // The case title is the page heading; the clock sits above the cards.
+  await open(page, "/care/tickets/nl-tickets-041");
+  await expect(page.getByRole("region", { name: "SLA clock" })).toBeVisible();
   const triage = card(page, "Triage");
   await triage.getByLabel("Case priority").selectOption("urgent");
   await triage.getByRole("button", { name: "Assign to me" }).click();
@@ -147,6 +149,8 @@ test("CARE triage: SLA view, saved draft, unsent reply, triage moves and resolut
   await expect(triage.getByText("Waiting on customer").first()).toBeVisible();
   const resolution = card(page, "Resolution");
   await resolution.getByLabel("Resolution reason").selectOption("Replacement arranged");
+  await expect(resolution.getByRole("button", { name: "Mark resolved" })).toBeDisabled();
+  await resolution.getByLabel("Resolution note").fill("Replacement shade ordered and confirmed with the customer.");
   await dismissToasts(page);
   await resolution.getByRole("button", { name: "Mark resolved" }).click();
   await expect(resolution.getByText("Replacement arranged")).toBeVisible();
@@ -157,9 +161,10 @@ test("CARE triage: SLA view, saved draft, unsent reply, triage moves and resolut
 });
 
 test("PROJECT subtasks and dependency links persist; health check is shown", async ({ page }) => {
-  await open(page, "/project/tasks/nl-tasks-024", "Task");
+  await open(page, "/project/tasks/nl-tasks-024", "Repaint and make good");
   await expect(card(page, "Dependencies").getByText(/Waiting on 2 unfinished tasks/)).toBeVisible();
   await card(page, "Dependencies").getByRole("button", { name: "Remove the link to Trade counter joinery" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Remove the link" }).click();
   await expect(card(page, "Dependencies").getByText(/Waiting on 1 unfinished task/)).toBeVisible();
   await page.getByRole("tab", { name: "Subtasks" }).click();
   await main(page).getByLabel("New subtask").fill("Mask the trade counter");
@@ -189,6 +194,8 @@ test("COMMS conversation search and mention picker", async ({ page }) => {
   await expect(composer).toHaveValue("Can you check this @Priya Shah ");
   await composer.fill("Can you check the glaze batch @Priya Shah ");
   await main(page).getByRole("button", { name: "Send" }).click();
+  // Reload only after the post is confirmed, as a person would; reloading mid-write races IndexedDB.
+  await expect(page.getByText("Message posted")).toBeVisible();
   await reload(page);
   await expect(main(page).locator("mark.cm-mention", { hasText: "@Priya Shah" }).last()).toBeVisible();
 });
@@ -197,7 +204,7 @@ test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("contract workspace and care inbox fit a phone", async ({ page }) => {
-    await open(page, "/legal/contracts/nl-contracts-024", "Contract");
+    await open(page, "/legal/contracts/nl-contracts-024", "Kestrel Brokers");
     await expect(card(page, "Key dates and renewal").getByText("The notice date has passed")).toBeVisible();
     const obligations = card(page, "Obligations from this contract");
     await obligations.scrollIntoViewIfNeeded();

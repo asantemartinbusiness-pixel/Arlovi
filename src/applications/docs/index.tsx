@@ -3,12 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignLeft, Bold, Braces, CheckCheck, ChevronDown, ChevronUp, CornerDownRight, FileDown, FileText,
   Highlighter, Image as ImageIcon, Italic, Link2, List, ListOrdered, MessageSquare, Minus, Quote,
-  Redo2, Search, Strikethrough, Table as TableIcon, Underline, Undo2, Upload,
+  MoreHorizontal, Redo2, Search, Strikethrough, Type as TypeIcon, Table as TableIcon, Underline, Undo2, Upload,
 } from "lucide-react";
 import {
   BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, InspectorSection,
-  Meter, Notice, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
-  TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
+  Menu, Meter, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
+  TextArea, TextInput, Tool, Toolbar, ToolbarSeparator, type RecordHeaderProps,
+  OVERLAY_WIDTH, OverlaySummary,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -29,6 +30,8 @@ import { SAVE_LABEL, SAVE_TONE, activeDocEditor, useDocEditor, type DocEditor } 
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { createStore, useStore } from "@/applications/visual/kit";
+import { CommentPopoverBody, FormatPopoverBody, ImagePopoverBody, LinkPopoverBody, PopoverTool, StylesPopoverBody, TablePopoverBody, openDocPopover } from "./popovers";
+import { LibraryStrip, RecordCardGrid, ViewToggle, useLibraryView } from "./libraryKit";
 import "./docs.css";
 
 /* ====================================================================== *
@@ -52,18 +55,32 @@ function useDocument(context: ScreenContext): Rec | undefined {
   return all.find((record) => !record.tags.includes("recovered")) ?? all[0];
 }
 
-/** The editor's contract actions, on its own bar (the full-chrome surface has no page header). */
+/** The editor's contract actions, kept reachable in one overflow menu (every one also has a tool on the ribbon). */
 function DocActions({ context }: { context: ScreenContext }) {
   const def = getScreenDef(context.screen.applicationCode, context.screen.id);
+  const items = (def?.actions ?? []).filter((action: ActionDef) => action.id !== "export").map((action: ActionDef) => {
+    const blocked = action.guard?.(context);
+    return { label: action.label ?? action.id, disabled: Boolean(blocked), onSelect: () => void action.run(context) };
+  });
   return (
-    <Toolbar label="Document actions">
-      {(def?.actions ?? []).filter((action: ActionDef) => action.id !== "export").map((action: ActionDef) => {
-        const blocked = action.guard?.(context);
-        return <Button key={action.id} size="sm" variant="ghost" disabled={Boolean(blocked)} title={blocked ?? action.shortcut} onClick={() => void action.run(context)}>{action.label ?? action.id}</Button>;
-      })}
-    </Toolbar>
+    <Menu label="Document actions" items={items} trigger={<Button size="sm" variant="ghost" icon={<MoreHorizontal size={15} />}>Actions</Button>} />
   );
 }
+
+/** Identity head for overlays that act on the open document. */
+function DocOverlaySummary({ context }: { context: ScreenContext }) {
+  const record = useDocument(context);
+  if (!record) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Document"
+      title={record.title}
+      status={<Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>}
+      meta={[String(record.fields.folder ?? "Unfiled"), record.ownerName, `Revision ${record.revision}`]}
+    />
+  );
+}
+const docSummary = (context: ScreenContext) => <DocOverlaySummary context={context} />;
 
 /** Outline view state shared by the outline tree and the screen's collapse action. */
 const outlineUi = createStore<{ collapseAll: number }>({ collapseAll: 0 });
@@ -177,12 +194,24 @@ function OutlineTree({
 
 type LibraryTab = "Recent" | "My docs" | "Shared" | "Templates" | "Archive";
 
+/** A copy starts as a draft with its own history: comments, approvals and links are not carried over. */
+async function duplicateDocument(context: ScreenContext, source: Rec): Promise<void> {
+  const model = readDoc(source.body, context.actor, context.now.toISOString());
+  const created = await context.mutate.create({
+    collection: "documents", title: `${source.title} copy`, status: "draft", summary: source.summary,
+    tags: source.tags, fields: { ...source.fields, approvals: "", signatureStatus: "not_requested" },
+    body: { ...model, comments: [], shares: [] },
+  }, `${source.title} duplicated`);
+  context.toast("Duplicated", `${created.title} is a draft. Comments, approvals and sharing records were not copied.`);
+}
+
 function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: LibraryTab }) {
   const data = useCollections(["documents", "templates"]);
   const { org, actor, now } = useWorkspace();
   const [query, setQuery] = useState("");
   const [folder, setFolder] = useState<string>("All folders");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [view, setView] = useLibraryView("docs");
 
   const documents = data.documents.filter((record) => !record.tags.includes("recovered"));
   const folders = ["All folders", ...new Set(documents.map((record) => String(record.fields.folder ?? "Unfiled")))];
@@ -247,43 +276,37 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 
   return (
     <Stack gap={4}>
-      <div className="dx-library-header">
-        <div>
-          <span className="dx-library-eyebrow">DOCUMENTS / {tab.toUpperCase()}</span>
-          <h2>{tab === "Recent" ? "Your document workspace." : tab === "My docs" ? "Work you've authored." : tab === "Shared" ? "Recorded sharing activity." : "The document archive."}</h2>
-          <p>{tab === "Shared" ? "Documents with a local sharing record are listed here. This does not mean a public link or external access exists." : tab === "Archive" ? "Archived records remain in the local library until explicitly removed." : "Find, review and continue working with company documents without losing their version history."}</p>
+      <LibraryStrip
+        label="Document library summary"
+        items={[
+          { label: "Active documents", value: activeDocuments.length },
+          { label: "Drafts", value: drafts.length },
+          { label: "In review", value: pendingReview.length, tone: pendingReview.length ? "warning" : undefined },
+          { label: "Confidential", value: confidentialCount },
+          { label: tab === "Recent" ? "shown (latest 12, filtered)" : "shown in this view", value: rows.length },
+        ]}
+      >
+        <ViewToggle label="Library view" value={view} onChange={setView} />
+      </LibraryStrip>
+      {tab === "Shared" && <p className="ds-subtle">Sharing here is a local record. This does not mean a public link or external access exists.</p>}
+      <div className="lk-toolbar">
+        <div className="lk-grow">
+          <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text (confidential: title and tags only)" />
         </div>
-        <Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>
-      </div>
-      <div className="dx-library-metrics" aria-label="Document library summary">
-        <div><span>Active documents</span><strong>{activeDocuments.length}</strong><small>Excluding archive</small></div>
-        <div><span>Drafts</span><strong>{drafts.length}</strong><small>Not published</small></div>
-        <div><span>In review</span><strong>{pendingReview.length}</strong><small>Needs a human decision</small></div>
-        <div><span>Confidential</span><strong>{confidentialCount}</strong><small>Restricted previews only</small></div>
-      </div>
-      <div className="dx-library-filters">
-      <Row gap={3} wrap>
-        <Field label="Search" hint="Confidential documents match on title and tags only.">
-          <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text" />
-        </Field>
-        <Field label="Folder">
-          <Select aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
-            {folders.map((name) => <option key={name} value={name}>{name}</option>)}
-          </Select>
-        </Field>
-      </Row>
-      {tab !== "Archive" && (
-        <Row gap={2} wrap>
-          <span className="ds-subtle">Status</span>
-          {(["all", "draft", "in_review", "published"] as const).map((state) => (
-            <Button key={state} size="sm" variant={statusFilter === state ? "secondary" : "ghost"}
-              aria-pressed={statusFilter === state} onClick={() => setStatusFilter(state)}>
-              {state === "all" ? "All states" : state === "in_review" ? "In review" : state === "published" ? "Published" : "Drafts"}
-            </Button>
-          ))}
-        </Row>
-      )}
-      {activeFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
+        <Select aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
+          {folders.map((name) => <option key={name} value={name}>{name}</option>)}
+        </Select>
+        {tab !== "Archive" && (
+          <Row gap={1} wrap>
+            {(["all", "draft", "in_review", "published"] as const).map((state) => (
+              <Button key={state} size="sm" variant={statusFilter === state ? "secondary" : "ghost"}
+                aria-pressed={statusFilter === state} onClick={() => setStatusFilter(state)}>
+                {state === "all" ? "All states" : state === "in_review" ? "In review" : state === "published" ? "Published" : "Drafts"}
+              </Button>
+            ))}
+          </Row>
+        )}
+        {activeFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
       </div>
 
       {confidentialHidden && (
@@ -300,6 +323,30 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
         >
           {activeFilters ? "Try another status, folder or search term." : tab === "Shared" ? "No documents have local sharing records yet. Open a document to record a workspace share." : "Create a document, or start from a governed template."}
         </Empty>
+      ) : view === "cards" ? (
+        <RecordCardGrid
+          label={`${tab} documents`}
+          cards={rows.map((row) => {
+            const confidential = row.fields.confidential === true;
+            const model = readDoc(row.body, row.ownerName, row.updatedAt);
+            return {
+              id: row.id, title: row.title, icon: <FileText size={15} />,
+              status: <Pill tone={row.status === "published" ? "success" : row.status === "in_review" ? "warning" : "neutral"}>{row.status.replace("_", " ")}</Pill>,
+              preview: confidential ? "Confidential: the body is not previewed." : toPlainText(model).slice(0, 220) || "Empty document.",
+              meta: [String(row.fields.folder ?? "Unfiled"), row.ownerName, `Changed ${context.relative(row.updatedAt)}`, confidential ? "Confidential" : null],
+              selected: context.selectedId === row.id,
+              onSelect: () => context.select(row.id),
+              onOpen: () => context.navigate(`/o/${org.slug}/docs/documents/${row.id}`),
+              actions: (
+                <>
+                  <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${row.id}`)}>Open</Button>
+                  <Button size="sm" variant="ghost" onClick={() => void duplicateDocument(context, row)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" onClick={() => context.openOverlay("sharing", { id: row.id })}>Share</Button>
+                </>
+              ),
+            };
+          })}
+        />
       ) : (
         <DataGrid
           rows={rows}
@@ -401,24 +448,82 @@ function LibraryInspector({ context }: { context: ScreenContext }) {
  * ARL-DOCS-002 — Document Editor
  * ====================================================================== */
 
-function WriteRibbon({ editor, context }: { editor: DocEditor; context: ScreenContext }) {
+function useNarrow(): boolean {
+  const query = "(max-width: 599px)";
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const on = () => setNarrow(list.matches);
+    list.addEventListener("change", on);
+    return () => list.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
+function WriteRibbon({ editor, context, onFind }: { editor: DocEditor; context: ScreenContext; onFind: () => void }) {
   const block = currentBlock(editor);
   const selection = editor.selection;
+  const narrow = useNarrow();
   const expanded = Boolean(selection && !(selection.anchor.blockId === selection.head.blockId && selection.anchor.offset === selection.head.offset));
   const mark = (type: MarkType) => () => selection && editor.handleEdit({ kind: "toggleMark", mark: type, range: selection });
+  if (narrow) {
+    const setType = (type: BlockType, label: string) => () => selection && editor.commit(setBlockType(editor.model, selection, type).model, label, selection);
+    return (
+      <Toolbar label="Writing tools">
+        <Tool label="Undo (Cmd+Z)" icon={<Undo2 size={16} />} disabled={!editor.canUndo} onClick={editor.undo} />
+        <Tool label="Redo (Cmd+Shift+Z)" icon={<Redo2 size={16} />} disabled={!editor.canRedo} onClick={editor.redo} />
+        <Tool label="Bold (Cmd+B)" icon={<Bold size={16} />} pressed={editor.marks.includes("bold")} disabled={!expanded} onClick={mark("bold")} />
+        <Tool label="Italic (Cmd+I)" icon={<Italic size={16} />} pressed={editor.marks.includes("italic")} disabled={!expanded} onClick={mark("italic")} />
+        <PopoverTool kind="link" label="Link (Cmd+Shift+L)" icon={<Link2 size={16} />} title="Link the selection" editor={editor} disabled={!expanded} width={280}>
+          {(done, range) => <LinkPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <PopoverTool kind="table" label="Insert table" icon={<TableIcon size={16} />} title="Insert a table" editor={editor} width={260}>
+          {(done) => <TablePopoverBody editor={editor} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <PopoverTool kind="image" label="Insert image reference" icon={<ImageIcon size={16} />} title="Image reference" editor={editor} width={300}>
+          {(done, _range, blockId) => <ImagePopoverBody editor={editor} blockId={blockId} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <PopoverTool kind="comment" label="Comment on the selection" icon={<MessageSquare size={16} />} title="Comment on the selection" editor={editor} width={280} disabled={!expanded}>
+          {(done, range) => <CommentPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+        </PopoverTool>
+        <Menu
+          label="More writing tools"
+          trigger={<Tool label="More writing tools" icon={<MoreHorizontal size={16} />} />}
+          items={[
+            { label: "Body text", onSelect: setType("paragraph", "Body text") },
+            { label: "Heading 1", onSelect: setType("heading1", "Heading 1") },
+            { label: "Heading 2", onSelect: setType("heading2", "Heading 2") },
+            { label: "Bulleted list", onSelect: setType("bulletItem", "Bulleted list"), separatorBefore: true },
+            { label: "Numbered list", onSelect: setType("numberItem", "Numbered list") },
+            { label: "Quote", onSelect: setType("quote", "Quote") },
+            { label: "Underline", onSelect: mark("underline"), disabled: !expanded, separatorBefore: true },
+            { label: "Strikethrough", onSelect: mark("strike"), disabled: !expanded },
+            { label: "Inline code", onSelect: mark("code"), disabled: !expanded },
+            { label: "Find and replace", onSelect: onFind, separatorBefore: true },
+          ]}
+        />
+      </Toolbar>
+    );
+  }
   return (
     <Toolbar label="Writing tools">
       <Tool label="Undo (Cmd+Z)" icon={<Undo2 size={16} />} disabled={!editor.canUndo} onClick={editor.undo} />
       <Tool label="Redo (Cmd+Shift+Z)" icon={<Redo2 size={16} />} disabled={!editor.canRedo} onClick={editor.redo} />
       <ToolbarSeparator />
-      <Select
-        aria-label="Block type"
-        value={block?.type ?? "paragraph"}
-        onChange={(event) => selection && editor.handleEdit({ kind: "setHeading", level: 0, range: selection }) === undefined
-          && editor.commit(setBlockType(editor.model, selection!, event.target.value as BlockType).model, "Block type", selection)}
+      <PopoverTool
+        kind="format" label="Format" title="Format" editor={editor} width={320}
+        trigger={() => (
+          <Select
+            aria-label="Block type"
+            value={block?.type ?? "paragraph"}
+            onChange={(event) => selection && editor.commit(setBlockType(editor.model, selection, event.target.value as BlockType).model, "Block type", selection)}
+          >
+            {BLOCK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </Select>
+        )}
       >
-        {BLOCK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </Select>
+        {(_done, range) => <FormatPopoverBody editor={editor} range={range} />}
+      </PopoverTool>
       <Select
         aria-label="Named style"
         value={block?.styleId ?? ""}
@@ -427,27 +532,38 @@ function WriteRibbon({ editor, context }: { editor: DocEditor; context: ScreenCo
         <option value="">No named style</option>
         {editor.model.styles.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}
       </Select>
+      <PopoverTool kind="styles" label="Edit named styles" icon={<TypeIcon size={16} />} title="Edit a named style" editor={editor} width={340}>
+        {(done) => <StylesPopoverBody editor={editor} done={done} toast={context.toast} />}
+      </PopoverTool>
       <ToolbarSeparator />
       <Tool label="Bold (Cmd+B)" icon={<Bold size={16} />} pressed={editor.marks.includes("bold")} disabled={!expanded} onClick={mark("bold")} />
       <Tool label="Italic (Cmd+I)" icon={<Italic size={16} />} pressed={editor.marks.includes("italic")} disabled={!expanded} onClick={mark("italic")} />
       <Tool label="Underline (Cmd+U)" icon={<Underline size={16} />} pressed={editor.marks.includes("underline")} disabled={!expanded} onClick={mark("underline")} />
       <Tool label="Strikethrough (Cmd+Shift+X)" icon={<Strikethrough size={16} />} pressed={editor.marks.includes("strike")} disabled={!expanded} onClick={mark("strike")} />
       <Tool label="Inline code (Cmd+E)" icon={<Braces size={16} />} pressed={editor.marks.includes("code")} disabled={!expanded} onClick={mark("code")} />
-      <Tool label="Link (Cmd+Shift+L)" icon={<Link2 size={16} />} disabled={!expanded} onClick={() => context.openOverlay("link", { range: selection })} />
+      <PopoverTool kind="link" label="Link (Cmd+Shift+L)" icon={<Link2 size={16} />} title="Link the selection" editor={editor} disabled={!expanded}>
+        {(done, range) => <LinkPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+      </PopoverTool>
       <ToolbarSeparator />
       <Tool label="Bulleted list" icon={<List size={16} />} pressed={block?.type === "bulletItem"} onClick={() => selection && editor.commit(setBlockType(editor.model, selection, "bulletItem").model, "Bulleted list", selection)} />
       <Tool label="Numbered list" icon={<ListOrdered size={16} />} pressed={block?.type === "numberItem"} onClick={() => selection && editor.commit(setBlockType(editor.model, selection, "numberItem").model, "Numbered list", selection)} />
       <Tool label="Quote" icon={<Quote size={16} />} pressed={block?.type === "quote"} onClick={() => selection && editor.commit(setBlockType(editor.model, selection, "quote").model, "Quote", selection)} />
       <ToolbarSeparator />
-      <Tool label="Insert table" icon={<TableIcon size={16} />} onClick={() => context.openOverlay("insert table")} />
-      <Tool label="Insert image reference" icon={<ImageIcon size={16} />} onClick={() => context.openOverlay("insert table", { mode: "image" })} />
+      <PopoverTool kind="table" label="Insert table" icon={<TableIcon size={16} />} title="Insert a table" editor={editor} width={280}>
+        {(done) => <TablePopoverBody editor={editor} done={done} toast={context.toast} />}
+      </PopoverTool>
+      <PopoverTool kind="image" label="Insert image reference" icon={<ImageIcon size={16} />} title="Image reference" editor={editor} width={340}>
+        {(done, _range, blockId) => <ImagePopoverBody editor={editor} blockId={blockId} done={done} toast={context.toast} />}
+      </PopoverTool>
       <Tool label="Insert page break" icon={<Minus size={16} />} onClick={() => {
         const result = insertBlockAfter(editor.model, editor.selection?.head.blockId, emptyBlock("pageBreak"));
         editor.commit(result.model, "Page break", result.selection);
       }} />
       <ToolbarSeparator />
-      <Tool label="Comment on the selection" icon={<MessageSquare size={16} />} disabled={!expanded} onClick={() => context.openOverlay("citations", { mode: "comment", range: selection })} />
-      <Tool label="Find and replace (Cmd+F)" icon={<Search size={16} />} onClick={() => context.openOverlay("Styles", { mode: "find" })} />
+      <PopoverTool kind="comment" label="Comment on the selection" icon={<MessageSquare size={16} />} title="Comment on the selection" editor={editor} width={320} disabled={!expanded}>
+        {(done, range) => <CommentPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+      </PopoverTool>
+      <Tool label="Find and replace (Cmd+F)" icon={<Search size={16} />} onClick={onFind} />
     </Toolbar>
   );
 }
@@ -473,7 +589,9 @@ function ReviewRibbon({ editor, context }: { editor: DocEditor; context: ScreenC
         }}
       />
       <ToolbarSeparator />
-      <Tool label="Comment on the selection" icon={<MessageSquare size={16} />} onClick={() => context.openOverlay("citations", { mode: "comment", range: editor.selection })} />
+      <PopoverTool kind="comment" label="Comment on the selection" icon={<MessageSquare size={16} />} title="Comment on the selection" editor={editor} width={320}>
+        {(done, range) => <CommentPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+      </PopoverTool>
       <Tool label="Open the full review desk" icon={<Highlighter size={16} />} onClick={() => context.navigate(context.path("/o/:org/docs/documents/:id/review", context.params.id))} />
     </Toolbar>
   );
@@ -607,7 +725,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
 
   function onEdit(intent: EditIntent) {
     editor.handleEdit(intent, {
-      onRequestLink: (range) => context.openOverlay("link", { range }),
+      onRequestLink: (range) => { if (tab !== "Write") context.setTab("Write"); openDocPopover("link", { range }); },
       onRequestFind: () => setFind((current) => ({ ...current, open: true })),
     });
   }
@@ -626,19 +744,33 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
   return (
     <div className="dx-shell">
       <div className="dx-bar">
-        <div className="dx-bar-title">
-          <input
-            aria-label="Document title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            onBlur={() => {
-              if (title.trim() && title !== record.title) {
-                void context.mutate.patch(record.id, { title: title.trim() }, { event: `Document renamed to ${title.trim()}` });
-              } else setTitle(record.title);
-            }}
-          />
-          <span>{String(record.fields.folder ?? "Unfiled")} · {record.ownerName}</span>
-        </div>
+        <section className="dx-bar-main" aria-label="Document working status">
+          <div className="dx-bar-title">
+            <h1 className="dx-bar-h1"><span className="ds-sr-only">{title || record.title}</span><input
+              aria-label="Document title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onBlur={() => {
+                if (title.trim() && title !== record.title) {
+                  void context.mutate.patch(record.id, { title: title.trim() }, { event: `Document renamed to ${title.trim()}` });
+                } else setTitle(record.title);
+              }}
+            /></h1>
+            <span className="dx-bar-sub">
+              <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+              {editor.model.suggestMode && <Pill tone="info">Suggesting</Pill>}
+              <span>{stats.words} words · {stats.readingMinutes} min</span>
+              <span data-attention={mandatoryComments.length + pendingChanges.length > 0 || undefined}>
+                {mandatoryComments.length} mandatory review{mandatoryComments.length === 1 ? "" : "s"} open · {pendingChanges.length} pending change{pendingChanges.length === 1 ? "" : "s"}
+              </span>
+            </span>
+          </div>
+          <ButtonGroup label="Document areas">
+            <Button size="sm" variant="ghost" onClick={() => navigateDocumentArea("outline")}>Full outline</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigateDocumentArea("review")}>Review history</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigateDocumentArea("publish")}>Publishing</Button>
+          </ButtonGroup>
+        </section>
         <span className="ds-grow" />
         <DocActions context={context} />
         <SaveBadge editor={editor} context={context} />
@@ -646,22 +778,6 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="primary" onClick={() => context.openOverlay("export")} icon={<FileDown size={15} />}>Export</Button>
       </div>
 
-      <section className="dx-workflow-strip" aria-label="Document working status">
-        <div className="dx-workflow-context">
-          <span className="dx-workflow-eyebrow">CURRENT DOCUMENT</span>
-          <Row gap={2} wrap>
-            <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
-            <span className="ds-subtle">{stats.words} words · {stats.readingMinutes} min read</span>
-            {editor.model.suggestMode && <Pill tone="info">Suggesting mode</Pill>}
-          </Row>
-          <span className="ds-subtle">{mandatoryComments.length} mandatory review{mandatoryComments.length === 1 ? "" : "s"} unresolved · {pendingChanges.length} pending change{pendingChanges.length === 1 ? "" : "s"}</span>
-        </div>
-        <div className="dx-workflow-actions">
-          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("outline")}>Full outline</Button>
-          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("review")}>Review history</Button>
-          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("publish")}>Publishing</Button>
-        </div>
-      </section>
       <div className="dx-tabstrip">
         <Tabs
           label="Editor modes"
@@ -685,7 +801,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
       </div>
 
       <div className="dx-ribbon">
-        {tab === "Write" && <WriteRibbon editor={editor} context={context} />}
+        {tab === "Write" && <WriteRibbon editor={editor} context={context} onFind={() => setFind((current) => ({ ...current, open: true }))} />}
         {tab === "Review" && <ReviewRibbon editor={editor} context={context} />}
         {tab === "Layout" && <LayoutRibbon editor={editor} />}
         {tab === "References" && <ReferenceRibbon editor={editor} context={context} />}
@@ -777,7 +893,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
                 onCommentClick={setActiveCommentId}
                 onTableCell={setTableCell}
                 onTableEdit={(blockId, edit) => editor.commit(editTable(editor.model, blockId, edit), edit.kind === "addRow" ? "Add table row" : edit.kind === "addColumn" ? "Add table column" : edit.kind === "removeRow" ? "Remove table row" : "Remove table column")}
-                onBlockClick={(blockId) => context.openOverlay("insert table", { mode: "image", blockId })}
+                onBlockClick={(blockId) => { if (tab !== "Write") context.setTab("Write"); openDocPopover("image", { blockId }); }}
                 pageWidth={editor.model.page.size === "A4" ? 820 : 860}
               />
             )}
@@ -817,7 +933,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
                   { label: "Last action", value: editor.undoLabel ?? "None" },
                 ]} />
                 <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
-                  <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Styles")}>Styles</Button>
+                  <Button size="sm" variant="secondary" onClick={() => { context.setTab("Write"); openDocPopover("styles"); }}>Styles</Button>
                   <Button size="sm" variant="ghost" onClick={() => {
                     const block = currentBlock(editor);
                     if (!block) return;
@@ -1296,9 +1412,7 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
   return (
     <Stack gap={4}>
       <div className="dx-library-header">
-        <div><span className="dx-library-eyebrow">DOCUMENTS / TEMPLATE GOVERNANCE</span>
-          <h2>Masters that keep work consistent.</h2>
-          <p>Choose a company, department or personal template. A master supplies starting content; existing documents remain independent, including signed copies.</p>
+        <div>
         </div>
         <Button variant="primary" onClick={() => context.openOverlay("Template editor")}>New template</Button>
       </div>
@@ -1366,7 +1480,98 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
  * ARL-DOCS-006 — Publishing & Export
  * ====================================================================== */
 
+/** Pieces of the document identity block. `record` runs outside hook rules, so each piece reads the document itself. */
+function useDocumentFacts(context: ScreenContext) {
+  const record = useDocument(context);
+  if (!record) return null;
+  const model = readDoc(record.body, context.actor, context.now.toISOString());
+  return {
+    record,
+    words: documentStats(model).words,
+    mandatory: model.comments.filter((comment) => comment.mandatory && !comment.resolved).length,
+    changes: openSuggestions(model).length,
+  };
+}
+function DocumentTitle({ context }: { context: ScreenContext }) {
+  return <>{useDocument(context)?.title ?? "Document"}</>;
+}
+function DocumentStatus({ context }: { context: ScreenContext }) {
+  const record = useDocument(context);
+  if (!record) return null;
+  return <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>;
+}
+function DocumentFacts({ context }: { context: ScreenContext }) {
+  const facts = useDocumentFacts(context);
+  if (!facts) return null;
+  const { record, words, mandatory, changes } = facts;
+  return (
+    <>
+      {String(record.fields.folder ?? "Unfiled")} · {record.ownerName} · {words} words ·{" "}
+      {mandatory + changes > 0 ? `${mandatory} mandatory review${mandatory === 1 ? "" : "s"} and ${changes} change${changes === 1 ? "" : "s"} open` : "no open review items"}
+    </>
+  );
+}
+function documentRecord(context: ScreenContext): RecordHeaderProps {
+  return {
+    title: <DocumentTitle context={context} />,
+    status: <DocumentStatus context={context} />,
+    meta: [<DocumentFacts key="facts" context={context} />],
+  };
+}
+
+/** Save, review and publish are three separate facts about a document; this strip never lets one stand in for another. */
+function ReleasePath({ context, record, model, saveState }: { context: ScreenContext; record: Rec; model: DocModel; saveState: string }) {
+  const mandatory = model.comments.filter((comment) => comment.mandatory && !comment.resolved).length;
+  const open = model.comments.filter((comment) => !comment.resolved).length;
+  const changes = openSuggestions(model).length;
+  const approvals = record.fields.approvals ? String(record.fields.approvals).split("|").filter(Boolean) : [];
+  const lastApproval = approvals[approvals.length - 1];
+  const published = record.status === "published";
+  const steps = [
+    {
+      key: "save", label: "Saved", tone: saveState === "conflict" || saveState === "error" ? "danger" : saveState === "dirty" || saveState === "saving" ? "warning" : "success",
+      state: saveState === "conflict" ? "Conflict" : saveState === "error" ? "Not saved" : saveState === "dirty" || saveState === "saving" ? "Saving" : "Up to date",
+      detail: `Revision ${record.revision} · ${context.relative(record.updatedAt)}`,
+    },
+    {
+      key: "review", label: "Reviewed", tone: mandatory + changes > 0 ? "warning" : open > 0 ? "info" : "success",
+      state: mandatory + changes > 0 ? "Blocked" : open > 0 ? "Comments open" : "Clear",
+      detail: `${mandatory} mandatory · ${open} open comment${open === 1 ? "" : "s"} · ${changes} tracked change${changes === 1 ? "" : "s"}`,
+    },
+    {
+      key: "publish", label: "Published", tone: published ? "success" : "neutral",
+      state: published ? "Published here" : "Not published",
+      detail: published ? (lastApproval ? `Approved: ${lastApproval.split(" ")[0]} ${lastApproval.split(" ")[1] ?? ""}`.trim() : "Approved in this workspace") : "Workspace record only; no public URL",
+    },
+  ] as const;
+  return (
+    <ol className="dx-release" aria-label="Save, review and publish are separate">
+      {steps.map((step, index) => (
+        <li key={step.key} className="dx-release-step" data-tone={step.tone}>
+          <span className="dx-release-index" aria-hidden="true">{index + 1}</span>
+          <div>
+            <div className="dx-release-head"><strong>{step.label}</strong><Pill tone={step.tone as "success" | "warning" | "danger" | "info" | "neutral"}>{step.state}</Pill></div>
+            <span className="dx-release-detail">{step.detail}</span>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export" | "Share" | "Publish" | "History" }) {
+  const record = useDocument(context);
+  const editor = useDocEditor(context, record);
+  if (!record) return <Empty title="No document is open" icon={<FileText size={20} />} />;
+  return (
+    <Stack gap={4}>
+      <ReleasePath context={context} record={record} model={editor.model} saveState={editor.saveState} />
+      <PublishTab context={context} tab={tab} />
+    </Stack>
+  );
+}
+
+function PublishTab({ context, tab }: { context: ScreenContext; tab: "Export" | "Share" | "Publish" | "History" }) {
   const record = useDocument(context);
   const editor = useDocEditor(context, record);
   const events = useCollection("documents");
@@ -1438,7 +1643,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
                   || openSuggestions(editor.model).length > 0}
                 onClick={() => context.openOverlay("approve document")}>Review and publish…</Button>
               <Button variant="secondary" disabled={record.status !== "published" || !context.can("edit_knowledge")} onClick={async () => {
-                await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` });
+                if (!(await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` }))) return;
               }}>Unpublish</Button>
             </Row>
           </Stack>
@@ -1685,8 +1890,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
     return (
       <Stack gap={4}>
         <div className="dx-library-header">
-          <div><span className="dx-library-eyebrow">DOCUMENTS / COMPANY EXPRESSION</span><h2>Brand alignment, with evidence.</h2>
-            <p>Review how this document reflects the selected company. Checks are local rules, not a certified brand audit or an applied print identity.</p>
+          <div>
           </div>
           <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/docs/templates`)}>Open templates</Button>
         </div>
@@ -1795,7 +1999,7 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
           }, `Document ${title.trim()} created`);
           if (template) {
             try {
-              await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision });
+              if (!(await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }))) return;
             } catch {
               context.toast("Document created", "The document was saved. The template usage counter could not be updated.", "info");
             }
@@ -1809,7 +2013,6 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
         } finally { setSaving(false); }
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / CREATION</span><h3>Start a new company document</h3><p>Choose a published master or begin blank, then file the record in the appropriate workspace folder.</p></div>
       <Field label="Title" required hint="Shown in the library, the outline and every export.">
         <TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus />
       </Field>
@@ -1851,7 +2054,7 @@ function FolderSelector({ context, close }: { context: ScreenContext; close: () 
       onSubmit={async (event) => {
         event.preventDefault();
         for (const record of targets) {
-          await context.mutate.patch(record.id, { fields: { ...record.fields, folder } }, { expectRevision: record.revision, event: `${record.title} moved to ${folder}` });
+          if (!(await context.mutate.patch(record.id, { fields: { ...record.fields, folder } }, { expectRevision: record.revision, event: `${record.title} moved to ${folder}` }))) return;
         }
         context.toast("Moved", `${targets.length} document${targets.length === 1 ? "" : "s"} moved to ${folder}.`);
         close();
@@ -2460,11 +2663,11 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
         setSaving(true);
         setError("");
         try {
-          await context.mutate.patch(record.id, {
+          if (!(await context.mutate.patch(record.id, {
             status: "in_review",
             fields: { ...record.fields, reviewers: chosen.join("|"), reviewMandatory: mandatory, reviewReason: reviewReason.trim(),
               reviewAssignedBy: context.actor, reviewAssignedAt: context.now.toISOString(), notificationStatus: "not_sent" },
-          }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title} by ${context.actor}: ${chosen.join(", ")}` });
+          }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title} by ${context.actor}: ${chosen.join(", ")}` }))) return;
           context.toast("Reviewers recorded", `${chosen.length} local reviewer assignment${chosen.length === 1 ? "" : "s"} saved. No invitations or emails were sent.`);
           close();
         } catch (cause) {
@@ -2472,7 +2675,6 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
         } finally { setSaving(false); }
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / ASSIGNMENT</span><h3>Assign accountable reviewers</h3><p>Existing reviewers remain selected. Choose people responsible for reviewing this particular document.</p></div>
       <Stack gap={2}>
         {members.map((member) => (
           <Checkbox
@@ -2530,7 +2732,7 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
             fields: { folder: "Unfiled", templateId: template.id, templateSourceRevision: template.revision, kind: "document", confidential: false },
             body: readDoc(template.body, context.actor, context.now.toISOString()),
           }, `Document created from ${template.title}`);
-          try { await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }); }
+          try { if (!(await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }))) return; }
           catch { context.toast("Document saved", "Template usage count could not be refreshed.", "info"); }
           close();
           context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
@@ -2560,10 +2762,10 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
         event.preventDefault();
         if (!title.trim()) return;
         if (template) {
-          await context.mutate.patch(template.id, {
+          if (!(await context.mutate.patch(template.id, {
             title: title.trim(), summary,
             fields: { ...template.fields, scope, tokens },
-          }, { expectRevision: template.revision, event: `Template ${title.trim()} updated` });
+          }, { expectRevision: template.revision, event: `Template ${title.trim()} updated` }))) return;
           const created = documents.filter((record) => record.fields.templateId === template.id);
           context.toast("Master updated", created.length
             ? `${created.length} existing document${created.length === 1 ? "" : "s"} were left exactly as they are.`
@@ -2620,7 +2822,7 @@ function TokenMapping({ context, close }: { context: ScreenContext; close: () =>
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(template.id, { fields: { ...template.fields, tokenMap: JSON.stringify(map) } }, { expectRevision: template.revision, event: `Token mapping updated on ${template.title}` });
+        if (!(await context.mutate.patch(template.id, { fields: { ...template.fields, tokenMap: JSON.stringify(map) } }, { expectRevision: template.revision, event: `Token mapping updated on ${template.title}` }))) return;
         context.toast("Mapping saved", "Tokens with a workspace source are filled when a document is created; the rest stay as tokens.");
         close();
       }}
@@ -2702,7 +2904,6 @@ function PdfSettings({ context, close }: { context: ScreenContext; close: () => 
         close();
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / PRINT LAYOUT</span><h3>Prepare a print-ready document</h3><p>Review page settings, comment inclusion and document confidentiality before generating browser-printable HTML.</p></div>
       <Notice tone="warning" title="No PDF engine is connected">
         A PDF is produced by printing the exported HTML from the browser. Saying it is a native PDF renderer would be untrue, so the export is named for what it is.
       </Notice>
@@ -2768,9 +2969,9 @@ function SignatureRequest({ context, close }: { context: ScreenContext; close: (
       onSubmit={async (event) => {
         event.preventDefault();
         if (signatories.length === 0) return;
-        await context.mutate.patch(record.id, {
+        if (!(await context.mutate.patch(record.id, {
           fields: { ...record.fields, signatureStatus: "requested", signatories: signatories.join(", ") },
-        }, { expectRevision: record.revision, event: `Signature requested on ${record.title} from ${signatories.join(", ")}` });
+        }, { expectRevision: record.revision, event: `Signature requested on ${record.title} from ${signatories.join(", ")}` }))) return;
         void context.mutate.log(`Signature request queued locally for ${record.title}`, { entityId: record.id, type: "capability", capability: "queued_local" });
         context.toast("Request recorded locally", "The signatories and the document are on the record. Nothing was sent, because no signature provider is connected.", "info");
         close();
@@ -2876,7 +3077,7 @@ function StyleSettings({ context, close }: { context: ScreenContext; close: () =
       onSubmit={async (event) => {
         event.preventDefault();
         if (existing) {
-          await context.mutate.patch(existing.id, { fields: { ...existing.fields, banned, maxWords: Number(maxWords) || 90 } }, { expectRevision: existing.revision, event: "House style updated" });
+          if (!(await context.mutate.patch(existing.id, { fields: { ...existing.fields, banned, maxWords: Number(maxWords) || 90 } }, { expectRevision: existing.revision, event: "House style updated" }))) return;
         } else {
           await context.mutate.create({
             collection: "preferences", title: "Documents house style", status: "active",
@@ -2914,13 +3115,19 @@ const docEditorFor = (context: ScreenContext) => activeDocEditor(context.params.
 /** A heading the editor should put the caret on when it next opens. */
 let pendingJump: string | undefined;
 
-function docFooter(form: string, label: string, danger = false) {
+function docFooter(form: string, label: string, danger = false, dismiss = "Cancel") {
   return ({ close }: { close: () => void }) => (
-    <>
-      <Button variant="ghost" onClick={close}>Cancel</Button>
-      <Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>
-    </>
+    <OverlayActions
+      primary={<Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>}
+      end={<Button variant="ghost" onClick={close}>{dismiss}</Button>}
+    />
   );
+}
+
+/** The folder selector needs documents chosen in the list; without them its footer offers only Close. */
+function hasDocumentTargets(context: ScreenContext): boolean {
+  const ids = (context.overlayPayload as { ids?: unknown } | undefined)?.ids;
+  return Array.isArray(ids) ? ids.length > 0 : Boolean(context.selectedId);
 }
 
 function focusPage(context: ScreenContext): void {
@@ -3159,10 +3366,10 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
           const fresh = await import("@/platform/repo").then((module) => module.getRecord(record.id));
           if (!fresh || fresh.organizationId !== context.org.id || fresh.collection !== "documents") throw new Error("The document is no longer available in this workspace.");
           if (fresh.status === "published") throw new Error("This document has already been published.");
-          await context.mutate.patch(record.id, {
+          if (!(await context.mutate.patch(record.id, {
             status: "published",
             fields: { ...fresh.fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}${note.trim() ? ` ${note.trim()}` : ""}`].join("|") },
-          }, { expectRevision: fresh.revision, event: `${record.title} approved by ${context.actor}` });
+          }, { expectRevision: fresh.revision, event: `${record.title} approved by ${context.actor}` }))) return;
           context.toast("Approved in Arlovi", `${record.title} is published in this local workspace. No external distribution was performed.`);
           close();
         } catch (cause) {
@@ -3172,7 +3379,6 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
         }
       }}
     >
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / HUMAN DECISION</span><h3>Approve and publish locally</h3><p>Inspect outstanding changes and mandatory review comments before accepting responsibility for publication.</p></div>
       {mandatoryOpen.length > 0 ? (
         <Notice tone="danger" title={`${mandatoryOpen.length} mandatory review${mandatoryOpen.length === 1 ? " is" : "s are"} still open`}>
           Approval is blocked until each “must resolve” comment is resolved, so a reviewer's objection is never erased by an approval. {mandatoryOpen.map((comment) => `${comment.author}: “${comment.body.slice(0, 60)}”`).join(" · ")}
@@ -3188,7 +3394,6 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
       {!context.can("edit_knowledge") && <Notice tone="warning" title="Insufficient role permissions">Your current role cannot record document approvals.</Notice>}
       {error && <Notice tone="danger" title="Approval not saved">{error}</Notice>}
       {saving && <p className="ds-subtle">Recording the approval…</p>}
-      <p className="ds-subtle">The dialog’s Approve action is only valid after acknowledgement and resolution of all mandatory comments and tracked changes.</p>
     </form>
   );
 }
@@ -3262,10 +3467,7 @@ function PreviewDocument({ context }: { context: ScreenContext }) {
   const pages = paginate(editor.model).pages.length;
   return (
     <Stack gap={4}>
-      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / EXPORT PREVIEW</span>
-        <h3>Inspect the rendered document</h3>
-        <p>Review the actual HTML rendering before creating a copy. This is not an approved, signed or externally published document.</p>
-      </div>
+      <Notice tone="info">The rendered HTML before a copy is made. This is not an approved, signed or externally published document.</Notice>
       <Properties rows={[
         { label: "Document", value: record.title },
         { label: "Company status", value: record.status.replace("_", " ") },
@@ -3365,45 +3567,55 @@ registerApp({
       actions: [
         { id: "Create", label: "New document", placement: "primary", run: (context) => context.openOverlay("New doc") },
         { id: "upload", label: "Upload", placement: "secondary", icon: <Upload size={15} />, run: (context) => context.openOverlay("New doc", { upload: true }) },
+        {
+          id: "duplicate", label: "Duplicate", placement: "overflow",
+          guard: (context) => (context.selectedId ? undefined : "Select a document first"),
+          run: async (context) => {
+            const source = context.selectedId ? await import("@/platform/repo").then((module) => module.getRecord(context.selectedId!)) : undefined;
+            if (source) await duplicateDocument(context, source);
+          },
+        },
         { id: "search", label: "Search documents…", placement: "overflow", run: (context) => context.openOverlay("search documents") },
         { id: "move", label: "Move to folder", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a document first"), run: (context) => context.openOverlay("folder selector") },
         { id: "share", label: "Share", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a document first"), run: (context) => context.openOverlay("sharing") },
       ],
       overlays: [
-        { id: "search documents", kind: "modal", title: "Search documents", width: 600, render: (context) => <SearchDocuments context={context} close={context.close} /> },
-        { id: "New doc", kind: "modal", title: "New document", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="new-doc">Create</Button></>, render: (context) => <NewDocumentOverlay context={context} close={context.close} /> },
-        { id: "folder selector", kind: "modal", title: "Move to folder", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="folder-selector">Move</Button></>, render: (context) => <FolderSelector context={context} close={context.close} /> },
-        { id: "sharing", kind: "drawer", title: "Sharing", width: 500, presentation: { selectedRecord: true, collection: "documents", guidance: "Review this document’s classification, existing sharing entries and local permission record. No public URL is created." }, render: (context) => <SharingOverlay context={context} close={context.close} /> },
-        { id: "trash confirm", kind: "modal", title: "Delete documents", tone: "danger", blocking: true, width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Keep them</Button><Button variant="outline-danger" type="submit" form="trash-confirm">Delete</Button></>, render: (context) => <TrashConfirm context={context} close={context.close} /> },
+        { id: "search documents", kind: "modal", title: "Search documents", width: OVERLAY_WIDTH.modal, render: (context) => <SearchDocuments context={context} close={context.close} /> },
+        { id: "New doc", kind: "modal", title: "New document", width: OVERLAY_WIDTH.form, footer: docFooter("new-doc", "Create", false), render: (context) => <NewDocumentOverlay context={context} close={context.close} /> },
+        { id: "folder selector", kind: "modal", title: "Move to folder", width: OVERLAY_WIDTH.compact, footer: (context) => (hasDocumentTargets(context) ? docFooter("folder-selector", "Move", false)(context) : <OverlayActions primary={<Button variant="ghost" onClick={context.close}>Close</Button>} />), render: (context) => <FolderSelector context={context} close={context.close} /> },
+        { id: "sharing", kind: "drawer", summary: docSummary, title: "Sharing", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "documents", guidance: "Review this document’s classification, existing sharing entries and local permission record. No public URL is created." }, render: (context) => <SharingOverlay context={context} close={context.close} /> },
+        { id: "trash confirm", kind: "modal", title: "Delete documents", tone: "danger", blocking: true, width: OVERLAY_WIDTH.form, footer: docFooter("trash-confirm", "Delete", true, "Keep them"), render: (context) => <TrashConfirm context={context} close={context.close} /> },
       ],
     },
 
     "ARL-DOCS-002": {
       id: "ARL-DOCS-002",
       chrome: "full",
+      chromeTitle: "surface",
       surface: (context) => <DocumentEditorScreen context={context} />,
       tabs: ["Write", "Review", "Layout", "References"].map((id) => ({ id, render: () => null })),
       actions: [
         { id: "Type", label: "Type on the page", placement: "toolbar", run: (context) => focusPage(context) },
-        { id: "format", label: "Format…", placement: "toolbar", run: (context) => context.openOverlay("format") },
-        { id: "insert", label: "Insert", placement: "toolbar", run: (context) => context.openOverlay("insert table") },
-        { id: "comment", label: "Comment", placement: "toolbar", run: (context) => context.openOverlay("citations", { mode: "comment" }) },
+        { id: "format", label: "Format…", placement: "toolbar", run: (context) => { context.setTab("Write"); openDocPopover("format", { range: docEditorFor(context)?.selection }); } },
+        { id: "insert", label: "Insert", placement: "toolbar", run: (context) => { context.setTab("Write"); openDocPopover("table"); } },
+        { id: "comment", label: "Comment", placement: "toolbar", run: (context) => openDocPopover("comment", { range: docEditorFor(context)?.selection }) },
         { id: "accept changes", label: "Accept changes…", placement: "toolbar", run: (context) => context.openOverlay("accept changes") },
         { id: "export", label: "Export", placement: "toolbar", run: (context) => context.openOverlay("export") },
       ],
       overlays: [
-        { id: "format", kind: "modal", title: "Format", width: 480, render: (context) => <FormatOverlay context={context} close={context.close} /> },
-        { id: "accept changes", kind: "modal", title: "Accept or reject changes", width: 600, render: (context) => <AcceptChanges context={context} close={context.close} /> },
-        { id: "Styles", kind: "drawer", title: "Styles", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="styles">Save styles</Button></>, render: (context) => <StylesOverlay context={context} close={context.close} /> },
-        { id: "insert table", kind: "modal", title: "Insert", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="insert">Insert</Button></>, render: (context) => <InsertOverlay context={context} close={context.close} /> },
-        { id: "citations", kind: "modal", title: "Comment or reference", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="citations">Save</Button></>, render: (context) => <CitationsOverlay context={context} close={context.close} /> },
-        { id: "link", kind: "modal", title: "Link", width: 460, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="link">Apply</Button></>, render: (context) => <LinkOverlay context={context} close={context.close} /> },
-        { id: "export", kind: "modal", title: "Export", width: 620, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="export">Download</Button></>, render: (context) => <ExportOverlay context={context} close={context.close} /> },
+        { id: "format", kind: "modal", title: "Format", width: OVERLAY_WIDTH.compact, render: (context) => <FormatOverlay context={context} close={context.close} /> },
+        { id: "accept changes", kind: "modal", summary: docSummary, title: "Accept or reject changes", width: OVERLAY_WIDTH.modal, render: (context) => <AcceptChanges context={context} close={context.close} /> },
+        { id: "Styles", kind: "drawer", summary: docSummary, title: "Styles", width: OVERLAY_WIDTH.form, footer: docFooter("styles", "Save styles", false), render: (context) => <StylesOverlay context={context} close={context.close} /> },
+        { id: "insert table", kind: "modal", title: "Insert", width: OVERLAY_WIDTH.form, footer: docFooter("insert", "Insert", false), render: (context) => <InsertOverlay context={context} close={context.close} /> },
+        { id: "citations", kind: "modal", title: "Comment or reference", width: OVERLAY_WIDTH.form, footer: docFooter("citations", "Save", false), render: (context) => <CitationsOverlay context={context} close={context.close} /> },
+        { id: "link", kind: "modal", title: "Link", width: OVERLAY_WIDTH.compact, footer: docFooter("link", "Apply", false), render: (context) => <LinkOverlay context={context} close={context.close} /> },
+        { id: "export", kind: "modal", title: "Export", width: OVERLAY_WIDTH.record, footer: docFooter("export", "Download", false, "Close"), render: (context) => <ExportOverlay context={context} close={context.close} /> },
       ],
     },
 
     "ARL-DOCS-003": {
       id: "ARL-DOCS-003",
+      record: documentRecord,
       title: () => "Outline & navigation",
       tabs: (["Headings", "Bookmarks", "Comments"] as const).map((id) => ({ id, render: (context) => <OutlineScreen context={context} tab={id} /> })),
       actions: [
@@ -3414,16 +3626,17 @@ registerApp({
         { id: "collapse", label: "Collapse or expand every heading", placement: "overflow", run: () => outlineUi.set((current) => ({ collapseAll: current.collapseAll + 1 })) },
       ],
       overlays: [
-        { id: "add section", kind: "modal", title: "Add a section", width: 520, footer: docFooter("docs-add-section", "Add"), render: (context) => <AddSection context={context} close={context.close} /> },
-        { id: "jump to", kind: "modal", title: "Jump to a heading", width: 480, render: (context) => <JumpTo context={context} close={context.close} /> },
-        { id: "reorder heading", kind: "modal", title: "Reorder a heading", width: 480, render: (context) => <ReorderHeading context={context} close={context.close} /> },
-        { id: "Heading properties", kind: "modal", title: "Heading properties", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="heading-properties">Save</Button></>, render: (context) => <HeadingProperties context={context} close={context.close} /> },
-        { id: "document structure warning", kind: "drawer", title: "Document structure", width: 520, render: (context) => <StructureWarningOverlay context={context} /> },
+        { id: "add section", kind: "modal", title: "Add a section", width: OVERLAY_WIDTH.form, footer: docFooter("docs-add-section", "Add"), render: (context) => <AddSection context={context} close={context.close} /> },
+        { id: "jump to", kind: "modal", title: "Jump to a heading", width: OVERLAY_WIDTH.compact, render: (context) => <JumpTo context={context} close={context.close} /> },
+        { id: "reorder heading", kind: "modal", title: "Reorder a heading", width: OVERLAY_WIDTH.compact, render: (context) => <ReorderHeading context={context} close={context.close} /> },
+        { id: "Heading properties", kind: "modal", title: "Heading properties", width: OVERLAY_WIDTH.compact, footer: docFooter("heading-properties", "Save", false), render: (context) => <HeadingProperties context={context} close={context.close} /> },
+        { id: "document structure warning", kind: "drawer", summary: docSummary, title: "Document structure", width: OVERLAY_WIDTH.form, render: (context) => <StructureWarningOverlay context={context} /> },
       ],
     },
 
     "ARL-DOCS-004": {
       id: "ARL-DOCS-004",
+      record: documentRecord,
       title: () => "Review & comments",
       tabs: (["Comments", "Changes", "Approvals", "Versions"] as const).map((id) => ({ id, render: (context) => <ReviewScreen context={context} tab={id} /> })),
       actions: [
@@ -3433,13 +3646,13 @@ registerApp({
         { id: "mention", label: "Mention someone…", placement: "overflow", run: (context) => context.openOverlay("mention") },
       ],
       overlays: [
-        { id: "approve document", kind: "modal", title: "Approve the document", width: 540, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
-        { id: "suggest edit", kind: "modal", title: "Suggest an edit", width: 560, footer: docFooter("docs-suggest", "Suggest"), render: (context) => <SuggestEdit context={context} close={context.close} /> },
-        { id: "accept changes", kind: "modal", title: "Accept or reject changes", width: 600, render: (context) => <AcceptChanges context={context} close={context.close} /> },
-        { id: "mention", kind: "modal", title: "Mention someone", width: 520, footer: docFooter("docs-mention", "Mention"), render: (context) => <MentionSomeone context={context} close={context.close} /> },
-        { id: "Comment thread", kind: "drawer", title: "Comment thread", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="comment-thread">Reply</Button></>, render: (context) => <CommentThread context={context} close={context.close} /> },
-        { id: "diff", kind: "drawer", title: "Compare", width: 560, render: (context) => <DiffOverlay context={context} /> },
-        { id: "reviewer assignment", kind: "modal", title: "Assign reviewers", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="reviewer-assignment">Assign</Button></>, render: (context) => <ReviewerAssignment context={context} close={context.close} /> },
+        { id: "approve document", kind: "modal", summary: docSummary, title: "Approve the document", width: OVERLAY_WIDTH.form, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
+        { id: "suggest edit", kind: "modal", title: "Suggest an edit", width: OVERLAY_WIDTH.modal, footer: docFooter("docs-suggest", "Suggest"), render: (context) => <SuggestEdit context={context} close={context.close} /> },
+        { id: "accept changes", kind: "modal", summary: docSummary, title: "Accept or reject changes", width: OVERLAY_WIDTH.modal, render: (context) => <AcceptChanges context={context} close={context.close} /> },
+        { id: "mention", kind: "modal", title: "Mention someone", width: OVERLAY_WIDTH.form, footer: docFooter("docs-mention", "Mention"), render: (context) => <MentionSomeone context={context} close={context.close} /> },
+        { id: "Comment thread", kind: "drawer", summary: docSummary, title: "Comment thread", width: OVERLAY_WIDTH.form, footer: docFooter("comment-thread", "Reply", false, "Close"), render: (context) => <CommentThread context={context} close={context.close} /> },
+        { id: "diff", kind: "drawer", summary: docSummary, title: "Compare", width: OVERLAY_WIDTH.form, render: (context) => <DiffOverlay context={context} /> },
+        { id: "reviewer assignment", kind: "modal", summary: docSummary, title: "Assign reviewers", width: OVERLAY_WIDTH.form, footer: docFooter("reviewer-assignment", "Assign", false), render: (context) => <ReviewerAssignment context={context} close={context.close} /> },
       ],
     },
 
@@ -3456,20 +3669,21 @@ registerApp({
           run: async (context) => {
             const id = context.selectedId;
             if (!id) return;
-            await context.mutate.patch(id, { status: "retired" }, { event: "Template retired" });
+            if (!(await context.mutate.patch(id, { status: "retired" }, { event: "Template retired" }))) return;
             context.toast("Retired", "It can no longer be used for a new document. Documents already created keep their own body.");
           },
         },
       ],
       overlays: [
-        { id: "Template editor", kind: "drawer", title: "Template", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="template-editor">Save</Button></>, render: (context) => <TemplateEditor context={context} close={context.close} /> },
-        { id: "token mapping", kind: "modal", title: "Token mapping", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="token-mapping">Save mapping</Button></>, render: (context) => <TokenMapping context={context} close={context.close} /> },
-        { id: "change impact", kind: "drawer", title: "Change impact", width: 560, render: (context) => <ChangeImpact context={context} /> },
+        { id: "Template editor", kind: "drawer", summary: docSummary, title: "Template", width: OVERLAY_WIDTH.form, footer: docFooter("template-editor", "Save", false), render: (context) => <TemplateEditor context={context} close={context.close} /> },
+        { id: "token mapping", kind: "modal", title: "Token mapping", width: OVERLAY_WIDTH.modal, footer: docFooter("token-mapping", "Save mapping", false), render: (context) => <TokenMapping context={context} close={context.close} /> },
+        { id: "change impact", kind: "drawer", summary: docSummary, title: "Change impact", width: OVERLAY_WIDTH.form, render: (context) => <ChangeImpact context={context} /> },
       ],
     },
 
     "ARL-DOCS-006": {
       id: "ARL-DOCS-006",
+      record: documentRecord,
       title: () => "Publishing & export",
       tabs: (["Export", "Share", "Publish", "History"] as const).map((id) => ({ id, render: (context) => <PublishScreen context={context} tab={id} /> })),
       actions: [
@@ -3479,17 +3693,18 @@ registerApp({
         { id: "revoke link", label: "Revoke a link…", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke links") },
       ],
       overlays: [
-        { id: "approve document", kind: "modal", title: "Approve the document", width: 540, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
-        { id: "preview", kind: "modal", title: "Export preview", width: 760, render: (context) => <PreviewDocument context={context} /> },
-        { id: "revoke links", kind: "modal", title: "Revoke a link", width: 560, tone: "danger", render: (context) => <RevokeLinks context={context} close={context.close} /> },
-        { id: "PDF settings", kind: "modal", title: "PDF settings", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="pdf-settings">Write print HTML</Button></>, render: (context) => <PdfSettings context={context} close={context.close} /> },
-        { id: "link permissions", kind: "modal", title: "Link permissions", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="link-permissions">Create link</Button></>, render: (context) => <LinkPermissions context={context} close={context.close} /> },
-        { id: "signature request", kind: "modal", title: "Signature request", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="signature-request">Record request</Button></>, render: (context) => <SignatureRequest context={context} close={context.close} /> },
+        { id: "approve document", kind: "modal", summary: docSummary, title: "Approve the document", width: OVERLAY_WIDTH.form, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
+        { id: "preview", kind: "modal", title: "Export preview", width: OVERLAY_WIDTH.wide, render: (context) => <PreviewDocument context={context} /> },
+        { id: "revoke links", kind: "modal", summary: docSummary, title: "Revoke a link", width: OVERLAY_WIDTH.modal, tone: "danger", render: (context) => <RevokeLinks context={context} close={context.close} /> },
+        { id: "PDF settings", kind: "modal", summary: docSummary, title: "PDF settings", width: OVERLAY_WIDTH.form, footer: docFooter("pdf-settings", "Write print HTML", false), render: (context) => <PdfSettings context={context} close={context.close} /> },
+        { id: "link permissions", kind: "modal", summary: docSummary, title: "Link permissions", width: OVERLAY_WIDTH.form, footer: docFooter("link-permissions", "Create link", false), render: (context) => <LinkPermissions context={context} close={context.close} /> },
+        { id: "signature request", kind: "modal", summary: docSummary, title: "Signature request", width: OVERLAY_WIDTH.form, footer: docFooter("signature-request", "Record request", false), render: (context) => <SignatureRequest context={context} close={context.close} /> },
       ],
     },
 
     "ARL-DOCS-007": {
       id: "ARL-DOCS-007",
+      record: documentRecord,
       title: () => "Document insights",
       tabs: (["Writing", "Accuracy", "Brand", "Sources"] as const).map((id) => ({ id, render: (context) => <InsightsScreen context={context} tab={id} /> })),
       actions: [
@@ -3498,10 +3713,10 @@ registerApp({
         { id: "inspect citations", label: "Inspect citations", placement: "overflow", run: (context) => context.setTab("Sources") },
       ],
       overlays: [
-        { id: "apply suggestions", kind: "modal", title: "Apply writing suggestions", width: 620, footer: docFooter("docs-apply", "Apply the ticked ones"), render: (context) => <ApplySuggestions context={context} close={context.close} /> },
-        { id: "Suggestion diff", kind: "modal", title: "Suggestion", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="suggestion-diff">Apply</Button></>, render: (context) => <SuggestionDiff context={context} close={context.close} /> },
-        { id: "source inspection", kind: "drawer", title: "Source", width: 520, render: (context) => <SourceInspection context={context} /> },
-        { id: "style settings", kind: "modal", title: "Style settings", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="style-settings">Save</Button></>, render: (context) => <StyleSettings context={context} close={context.close} /> },
+        { id: "apply suggestions", kind: "modal", title: "Apply writing suggestions", width: OVERLAY_WIDTH.record, footer: docFooter("docs-apply", "Apply the ticked ones"), render: (context) => <ApplySuggestions context={context} close={context.close} /> },
+        { id: "Suggestion diff", kind: "modal", title: "Suggestion", width: OVERLAY_WIDTH.modal, footer: docFooter("suggestion-diff", "Apply", false, "Close"), render: (context) => <SuggestionDiff context={context} close={context.close} /> },
+        { id: "source inspection", kind: "drawer", summary: docSummary, title: "Source", width: OVERLAY_WIDTH.form, render: (context) => <SourceInspection context={context} /> },
+        { id: "style settings", kind: "modal", title: "Style settings", width: OVERLAY_WIDTH.form, footer: docFooter("style-settings", "Save", false), render: (context) => <StyleSettings context={context} close={context.close} /> },
       ],
     },
   },

@@ -54,6 +54,8 @@ async function action(page: Page, label: string | RegExp): Promise<void> {
   /* A route change renders as a transition, so the previous screen's bar can
      stay on view for a frame after the address changes. Wait briefly for the
      action to appear in the bar before falling back to the overflow menu. */
+  // An application shows a loading state until its own records are written.
+  await expect(page.locator('.pg[aria-busy="true"]')).toHaveCount(0, { timeout: 20_000 });
   await direct.first().waitFor({ state: "visible", timeout: 1500 }).catch(() => undefined);
   if (await direct.count()) {
     await direct.first().click();
@@ -148,8 +150,12 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   // Lead -> CRM qualify -> convert: conversion writes a real deal linked to the contact and account.
   await open(page, "/crm/leads", "Leads & Qualification");
   await pick(page, /Dublin reseller enquiry/, "Dublin reseller enquiry");
-  await expect(dialog(page).getByRole("heading", { name: "53 of 100, warm" })).toBeVisible();
+  // The lead inspector now shows the score as a fact ("53 / 100" with a "warm" band) rather than a heading.
+  await expect(dialog(page).getByText("53 / 100", { exact: true })).toBeVisible();
+  await expect(dialog(page).getByText("warm", { exact: true })).toBeVisible();
   await dialog(page).getByRole("button", { name: "Convert to a deal" }).click();
+  // The form prefills the lead's recorded value, so clear it to exercise the "needs an amount" rule deterministically.
+  await dialog(page).getByLabel("Deal amount").fill("0");
   await expect(dialog(page).getByText("This lead cannot be converted")).toBeVisible();
   await dialog(page).getByLabel("Deal amount").fill("3360");
   await dialog(page).getByLabel("Also create a draft quote").selectOption({ index: 0 });
@@ -207,7 +213,7 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   await open(page, "/crm/quotes?tab=Accepted", "Quotes & Proposals");
   await expect(main(page).getByRole("row", { name: /Q-126/ })).toBeVisible();
   // Closing won writes the deal and draft invoice together, atomically.
-  await open(page, "/crm/deals/nl-deals-721", "Deal");
+  await open(page, "/crm/deals/nl-deals-721", /.+/);
   await action(page, "Close the deal");
   await expect(dialog(page).getByText(/Q-126 \(accepted\)/)).toBeVisible();
   await expect(dialog(page).getByText("£12,456.00")).toBeVisible();
@@ -220,7 +226,7 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   await expect(main(page).getByText("A draft invoice is not in the ledger")).toBeVisible();
 
   // The CRM side now shows the invoice and the accepted quote.
-  await open(page, "/crm/deals/nl-deals-721", "Deal");
+  await open(page, "/crm/deals/nl-deals-721", /.+/);
   await expect(main(page).getByText(/Invoiced\s*£12,456\.00/)).toBeVisible();
   await expect(main(page).getByText("CLOSED WON").first()).toBeVisible();
   await open(page, "/crm/quotes?tab=Accepted", "Quotes & Proposals");
@@ -229,7 +235,8 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   // Financial posting: approving the invoice posts one balanced journal.
   await open(page, "/fin/reconciliation", "Bank Reconciliation");
   await expect(main(page).getByText("statement-2026-11.csv")).toBeVisible();
-  const ledgerBefore = await statAfter(page, /LEDGER BALANCE/);
+  // A1: the reconciliation equation now reads "Ledger at statement end"; the to-date book balance is the source note "Ledger balance to date £x".
+  const ledgerBefore = await statAfter(page, /Ledger balance to date/);
   await open(page, "/fin/invoices?tab=Draft", "Invoice List");
   await main(page).getByRole("row", { name: new RegExp(number) }).getByText(number, { exact: true }).click();
   await expect(page).toHaveURL(/\/fin\/invoices\/[0-9a-f-]{36}/);
@@ -252,7 +259,7 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
 
   await open(page, "/fin/reconciliation", "Bank Reconciliation");
   await expect(main(page).getByText("statement-2026-11.csv")).toBeVisible();
-  await expect.poll(() => statAfter(page, /LEDGER BALANCE/).catch(() => Number.NaN), { timeout: 15_000 }).toBe(ledgerBefore + 1_245_600);
+  await expect.poll(() => statAfter(page, /Ledger balance to date/).catch(() => Number.NaN), { timeout: 15_000 }).toBe(ledgerBefore + 1_245_600);
 
   // Reporting and audit: the paid invoice is in the paid list after a reload, with nothing outstanding.
   await open(page, "/fin/invoices?tab=Paid", "Invoice List");
@@ -295,7 +302,9 @@ test("WF-01 Company onboarding: identity, domain claim, connector boundary, brai
 
   // Optionally connect a provider: the authorisation stops before any provider is reached.
   await open(page, "/connect/marketplace", "Integration directory");
-  await expect(main(page).getByText("Every provider here is not connected")).toBeVisible();
+  // B9/B8: the directory lede now states the boundary as "Review what each provider would need before anything is connected."
+  await expect(main(page).getByText(/Review what each provider would need before anything is connected/)).toBeVisible();
+  await expect(main(page).getByText("Not connected").first()).toBeVisible();
   await tap(main(page).getByRole("button", { name: "What it needs" }).first(), "/connect/marketplace 'What it needs' on Send email");
   await expect(dialog(page).getByText("mail.send")).toBeVisible();
   await dialog(page).getByRole("button", { name: "Open the authorisation flow" }).click();
@@ -343,7 +352,8 @@ test("WF-02 Cross-department campaign: creative rights gate, consented recipient
   await open(page, "/fin/home", "Finance Overview");
 
   // Marketing plan approval is gated on creative being approved (asset rights).
-  await open(page, "/market/campaigns/nl-campaigns-621", "Campaign");
+  // Record screens now title the page with the record (ARL B-packages), not the generic noun.
+  await open(page, "/market/campaigns/nl-campaigns-621", "Clerkenwell open studio");
   await expect(main(page).getByText("Clerkenwell open studio").first()).toBeVisible();
   await action(page, "Approve plan");
   await expect(dialog(page).getByText("All creative approved")).toBeVisible();
@@ -399,7 +409,7 @@ test("WF-02 Cross-department campaign: creative rights gate, consented recipient
   await expect(main(page).getByText(/CONFIRMED BY A PROVIDER\s*0/i)).toBeVisible();
 
   // Rollback limitations are stated, not hidden: pausing cannot stop provider spend.
-  await open(page, "/market/campaigns/nl-campaigns-620", "Campaign");
+  await open(page, "/market/campaigns/nl-campaigns-620", /.+/); // h1 is the campaign title
   await action(page, "Pause");
   await expect(dialog(page).getByText("Cannot be confirmed")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -452,7 +462,7 @@ test("WF-04 Customer request to resolution: verified contact, approved answer, r
   await expect(main(page).getByText("CARE-19").first()).toBeVisible();
 
   // Contact verified: the case shows only what it needs about a linked customer record.
-  await open(page, "/care/tickets/nl-tickets-041", "Case");
+  await open(page, "/care/tickets/nl-tickets-041", "CARE-32 Wrong finish delivered"); // h1 is the case reference and subject
   await expect(main(page).getByText("CARE-32 Wrong finish delivered")).toBeVisible();
   await expect(main(page).getByText("o.delacroix@delacroix.example")).toBeVisible();
 
@@ -481,7 +491,7 @@ test("WF-04 Customer request to resolution: verified contact, approved answer, r
   await expect(main(page).getByText(/£120\.00 requested by Maya Chen/)).toBeVisible();
 
   // No double refund: a second request on the same case must be refused.
-  await open(page, "/care/tickets/nl-tickets-041", "Case");
+  await open(page, "/care/tickets/nl-tickets-041", "CARE-32 Wrong finish delivered"); // h1 is the case reference and subject
   await action(page, "Request a refund");
   const second = dialog(page);
   const refused = (await second.getByText(/already (been )?requested|already has a refund/i).count()) > 0
@@ -491,6 +501,9 @@ test("WF-04 Customer request to resolution: verified contact, approved answer, r
 
   // Case closed with evidence: the resolution names who resolved it and when.
   await page.getByRole("tab", { name: "Overview" }).click();
+  // B7: the resolution note is required, so "Mark resolved" stays disabled until one is written.
+  await expect(main(page).getByRole("button", { name: "Mark resolved" })).toBeDisabled();
+  await main(page).getByLabel("Resolution note").fill("Replacement finish dispatched; customer to return the wrong item.");
   await main(page).getByRole("button", { name: "Mark resolved" }).click();
   await expect(main(page).getByText(/RESOLVED IN/i)).toBeVisible();
   await reload(page);
@@ -520,7 +533,9 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
 
   // Acceptance must be recordable so the candidate becomes an employee from the offer.
   await page.getByRole("tab", { name: "Candidates" }).click();
-  await main(page).getByRole("tabpanel").getByText("Marta Nowak").click();
+  // Marta is also on the Offers panel; wait for the Candidates panel before choosing her card.
+  await expect(page.getByRole("tab", { name: "Candidates" })).toHaveAttribute("aria-selected", "true");
+  await main(page).getByRole("tabpanel", { name: "Candidates" }).getByRole("button", { name: /Marta Nowak/ }).click();
   await expect(page).toHaveURL(/\/hr\/candidates\//);
   await action(page, "Review and move stage");
   const stages = await dialog(page).getByRole("combobox").first().locator("option").allInnerTexts();
@@ -593,7 +608,7 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
   // Payroll: the new starter is an input to the next run.
   await open(page, "/hr/payroll?tab=Inputs", "Payroll");
   await expect(main(page).getByRole("row", { name: /Marta Nowak/ })).toContainText("full-time");
-  await expect(main(page).getByText(/Nothing on this page is filed or paid/)).toBeVisible();
+  await expect(main(page).getByText(/Nothing is filed and nothing is paid/)).toBeVisible();
 });
 
 test("WF-10 Booking-to-service: atomic slot, deposit boundary, check-in, service history", async ({ page }) => {
@@ -684,8 +699,8 @@ test("WF-11 Replenishment-to-payment: requisition, approval, purchase order, rec
   await pick(page, new RegExp(reqNumber), reqNumber);
   await action(page, "Approve selected");
   await expect(dialog(page).getByText("Drift Pendant is below its reorder point of 8.")).toBeVisible();
-  await expect(dialog(page).getByRole("button", { name: "Reject — a reason is required" })).toBeDisabled();
-  await dialog(page).getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(dialog(page).getByRole("button", { name: "Reject with reason" })).toBeDisabled(); // B6: button renamed; still disabled until a reason is written
+  await dialog(page).getByRole("button", { name: "Approve requisition" }).click(); // B6: primary renamed from "Approve"
   await page.getByRole("tab", { name: "Mine" }).click();
   await expect(main(page).getByRole("row", { name: new RegExp(reqNumber) })).toContainText("APPROVED", { ignoreCase: true });
 
@@ -736,7 +751,8 @@ test("WF-11 Replenishment-to-payment: requisition, approval, purchase order, rec
 
   // AP bill and payment authorisation: a payable can be captured but never paid from here.
   await open(page, "/fin/bills", "Bills & Payables");
-  await expect(main(page).getByText("No bank mandate exists in this workspace.")).toBeVisible();
+  // A1: the boundary is now stated in the page lede ("No bank mandate exists here.").
+  await expect(main(page).getByText("No bank mandate exists here.")).toBeVisible();
   await action(page, "Capture a bill");
   await expect(dialog(page).getByText("Capture is manual here")).toBeVisible();
   await dialog(page).getByLabel("Bill number").fill("TBF-7781");
@@ -762,7 +778,8 @@ test("WF-11 Replenishment-to-payment: requisition, approval, purchase order, rec
 test("WF-14 Notification and approval: scoped request, typed confirmation, decision recorded everywhere", async ({ page }) => {
   // Bundled notice: the attention centre and the approvals inbox agree on what is waiting.
   await open(page, "/inbox/approvals", "Approvals");
-  await shows(page, /APPROVALS\s*4 waiting/);
+  // A5: the count is a "4 waiting" state line under the tab strip, no longer an APPROVALS stat label.
+  await shows(page, /\b4 waiting\b/);
   await open(page, "/hq/home", "Executive Home");
   await showsSoft(page, /Waiting on you\s*Today · 4 items/, "DEFECT: /hq/home 'Waiting on you' says 'Nothing to approve' while /inbox/approvals has 4 requests assigned to Maya Chen");
 
@@ -785,22 +802,27 @@ test("WF-14 Notification and approval: scoped request, typed confirmation, decis
   await expect(dialog(page).getByText("Post one journal in the current period")).toBeVisible();
   await expect(dialog(page).getByText("6300 Wages, 2200 Accrued wages")).toBeVisible();
   // The request and its target must describe the same journal and amount.
-  await expect(dialog(page).getByText(/Wage accrual draft \(revision 1\)/)).toBeVisible();
+  // A5: the "Bound to" block lists Target and Revision as separate facts.
+  await expect(dialog(page).getByText("Wage accrual draft", { exact: true })).toBeVisible();
+  await expect(dialog(page).getByText(/1 at request · now 1/)).toBeVisible();
   await expect.soft(dialog(page).getByText(targetValue).first(), `DEFECT: /inbox/approvals 'Post the October wage accrual' asks to post £18,420.00 (JRN-0008, October) but its target record is 'Wage accrual draft', a ${targetValue} journal dated 1 Nov 2026`).toBeVisible();
   // Deny needs a reason.
   await expect(dialog(page).getByRole("button", { name: "Deny" })).toBeDisabled();
 
   // Step-up: a typed confirmation, which says it is not a second factor.
   await dialog(page).getByRole("button", { name: "Approve…" }).click();
-  await expect(dialog(page).getByText("This is a local confirmation, not a second factor")).toBeVisible();
+  await expect(dialog(page).getByText(/A local confirmation recorded in the audit log, not a second factor/)).toBeVisible(); // A5 wording
   const approve = dialog(page).getByRole("button", { name: "Approve this action" });
-  await expect(approve).toBeDisabled();
+  // A5: the submit stays enabled and refuses an unmatched phrase with a hint instead of being disabled.
+  await approve.click();
+  await expect(dialog(page).getByText("Type APPROVE exactly to approve.")).toBeVisible();
+  await expect(dialog(page)).toBeVisible();
   await dialog(page).getByLabel("Type APPROVE to confirm").fill("APPROVE");
   await approve.click();
   await expect(dialog(page)).toHaveCount(0);
 
   // Decision recorded: history, waiting count, and a receipt in Integrations.
-  await shows(page, /APPROVALS\s*3 waiting/);
+  await shows(page, /\b3 waiting\b/);
   await page.getByRole("tab", { name: "History" }).click();
   await expect(main(page).getByRole("row", { name: /Post the October wage accrual/ })).toContainText("APPROVED", { ignoreCase: true });
   await reload(page);
@@ -813,7 +835,8 @@ test("WF-14 Notification and approval: scoped request, typed confirmation, decis
   await open(page, "/inbox/approvals", "Approvals");
   await pick(page, /Pay Hollis Metalwork bill BILL-220/, "Pay Hollis Metalwork bill BILL-220");
   await action(page, "Review");
-  await expect(dialog(page).getByText(/BILL-220 \(revision 1\)/)).toBeVisible();
+  await expect(dialog(page).getByText(/1 at request · now 1/)).toBeVisible();
+  await expect(dialog(page).getByText(/BILL-220/).first()).toBeVisible();
   await expect.soft(dialog(page).getByText("The target changed after this request was made"), "DEFECT: /inbox/approvals 'Pay Hollis Metalwork bill BILL-220' — the request is bound to plan version 2 but BILL-220 is at revision 1, a revision it cannot have gone back to; the review reports 'The target changed after this request was made' and blocks approval (the drift check compares a plan version with a record revision)").toHaveCount(0);
 });
 
@@ -880,7 +903,9 @@ test("WF-07 Design-to-publish: editable file, brand rules, review approval, publ
   // Human review: a version is approved on the record.
   await open(page, `${designUrl}/review`, "Design Review");
   await action(page, "Approve this version");
-  await expect(dialog(page).getByText(/This decision binds to version \w+ \(revision \d+\)/)).toBeVisible();
+  // A3/B-design: the binding is now two facts ("Binds to version <id>", "Revision <n>").
+  await expect(dialog(page).getByText("Binds to version", { exact: true })).toBeVisible();
+  await expect(dialog(page).getByText("Revision", { exact: true })).toBeVisible();
   await dialog(page).getByLabel("Decision").selectOption({ label: "Approved" });
   await dialog(page).getByLabel("Note").fill("Brand type and palette checked against the master kit.");
   await dialog(page).getByRole("button", { name: "Record the decision" }).click();
@@ -919,7 +944,7 @@ test("WF-08 Build-to-deploy: local checks, secrets masked, production promotion 
   await action(page, "Promote");
   await expect(dialog(page).getByText("Model checks · clear")).toBeVisible();
   await expect(dialog(page).getByText("Promotion to production stops at the hosting boundary")).toBeVisible();
-  await dialog(page).getByRole("button", { name: "Record the attempt honestly" }).click();
+  await dialog(page).getByRole("button", { name: "Record a blocked attempt" }).click();
   await expect(dialog(page)).toHaveCount(0);
   await page.getByRole("tab", { name: "Releases" }).click();
   await expect(main(page).getByText(/production/i).first()).toBeVisible();
@@ -1108,24 +1133,24 @@ test("WF-13 AI workforce lifecycle: validated contract, evaluation before activa
   await expect(main(page).getByText("Ledger checker").first()).toBeVisible();
 
   // Review metrics, then suspend: a paused contract is not offered for delegation.
-  await open(page, agentUrl, "AI employee");
+  await open(page, agentUrl, /.+/); // the page head now carries the contract name, not a generic title
   await shows(page, /Ledger checker\s*Reconciliation assistant · active/);
   await page.getByRole("tab", { name: "Performance" }).click();
   await action(page, "pause");
-  await open(page, agentUrl, "AI employee");
+  await open(page, agentUrl, /.+/); // the page head now carries the contract name, not a generic title
   await shows(page, /Ledger checker\s*Reconciliation assistant · paused/);
   // A paused contract is not offered for delegation on a mission team.
   await open(page, "/mission/missions/nl-missions-001/team");
   await expect(main(page).getByText("Ledger checker")).toHaveCount(0);
 
   // Agents are not self-authorising: no seeded contract may be active with activation blockers.
-  await open(page, "/team/agents/nl-agents-001", "AI employee");
+  await open(page, "/team/agents/nl-agents-001", /.+/);
   await showsSoft(page, /Chief of Staff · active[^]*Can it be activated\?\s*(No blockers|0 blockers)/, "DEFECT: /team/agents/nl-agents-001 — Nia Okonkwo is active although her own profile lists 5 activation blockers, including an unset (unbounded) spend ceiling and no manager");
 });
 
 test("WF-15 Monthly executive reporting: cited figures, reconciled to the ledger, reviewed, distributed only to the boundary", async ({ page }) => {
   // Freshness and aggregation: every figure in the report names its source and age.
-  await open(page, "/analytics/reports/nl-reports-020", "Report builder");
+  await open(page, "/analytics/reports/nl-reports-020", "Monthly trading review"); // h1 is the report title
   await expect(main(page).getByText("Monthly trading review").first()).toBeVisible();
   await shows(page, /Source: sum\(revenue account credits [−-] debits\) over posted journals, by ledger date; \d+ records, newest \d+ days? old\./);
   await shows(page, /Nothing on this page is generated by a model; no model is connected\./);
@@ -1153,7 +1178,7 @@ test("WF-15 Monthly executive reporting: cited figures, reconciled to the ledger
   expect.soft(hqOverdue, `DEFECT: /hq/home says ${hqOverdue} invoices are past due; /fin/invoices Overdue lists ${financeOverdue}`).toBe(financeOverdue);
 
   // Reviewer approval: citations are checked, then the report is published.
-  await open(page, "/analytics/reports/nl-reports-020", "Report builder");
+  await open(page, "/analytics/reports/nl-reports-020", "Monthly trading review"); // h1 is the report title
   await action(page, "Check the citations");
   if (await dialog(page).count()) await page.keyboard.press("Escape");
   await action(page, "Publish");
@@ -1186,7 +1211,7 @@ test("WF-16 External client collaboration: scoped portal, invitation at the boun
   await shows(page, /Harrow House Interiors[^]*Inherits internal access\s*NO/);
 
   // Portal invitation: scoped to this portal alone, the email stays a local draft.
-  await open(page, "/portal/portals/nl-portals-001/admin", "Access and analytics");
+  await open(page, "/portal/portals/nl-portals-001/admin", "Harrow House Interiors");
   await action(page, "Invite someone");
   await expect(dialog(page).getByText("An invitation grants nothing beyond this portal")).toBeVisible();
   await dialog(page).getByLabel("Name").fill("Ines Harrow");
@@ -1220,7 +1245,7 @@ test("WF-16 External client collaboration: scoped portal, invitation at the boun
   await open(page, "/portal/portals/nl-portals-001/billing");
   await expect(main(page).getByText("Paying online is not available")).toBeVisible();
   await expect(main(page).getByText("No processor is connected. No card data is collected or stored here.")).toBeVisible();
-  await open(page, "/portal/portals/nl-portals-001/admin?tab=Audit", "Access and analytics");
+  await open(page, "/portal/portals/nl-portals-001/admin?tab=Audit", "Harrow House Interiors"); // B7: h1 is the portal name; "Access and analytics" is the breadcrumb
   await expect(main(page).getByText("Invited ines@harrow.example as portal member.")).toBeVisible();
 });
 
@@ -1237,7 +1262,8 @@ test("WF-17 Multi-entity organization: switching organization rescopes records, 
   await page.getByRole("menuitem", { name: "Harbor Supply" }).filter({visible:true}).first().click();
   await expect(page).toHaveURL(/\/o\/harbor\//);
   await open(page, "/o/harbor/fin/invoices?tab=Awaiting%20payment", "Invoice List");
-  await expect(main(page).getByText("Every invoice in Harbor Supply, with the tax code each line resolved to.")).toBeVisible();
+  // A1: the invoice list lede no longer names the organisation; the org scope is asserted by the rows below.
+  await expect(main(page).getByText("Tax is resolved per line from jurisdiction, category, customer status and date.")).toBeVisible();
   const harborRow = main(page).getByRole("row", { name: /HB-208/ });
   await expect(harborRow).toContainText("$640.00");
   await expect(harborRow).toContainText("Nov 10, 2026");
@@ -1247,7 +1273,7 @@ test("WF-17 Multi-entity organization: switching organization rescopes records, 
 
   // AI context reset: the assistant reads only the active organisation.
   await open(page, "/o/harbor/ai/chat");
-  await expect(main(page).getByText(/READING HARBOR SUPPLY ONLY/i)).toBeVisible();
+  await expect(main(page).getByText(/Answers are composed from Harbor Supply records/)).toBeVisible(); // AI chat scope line reworded; still names the active organisation only
 
   // Transactions stay within the organisation: a Northline record is not reachable from Harbor.
   await page.goto(withClock("/o/harbor/fin/invoices/nl-invoices-003"));
@@ -1299,20 +1325,23 @@ test("WF-19 Sensitive data deletion/export: legal hold refuses erasure, export s
   expect(registerSam).toBe(34);
   await pick(page, /Rowan Pike — erasure of personal data/, "Rowan Pike — erasure of personal data");
   await action(page, "Review request");
-  await expect(dialog(page).getByText("A legal hold applies")).toBeVisible();
-  await expect(dialog(page).getByText(/Erasure is refused while the hold stands/)).toBeVisible();
-  await expect(dialog(page).getByRole("button", { name: "Delete where lawful…" })).toBeDisabled();
+  // A2: the Subject request drawer states the hold as "Legal hold recorded … Erasure is blocked while the hold remains" and gates "Review deletion impact…".
+  await expect(dialog(page).getByText("Legal hold recorded")).toBeVisible();
+  await expect(dialog(page).getByText(/Erasure is blocked while the hold remains/)).toBeVisible();
+  await expect(dialog(page).getByRole("button", { name: "Review deletion impact…" })).toBeDisabled();
   // The records matched must be the records the register says the request covers.
-  await expect.soft(dialog(page).getByText(new RegExp(`^${registerCount} across`)), `DEFECT: /admin/privacy Requests — the register says Rowan Pike's request covers ${registerCount} records; the review matches a different number`).toBeVisible();
+  await expect.soft(dialog(page).getByText(new RegExp(`^${registerCount} matches in`)), `DEFECT: /admin/privacy Requests — the register says Rowan Pike's request covers ${registerCount} records; the review matches a different number`).toBeVisible();
   await dialog(page).getByRole("button", { name: "Close" }).last().click();
 
   // Scoped export for an access request: the job is recorded and stays in this browser.
   await pick(page, /Sam Okafor — copy of their data/, "Sam Okafor — copy of their data");
   await action(page, "Export subject data");
-  await expect.soft(dialog(page).getByText(new RegExp(`^${registerSam} across`)), `DEFECT: /admin/privacy Requests — the register says Sam Okafor's access request covers ${registerSam} records; 'Export subject data' matches 0, so the export would be empty`).toBeVisible();
-  await dialog(page).getByRole("button", { name: "Export their data" }).click();
+  await expect.soft(dialog(page).getByText(new RegExp(`^${registerSam} matches in`)), `DEFECT: /admin/privacy Requests — the register says Sam Okafor's access request covers ${registerSam} records; 'Export subject data' matches 0, so the export would be empty`).toBeVisible();
+  // A2: the drawer asks for an identity-verified attestation, then offers "Export scoped CSV" (toast "CSV prepared").
+  await dialog(page).getByRole("checkbox", { name: /independently verified the requester's identity/ }).check();
+  await dialog(page).getByRole("button", { name: "Export scoped CSV" }).click();
   // Wait for the actual local audit write, not just the download-button click.
-  await expect(page.getByText("Copy prepared", { exact: true })).toBeVisible();
+  await expect(page.getByText("CSV prepared", { exact: true })).toBeVisible();
   // Downstream connectors are not reached; the evidence is the audit entry.
   await open(page, "/admin/audit", "Audit Trail");
   await main(page).getByRole("searchbox").first().fill("Sam Okafor");

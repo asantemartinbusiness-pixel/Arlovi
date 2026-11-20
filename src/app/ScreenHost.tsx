@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { OverlayOrigin, OverlayRecordContext, nativeOverlayDomain } from "@/app/OverlayExperience";
 import "@/app/native-overlay-experience.css";
-import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
+import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel, RecordHeader, OVERLAY_WIDTH } from "@/design-system";
 import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
 import { runNativeScreenAction } from "@/app/screenActions";
 import { APP_ENTRIES } from "@/app/nav";
@@ -210,6 +210,11 @@ export function ScreenHost() {
   }
 
 
+  // An application is usable once its own records are written, not merely once
+  // its screens register: a board drawn first would show the workspace without them.
+  if (app && applicationStatus(screen.applicationCode) === "loading") {
+    return <div className="pg" role="status" aria-busy="true"><div className="pg-head"><h1>Opening {screen.applicationName}…</h1></div><div className="pg-body"><span className="ds-spinner" aria-hidden="true"/> Loading this native application.</div></div>;
+  }
   if (!app) {
     const status = applicationStatus(screen.applicationCode);
     if (status === "idle" || status === "loading") return <div className="pg" role="status" aria-busy="true"><div className="pg-head"><h1>Opening {screen.applicationName}…</h1></div><div className="pg-body"><span className="ds-spinner" aria-hidden="true"/> Loading this native application.</div></div>;
@@ -238,6 +243,7 @@ export function ScreenHost() {
   const activeDefTab = def?.tabs?.find((item) => item.id === activeTab);
   const title = def?.title?.(context) ?? screen.title;
   const AppIcon = APP_ENTRIES[screen.applicationCode]?.icon;
+  const recordHeader = def?.record?.(context) ?? null;
 
   const content = def?.surface
     ? def.surface(context)
@@ -290,11 +296,13 @@ export function ScreenHost() {
        happened to duplicate them into its own toolbar. */
     return (
       <div className="pg">
-        <div className="pg-cmdbar" role="region" aria-label={`${title} actions`}>
-          <h1 className="pg-cmdbar-title ds-truncate">{title}</h1>
+        {!(def.chromeTitle === "surface" && primary.length + secondary.length + overflow.length === 0) && <div className="pg-cmdbar" role="region" aria-label={`${title} actions`} data-surface-title={def.chromeTitle === "surface" ? "true" : undefined}>
+          {def.chromeTitle === "surface"
+            ? <span className="pg-cmdbar-title ds-truncate ds-sr-only">{title}</span>
+            : <h1 className="pg-cmdbar-title ds-truncate">{title}</h1>}
           <span className="ds-grow" />
           {actions.length > 0 && actionBar}
-        </div>
+        </div>}
         {body}
         <ScreenOverlays context={context} def={def} overlayId={overlay?.id} onClose={context.closeOverlay} />
       </div>
@@ -303,7 +311,7 @@ export function ScreenHost() {
 
   const page = (
     <div className="pg">
-      <header className="pg-head">
+      <header className="pg-head" data-record={recordHeader ? "true" : undefined}>
         <Breadcrumbs
           items={[
             { label: workspace.org.shortName, to: `/o/${workspace.org.slug}/hq/home` },
@@ -311,20 +319,24 @@ export function ScreenHost() {
             { label: title },
           ]}
         />
-        <div className="pg-titlerow">
-          <div className="pg-title">
-            <h1>
-              {AppIcon && <AppIcon size={0} />}
-              {title}
-            </h1>
-            {def?.subtitle
-              ? <div className="pg-lede">{def.subtitle(context)}</div>
-              : def
-                ? null
-                : <p className="pg-lede">{screen.purpose}</p>}
-          </div>
-          {actionBar}
-        </div>
+        {recordHeader
+          ? <RecordHeader level={1} flat {...recordHeader} eyebrow={title} actions={actions.length > 0 ? actionBar : undefined} />
+          : (
+            <div className="pg-titlerow">
+              <div className="pg-title">
+                <h1>
+                  {AppIcon && <AppIcon size={0} />}
+                  {title}
+                </h1>
+                {def?.subtitle
+                  ? <div className="pg-lede">{def.subtitle(context)}</div>
+                  : def
+                    ? null
+                    : <p className="pg-lede">{screen.purpose}</p>}
+              </div>
+              {actionBar}
+            </div>
+          )}
       </header>
 
       {def?.header?.(context)}
@@ -397,6 +409,17 @@ function NotBuilt({ title, application }: { title: string; application: string }
 
 function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { context: ScreenContext; def?: ScreenDef; overlayId?: string; onClose: () => void }) {
   const found = screenDef?.overlays?.find((item) => item.id === overlayId);
+  /* Hooks run before any early return. A required record that does not resolve
+     in this organisation (or collection) also suppresses the footer action. */
+  const earlyPayloadId = (ctx.overlayPayload as { id?: unknown } | undefined)?.id;
+  const earlyIds = [typeof earlyPayloadId === "string" ? earlyPayloadId : undefined, ctx.params.id, ctx.selectedId].filter((id): id is string => Boolean(id));
+  const earlyRequiredId = found?.presentation?.selectedRecord ? earlyIds[0] : undefined;
+  const earlyCollection = found?.presentation?.collection;
+  const requiredAvailable = useLiveQuery(async () => {
+    if (!earlyRequiredId) return true;
+    const record = await getRecordInOrg(ctx.org.id, earlyRequiredId);
+    return Boolean(record && (!earlyCollection || record.collection === earlyCollection));
+  }, [ctx.org.id, earlyRequiredId, earlyCollection], true);
   if (!overlayId) return null;
   if (!found) {
     return (
@@ -411,20 +434,25 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   const payloadId = (ctx.overlayPayload as { id?: unknown } | undefined)?.id;
   const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.params.id, ctx.selectedId].filter((id): id is string => Boolean(id));
   const requiredId = found.presentation?.selectedRecord ? ids[0] : undefined;
+  /* A "choose a record first" guard must not carry an enabled footer action. */
+  const guarded = Boolean(found.presentation?.selectedRecord && (!requiredId || !requiredAvailable));
+  const footer = guarded ? undefined : found.footer?.(overlayContext);
   const requiredCollection = found.presentation?.collection;
   const body = found.presentation?.selectedRecord && !requiredId
     ? <Notice tone="warning" title="Choose a record first">
-        Select the {nativeOverlayDomain(ctx.screen.applicationCode).entity.toLowerCase()} to work with before opening this {found.kind}.
-        Nothing has been selected or changed.
+        Select the {nativeOverlayDomain(ctx.screen.applicationCode).entity.toLowerCase()} to work with, then open this again.
+        Nothing has been changed.
       </Notice>
     : <PrimedOverlayBody ids={ids} orgId={ctx.org.id} requiredId={requiredId}
         requiredCollection={requiredCollection} render={() => found.render(overlayContext)} />;
   const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
   const appCode = ctx.screen.applicationCode;
-  const origin = <OverlayOrigin context={ctx} />;
-  const recordContext = found.presentation?.noRecordContext
-    ? undefined
-    : <OverlayRecordContext context={ctx} selection={found.presentation?.selectedRecord} collection={found.presentation?.collection} />;
+  const origin = <OverlayOrigin context={ctx} screenTitle={screenDef?.title?.(ctx)} />;
+  const recordContext = found.summary
+    ? found.summary(overlayContext)
+    : found.presentation?.noRecordContext
+      ? undefined
+      : <OverlayRecordContext context={ctx} selection={found.presentation?.selectedRecord} collection={found.presentation?.collection} />;
   const description = found.description ?? found.presentation?.guidance;
   // This is a local presentation guard, not a substitute for authenticated API checks.
   if (found.capability && !ctx.can(found.capability)) {
@@ -438,7 +466,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   }
   if (found.kind === "drawer") {
     return (
-      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={description} origin={origin} head={recordContext} application={appCode} width={found.width ?? 440} footer={found.footer?.(overlayContext)}>
+      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={description} origin={origin} head={recordContext} application={appCode} width={found.width ?? OVERLAY_WIDTH.compact} footer={footer}>
         {body}
       </Drawer>
     );
@@ -452,10 +480,10 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
       origin={origin}
       head={recordContext}
       application={appCode}
-      width={found.width ?? 560}
+      width={found.width ?? OVERLAY_WIDTH.modal}
       tone={found.tone}
       blocking={found.blocking}
-      footer={found.footer?.(overlayContext)}
+      footer={footer}
     >
       {body}
     </Modal>

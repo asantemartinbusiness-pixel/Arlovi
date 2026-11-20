@@ -23,3 +23,5 @@
 }
 .lx-layer[data-selected="true"] .lx-layer-name { color: var(--accent-soft-fg); font-weight: 600; }
 .lx-layer-name:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+
+.lx-overset-quote { margin: 0; padding: var(--space-2) var(--space-3); border-inline-start: 2px solid var(--danger); background: var(--danger-soft); color: var(--fg-default); font-size: var(--text-sm); max-height: 9em; overflow: auto; }
