@@ -189,8 +189,20 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 | B2 Design + Layout | complete, awaiting review | 54 rows: Rebuilt 8, Restructured 13, Enhanced 5, Refined 16, Verified 12; specs 11/11; `shots/B2/` |
 | B4 Web + Build | complete, in review | 98 rows; rollback now restores the model; specs 18/18 + 3/3; `shots/B4/` |
 | B5 Connect + IT + Forms | complete, in review | 125 rows; t6kit footer convention and picker fix; specs 19/19 + 3/3; `shots/B5/` |
-| B1, B3, B6, B7, B8, B9 | in progress | |
+| B1 Docs + Sheets + Present | complete, in review | 102 rows; popover tools, change preview, libraries; 47/47 specs; `shots/B1/` |
+| B3 Photo + Video + Motion | complete, awaiting review | 83 rows; render settings gate, batch collision plan, keyframe inspector, lean editor heads; `shots/B3/` |
+| B6, B7, B8, B9 | in progress | |
 | Central fixes by orchestrator | done | `OverlayDef.summary` head slot; status strip wraps at 390; journey bar names the remembered tab; heading focus waits for lazy surfaces; generic hidden dialog descriptions removed; WF-05 and w2a spec labels aligned |
+
+## 7b. Phase 3 central items (orchestrator-owned, after the last package lands)
+
+1. `data-grid.tsx`: the mobile card layout drops selection checkboxes and editable cells (seen in Photo batch; A2 worked around it with a stacked list) — render a selection control and editable cells in card mode.
+2. Full-chrome editors: the command bar title repeats the screen name above the apps' identity bars — allow a record title there (`ScreenDef.title` already exists; make editors use it or hide the bar title when an identity bar is present).
+3. Journey bar: "Back to X" sometimes shows above unrelated screens — verify `canReturnTo` and the trail scoping.
+4. Repository-wide sweep for `mutate.patch`/`put`/`putMany` results ignored before a success toast (A2 found and fixed 29 in two apps; others fixed theirs on request; run a grep across all apps and fix stragglers).
+5. Fold the `.hq-state-line` size override from `hq/command.css` into `shell.css`.
+6. Full gate run on a quiet machine: typecheck, lint, unit, build, then Playwright groups on the dev server with `--workers=1..2`; compare with `QA_BASELINE.md`.
+7. Opus HR acceptance sample (≥15% of overlays per package via `?overlay=`), final report, PR body.
 
 ## 8. Definition of done per component
 

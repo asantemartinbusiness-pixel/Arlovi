@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Button, DataGrid, DrawerActions, Empty, FactGrid, Field, ModalActions, ModalInFlight, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextInput,
+  Button, DataGrid, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -228,11 +228,10 @@ export function GrantDataset({ context, close }: { context: ScreenContext; close
           onClick={async () => {
             setBusy(true);
             const next = [...grants, { role, access, by: context.actor, at: clockIso() }];
-            if (existing) {
-              await context.mutate.patch(existing.id, { body: { ...(existing.body as object ?? {}), grants: next } }, { expectRevision: existing.revision, event: `${ROLE_LABELS[role]} granted ${access} on ${collection}` });
-            } else {
-              await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Access recorded for ${collection}.`, fields: { collection, kind: "native" }, body: { grants: next } }, `${ROLE_LABELS[role]} granted ${access} on ${collection}`);
-            }
+            const saved = existing
+              ? await context.mutate.patch(existing.id, { body: { ...(existing.body as object ?? {}), grants: next } }, { expectRevision: existing.revision, event: `${ROLE_LABELS[role]} granted ${access} on ${collection}` })
+              : await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Access recorded for ${collection}.`, fields: { collection, kind: "native" }, body: { grants: next } }, `${ROLE_LABELS[role]} granted ${access} on ${collection}`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Grant recorded", `${ROLE_LABELS[role]} may ${access} ${collection}, granted by ${context.actor}.`);
             setBusy(false);
             if (saved) close();
@@ -281,8 +280,10 @@ export function RefreshDataset({ context, close }: { context: ScreenContext; clo
           onClick={async () => {
             setBusy(true);
             const fields = { collection, kind: "native", refreshedAt: clockIso(), refreshedBy: context.actor, recordCount: rows.length, newestAt: asOf ?? "", failing };
-            if (existing) await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Dataset ${collection} refreshed: ${rows.length} records` });
-            else await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Catalogue entry for ${collection}.`, fields }, `Dataset ${collection} refreshed: ${rows.length} records`);
+            const saved = existing
+              ? await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Dataset ${collection} refreshed: ${rows.length} records` })
+              : await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Catalogue entry for ${collection}.`, fields }, `Dataset ${collection} refreshed: ${rows.length} records`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Refreshed", `${collection}: ${rows.length} records re-read, ${failing} quality failure${failing === 1 ? "" : "s"}.`);
             setBusy(false);
             if (saved) close();
@@ -336,7 +337,7 @@ export function TestMeasure({ context, close }: { context: ScreenContext; close:
             await context.mutate.log(`Measure ${measure?.name} tested by ${context.actor}: ${passed} of ${tests.length} checks pass`, { type: "analytics.test" });
             context.toast("Test recorded", `${passed} of ${tests.length} checks pass for ${measure?.name}. The result is in the audit trail.`, passed === tests.length ? "ok" : "blocked");
             setBusy(false);
-            if (saved) close();
+            close();
           }}
         >
           Record the test result
@@ -427,8 +428,10 @@ export function ValidateModel({ context, close }: { context: ScreenContext; clos
           onClick={async () => {
             setBusy(true);
             const fields = { lastValidatedAt: clockIso(), lastValidatedBy: context.actor, passing: results.length - failing.length, failing: failing.length };
-            if (model) await context.mutate.patch(model.id, { fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model validated: ${fields.passing} pass, ${fields.failing} fail` });
-            else await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations: results.map((item) => item.relation) } }, `Data model validated: ${fields.passing} pass, ${fields.failing} fail`);
+            const saved = model
+              ? await context.mutate.patch(model.id, { fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model validated: ${fields.passing} pass, ${fields.failing} fail` })
+              : await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations: results.map((item) => item.relation) } }, `Data model validated: ${fields.passing} pass, ${fields.failing} fail`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Validation recorded", `${fields.passing} pass, ${fields.failing} fail.`, failing.length ? "blocked" : "ok");
             setBusy(false);
             if (saved) close();
@@ -470,8 +473,10 @@ export function RefreshModel({ context, close }: { context: ScreenContext; close
             setBusy(true);
             const relations = results.map((item) => ({ ...item.relation, kind: (item.check.fanOut ? "one-to-many" : "many-to-one") as "one-to-many" | "many-to-one" }));
             const fields = { refreshedAt: clockIso(), refreshedBy: context.actor };
-            if (model) await context.mutate.patch(model.id, { body: { ...(model.body as object ?? {}), relations }, fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model refreshed: ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected` });
-            else await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations } }, `Data model refreshed: ${changed.length} corrected`);
+            const saved = model
+              ? await context.mutate.patch(model.id, { body: { ...(model.body as object ?? {}), relations }, fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model refreshed: ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected` })
+              : await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations } }, `Data model refreshed: ${changed.length} corrected`);
+            if (!saved) { setBusy(false); return; }
             context.toast("Model refreshed", `${results.length} joins re-measured; ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected.`);
             setBusy(false);
             if (saved) close();

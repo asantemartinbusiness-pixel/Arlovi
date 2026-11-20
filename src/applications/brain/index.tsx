@@ -773,12 +773,14 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="A financial mismatch is not settled here">
-        Where a conflict touches the ledger, this board records it and sends it to an accounting review. Choosing a side would change a figure without a posting behind it.
-      </Notice>
+      {rows.some((conflict) => conflict.fields.requiresLedgerReview === true) && (
+        <Notice tone="warning" title="A financial mismatch is not settled here">
+          Where a conflict touches the ledger, this board records it and sends it to an accounting review. Choosing a side would change a figure without a posting behind it.
+        </Notice>
+      )}
       <Grid>
         {domains.map((domain) => (
-          <Card key={domain} span={6} eyebrow="CONFLICTS" prov="unknown" title={domain} subtitle={`${rows.filter((conflict) => conflict.fields.domain === domain).length} in this domain`}>
+          <Card key={domain} span={6} prov="unknown" title={domain} subtitle={`${rows.filter((conflict) => conflict.fields.domain === domain).length} in this domain`}>
             <Stack gap={3}>
               {rows.filter((conflict) => conflict.fields.domain === domain).map((conflict) => {
                 const options = conflictOptions(conflict);
@@ -795,8 +797,8 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
                       {options.map((option) => (
                         <Row key={option.id} gap={2}>
                           <Pill tone="neutral">{option.value}</Pill>
-                          <span className="ds-subtle ds-grow ds-truncate">{option.note}</span>
-                          <span className="ds-subtle">{context.date(option.recordedAt)}</span>
+                          <span className="ds-subtle ds-grow ds-truncate">{sourceOf(data, option.sourceId)?.title ?? option.note}</span>
+                          <span className="ds-subtle ds-num">{context.date(option.recordedAt)}</span>
                         </Row>
                       ))}
                     </Stack>
@@ -1069,10 +1071,6 @@ function KnowledgePermissions({ context, view }: { context: ScreenContext; view:
           ]}
           onOpen={(id) => { context.select(id); context.openOverlay("Grant dialog", { agentId: id }); }}
         />
-        <Row gap={2} wrap>
-          <Button variant="secondary" onClick={() => context.openOverlay("Grant dialog")}>Adjust a grant</Button>
-          <Button variant="ghost" onClick={() => context.openOverlay("revoke confirmation")}>Revoke a grant</Button>
-        </Row>
       </Stack>
     );
   }
@@ -1363,7 +1361,7 @@ function UploadDialog({ context, close }: { context: ScreenContext; close: () =>
           {file.failed ? <Notice tone="danger" title="Isolated">{file.failed}</Notice> : <p className="ds-subtle" style={{ whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>{file.text?.slice(0, 400) || "No text content."}</p>}
         </Card>
       ))}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={files.length === 0}
         onClick={async () => {
@@ -1383,7 +1381,7 @@ function UploadDialog({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         Register {files.length || ""} source{files.length === 1 ? "" : "s"}
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1408,7 +1406,7 @@ function SourceDetailDrawer({ context }: { context: ScreenContext }) {
           <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.extracted ?? []).map((line) => <li key={line}>{line}</li>)}</ul>
         )}
       </Card>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the full record</Button>
+      <DrawerActions><OverlayActions primary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the full record</Button>} end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Cancel</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -1430,7 +1428,7 @@ function RetentionDialog({ context, close }: { context: ScreenContext; close: ()
           {facts.map((fact) => fact.title).join(", ")}. They will show their evidence as retired, which is a reason to re-verify them.
         </Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="danger"
         onClick={async () => {
           if (!(await context.mutate.patch(source.id, { status: "retired", fields: { ...source.fields, indexing: "retired", retiredBy: context.actor } }, { expectRevision: source.revision, event: `${source.title} retired from retrieval` }))) return;
@@ -1439,7 +1437,7 @@ function RetentionDialog({ context, close }: { context: ScreenContext; close: ()
         }}
       >
         Retire this source
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1510,7 +1508,7 @@ function PermissionEditor({ context, close }: { context: ScreenContext; close: (
       <Notice tone="warning" title="Changing this changes what answers can read">
         An answer composed after this change reads the new set. Answers already given keep the records they named at the time.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(source.id, { fields: { ...source.fields, classification } }, { expectRevision: source.revision, event: `${source.title} reclassified as ${classification}` }))) return;
@@ -1519,7 +1517,7 @@ function PermissionEditor({ context, close }: { context: ScreenContext; close: (
         }}
       >
         Save classification
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1542,7 +1540,7 @@ function DeleteRequest({ context, close }: { context: ScreenContext; close: () =
         </Notice>
       )}
       <Field label="Reason" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="outline-danger"
         disabled={blocked || !reason.trim()}
         onClick={async () => {
@@ -1552,7 +1550,7 @@ function DeleteRequest({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Record the request
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1685,33 +1683,60 @@ function RelationshipEditor({ context, close }: { context: ScreenContext; close:
   );
 }
 
+function usedFact(data: Record<string, Rec[]>, context: ScreenContext): Rec | undefined {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  return data.facts.find((item) => item.id === (payload?.id ?? context.selectedId));
+}
+
+function FactSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useKnowledge();
+  const fact = usedFact(data, context);
+  if (!fact) return <OverlaySummary eyebrow={eyebrow} title="No assertion chosen" />;
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={fact.title}
+      status={<Pill tone={CONFIDENCE_TONE[fact.status] ?? "neutral"}>{fact.status}</Pill>}
+      meta={[String(fact.fields.value ?? fact.summary), `${String(fact.fields.confidenceScore ?? 0)}% confidence`]}
+    />
+  );
+}
+
 function EvidenceDrawer({ context }: { context: ScreenContext }) {
   const data = useKnowledge();
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const fact = data.facts.find((item) => item.id === (payload?.id ?? context.selectedId));
+  const fact = usedFact(data, context);
   if (!fact) return <Empty title="Choose an assertion" />;
   const source = sourceOf(data, fact.fields.sourceId);
   const open = conflictsOfFact(fact, data.conflicts);
-  const body = source?.body as { extracted?: string[] } | undefined;
+  const canVerify = context.can("edit_knowledge") && Boolean(source) && ["proposed", "conflicting"].includes(fact.status) && open.length === 0;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Assertion", value: `${String(fact.fields.subject)} — ${String(fact.fields.predicate)}` },
-        { label: "Value", value: String(fact.fields.value ?? fact.summary) },
-        { label: "Confidence", value: <Pill tone={CONFIDENCE_TONE[fact.status] ?? "neutral"}>{fact.status} · {String(fact.fields.confidenceScore ?? 0)}%</Pill> },
-        { label: "Valid", value: `${context.date(String(fact.fields.validFrom ?? fact.at))}${fact.fields.validTo ? ` – ${context.date(String(fact.fields.validTo))}` : " – open"}` },
-        { label: "Owner", value: fact.ownerName },
-      ]} />
-      {source ? (
-        <Card title={source.title} subtitle={`${source.status} · ${context.date(String(source.fields.freshness ?? source.updatedAt))}`} prov="human">
-          <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.extracted ?? ["No extracted line recorded."]).map((line) => <li key={line}>{line}</li>)}</ul>
-        </Card>
-      ) : <Notice tone="danger" title="No source record">This assertion cannot be verified while nothing backs it.</Notice>}
+      <OverlaySection title="Assertion">
+        <FactGrid items={[
+          { label: "Subject", value: String(fact.fields.subject ?? fact.title) },
+          { label: "Value", value: String(fact.fields.value ?? fact.summary) },
+          { label: "Valid", value: `${context.date(String(fact.fields.validFrom ?? fact.at))}${fact.fields.validTo ? ` – ${context.date(String(fact.fields.validTo))}` : " – open"}`, mono: true },
+          { label: "Canonical owner", value: fact.ownerName },
+          ...(fact.fields.verifiedBy ? [{ label: "Verified by", value: String(fact.fields.verifiedBy) }] : []),
+        ]} />
+      </OverlaySection>
+      <OverlaySection title="Where it came from" hint="The source record, how old it is and who may see it.">
+        <SourceTrail context={context} source={source} line={String(fact.fields.sourceLine ?? "") || undefined} />
+      </OverlaySection>
       {open.length > 0 && (
         <Notice tone="warning" title={`${open.length} open conflict${open.length === 1 ? "" : "s"}`}>
           {open.map((conflict) => `${conflict.title}: ${conflictOptions(conflict).map((option) => option.value).join(" or ")}`).join("; ")}. Two incompatible assertions are never both authoritative.
         </Notice>
       )}
+      <DrawerActions>
+        <OverlayActions
+          primary={canVerify
+            ? <Button variant="primary" onClick={() => { context.closeOverlay(); context.openOverlay("verification dialog", { id: fact.id }); }}>Verify this assertion</Button>
+            : source ? <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the source</Button> : undefined}
+          secondary={canVerify && source ? <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/brain/sources/${source.id}`)}>Open the source</Button> : undefined}
+          end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1724,28 +1749,29 @@ function VerificationDialog({ context, close }: { context: ScreenContext; close:
   const [note, setNote] = useState("");
   if (!fact) return <Empty title="Select an assertion first" />;
   const source = sourceOf(data, fact.fields.sourceId);
+  const expiring = payload?.mode === "expiry";
+  const blocked = !expiring && !source;
   return (
     <form
       id="verification"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (blocked) return;
         if (!(await context.mutate.patch(fact.id, {
-          status: payload?.mode === "expiry" ? fact.status : "verified",
-          fields: { ...fact.fields, validTo: expiry, note, verifiedBy: payload?.mode === "expiry" ? String(fact.fields.verifiedBy ?? "") : context.actor },
-        }, { expectRevision: fact.revision, event: payload?.mode === "expiry" ? `Expiry set on ${fact.title}` : `${fact.title} verified by ${context.actor}` }))) return;
-        context.toast(payload?.mode === "expiry" ? "Expiry recorded" : "Verified", payload?.mode === "expiry" ? "The assertion expires on that date and will be shown as expired afterwards." : `${fact.title} is authoritative.`);
+          status: expiring ? fact.status : "verified",
+          fields: { ...fact.fields, validTo: expiry, note, verifiedBy: expiring ? String(fact.fields.verifiedBy ?? "") : context.actor },
+        }, { expectRevision: fact.revision, event: expiring ? `Expiry set on ${fact.title}` : `${fact.title} verified by ${context.actor}` }))) return;
+        context.toast(expiring ? "Expiry recorded" : "Verified", expiring ? "The assertion expires on that date and will be shown as expired afterwards." : `${fact.title} is authoritative.`);
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Assertion", value: fact.title },
-        { label: "Evidence", value: source?.title ?? "No source record" },
-      ]} />
-      {!source && <Notice tone="danger" title="Nothing backs this assertion">Verifying it would make a claim this workspace cannot show evidence for.</Notice>}
+      <ModalUnsavedChanges when={Boolean(note.trim()) || expiry !== String(fact.fields.validTo ?? "")} />
+      <OverlaySection title="Evidence"><SourceTrail context={context} source={source} line={String(fact.fields.sourceLine ?? "") || undefined} /></OverlaySection>
+      {blocked && <Notice tone="danger" title="Nothing backs this assertion">Verifying it would make a claim this workspace cannot show evidence for.</Notice>}
       <Field label="Valid until" hint="Leave empty for an assertion with no end date."><TextInput type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} /></Field>
       <Field label="Note"><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
-      {source && <Notice tone="info">Verifying records your name against the assertion. It can be changed later, and the change is kept.</Notice>}
+      {source && !expiring && <p className="ds-subtle">Verifying records your name against the assertion. It can be changed later, and the change is kept.</p>}
     </form>
   );
 }
@@ -1762,48 +1788,83 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
   const ledger = conflict.fields.requiresLedgerReview === true;
   return (
     <Stack gap={4}>
-      <Card title={conflict.title} subtitle={conflict.summary} prov="unknown" />
-      {ledger ? (
-        <Notice tone="danger" title="This is a financial mismatch">
-          A figure cannot be chosen here. It goes to an accounting review so the ledger and the record agree for a reason that can be audited.
-        </Notice>
-      ) : (
-        <Stack gap={3}>
-          {options.map((option) => (
-            <label key={option.id} className="ds-panel" style={{ padding: "var(--space-3)", display: "block", cursor: "pointer" }}>
-              <Row gap={2}>
-                <input type="radio" name="truth" value={option.id} checked={chosen === option.id} onChange={() => setPicked(option.id)} />
-                <strong className="ds-grow">{option.value}</strong>
-                <span className="ds-subtle">{context.date(option.recordedAt)}</span>
-              </Row>
-              <span className="ds-subtle">{option.note}</span>
-            </label>
-          ))}
-          <Field label="Why this one" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
-        </Stack>
-      )}
-      <Button
-        variant="primary"
-        disabled={ledger || !chosen || !reason.trim()}
-        onClick={async () => {
-          const option = options.find((item) => item.id === chosen);
-          if (!(await context.mutate.patch(conflict.id, {
-            status: "resolved",
-            fields: { ...conflict.fields, chosen: option?.factId ?? chosen, resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason },
-          }, { expectRevision: conflict.revision, event: `${conflict.title} resolved by ${context.actor}` }))) return;
-          if (option?.factId) {
-            const fact = data.facts.find((item) => item.id === option.factId);
-            if (fact) {
-              if (!(await context.mutate.patch(fact.id, { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }, { event: `${fact.title} became the source of truth` }))) return;
-            }
-          }
-          context.toast("Conflict resolved", "The chosen assertion is authoritative; the other stays on the record as rejected evidence.");
-          close();
-        }}
-      >
-        Record the resolution
-      </Button>
+      <ModalUnsavedChanges when={Boolean(reason.trim())} />
+      <OverlaySection title={conflict.title} hint={conflict.summary} tone={ledger ? "danger" : "neutral"}>
+        {ledger ? (
+          <Notice tone="danger" title="This is a financial mismatch">
+            A figure cannot be chosen here. It goes to an accounting review so the ledger and the record agree for a reason that can be audited.
+          </Notice>
+        ) : (
+          <Stack gap={3}>
+            {options.map((option) => {
+              const source = sourceOf(data, option.sourceId);
+              return (
+                <label key={option.id} className="ds-panel" style={{ padding: "var(--space-3)", display: "block", cursor: "pointer" }}>
+                  <Row gap={2}>
+                    <input type="radio" name="truth" value={option.id} checked={chosen === option.id} onChange={() => setPicked(option.id)} />
+                    <strong className="ds-grow">{option.value}</strong>
+                    <span className="ds-subtle ds-num">{context.date(option.recordedAt)}</span>
+                  </Row>
+                  <span className="ds-subtle">{option.note}{source ? ` · ${source.title}` : ""}</span>
+                </label>
+              );
+            })}
+            <Field label="Why this one" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
+            <p className="ds-subtle">The chosen assertion becomes the current fact. The others stay on the record, marked rejected, with your reason.</p>
+          </Stack>
+        )}
+      </OverlaySection>
+      <ModalActions>
+        <OverlayActions
+          primary={(
+            <Button
+              variant="primary"
+              disabled={ledger || !chosen || !reason.trim()}
+              onClick={async () => {
+                const option = options.find((item) => item.id === chosen);
+                if (!(await context.mutate.patch(conflict.id, {
+                  status: "resolved",
+                  fields: { ...conflict.fields, chosen: option?.factId ?? chosen, resolvedBy: context.actor, resolvedAt: context.now.toISOString().slice(0, 10), reason },
+                }, { expectRevision: conflict.revision, event: `${conflict.title} resolved by ${context.actor}` }))) return;
+                let followed = true;
+                for (const candidate of options) {
+                  const fact = data.facts.find((item) => item.id === candidate.factId);
+                  if (!fact) continue;
+                  const verdict = candidate.id === chosen;
+                  const saved = await context.mutate.patch(fact.id, verdict
+                    ? { status: "verified", fields: { ...fact.fields, confidence: "verified", verifiedBy: context.actor } }
+                    : { status: "rejected", fields: { ...fact.fields, confidence: "rejected", rejectedBy: context.actor, rejectedBecause: reason } },
+                  { expectRevision: fact.revision, event: verdict ? `${fact.title} became the source of truth` : `${fact.title} rejected in favour of another source` });
+                  if (!saved) followed = false;
+                }
+                if (followed) context.toast("Conflict resolved", "The chosen assertion is current; the other stays on the record as rejected evidence.");
+                else context.toast("Resolution recorded, assertions not all updated", "One assertion changed elsewhere. Check both in the fact registry.", "blocked");
+                close();
+              }}
+            >
+              Record the resolution
+            </Button>
+          )}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
+  );
+}
+
+function ConflictSummary({ context, eyebrow }: { context: ScreenContext; eyebrow: string }) {
+  const data = useKnowledge();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const conflict = data.conflicts.find((item) => item.id === (payload?.id ?? context.selectedId));
+  if (!conflict) return <OverlaySummary eyebrow={eyebrow} title="No conflict chosen" />;
+  const urgency = String(conflict.fields.urgency ?? "normal");
+  return (
+    <OverlaySummary
+      eyebrow={eyebrow}
+      title={conflict.title}
+      status={<Pill tone={urgency === "critical" ? "danger" : urgency === "high" ? "warning" : "neutral"}>{urgency}</Pill>}
+      meta={[String(conflict.fields.domain ?? "general"), conflict.fields.requiresLedgerReview === true ? "Ledger review decides" : undefined, conflict.status === "in_review" ? "In review" : conflict.status === "resolved" ? "Resolved" : undefined]}
+    />
   );
 }
 
@@ -1813,50 +1874,77 @@ function ComparisonDrawer({ context }: { context: ScreenContext }) {
   const conflict = data.conflicts.find((item) => item.id === (payload?.id ?? context.selectedId));
   if (!conflict) return <Empty title="Choose a conflict" />;
   const options = conflictOptions(conflict);
+  const ledger = conflict.fields.requiresLedgerReview === true;
+  const closed = conflict.status === "resolved";
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Both sides, with their dates">
-        A conflict is shown as evidence against evidence. The newer record is not automatically right.
-      </Notice>
-      {options.map((option) => {
-        const source = sourceOf(data, option.sourceId);
-        return (
-          <Card key={option.id} title={option.value} subtitle={source?.title ?? option.sourceId} prov="human"
-            actions={<Pill tone={source?.status === "indexed" ? "success" : "warning"}>{source?.status ?? "no source record"}</Pill>}>
-            <Properties rows={[
-              { label: "Recorded", value: context.date(option.recordedAt) },
-              { label: "Note", value: option.note },
-              { label: "Source freshness", value: source ? context.date(String(source.fields.freshness ?? source.updatedAt)) : "Unknown" },
-            ]} />
-          </Card>
-        );
-      })}
+      {ledger && (
+        <Notice tone="danger" title="A ledger review decides this one">
+          It touches a financial figure. Choosing a side here would change the figure without a posting behind it, so it goes to accounting.
+        </Notice>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, Math.min(options.length, 2))}, minmax(0, 1fr))`, gap: "var(--space-3)" }}>
+        {options.map((option, index) => {
+          const source = sourceOf(data, option.sourceId);
+          const chosen = closed && String(conflict.fields.chosen ?? "") === option.factId;
+          return (
+            <OverlaySection key={option.id} title={option.value} hint={`Version ${String.fromCharCode(65 + index)}${chosen ? " · chosen" : ""}`} tone={chosen ? "success" : "neutral"}>
+              <Stack gap={3}>
+                <FactGrid columns={2} dense items={[
+                  { label: "Recorded", value: context.date(option.recordedAt), mono: true },
+                  { label: "Source state", value: <Pill tone={source?.status === "indexed" ? "success" : "warning"}>{source?.status ?? "no source record"}</Pill> },
+                  { label: "Source", value: source?.title ?? option.sourceId },
+                  { label: "Freshness", value: source ? context.date(String(source.fields.freshness ?? source.updatedAt)) : "Unknown", mono: true },
+                  { label: "Visibility", value: <Pill tone={visibilityOf(source).tone}>{visibilityOf(source).label}</Pill> },
+                ]} />
+                <p className="ds-prose">{option.note}</p>
+              </Stack>
+            </OverlaySection>
+          );
+        })}
+      </div>
+      <p className="ds-subtle">Evidence against evidence: the newer record is not automatically right.</p>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={ledger || closed || !context.can("edit_knowledge")} onClick={() => { context.closeOverlay(); context.openOverlay("resolution dialog", { id: conflict.id }); }}>Choose the source of truth</Button>}
+          secondary={ledger
+            ? <Button variant="outline-danger" onClick={() => { context.closeOverlay(); context.openOverlay("escalation", { id: conflict.id }); }}>Send to ledger review</Button>
+            : !closed ? <Button variant="secondary" onClick={() => { context.select(conflict.id); void deferConflict(context); context.closeOverlay(); }}>Defer</Button> : undefined}
+          end={<Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
 
 function Escalation({ context, close }: { context: ScreenContext; close: () => void }) {
-  const conflict = useRecord(context.selectedId);
+  const conflict = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
   const [note, setNote] = useState("");
   if (!conflict) return <Empty title="Choose a conflict" />;
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={Boolean(note.trim())} />
       <CapabilityLine id="bank.feed" title="External confirmation is not connected" />
-      <Notice tone="warning" title="What happens instead">
-        The conflict is marked as needing confirmation from outside this workspace, with your note. Nothing is requested from anyone automatically: no mail or feed is connected.
-      </Notice>
+      <p className="ds-subtle">The conflict is marked as needing confirmation from outside this workspace, with your note. Nothing is requested from anyone: no mail or feed is connected.</p>
       <Field label="What confirmation is needed" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
-      <Button
-        variant="primary"
-        disabled={!note.trim()}
-        onClick={async () => {
-          if (!(await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, escalatedBy: context.actor, escalationNote: note } }, { expectRevision: conflict.revision, event: `${conflict.title} escalated for external confirmation` }))) return;
-          context.toast("Escalated", "It is in review with your note. No request has left this browser.");
-          close();
-        }}
-      >
-        Mark as needing confirmation
-      </Button>
+      <ModalActions>
+        <OverlayActions
+          primary={(
+            <Button
+              variant="primary"
+              disabled={!note.trim()}
+              onClick={async () => {
+                if (!(await context.mutate.patch(conflict.id, { status: "in_review", fields: { ...conflict.fields, escalatedBy: context.actor, escalationNote: note } }, { expectRevision: conflict.revision, event: `${conflict.title} escalated for external confirmation` }))) return;
+                context.toast("Escalated", "It is in review with your note. No request has left this browser.");
+                close();
+              }}
+            >
+              Mark as needing confirmation
+            </Button>
+          )}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -2043,7 +2131,7 @@ function BrandImpactPreview({ context, close }: { context: ScreenContext; close:
         { label: "Extracted from", value: String(proposal.fields.extractedFrom || "Not recorded") },
         { label: "Current state", value: proposal.status },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(proposal.id, {
@@ -2056,7 +2144,7 @@ function BrandImpactPreview({ context, close }: { context: ScreenContext; close:
         }}
       >
         Approve the variant
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2092,7 +2180,7 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
       <Notice tone="warning" title="A change applies to the next request">
         An answer already given keeps the records it named. Queued work that was authorised under the old grant is re-checked when it runs.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const next = grants.some((grant) => grant.agentId === agentId)
@@ -2104,7 +2192,7 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
         }}
       >
         Save the grant
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2164,7 +2252,7 @@ function RevokeConfirmation({ context, close }: { context: ScreenContext; close:
       <Notice tone="warning" title="What revoking reaches">
         The contract stops being offered those sources from its next request. Answers already written keep the records they named: this workspace cannot unsay them, and it does not pretend to.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="danger"
         disabled={!agentId}
         onClick={async () => {
@@ -2175,7 +2263,7 @@ function RevokeConfirmation({ context, close }: { context: ScreenContext; close:
         }}
       >
         Revoke
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2527,9 +2615,14 @@ export const brainApp = registerApp({
         { id: "compare facts", placement: "overflow", run: (context) => context.openOverlay("conflict resolver") },
       ],
       overlays: [
-        { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: 560, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
-        { id: "verification dialog", kind: "modal", title: "Verify an assertion", width: 560, render: ({ close, ...context }) => <VerificationDialog context={context} close={close} />, footer: submitFooter("verification", "Record") },
-        { id: "conflict resolver", kind: "modal", title: "Resolve a conflict", width: 620, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
+        { id: "Evidence drawer", kind: "drawer", title: "Evidence", width: OVERLAY_WIDTH.form, summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow="Evidence" />, render: ({ ...context }) => <EvidenceDrawer context={context} /> },
+        {
+          id: "verification dialog", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Set an expiry" : "Verify an assertion"), width: OVERLAY_WIDTH.modal,
+          summary: ({ close: _close, ...context }) => <FactSummary context={context} eyebrow={(context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Expiry" : "Verification"} />,
+          render: ({ close, ...context }) => <VerificationDialog context={context} close={close} />,
+          footer: ({ close, ...context }) => submitFooter("verification", (context.overlayPayload as { mode?: string } | undefined)?.mode === "expiry" ? "Record the expiry" : "Record the verification")({ close }),
+        },
+        { id: "conflict resolver", kind: "modal", title: "Resolve a conflict", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
       ],
     },
 
@@ -2546,9 +2639,9 @@ export const brainApp = registerApp({
         { id: "request external confirmation", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a conflict first"), run: (context) => context.openOverlay("escalation") },
       ],
       overlays: [
-        { id: "Comparison drawer", kind: "drawer", title: "Compare the sources", width: 560, render: ({ ...context }) => <ComparisonDrawer context={context} /> },
-        { id: "resolution dialog", kind: "modal", title: "Choose the source of truth", width: 620, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
-        { id: "escalation", kind: "modal", title: "Ask for external confirmation", width: 560, render: ({ close, ...context }) => <Escalation context={context} close={close} /> },
+        { id: "Comparison drawer", kind: "drawer", title: "Compare the sources", width: OVERLAY_WIDTH.wide, summary: ({ close: _close, ...context }) => <ConflictSummary context={context} eyebrow="Conflict" />, render: ({ ...context }) => <ComparisonDrawer context={context} /> },
+        { id: "resolution dialog", kind: "modal", title: "Choose the source of truth", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ConflictResolver context={context} close={close} /> },
+        { id: "escalation", kind: "modal", title: "Ask for external confirmation", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <Escalation context={context} close={close} /> },
       ],
     },
 
@@ -2608,9 +2701,9 @@ export const brainApp = registerApp({
         { id: "inspect usage", placement: "overflow", run: (context) => context.setTab("Activity") },
       ],
       overlays: [
-        { id: "Grant dialog", kind: "modal", title: "Source grant", width: 560, render: ({ close, ...context }) => <GrantDialog context={context} close={close} /> },
-        { id: "simulation report", kind: "drawer", title: "Simulated retrieval", width: 620, render: ({ ...context }) => <SimulationReport context={context} /> },
-        { id: "revoke confirmation", kind: "modal", title: "Revoke a grant", tone: "danger", width: 560, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
+        { id: "Grant dialog", kind: "modal", title: "Source grant", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <GrantDialog context={context} close={close} /> },
+        { id: "simulation report", kind: "drawer", title: "Simulated retrieval", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <SimulationReport context={context} /> },
+        { id: "revoke confirmation", kind: "modal", title: "Revoke a grant", tone: "danger", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
       ],
     },
 
