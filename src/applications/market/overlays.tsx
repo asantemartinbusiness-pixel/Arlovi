@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { commitTogether } from "@/applications/shared/commit";
 import {
   Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Meter, Notice, OverlayActions, OverlayCancel,
   ModalActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
@@ -530,10 +531,11 @@ export function PauseConsequence({ context, close }: { context: ScreenContext; c
           <Button
             variant="danger"
             onClick={async () => {
-              if (!(await context.mutate.patch(campaign.id, { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, { expectRevision: campaign.revision, event: `${campaign.title} paused` }))) return;
-              for (const post of posts) {
-                if (!(await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, { event: `${post.title} held because its campaign was paused` }))) return;
-              }
+              // The campaign and its queued posts change together or not at all.
+              if (!(await commitTogether(context, [
+                { record: campaign, patch: { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, event: `${campaign.title} paused` },
+                ...posts.map((post) => ({ record: post, patch: { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, event: `${post.title} held because its campaign was paused` })),
+              ]))) return;
               context.toast("Paused", `${campaign.title} is paused and ${posts.length} queued item${posts.length === 1 ? " was" : "s were"} returned to drafts.`);
               close();
             }}

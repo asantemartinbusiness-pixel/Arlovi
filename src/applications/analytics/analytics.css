@@ -219,7 +219,7 @@
 .an-inspector { position: sticky; inset-block-start: var(--space-3); min-width: 0; }
 @media (max-width: 1100px) {
   .an-editor-split { grid-template-columns: minmax(0, 1fr); }
-  .an-inspector { position: static; order: -1; }
+  .an-inspector { position: static; }
 }
 .an-tile-title {
   all: unset;

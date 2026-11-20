@@ -1,4 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
+import { commitTogether } from "@/applications/shared/commit";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Notice, Pill, Row, Select, Stack, TextArea, TextInput,
@@ -625,15 +626,20 @@ export async function publishTemplate(context: ScreenContext) {
     blocked: template.status !== "approved" ? "Only an approved version can be published. Review it first." : previous === version ? `Version ${version} is already published.` : undefined,
     confirmLabel: `Publish version ${version}`,
     run: async () => {
-      for (const campaign of users) {
-        if (campaign.fields.templateVersion) continue;
-        const pinned = await context.mutate.patch(campaign.id, { fields: { ...campaign.fields, templateVersion: previous || version } }, { expectRevision: campaign.revision, event: `${campaign.title} pinned to template version ${previous || version} before a new version was published` });
-        if (!pinned) return CHANGED_ELSEWHERE;
-      }
-      const saved = await context.mutate.patch(template.id, {
-        status: "approved",
-        fields: { ...template.fields, publishedVersion: version, publishedBy: context.actor, publishedAt: iso(context) },
-      }, { expectRevision: template.revision, event: `Template ${template.title} version ${version} published by ${context.actor}` });
+      // Campaigns are pinned to the outgoing version and the template is published in one
+      // transaction: a stale revision leaves no campaign pinned to a version that never shipped.
+      const saved = await commitTogether(context, [
+        ...users.filter((campaign) => !campaign.fields.templateVersion).map((campaign) => ({
+          record: campaign,
+          patch: { fields: { ...campaign.fields, templateVersion: previous || version } },
+          event: `${campaign.title} pinned to template version ${previous || version} before a new version was published`,
+        })),
+        {
+          record: template,
+          patch: { status: "approved", fields: { ...template.fields, publishedVersion: version, publishedBy: context.actor, publishedAt: iso(context) } },
+          event: `Template ${template.title} version ${version} published by ${context.actor}`,
+        },
+      ]);
       if (!saved) return CHANGED_ELSEWHERE;
       context.toast("Published", `Version ${version} is the current template. ${live.length} live campaign${live.length === 1 ? "" : "s"} kept their version.`);
     },

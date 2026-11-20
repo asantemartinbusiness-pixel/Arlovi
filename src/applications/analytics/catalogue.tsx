@@ -561,7 +561,7 @@ export function MetricDefinitionInspector({ context }: { context: ScreenContext 
   const { context: queryContext } = useAnalytics();
   const dashboards = useCollection("dashboards");
   const reports = useCollection("reports");
-  const measure = context.selectedId ? measureById(context.selectedId) : undefined;
+  const measure = (context.selectedId ? measureById(context.selectedId) : undefined) ?? allMeasures()[0];
   const result = useMemo(() => (measure ? runQuery({ measureIds: [measure.id], filters: [] }, queryContext) : undefined), [measure, queryContext]);
   if (!measure || !result) {
     return <Empty title="No measure selected">Select a measure to read its formula, its source and what depends on it.</Empty>;

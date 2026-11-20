@@ -106,6 +106,13 @@ export interface ScreenDef {
   surface?: (context: ScreenContext) => ReactNode;
   /** Replaces the whole page chrome (editors, consoles, public pages). */
   chrome?: "standard" | "full";
+  /**
+   * Full-chrome screens only. "surface" means the editor's own identity bar
+   * carries the page title (and the h1), so the slim command bar shows its
+   * actions without repeating the screen name. Default: the command bar
+   * shows the title.
+   */
+  chromeTitle?: "command-bar" | "surface";
   /** Extra content beneath the title, e.g. a record header card. */
   header?: (context: ScreenContext) => ReactNode;
   /** Right-hand contextual inspector. */

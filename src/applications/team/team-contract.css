@@ -73,3 +73,7 @@
 .team-builder-steps li[data-done] button > span[aria-hidden] { background: var(--success-soft); border-color: var(--success-border); color: var(--success); }
 .team-builder-steps li[data-current] button { color: var(--fg-strong); font-weight: 600; }
 .team-builder-steps button:hover { background: var(--bg-inset); }
+
+/* Directory cards on the dark machine stage: quiet footer actions must still be readable. */
+.team-agent-card[data-machine="true"] .ds-btn[data-variant="ghost"]:not(:disabled) { color: rgb(255 255 255 / 88%); }
+.team-agent-card[data-machine="true"] .ds-btn[data-variant="ghost"]:not(:disabled):hover { color: #fff; background: rgb(255 255 255 / 10%); }

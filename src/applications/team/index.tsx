@@ -246,7 +246,7 @@ function AgentDirectory({ context, view }: { context: ScreenContext; view: "All"
           <Card
             key={agent.id}
             span={4}
-            eyebrow="AI EMPLOYEE"
+            className="team-agent-card"
             prov="agent"
             machine={agent.status === "active"}
             title={<Row gap={2}><Avatar name={agent.title} kind="ai" size="sm" />{agent.title}</Row>}
@@ -681,7 +681,8 @@ function AgentBuilder({ context, step }: { context: ScreenContext; step: Builder
           <Stack gap={3}>
             <ol className="team-builder-steps" aria-label="Step completion">
               {BUILDER_STEPS.map((item) => {
-                const done = builderProblems(draft, item).length === 0;
+                const last = item === BUILDER_STEPS[BUILDER_STEPS.length - 1];
+                const done = builderProblems(draft, item).length === 0 && (!last || allProblems.length === 0);
                 return (
                   <li key={item} data-done={done || undefined} data-current={item === step || undefined}>
                     <button type="button" onClick={() => context.setTab(item)} aria-current={item === step ? "step" : undefined}>

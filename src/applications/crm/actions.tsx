@@ -13,6 +13,7 @@ import { CapabilityNotice, ConsentPill, Money, StagePill, isExpired } from "./pa
 import { quoteTotals } from "./quotes";
 import { duplicateQuoteBody, fieldsForQuoteDuplicate } from "./quoteEvidence";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/applications/shared/commit";
 
 /* ====================================================================== *
  * CRM contract actions that perform the named operation. Each writes the
@@ -906,14 +907,13 @@ export function StopRule({ context, close }: { context: ScreenContext; close: ()
           onClick={async () => {
             setBusy(true);
             try {
-              const saved = await context.mutate.patch(rule.id, {
-                status: "stopped",
-                fields: { ...rule.fields, stoppedBy: context.actor, stoppedAt: clockIso(), stopReason: reason.trim() },
-              }, { expectRevision: rule.revision, event: `Workflow ${rule.title} stopped by ${context.actor}: ${reason.trim()}` });
-              for (const run of queued) {
-                if (!(await context.mutate.patch(run.id, { status: "cancelled", fields: { ...run.fields, cancelledBy: context.actor } }, { event: `Run of ${rule.title} cancelled when the rule stopped` }))) return;
-              }
-              if (saved) context.toast("Rule stopped", `${rule.title} is stopped. ${queued.length} queued runs cancelled.`, "blocked");
+              // The rule and its queued runs change together or not at all.
+              const saved = await commitTogether(context, [
+                { record: rule, patch: { status: "stopped", fields: { ...rule.fields, stoppedBy: context.actor, stoppedAt: clockIso(), stopReason: reason.trim() } }, event: `Workflow ${rule.title} stopped by ${context.actor}: ${reason.trim()}` },
+                ...queued.map((run) => ({ record: run, patch: { status: "cancelled", fields: { ...run.fields, cancelledBy: context.actor } }, event: `Run of ${rule.title} cancelled when the rule stopped` })),
+              ]);
+              if (!saved) return;
+              context.toast("Rule stopped", `${rule.title} is stopped. ${queued.length} queued runs cancelled.`, "blocked");
               close();
             } finally {
               setBusy(false);

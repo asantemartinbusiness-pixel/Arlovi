@@ -2883,7 +2883,7 @@ export const aiApp = registerApp({
       title: () => "Chief of Staff",
       statusStrip: (context) => (
         <Row gap={2} wrap>
-          <Pill tone="warning" dot>No model connected</Pill>
+          <Pill tone="warning" dot>Model: not connected</Pill>
           <span className="ds-subtle">Answers are composed from {context.org.name} records and name every record they read. Nothing leaves this browser.</span>
         </Row>
       ),

@@ -416,7 +416,8 @@ function MissionCreation({ context, step }: { context: ScreenContext; step: Wiza
           <Stack gap={3}>
           <ol className="mission-builder-steps" aria-label="Step completion">
             {WIZARD_STEPS.map((item, index) => {
-              const done = wizardProblems(draft, item).length === 0;
+              const last = item === WIZARD_STEPS[WIZARD_STEPS.length - 1];
+              const done = wizardProblems(draft, item).length === 0 && (!last || WIZARD_STEPS.every((other) => wizardProblems(draft, other).length === 0));
               return (
                 <li key={item} data-done={done || undefined} data-current={item === step || undefined}>
                   <button type="button" onClick={() => context.setTab(item)} aria-current={item === step ? "step" : undefined}>
@@ -1080,7 +1081,7 @@ function ExecutionConsole({ context, view }: { context: ScreenContext; view: str
                 </Row>
                 <KeyValueList columns={2} items={[
                   { label: "Inputs", value: (body?.inputs ?? []).length ? `${(body?.inputs ?? []).length} record${(body?.inputs ?? []).length === 1 ? "" : "s"} read` : operation?.note ?? "Nothing read yet" },
-                  { label: "Last run", value: step.fields.lastRunAt ? `${context.dateTime(String(step.fields.lastRunAt))} · ${String(step.fields.attempts ?? 0)} attempt${Number(step.fields.attempts ?? 0) === 1 ? "" : "s"}` : "Not run", mono: true },
+                  { label: "Last run", value: step.fields.lastRunAt ? `${context.dateTime(String(step.fields.lastRunAt))} · ${String(step.fields.attempts ?? 0)} attempt${Number(step.fields.attempts ?? 0) === 1 ? "" : "s"}` : Number(step.fields.attempts ?? 0) > 0 ? `${String(step.fields.attempts)} attempt${Number(step.fields.attempts) === 1 ? "" : "s"}, time not recorded` : "Not run", mono: Boolean(step.fields.lastRunAt) },
                   { label: "Output", value: body?.output || "—" },
                   ...(body?.reason ? [{ label: "Why it stopped", value: body.reason }] : []),
                 ]} />
@@ -1266,6 +1267,20 @@ function Deliverables({ context, view }: { context: ScreenContext; view: string 
         selectedId={context.selectedId}
         onSelect={(id) => context.select(id)}
         onOpen={(id) => { context.select(id); context.openOverlay("Artifact preview", { id }); }}
+        card={(row) => (
+          <Stack gap={2}>
+            <Row gap={2}>
+              <strong className="ds-grow">{row.title}</strong>
+              <Pill tone={row.status === "approved" ? "success" : row.status === "published" ? "info" : row.status === "draft" ? "neutral" : "warning"} dot>{approvalLabel(row)}</Pill>
+            </Row>
+            <span className="ds-subtle ds-num">v{String(row.fields.version ?? 1)} · {versionsOf(row)} saved · {row.ownerName}</span>
+            <Row gap={1} wrap>
+              <Button size="sm" variant="secondary" disabled={row.status === "approved" || row.status === "published"} onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("approval", { id: row.id }); }}>Approve</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("version diff", { id: row.id }); }}>Versions</Button>
+              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); context.select(row.id); context.openOverlay("publish verification", { id: row.id }); }}>Publish</Button>
+            </Row>
+          </Stack>
+        )}
         columns={[
           { key: "title", header: "Deliverable", primary: true, cell: (row) => row.title, filterValue: (row) => row.title, sortValue: (row) => row.title },
           { key: "version", header: "Version", align: "end", cell: (row) => <span className="ds-num">v{String(row.fields.version ?? 1)} · {versionsOf(row)} saved</span>, sortValue: (row) => Number(row.fields.version ?? 1) },

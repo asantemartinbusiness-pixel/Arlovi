@@ -7,6 +7,7 @@ import { can as roleCan, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
 import { useInboxData } from "./engine";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/applications/shared/commit";
 
 /* ====================================================================== *
  * Inbox contract actions that change the record they name.
@@ -374,16 +375,17 @@ export function RevokeRule({ context, close }: { context: ScreenContext; close: 
           onClick={async () => {
             setBusy(true);
             try {
-              const saved = await context.mutate.patch(rule.id, {
-                status: "revoked",
-                fields: { ...rule.fields, enabled: false, revokedBy: context.actor, revokedAt: clockIso() },
-              }, { expectRevision: rule.revision, event: `Escalation rule revoked by ${context.actor}: ${String(rule.fields.condition)} → ${String(rule.fields.backup)}` });
-              if (!saved) return;
-              for (const row of covering) {
+              // The rule and every item it covered change together or not at all.
+              const returned = covering.map((row) => {
                 const fields = { ...row.fields, assignee: String(rule.fields.owner ?? row.fields.assignee ?? "") };
                 delete (fields as Record<string, unknown>).delegatedTo;
-                if (!(await context.mutate.patch(row.id, { fields }, { event: `${row.title} returned from ${String(rule.fields.backup)} when the delegation was revoked` }))) return;
-              }
+                return { record: row, patch: { fields }, event: `${row.title} returned from ${String(rule.fields.backup)} when the delegation was revoked` };
+              });
+              const saved = await commitTogether(context, [
+                { record: rule, patch: { status: "revoked", fields: { ...rule.fields, enabled: false, revokedBy: context.actor, revokedAt: clockIso() } }, event: `Escalation rule revoked by ${context.actor}: ${String(rule.fields.condition)} → ${String(rule.fields.backup)}` },
+                ...returned,
+              ]);
+              if (!saved) return;
               context.toast("Revoked", `${String(rule.fields.backup)} no longer covers ${String(rule.fields.condition)}.`, "blocked");
               close();
             } finally {

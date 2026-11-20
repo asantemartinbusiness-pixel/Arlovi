@@ -343,12 +343,12 @@ export function RunDetailHeader({ context }: { context: ScreenContext }) {
   const dry = String(run.fields.mode) === "dry";
   return (
     <div className="auto-run-head">
-      <StatRow>
+      {traced && <StatRow>
         <Stat prov="agent" label="Steps" value={traced ? String(steps.length) : "Unavailable"} unavailable={!traced} meta={traced ? `budget ${stored!.result.budget.used} of ${stored!.result.budget.max}` : "No trace was stored"} />
         <Stat prov="agent" label="Duration" value={traced ? `${run.fields.durationMs ?? 0} ms` : "Unavailable"} unavailable={!traced} meta={context.dateTime(run.at)} />
         <Stat prov="agent" label="Attempts" value={traced ? String(attempts) : "Unavailable"} unavailable={!traced} meta="Including retries with backoff" />
         <Stat prov="posted" label="Record changes" value={traced ? String(run.fields.writes ?? 0) : "Unavailable"} unavailable={!traced} meta={dry ? "A dry run writes nothing" : traced ? "Applied through the normal mutation path" : "Not recorded"} />
-      </StatRow>
+      </StatRow>}
       {workflow && (
         <Row gap={2}>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/workflows/${workflow.id}`)}>Open the automation</Button>

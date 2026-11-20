@@ -291,8 +291,10 @@ export function ScreenHost() {
        happened to duplicate them into its own toolbar. */
     return (
       <div className="pg">
-        <div className="pg-cmdbar" role="region" aria-label={`${title} actions`}>
-          <h1 className="pg-cmdbar-title ds-truncate">{title}</h1>
+        <div className="pg-cmdbar" role="region" aria-label={`${title} actions`} data-surface-title={def.chromeTitle === "surface" ? "true" : undefined}>
+          {def.chromeTitle === "surface"
+            ? <span className="pg-cmdbar-title ds-truncate ds-sr-only">{title}</span>
+            : <h1 className="pg-cmdbar-title ds-truncate">{title}</h1>}
           <span className="ds-grow" />
           {actions.length > 0 && actionBar}
         </div>

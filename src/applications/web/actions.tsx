@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import { LayoutPanelTop } from "lucide-react";
 import { BarChart, Button, Empty, Field, Notice, Pill, Properties, Row, Segmented, Select, Stack } from "@/design-system";
 import type { Rec } from "@/domain/types";
