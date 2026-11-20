@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { Link } from "react-router-dom";
@@ -22,6 +22,7 @@ import type { FinData } from "./data";
 import { Amount, BooksLoading, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
 import { CollectionsByCustomer } from "./collectionsView";
 import { clockIso } from "@/platform/clock";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
 import { assessTimeBilling } from "./timeBilling";
 import { OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
@@ -1419,9 +1420,14 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
   const { now } = useWorkspace();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  // Revisions as they were when this dialog opened: a change made after that is a conflict, not something to overwrite.
+  const openedRevisions = useRef<Record<string, number>>({});
   if (!invoice) return <Empty title="No invoice selected" />;
 
   const journal = data.journals.find((item) => item.id === String(invoice.fields.journalId ?? ""));
+  for (const record of [invoice, journal]) {
+    if (record && openedRevisions.current[record.id] === undefined) openedRevisions.current[record.id] = record.revision;
+  }
   const paid = Number(invoice.fields.paidMinor ?? 0);
   const creditNoteNeeded = invoice.status === "paid" || paid > 0;
 
@@ -1460,8 +1466,12 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
           onClick={async () => {
             setBusy(true);
             try {
+            const ctx = { actor: context.actor, now: clockIso(), screenId: context.screen.id };
+            const openedInvoice = openedRevisions.current[invoice.id] ?? invoice.revision;
             if (creditNoteNeeded) {
-              const credited = await context.mutate.create({
+              const credited = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
                 collection: "invoices",
                 title: `CN-${invoice.title}`,
                 status: "draft",
@@ -1481,15 +1491,25 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
                   reason,
                 },
                 body: writeLines(totals.lines.map((line) => ({ ...line, quantity: -line.quantity }))),
-              }, `Credit note raised against ${invoice.title}`);
-              await context.mutate.patch(invoice.id, {
-                fields: { ...invoice.fields, creditNoteId: credited.id },
-              }, { expectRevision: invoice.revision, event: `${invoice.title} credited by ${credited.title}` });
+              }, ctx);
+              const linked = revisedRecord(invoice, { fields: { ...invoice.fields, creditNoteId: credited.id } }, ctx);
+              // The credit note and the link to it commit together, or neither does.
+              await context.mutate.putMany(
+                [credited, linked],
+                [`Credit note raised against ${invoice.title}`, `${invoice.title} credited by ${credited.title}`],
+                { [invoice.id]: openedInvoice }, ["create", "update"],
+              );
               context.toast("Credit note drafted", `${credited.title} reverses the lines of ${invoice.title}. Approve it to post the correction.`);
             } else {
+              const records: Rec[] = [];
+              const messages: string[] = [];
+              const types: ("create" | "update")[] = [];
+              const expected: Record<string, number> = { [invoice.id]: openedInvoice };
               if (journal && journal.status === "posted") {
                 const reversal = journalLinesFor(journal);
-                const created = await context.mutate.create({
+                const created = newRecord({
+                  organizationId: context.org.id,
+                  currency: context.org.currency,
                   collection: "journals",
                   title: `Reversal · ${journal.title}`,
                   status: "posted",
@@ -1500,13 +1520,20 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
                   tags: ["ledger", "reversal"],
                   fields: { date: now.toISOString().slice(0, 10), source: "reversal", reversesId: journal.id, reason },
                   body: { date: now.toISOString().slice(0, 10), memo: `Reversal of ${journal.title}`, lines: reversal, reversesId: journal.id },
-                }, `Reversed ${journal.title}`);
-                await context.mutate.patch(journal.id, { status: "reversed", fields: { ...journal.fields, reversedBy: created.id } }, { event: `${journal.title} marked reversed` });
+                }, ctx);
+                records.push(created, revisedRecord(journal, { status: "reversed", fields: { ...journal.fields, reversedBy: created.id } }, ctx));
+                messages.push(`Reversed ${journal.title}`, `${journal.title} marked reversed`);
+                types.push("create", "update");
+                expected[journal.id] = openedRevisions.current[journal.id] ?? journal.revision;
               }
-              await context.mutate.patch(invoice.id, {
+              records.push(revisedRecord(invoice, {
                 status: "void",
                 fields: { ...invoice.fields, voidReason: reason, voidedBy: context.actor, voidedAt: now.toISOString() },
-              }, { expectRevision: invoice.revision, event: `${invoice.title} voided` });
+              }, ctx));
+              messages.push(`${invoice.title} voided`);
+              types.push("update");
+              // Reversal, original journal and invoice commit together; a stale revision writes nothing.
+              await context.mutate.putMany(records, messages, expected, types);
               context.toast("Invoice voided", journal ? "Its journal was reversed, so the ledger still balances." : "Nothing was posted, so no ledger entry changed.");
             }
             close();

@@ -465,19 +465,6 @@ function AgentBuilder({ context, step }: { context: ScreenContext; step: Builder
   const problems = builderProblems(draft, step);
   const allProblems = BUILDER_STEPS.flatMap((item) => builderProblems(draft, item).map((problem) => ({ step: item, problem })));
 
-  const progress = (
-    <Row gap={2} wrap>
-      {BUILDER_STEPS.map((item, index) => {
-        const done = builderProblems(draft, item).length === 0;
-        return (
-          <Pill key={item} tone={item === step ? "accent" : done ? "success" : "neutral"} dot={item === step}>
-            {index + 1}. {item}{done ? " ✓" : ""}
-          </Pill>
-        );
-      })}
-    </Row>
-  );
-
   const stepBody = () => {
     if (step === "Identity") {
       return (
@@ -661,9 +648,8 @@ function AgentBuilder({ context, step }: { context: ScreenContext; step: Builder
 
   return (
     <Stack gap={4}>
-      {progress}
       <Grid>
-        <Card span={8} eyebrow="AGENT BUILDER" title={step} subtitle={`Step ${BUILDER_STEPS.indexOf(step) + 1} of ${BUILDER_STEPS.length}`}>
+        <Card span={8} title={step} subtitle={`Step ${BUILDER_STEPS.indexOf(step) + 1} of ${BUILDER_STEPS.length}`}>
           <Stack gap={4}>
             {stepBody()}
             {problems.length > 0 && (
@@ -691,8 +677,21 @@ function AgentBuilder({ context, step }: { context: ScreenContext; step: Builder
             </Row>
           </Stack>
         </Card>
-        <Card span={4} eyebrow="DRAFT" prov="human" title="Contract so far" subtitle="Written only when you activate">
+        <Card span={4} prov="human" title="Contract so far" subtitle="Written only when you activate">
           <Stack gap={3}>
+            <ol className="team-builder-steps" aria-label="Step completion">
+              {BUILDER_STEPS.map((item) => {
+                const done = builderProblems(draft, item).length === 0;
+                return (
+                  <li key={item} data-done={done || undefined} data-current={item === step || undefined}>
+                    <button type="button" onClick={() => context.setTab(item)} aria-current={item === step ? "step" : undefined}>
+                      <span aria-hidden="true">{done ? "✓" : BUILDER_STEPS.indexOf(item) + 1}</span>
+                      {item}<span className="ds-sr-only">{done ? ", complete" : ", incomplete"}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
             <Properties rows={[
               { label: "Name", value: draft.name || "—" },
               { label: "Role", value: draft.role || "—" },
@@ -701,9 +700,7 @@ function AgentBuilder({ context, step }: { context: ScreenContext; step: Builder
               { label: "Ceiling", value: context.money(draft.spendCapMinor) },
               { label: "Evaluated", value: draft.evaluated ? "Yes" : "No" },
             ]} />
-            <Notice tone="info" title="Nothing exists yet">
-              This draft is held in this browser for you. No contract record is created until every step is complete and you activate it.
-            </Notice>
+            <p className="ds-subtle">Held in this browser. No contract record exists until every step is complete and you activate it.</p>
           </Stack>
         </Card>
       </Grid>
