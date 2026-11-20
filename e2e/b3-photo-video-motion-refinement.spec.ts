@@ -73,7 +73,7 @@ test("photo batch: one image can be picked on a phone-sized screen", async ({ pa
   const main = page.locator("#main");
   await main.getByRole("button", { name: /^Arc Lamp study/ }).first().click();
   await expect(main.getByText("1 of 4 selected")).toBeVisible();
-  await expect(main.getByText("In the batch").first()).toBeVisible();
+  await expect(main.locator(".ds-pill", { hasText: "In the batch" }).first()).toBeVisible();
   await main.getByRole("tabpanel", { name: "Queue" }).getByRole("button", { name: "Build the batch" }).click();
   await expect(main.getByRole("list", { name: "Planned output files" }).getByRole("listitem")).toHaveCount(1);
 });
