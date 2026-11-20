@@ -74,3 +74,19 @@ A new additive contributor `flagship-lighthouse-review` creates a canonical `nl-
 **Privacy and trust:** The portal is a *draft* and cannot be misrepresented as customer-visible. No external client views are assigned, no real email or payment has been sent, and no approval or procurement receipt has been fabricated. The casefile and the main Northline showcase are hidden from a local Client role preview and other demo organisations. This is still browser-local role visibility, **not** backend-enforced access control.
 
 Validation is added in `tests/unit/flagship-lighthouse.test.ts` and `e2e/flagship-lighthouse.spec.ts`, alongside the existing site, editor and finance coverage. Manual testing still needs to verify native Portal Builder appearance, expected record resolution, keyboard navigation, dynamic updates, and mobile horizontal overflow. Await CI and browser QA for the exact final head before merging.
+
+
+## QA correction — independent Collective company (20 November 2026)
+
+**Why this change matters:** Full browser QA on the earlier preview reported 50 failing checks. In particular, the large fictional Collective dataset was leaking into the original Northline Atelier simulation, altering Finance, reporting, CRM, teams and other existing demo expectations. The flagship is now isolated as a **third browser-local company**, alongside the original Northline Atelier and Harbor Supply.
+
+- Workspace slug: `/o/collective/`; profile ID `org-northline-collective`.
+- Original Atelier remains `/o/northline/`; Harbor remains `/o/harbor/`.
+- All five `flagship-*` seed contributors explicitly scope their records and audit events to the Collective organisation. Existing deterministic `nl-<collection>-<number>` IDs remain unchanged to preserve links and authored files; the organisationId, not the ID prefix, controls tenant ownership.
+- A one-time IndexedDB migration safely reassigns previously seeded flagship fixtures from Atelier to Collective by **known contributor IDs only**. Existing titles, fields, drafts, edits, revision numbers, audit history and attachments are preserved. Unrelated Atelier records are not modified. Migration is tracked by a `meta` checkpoint and an organisation-scoped audit event.
+- `src/platform/org.ts` now recognises Collective in the company switcher; user-created companies retain precedence during recovery and the legacy default remains Northline Atelier.
+- Flagship workspace, Lighthouse casefile, banner, browser tests and deep links now target `/o/collective/`. The standalone editorial experience remains `/northline-collective/index.html` with a friendly directory rewrite.
+- Client role preview keeps filtered app-directory access while redirecting navigation away from inaccessible native app screens.
+- `tests/unit/flagship-tenant-isolation.test.ts` asserts unique IDs, separated organisations and non-overlap with base fixtures.
+
+**Release policy:** The earlier successful Vercel build was *not* QA success. No production merge until the latest exact-commit unit, end-to-end and three-viewport runs are green, followed by a visual review of the migrated data and flows. Browser-local switching is a simulation and not server-enforced security.
