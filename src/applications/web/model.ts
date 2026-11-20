@@ -46,7 +46,7 @@ export interface Page {
 }
 
 export interface Theme {
-  font: "Inter" | "Source Serif" | "IBM Plex Mono";
+  font: "Inter" | "Source Serif" | "IBM Plex Mono" | "Manrope" | "Newsreader" | "DM Mono";
   accent: string;
   ink: string;
   paper: string;
@@ -245,7 +245,7 @@ export function readSite(record: Rec | undefined): SiteModel {
   return {
     pages: live,
     theme: {
-      font: ["Inter", "Source Serif", "IBM Plex Mono"].includes(str(theme.font)) ? (str(theme.font) as Theme["font"]) : DEFAULT_THEME.font,
+      font: ["Inter", "Source Serif", "IBM Plex Mono", "Manrope", "Newsreader", "DM Mono"].includes(str(theme.font)) ? (str(theme.font) as Theme["font"]) : DEFAULT_THEME.font,
       accent: str(theme.accent, DEFAULT_THEME.accent),
       ink: str(theme.ink, DEFAULT_THEME.ink),
       paper: str(theme.paper, DEFAULT_THEME.paper),
@@ -377,6 +377,9 @@ const FONT_STACKS: Record<Theme["font"], string> = {
   Inter: "Inter, system-ui, sans-serif",
   "Source Serif": "'Source Serif 4', Georgia, serif",
   "IBM Plex Mono": "'IBM Plex Mono', ui-monospace, monospace",
+  Manrope: "Manrope, Arial, sans-serif",
+  Newsreader: "Newsreader, Georgia, serif",
+  "DM Mono": "'DM Mono', ui-monospace, monospace",
 };
 
 export function themeCss(theme: Theme): string {
