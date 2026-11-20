@@ -1809,26 +1809,64 @@ function MessageActionMenu({ context, close }: { context: ScreenContext; close: 
   );
 }
 
+function chiefOf(records: Rec[]): Rec | undefined {
+  return records.find((record) => record.collection === "agents" && record.id === "nl-agents-001")
+    ?? records.find((record) => record.collection === "agents" && String(record.fields.role) === "Chief of Staff");
+}
+
+function useAuthorisingAgent() {
+  const records = useOrgRecords();
+  const agent = chiefOf(records);
+  const policy = records.find((record) => record.collection === "policies" && record.fields.kind === "autonomyGrant" && record.fields.agentId === agent?.id);
+  return { records, agent, policy };
+}
+
+function TaskAuthorizationSummary({ context }: { context: ScreenContext }) {
+  const { agent } = useAuthorisingAgent();
+  if (!agent) return <OverlaySummary eyebrow="Mission authorisation" title="No AI employee holds this contract" />;
+  return (
+    <OverlaySummary
+      eyebrow="Mission authorisation"
+      avatar={<Avatar name={agent.title} kind="ai" size="lg" />}
+      title={agent.title}
+      status={<Pill tone="warning">Proposal only</Pill>}
+      meta={[String(agent.fields.role ?? "AI employee"), `Autonomy: ${String(agent.fields.autonomy ?? "draft")}`, `Contract ceiling ${context.money(Number(agent.fields.spendCapMinor ?? 0))}`]}
+    />
+  );
+}
+
+const MISSION_GRANTS = [
+  { id: "workspace.read", label: "Read records in this organisation", available: true },
+  { id: "workspace.draft", label: "Create draft records", available: true },
+  { id: "email.send", label: "Send email", available: false, why: "No mail provider is connected" },
+  { id: "site.publish", label: "Publish a page", available: false, why: "No hosting is connected" },
+];
+
 function TaskAuthorization({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { from?: string } | undefined;
-  const records = useOrgRecords();
+  const { records, agent, policy } = useAuthorisingAgent();
   const candidates = records.filter((record) => ["contacts", "companies", "suppliers"].includes(record.collection));
   const [goal, setGoal] = useState(payload?.from ?? "");
   const [target, setTarget] = useState("");
   const [budget, setBudget] = useState("500");
   const [grants, setGrants] = useState<string[]>(["workspace.read"]);
+  const [touched, setTouched] = useState(false);
   const amountMinor = Math.round(Number(budget) * 100);
   const ambiguous = candidates.filter((candidate) => goal.toLowerCase().includes(candidate.title.toLowerCase().split(" ")[0].toLowerCase()));
   const needsTarget = !target;
-  const invalid = !goal.trim() || needsTarget || !Number.isFinite(amountMinor) || amountMinor <= 0;
+  const invalid = !goal.trim() || needsTarget || !Number.isFinite(amountMinor) || amountMinor <= 0 || !agent;
+  const requiresApproval = String(policy?.fields.requiresApproval ?? "all");
+  const dirty = touched && (goal.trim() !== (payload?.from ?? "").trim() || Boolean(target) || budget !== "500" || grants.length !== 1);
+  const targetRecord = candidates.find((candidate) => candidate.id === target);
 
   return (
     <form
       id="task-authorization"
       className="ds-stack ds-gap-4"
+      onChange={() => setTouched(true)}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (invalid) return;
+        if (invalid || !agent) return;
         const mission = await context.mutate.create({
           collection: "missions",
           title: goal.slice(0, 70),
@@ -1836,7 +1874,7 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
           summary: `Authorised from a conversation by ${context.actor}. Target and ceiling are recorded on the mission contract.`,
           amountMinor,
           fields: {
-            agentId: "nl-agents-001",
+            agentId: agent.id,
             budgetMinor: amountMinor,
             committedMinor: 0,
             spentMinor: 0,
@@ -1861,43 +1899,59 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
         context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`);
       }}
     >
-      <Notice tone="warning" title="An ambiguous target is not authorised">
-        A mission needs one named account and a ceiling before it can be proposed. Without both, nothing can be authorised — and no external action is possible from here in any case.
-      </Notice>
-      <Field label="What the mission must achieve" required>
-        <TextArea value={goal} rows={3} onChange={(event) => setGoal(event.target.value)} required />
-      </Field>
-      <Field
-        label="Target account"
-        required
-        error={needsTarget ? "Choose exactly one account. This mission cannot be authorised against an unknown target." : undefined}
-        hint={ambiguous.length > 1 ? `${ambiguous.length} accounts match the words in the goal: ${ambiguous.map((item) => item.title).join(", ")}.` : undefined}
-      >
-        <Select value={target} onChange={(event) => setTarget(event.target.value)} required>
-          <option value="">Choose an account…</option>
-          {candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title} ({candidate.collection})</option>)}
-        </Select>
-      </Field>
-      <Field label={`Spend ceiling (${context.org.currency})`} required hint="An unbounded mission cannot be authorised.">
-        <TextInput value={budget} inputMode="decimal" align="end" onChange={(event) => setBudget(event.target.value)} invalid={!(amountMinor > 0)} required />
-      </Field>
-      <Stack gap={2}>
-        <span className="ds-field-label">Grants</span>
-        {[
-          { id: "workspace.read", label: "Read records in this organisation", available: true },
-          { id: "workspace.draft", label: "Create draft records", available: true },
-          { id: "email.send", label: "Send email (no provider connected)", available: false },
-          { id: "site.publish", label: "Publish a page (no hosting connected)", available: false },
-        ].map((grant) => (
-          <Checkbox
-            key={grant.id}
-            label={grant.label}
-            disabled={!grant.available}
-            checked={grants.includes(grant.id)}
-            onChange={(event) => setGrants((current) => event.target.checked ? [...current, grant.id] : current.filter((item) => item !== grant.id))}
-          />
-        ))}
-      </Stack>
+      <ModalUnsavedChanges when={dirty} />
+      <OverlaySection title="What it would do">
+        <Stack gap={3}>
+          <Field label="Goal" required>
+            <TextArea value={goal} rows={3} onChange={(event) => setGoal(event.target.value)} required />
+          </Field>
+          <Field
+            label="Target account"
+            required
+            error={needsTarget ? "Choose exactly one account. A mission cannot be authorised against an unknown target." : undefined}
+            hint={ambiguous.length > 1 ? `${ambiguous.length} accounts match words in the goal: ${ambiguous.map((item) => item.title).join(", ")}.` : undefined}
+          >
+            <Select value={target} onChange={(event) => setTarget(event.target.value)} required>
+              <option value="">Choose an account…</option>
+              {candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title} ({candidate.collection})</option>)}
+            </Select>
+          </Field>
+          <Field label={`Spend ceiling (${context.org.currency})`} required hint="An unbounded mission cannot be authorised.">
+            <TextInput value={budget} inputMode="decimal" align="end" onChange={(event) => setBudget(event.target.value)} invalid={!(amountMinor > 0)} required />
+          </Field>
+        </Stack>
+      </OverlaySection>
+
+      <OverlaySection title="Tools and scope" hint="Only what is ticked is written into the mission contract.">
+        <Stack gap={2}>
+          {MISSION_GRANTS.map((grant) => (
+            <Row key={grant.id} gap={2}>
+              <div className="ds-grow">
+                <Checkbox
+                  label={grant.label}
+                  disabled={!grant.available}
+                  checked={grants.includes(grant.id)}
+                  onChange={(event) => setGrants((current) => event.target.checked ? [...current, grant.id] : current.filter((item) => item !== grant.id))}
+                />
+              </div>
+              {!grant.available && <Pill tone="warning">{grant.why}</Pill>}
+            </Row>
+          ))}
+        </Stack>
+      </OverlaySection>
+
+      <OverlaySection title="Human approval" tone="info">
+        <FactGrid
+          items={[
+            { label: "Before any step runs", value: "A person approves the plan" },
+            { label: "Status after this", value: "Proposed" },
+            { label: "Approval policy", value: policy ? `${policy.title}: ${requiresApproval === "all" ? "every action" : requiresApproval.split(",").join(", ")}` : "Every action (no policy recorded)" },
+            { label: "Your role view", value: context.can("approve_mission") ? "Can approve" : "Cannot approve" },
+            { label: "Target", value: targetRecord?.title ?? "Not chosen" },
+            { label: "Outside this workspace", value: "Nothing is sent or published" },
+          ]}
+        />
+      </OverlaySection>
     </form>
   );
 }
@@ -2842,7 +2896,7 @@ export const aiApp = registerApp({
         { id: "Source selector", kind: "drawer", title: "Pin records into scope", width: 520, render: ({ ...context }) => <SourceSelector context={context} /> },
         { id: "upload review", kind: "modal", title: "Attach a file by reference", width: 560, render: ({ ...context }) => <UploadReview context={context} /> },
         { id: "message action menu", kind: "drawer", title: "Message actions", width: 480, render: ({ close, ...context }) => <MessageActionMenu context={context} close={close} /> },
-        { id: "task authorization", kind: "modal", title: "Authorise a mission", width: 620, render: ({ close, ...context }) => <TaskAuthorization context={context} close={close} />, footer: submitFooter("task-authorization", "Authorise") },
+        { id: "task authorization", kind: "modal", title: "Authorise a mission", width: OVERLAY_WIDTH.modal, summary: ({ close: _close, ...context }) => <TaskAuthorizationSummary context={context} />, render: ({ close, ...context }) => <TaskAuthorization context={context} close={close} />, footer: submitFooter("task-authorization", "Authorise the mission") },
       ],
     },
 

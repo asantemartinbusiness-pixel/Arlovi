@@ -49,10 +49,9 @@ function useSettled(key: string, ms = 1400): boolean {
   }, [key, ms]);
   return settled === key;
 }
-export function WorkspaceHome({ orgName, slug, actor, tasks, projects, missions, docs, continuity }: Props) {
+export function WorkspaceHome({ orgName, slug, actor, tasks, missions, docs, continuity }: Props) {
   const mine = tasks.filter(t => t.ownerName === actor || t.fields.assignee === actor);
   const pending = mine.filter(t => !closed.has(t.status));
-  const activeProjects = projects.filter(p => !closed.has(p.status));
   const openMissions = missions.filter(m => !closed.has(m.status));
   const recentDocs = [...docs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3);
   const focused = [...pending].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);

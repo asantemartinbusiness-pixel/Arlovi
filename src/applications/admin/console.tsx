@@ -1924,7 +1924,7 @@ export function ScopeLimits({ context }: { context: ScreenContext }) {
   );
 }
 
-export function CallbackTester({ context, close }: { context: ScreenContext; close: () => void }) {
+export function CallbackTester({ context, close: _close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const hook = data.webhooks.find((row) => row.id === (payload?.id ?? context.selectedId)) ?? data.webhooks[0];

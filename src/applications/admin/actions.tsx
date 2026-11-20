@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput, ModalActions, DrawerActions, OverlayActions, OverlayCancel,
+  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput, ModalActions, OverlayActions, OverlayCancel,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useOrgRecords } from "@/platform/workspace";
